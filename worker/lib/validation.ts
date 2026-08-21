@@ -38,7 +38,26 @@ export function isIngestionJob(value: unknown): value is IngestionJob {
     return true;
   }
 
-  return value.type === "enrich-availability" && isKnownTitle(value.titleId);
+  if (value.type === "sync-discover-page") {
+    return (
+      (value.mediaType === "movie" || value.mediaType === "tv") &&
+      typeof value.page === "number" &&
+      Number.isInteger(value.page) &&
+      value.page >= 1 &&
+      value.page <= 500
+    );
+  }
+
+  if (
+    value.type === "enrich-availability" ||
+    value.type === "enrich-ratings" ||
+    value.type === "enrich-trakt" ||
+    value.type === "enrich-simkl"
+  ) {
+    return isKnownTitle(value.titleId);
+  }
+
+  return false;
 }
 
 export function viewingContext(value: unknown): ViewingContext[] {
@@ -106,7 +125,6 @@ export function curatorCandidates(value: unknown): CuratorCandidate[] {
               {
                 id: provider.id,
                 name: provider.name.slice(0, 100),
-                logoUrl: null,
                 offerTypes,
                 webUrl: null,
                 source: provider.source === "Watchmode" ? "Watchmode" : "TMDB / JustWatch",

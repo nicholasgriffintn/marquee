@@ -4,8 +4,14 @@
   "main": "./worker/index.ts",
   "compatibility_date": "2026-08-21",
   "compatibility_flags": ["nodejs_compat"],
-  "workers_dev": true,
-  "preview_urls": true,
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [
+    {
+      "pattern": "marquee.pashi.app",
+      "custom_domain": true
+    }
+  ],
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
@@ -16,7 +22,7 @@
     {
       "binding": "DB",
       "database_name": "marquee",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "4bdf8e03-0ac3-496c-8e69-c8dedd116976",
       "migrations_dir": "./migrations"
     }
   ],
@@ -49,7 +55,10 @@
       "CLOUDFLARE_ACCOUNT_ID",
       "CLOUDFLARE_API_TOKEN",
       "GITHUB_CLIENT_ID",
-      "GITHUB_CLIENT_SECRET"
+      "GITHUB_CLIENT_SECRET",
+      "OMDB_API_KEY",
+      "TRAKT_CLIENT_ID",
+      "SIMKL_CLIENT_ID"
     ]
   },
   "observability": {
@@ -63,6 +72,22 @@
       {
         "binding": "INGESTION_QUEUE",
         "queue": "marquee-ingestion"
+      },
+      {
+        "binding": "AVAILABILITY_QUEUE",
+        "queue": "marquee-availability"
+      },
+      {
+        "binding": "RATINGS_QUEUE",
+        "queue": "marquee-ratings"
+      },
+      {
+        "binding": "TRAKT_QUEUE",
+        "queue": "marquee-trakt"
+      },
+      {
+        "binding": "SIMKL_QUEUE",
+        "queue": "marquee-simkl"
       }
     ],
     "consumers": [
@@ -72,7 +97,43 @@
         "max_batch_timeout": 5,
         "max_retries": 5,
         "dead_letter_queue": "marquee-ingestion-dead-letter",
+        "max_concurrency": 5,
+        "retry_delay": 30
+      },
+      {
+        "queue": "marquee-availability",
+        "max_batch_size": 1,
+        "max_batch_timeout": 5,
+        "max_retries": 10,
+        "dead_letter_queue": "marquee-ingestion-dead-letter",
         "max_concurrency": 1,
+        "retry_delay": 60
+      },
+      {
+        "queue": "marquee-ratings",
+        "max_batch_size": 1,
+        "max_batch_timeout": 5,
+        "max_retries": 5,
+        "dead_letter_queue": "marquee-ingestion-dead-letter",
+        "max_concurrency": 1,
+        "retry_delay": 60
+      },
+      {
+        "queue": "marquee-trakt",
+        "max_batch_size": 5,
+        "max_batch_timeout": 5,
+        "max_retries": 5,
+        "dead_letter_queue": "marquee-ingestion-dead-letter",
+        "max_concurrency": 2,
+        "retry_delay": 30
+      },
+      {
+        "queue": "marquee-simkl",
+        "max_batch_size": 5,
+        "max_batch_timeout": 5,
+        "max_retries": 5,
+        "dead_letter_queue": "marquee-ingestion-dead-letter",
+        "max_concurrency": 2,
         "retry_delay": 30
       }
     ]

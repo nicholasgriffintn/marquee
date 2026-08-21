@@ -12,13 +12,52 @@ export type Bindings = {
   GITHUB_CLIENT_SECRET?: string;
   SITE_ORIGIN?: string;
   TMDB_API_TOKEN?: string;
+  OMDB_API_KEY?: string;
+  TRAKT_CLIENT_ID?: string;
+  SIMKL_CLIENT_ID?: string;
   INGESTION_QUEUE: Queue<IngestionJob>;
+  AVAILABILITY_QUEUE: Queue<IngestionJob>;
+  RATINGS_QUEUE: Queue<IngestionJob>;
+  TRAKT_QUEUE: Queue<IngestionJob>;
+  SIMKL_QUEUE: Queue<IngestionJob>;
+};
+
+export type EnrichmentSource = "watchmode" | "omdb" | "trakt" | "simkl";
+
+export type TitleRatings = {
+  imdbScore: number | null;
+  imdbVotes: number | null;
+  rottenTomatoes: string | null;
+  metascore: number | null;
+};
+
+export type TraktStats = {
+  slug: string;
+  traktId: number | null;
+  imdbId: string | null;
+  watchers: number | null;
+  plays: number | null;
+  collectors: number | null;
+  rating: number | null;
+  votes: number | null;
+};
+
+export type ExternalIds = {
+  simklId: number | null;
+  imdbId: string | null;
+  tvdbId: number | null;
+  malId: number | null;
+  anilistId: number | null;
 };
 
 export type IngestionJob =
   | { type: "sync-catalog" }
   | { type: "sync-providers" }
-  | { type: "enrich-availability"; titleId: string };
+  | { type: "sync-discover-page"; mediaType: "movie" | "tv"; page: number }
+  | { type: "enrich-availability"; titleId: string }
+  | { type: "enrich-ratings"; titleId: string }
+  | { type: "enrich-trakt"; titleId: string }
+  | { type: "enrich-simkl"; titleId: string };
 
 export type EntryStatus = "watchlist" | "watching" | "watched" | "dropped";
 

@@ -39,7 +39,6 @@ export function useAvailability(item: MediaTitle, enabled: boolean) {
             const fallback = fallbackById.get(provider.id);
 
             return Object.assign({}, provider, {
-              logoUrl: provider.logoUrl ?? fallback?.logoUrl ?? null,
               webUrl: provider.webUrl ?? fallback?.webUrl ?? item.watchLink,
             });
           }),

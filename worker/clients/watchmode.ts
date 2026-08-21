@@ -44,9 +44,15 @@ async function requestWatchmode(
     },
   });
 
+  if (response.status === 404) {
+    return null;
+  }
+
   if (!response.ok) {
     throw new WatchmodeError(
-      response.status === 401 ? "Watchmode credentials were rejected" : "Watchmode request failed",
+      response.status === 401
+        ? "Watchmode credentials were rejected"
+        : `Watchmode request failed (${response.status})`,
       response.status === 401 ? 503 : 502,
     );
   }
@@ -72,6 +78,10 @@ export async function getWatchmodeAvailability(
   const payload = await requestWatchmode(env, `/title/${mediaType}-${tmdbId}/sources/`, {
     regions: PROVIDER_REGION,
   });
+
+  if (payload === null) {
+    return [];
+  }
 
   if (!Array.isArray(payload)) {
     throw new WatchmodeError("Watchmode returned invalid availability data");

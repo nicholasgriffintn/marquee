@@ -12,7 +12,6 @@ export type WatchmodeSource = {
   id: number;
   name: string;
   type: string;
-  logoUrl: string | null;
   regions: string[];
 };
 
@@ -70,7 +69,6 @@ export function parseWatchmodeSources(value: unknown) {
         id,
         name,
         type: stringAt(source, "type") ?? "sub",
-        logoUrl: httpsUrl(stringAt(source, "logo_100px")),
         regions: Array.isArray(source.regions)
           ? source.regions.filter((region): region is string => typeof region === "string")
           : [],
@@ -109,7 +107,6 @@ export function parseWatchmodeAvailability(value: unknown) {
     providers.set(providerId, {
       id: providerId,
       name: registry?.name ?? name,
-      logoUrl: null,
       offerTypes: [offerType],
       webUrl: httpsUrl(stringAt(source, "web_url")),
       source: "Watchmode",

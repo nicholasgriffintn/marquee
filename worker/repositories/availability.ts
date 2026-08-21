@@ -19,7 +19,6 @@ export async function enrichAvailability(
 
     mergedProviders.set(provider.id, {
       ...provider,
-      logoUrl: provider.logoUrl ?? existing?.logoUrl ?? null,
       webUrl: provider.webUrl ?? existing?.webUrl ?? title.watchLink,
       offerTypes: [...new Set([...(existing?.offerTypes ?? []), ...provider.offerTypes])],
     });

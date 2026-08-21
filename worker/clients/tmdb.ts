@@ -1,14 +1,22 @@
-import type { CatalogResponse, CatalogSection, MediaTitle } from "../../src/domain/catalog.ts";
+import type {
+  CatalogResponse,
+  CatalogSection,
+  MediaTitle,
+  MediaType,
+} from "../../src/domain/catalog.ts";
 import {
   parseTmdbProviders,
   parseTmdbSummaries,
   parseTmdbTitle,
   type TmdbSummary,
 } from "../lib/tmdb-payload.ts";
+import { isRecord } from "../lib/values.ts";
 import type { Bindings } from "../types.ts";
 
 const API_BASE = "https://api.themoviedb.org/3";
 const PROVIDER_REGION = "GB";
+const HYDRATE_BATCH = 12;
+const TMDB_MAX_PAGES = 500;
 
 export async function getItems(env: Bindings, ids: string[]) {
   const summaries = ids.flatMap((id): TmdbSummary[] => {
@@ -50,9 +58,42 @@ async function hydrateTitles(env: Bindings, summaries: TmdbSummary[]) {
     ...new Map(
       summaries.map((summary) => [`${summary.mediaType}:${summary.id}`, summary]),
     ).values(),
-  ].slice(0, 24);
+  ];
+  const titles: MediaTitle[] = [];
 
-  return Promise.all(uniqueSummaries.map((summary) => getTitleDetails(env, summary)));
+  for (let index = 0; index < uniqueSummaries.length; index += HYDRATE_BATCH) {
+    const wave = uniqueSummaries.slice(index, index + HYDRATE_BATCH);
+    // oxlint-disable-next-line no-await-in-loop
+    const settled = await Promise.allSettled(wave.map((summary) => getTitleDetails(env, summary)));
+
+    titles.push(
+      ...settled.flatMap((result) => (result.status === "fulfilled" ? [result.value] : [])),
+    );
+  }
+
+  return titles;
+}
+
+export async function getDiscoverPageCount(env: Bindings, mediaType: MediaType) {
+  const response = await requestTmdb(env, `/discover/${mediaType}`, {
+    include_adult: "false",
+    page: "1",
+    sort_by: "popularity.desc",
+  });
+  const total = isRecord(response) ? Number(response.total_pages) : 0;
+
+  return Number.isFinite(total) ? Math.min(Math.max(Math.trunc(total), 1), TMDB_MAX_PAGES) : 1;
+}
+
+export async function getDiscoverPage(env: Bindings, mediaType: MediaType, page: number) {
+  const response = await requestTmdb(env, `/discover/${mediaType}`, {
+    include_adult: "false",
+    page: String(page),
+    sort_by: "popularity.desc",
+  });
+  const summaries = parseTmdbSummaries(response, mediaType);
+
+  return hydrateTitles(env, summaries);
 }
 
 async function getTitleDetails(env: Bindings, summary: TmdbSummary) {
@@ -135,7 +176,7 @@ export async function getCatalog(
       query,
       include_adult: "false",
     });
-    const items = await hydrateTitles(env, parseTmdbSummaries(response).slice(0, 16));
+    const items = await hydrateTitles(env, parseTmdbSummaries(response));
 
     return {
       sections: [
@@ -173,7 +214,7 @@ export async function getCatalog(
             id: "trending",
             title: "Trending on TMDB",
             description: "TMDB trending titles this week",
-            summaries: parseTmdbSummaries(trending).slice(0, 8),
+            summaries: parseTmdbSummaries(trending),
           },
         ]
       : []),
@@ -183,7 +224,7 @@ export async function getCatalog(
       description: providerIds.length
         ? "GB availability supplied by JustWatch via TMDB"
         : "Popular movies on TMDB",
-      summaries: parseTmdbSummaries(movies, "movie").slice(0, 8),
+      summaries: parseTmdbSummaries(movies, "movie"),
     },
     {
       id: "television",
@@ -191,7 +232,7 @@ export async function getCatalog(
       description: providerIds.length
         ? "GB availability supplied by JustWatch via TMDB"
         : "Popular television on TMDB",
-      summaries: parseTmdbSummaries(television, "tv").slice(0, 8),
+      summaries: parseTmdbSummaries(television, "tv"),
     },
   ];
   const titles = await hydrateTitles(

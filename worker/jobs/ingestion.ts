@@ -1,13 +1,68 @@
-import { getCatalog, getItems } from "../clients/tmdb.ts";
+import { getOmdbRatings } from "../clients/omdb.ts";
+import { getSimklIds } from "../clients/simkl.ts";
+import { getCatalog, getDiscoverPage, getDiscoverPageCount, getItems } from "../clients/tmdb.ts";
+import { getTraktStats } from "../clients/trakt.ts";
 import { getWatchmodeAvailability } from "../clients/watchmode.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { enrichAvailability } from "../repositories/availability.ts";
+import { claimBudget } from "../repositories/budgets.ts";
+import { readItems } from "../repositories/catalog-reader.ts";
 import { storeCatalog, storeItems } from "../repositories/catalog-writer.ts";
+import { selectUnenriched, storeEnrichment } from "../repositories/enrichment.ts";
 import { storeProviders } from "../repositories/providers.ts";
-import type { Bindings, IngestionJob } from "../types.ts";
+import type { Bindings, EnrichmentSource, IngestionJob } from "../types.ts";
 import { getProviderLedger } from "./provider-ledger.ts";
 
 type SavedTitleRow = { titleId: string };
+
+const AVAILABILITY_MAX_AGE_DAYS = 7;
+const QUEUE_BATCH = 100;
+
+const ENRICHERS = [
+  { source: "omdb", job: "enrich-ratings", maxAgeDays: 30, perRun: 900 },
+  { source: "trakt", job: "enrich-trakt", maxAgeDays: 7, perRun: 2_000 },
+  { source: "simkl", job: "enrich-simkl", maxAgeDays: 90, perRun: 2_000 },
+] as const satisfies readonly {
+  source: EnrichmentSource;
+  job: IngestionJob["type"];
+  maxAgeDays: number;
+  perRun: number;
+}[];
+
+function enrichmentQueue(env: Bindings, source: EnrichmentSource) {
+  if (source === "omdb") {
+    return env.RATINGS_QUEUE;
+  }
+
+  if (source === "trakt") {
+    return env.TRAKT_QUEUE;
+  }
+
+  return env.SIMKL_QUEUE;
+}
+
+function sourceConfigured(env: Bindings, source: EnrichmentSource) {
+  if (source === "omdb") {
+    return Boolean(env.OMDB_API_KEY);
+  }
+
+  if (source === "trakt") {
+    return Boolean(env.TRAKT_CLIENT_ID);
+  }
+
+  return Boolean(env.SIMKL_CLIENT_ID);
+}
+
+function titleParts(titleId: string) {
+  const match = /^(movie|tv):(\d+)$/u.exec(titleId);
+
+  return match
+    ? {
+        mediaType: match[1] === "movie" ? ("movie" as const) : ("tv" as const),
+        tmdbId: Number(match[2]),
+      }
+    : null;
+}
 
 async function syncCatalog(env: Bindings) {
   const catalogue = await getCatalog(env, "", []);
@@ -26,14 +81,104 @@ async function syncCatalog(env: Bindings) {
 
   await storeItems(env.DB, missingSavedTitles, catalogue.fetchedAt);
 
-  if (env.WATCHMODE_API_KEY) {
-    const titleIds = [...catalogueTitles, ...missingSavedTitles].map((title) => title.id);
+  const [moviePages, televisionPages] = await Promise.all([
+    getDiscoverPageCount(env, "movie"),
+    getDiscoverPageCount(env, "tv"),
+  ]);
+  const pageJobs: IngestionJob[] = [
+    ...Array.from({ length: moviePages }, (_, index): IngestionJob => ({
+      type: "sync-discover-page",
+      mediaType: "movie",
+      page: index + 1,
+    })),
+    ...Array.from({ length: televisionPages }, (_, index): IngestionJob => ({
+      type: "sync-discover-page",
+      mediaType: "tv",
+      page: index + 1,
+    })),
+  ];
 
-    await env.INGESTION_QUEUE.sendBatch(
-      [...new Set(titleIds)].map((titleId) => ({
-        body: { type: "enrich-availability", titleId },
-        contentType: "json",
-      })),
+  console.log(JSON.stringify({ event: "discover_sweep_queued", moviePages, televisionPages }));
+
+  await enqueue(env.INGESTION_QUEUE, pageJobs);
+  await queueAvailability(
+    env,
+    catalogueTitles.map((title) => title.id),
+  );
+  await queueEnrichment(env);
+}
+
+async function queueEnrichment(env: Bindings) {
+  for (const enricher of ENRICHERS) {
+    if (!sourceConfigured(env, enricher.source)) {
+      continue;
+    }
+
+    // oxlint-disable-next-line no-await-in-loop
+    const titleIds = await selectUnenriched(
+      env,
+      enricher.source,
+      enricher.maxAgeDays,
+      enricher.perRun,
+    );
+
+    console.log(
+      JSON.stringify({
+        event: "enrichment_queued",
+        source: enricher.source,
+        count: titleIds.length,
+      }),
+    );
+
+    // oxlint-disable-next-line no-await-in-loop
+    await enqueue(
+      enrichmentQueue(env, enricher.source),
+      titleIds.map((titleId): IngestionJob => ({ type: enricher.job, titleId })),
+    );
+  }
+}
+
+async function syncDiscoverPage(env: Bindings, mediaType: "movie" | "tv", page: number) {
+  const titles = await getDiscoverPage(env, mediaType, page);
+
+  await storeItems(env.DB, titles, new Date().toISOString());
+  await queueAvailability(
+    env,
+    titles.map((title) => title.id),
+  );
+}
+
+async function queueAvailability(env: Bindings, titleIds: string[]) {
+  if (!env.WATCHMODE_API_KEY || titleIds.length === 0) {
+    return;
+  }
+
+  const unique = [...new Set(titleIds)];
+  const placeholders = unique.map(() => "?").join(", ");
+  const fresh = await env.DB.prepare(
+    `SELECT id AS titleId
+     FROM catalog_titles
+     WHERE id IN (${placeholders})
+       AND enriched_at IS NOT NULL
+       AND enriched_at > datetime('now', ?)`,
+  )
+    .bind(...unique, `-${AVAILABILITY_MAX_AGE_DAYS} days`)
+    .all<SavedTitleRow>();
+  const skip = new Set(fresh.results.map((row) => row.titleId));
+
+  await enqueue(
+    env.AVAILABILITY_QUEUE,
+    unique
+      .filter((titleId) => !skip.has(titleId))
+      .map((titleId): IngestionJob => ({ type: "enrich-availability", titleId })),
+  );
+}
+
+async function enqueue(queue: Queue<IngestionJob>, jobs: IngestionJob[]) {
+  for (let index = 0; index < jobs.length; index += QUEUE_BATCH) {
+    // oxlint-disable-next-line no-await-in-loop
+    await queue.sendBatch(
+      jobs.slice(index, index + QUEUE_BATCH).map((body) => ({ body, contentType: "json" })),
     );
   }
 }
@@ -49,10 +194,77 @@ async function enrichTitleAvailability(env: Bindings, titleId: string) {
     return;
   }
 
+  if (!(await claimBudget(env, "watchmode"))) {
+    console.log(JSON.stringify({ event: "budget_exhausted", source: "watchmode", titleId }));
+
+    return;
+  }
+
   const mediaType = match[1] === "movie" ? "movie" : "tv";
   const availability = await getWatchmodeAvailability(env, mediaType, Number(match[2]));
 
   await enrichAvailability(env.DB, titleId, availability);
+}
+
+async function enrichRatings(env: Bindings, titleId: string) {
+  if (!env.OMDB_API_KEY) {
+    return;
+  }
+
+  const [title] = await readItems(env.DB, [titleId]);
+  const imdbId = title?.imdbUrl ? /\/(tt\d+)/u.exec(title.imdbUrl)?.[1] : null;
+
+  if (!imdbId) {
+    return;
+  }
+
+  if (!(await claimBudget(env, "omdb"))) {
+    console.log(JSON.stringify({ event: "budget_exhausted", source: "omdb", titleId }));
+
+    return;
+  }
+
+  await storeEnrichment(env, titleId, "omdb", { ratings: await getOmdbRatings(env, imdbId) });
+}
+
+async function enrichTrakt(env: Bindings, titleId: string) {
+  const parts = env.TRAKT_CLIENT_ID ? titleParts(titleId) : null;
+
+  if (!parts) {
+    return;
+  }
+
+  if (!(await claimBudget(env, "trakt"))) {
+    console.log(JSON.stringify({ event: "budget_exhausted", source: "trakt", titleId }));
+
+    return;
+  }
+
+  const traktStats = await getTraktStats(env, parts.mediaType, parts.tmdbId);
+
+  if (traktStats) {
+    await storeEnrichment(env, titleId, "trakt", { traktStats });
+  }
+}
+
+async function enrichSimkl(env: Bindings, titleId: string) {
+  const parts = env.SIMKL_CLIENT_ID ? titleParts(titleId) : null;
+
+  if (!parts) {
+    return;
+  }
+
+  if (!(await claimBudget(env, "simkl"))) {
+    console.log(JSON.stringify({ event: "budget_exhausted", source: "simkl", titleId }));
+
+    return;
+  }
+
+  const externalIds = await getSimklIds(env, parts.mediaType, parts.tmdbId);
+
+  if (externalIds) {
+    await storeEnrichment(env, titleId, "simkl", { externalIds });
+  }
 }
 
 export async function executeIngestionJob(env: Bindings, job: IngestionJob) {
@@ -66,6 +278,30 @@ export async function executeIngestionJob(env: Bindings, job: IngestionJob) {
 
   if (job.type === "sync-catalog") {
     await syncCatalog(env);
+
+    return;
+  }
+
+  if (job.type === "sync-discover-page") {
+    await syncDiscoverPage(env, job.mediaType, job.page);
+
+    return;
+  }
+
+  if (job.type === "enrich-ratings") {
+    await enrichRatings(env, job.titleId);
+
+    return;
+  }
+
+  if (job.type === "enrich-trakt") {
+    await enrichTrakt(env, job.titleId);
+
+    return;
+  }
+
+  if (job.type === "enrich-simkl") {
+    await enrichSimkl(env, job.titleId);
 
     return;
   }

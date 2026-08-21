@@ -21,7 +21,6 @@ function configuredProviders(): Provider[] {
     integration: provider.integration,
     status: providerStatus(provider.integration),
     sourceLabel: providerSourceLabel(provider.integration),
-    logoUrl: null,
     displayPriority: index,
     homepage: provider.homepage,
     watchmodeSourceIds: [],
@@ -105,7 +104,6 @@ function mergeProviderLedger(
 
     if (existing) {
       addSourceId(existing.watchmodeSourceIds, source.id);
-      existing.logoUrl ??= source.logoUrl;
 
       if (isLongTail(existing)) {
         preferName(existing, name);
@@ -122,7 +120,6 @@ function mergeProviderLedger(
       integration: "watchmode",
       status: "feed",
       sourceLabel: "Watchmode",
-      logoUrl: source.logoUrl,
       displayPriority: 1_000 + providers.length,
       homepage: null,
       watchmodeSourceIds: [source.id],
@@ -142,7 +139,6 @@ function mergeProviderLedger(
 
     if (existing) {
       addSourceId(existing.tmdbProviderIds, source.id);
-      existing.logoUrl ??= source.logoUrl;
 
       if (isLongTail(existing)) {
         preferName(existing, name);
@@ -159,7 +155,6 @@ function mergeProviderLedger(
       integration: "tmdb",
       status: "feed",
       sourceLabel: "TMDB / JustWatch",
-      logoUrl: source.logoUrl,
       displayPriority: 2_000 + source.displayPriority,
       homepage: null,
       watchmodeSourceIds: [],

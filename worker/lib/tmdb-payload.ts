@@ -21,7 +21,6 @@ export type TmdbSummary = { id: number; mediaType: MediaType };
 export type TmdbProviderSource = {
   id: number;
   name: string;
-  logoUrl: string | null;
   displayPriority: number;
 };
 
@@ -61,7 +60,6 @@ function parseAvailability(details: Record<string, unknown>): {
       providers.set(providerId, {
         id: providerId,
         name: registry?.name ?? name,
-        logoUrl: imageUrl(stringAt(item, "logo_path"), "w92"),
         offerTypes: [label],
         webUrl: httpsUrl(stringAt(region, "link")),
         source: "TMDB / JustWatch",
@@ -210,6 +208,6 @@ export function parseTmdbProviders(value: unknown) {
       ? (numberAt(priorities, PROVIDER_REGION) ?? numberAt(item, "display_priority") ?? 999)
       : (numberAt(item, "display_priority") ?? 999);
 
-    return [{ id, name, logoUrl: imageUrl(stringAt(item, "logo_path"), "w92"), displayPriority }];
+    return [{ id, name, displayPriority }];
   });
 }

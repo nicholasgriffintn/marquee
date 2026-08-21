@@ -10,7 +10,6 @@ export type Provider = {
   integration: ProviderIntegration;
   status: ProviderStatus;
   sourceLabel: string;
-  logoUrl: string | null;
   displayPriority: number;
   homepage: string | null;
   watchmodeSourceIds: number[];
@@ -20,7 +19,6 @@ export type Provider = {
 export type ProviderAvailability = {
   id: string;
   name: string;
-  logoUrl: string | null;
   offerTypes: string[];
   webUrl: string | null;
   source: "Watchmode" | "TMDB / JustWatch";
@@ -48,6 +46,29 @@ export type MediaTitle = {
   watchLink: string | null;
   tmdbUrl: string;
   imdbUrl: string | null;
+  ratings?: {
+    imdbScore: number | null;
+    imdbVotes: number | null;
+    rottenTomatoes: string | null;
+    metascore: number | null;
+  };
+  traktStats?: {
+    slug: string;
+    traktId: number | null;
+    imdbId: string | null;
+    watchers: number | null;
+    plays: number | null;
+    collectors: number | null;
+    rating: number | null;
+    votes: number | null;
+  };
+  externalIds?: {
+    simklId: number | null;
+    imdbId: string | null;
+    tvdbId: number | null;
+    malId: number | null;
+    anilistId: number | null;
+  };
 };
 
 export type CatalogSection = {

@@ -208,6 +208,12 @@ export const providerRegistry: ProviderRegistryEntry[] = [
 
 export const providerRegistryIds = new Set(providerRegistry.map((provider) => provider.id));
 
+export function providerMark(id: string, name: string) {
+  const configured = providerRegistry.find((provider) => provider.id === id);
+
+  return configured?.mark ?? name.slice(0, 2).toUpperCase();
+}
+
 export function providerStatus(integration: ProviderIntegration): ProviderStatus {
   if (integration === "direct") {
     return "link";

@@ -55,7 +55,7 @@ catalogRoutes.get("/providers", async (context) => {
       return context.json({ error: "Provider catalogue is warming up" }, 503);
     }
 
-    context.header("cache-control", "public, max-age=21600");
+    context.header("cache-control", "public, max-age=300, stale-while-revalidate=21600");
 
     return context.json(providers);
   } catch (error) {

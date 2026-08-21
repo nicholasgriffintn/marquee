@@ -19,7 +19,6 @@ function isAvailability(value: unknown): value is ProviderAvailability {
     isRecord(value) &&
     typeof value.id === "string" &&
     typeof value.name === "string" &&
-    isNullableString(value.logoUrl) &&
     isStringArray(value.offerTypes) &&
     isNullableString(value.webUrl) &&
     (value.source === "Watchmode" || value.source === "TMDB / JustWatch")
@@ -64,7 +63,6 @@ function isProvider(value: unknown): value is Provider {
     typeof value.integration === "string" &&
     typeof value.status === "string" &&
     typeof value.sourceLabel === "string" &&
-    isNullableString(value.logoUrl) &&
     typeof value.displayPriority === "number" &&
     isNullableString(value.homepage) &&
     isNumberArray(value.watchmodeSourceIds) &&

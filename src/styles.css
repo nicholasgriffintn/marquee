@@ -790,11 +790,14 @@ h2 em {
   overflow: hidden;
   padding: 3px;
 }
+.provider-badge:has(img) {
+  background: none;
+  padding: 0;
+}
 .provider-badge img {
   height: 100%;
-  max-width: 100%;
   object-fit: contain;
-  width: auto;
+  width: 100%;
 }
 .provider-badge-compact {
   font-size: 8px;
@@ -803,7 +806,6 @@ h2 em {
   min-width: 23px;
   padding: 2px 4px;
 }
-/* In the picker every tile gets the same logo area, so the marks line up in a row. */
 .provider-picker .provider-badge {
   height: 34px;
   padding: 4px 6px;

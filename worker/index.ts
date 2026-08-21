@@ -49,7 +49,7 @@ app.notFound(async (context) => {
 
   response.headers.set(
     "content-security-policy",
-    `default-src 'self'; style-src 'self' 'unsafe-inline'; script-src ${scriptSource}; img-src 'self' data: https://image.tmdb.org https://www.themoviedb.org https://cdn.watchmode.com https://avatars.githubusercontent.com; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'`,
+    `default-src 'self'; style-src 'self' 'unsafe-inline'; script-src ${scriptSource}; img-src 'self' data: https://image.tmdb.org https://www.themoviedb.org https://avatars.githubusercontent.com; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'`,
   );
   response.headers.set("permissions-policy", "camera=(), microphone=(), geolocation=()");
   response.headers.set("referrer-policy", "strict-origin-when-cross-origin");

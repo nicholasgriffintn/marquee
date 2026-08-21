@@ -1,4 +1,6 @@
 import type { MediaTitle, Provider, ProviderAvailability } from "../domain/catalog";
+import { providerLogo } from "../domain/provider-logos";
+import { providerMark } from "../domain/providers";
 
 export function ArrowIcon() {
   return (
@@ -40,15 +42,17 @@ export function ProviderBadge({
   provider: Provider | ProviderAvailability;
   compact?: boolean;
 }) {
+  const logo = providerLogo(provider.id);
+
   return (
     <span
       className={`provider-badge${compact ? " provider-badge-compact" : ""}`}
       title={provider.name}
     >
-      {provider.logoUrl ? (
-        <img src={provider.logoUrl} alt="" loading="lazy" />
+      {logo ? (
+        <img src={logo} alt="" loading="lazy" />
       ) : (
-        <span>{provider.name.slice(0, 2).toUpperCase()}</span>
+        <span>{providerMark(provider.id, provider.name)}</span>
       )}
     </span>
   );

@@ -16,7 +16,7 @@ export type AuthVariables = {
   sessionToken: string;
 };
 
-export type AppContext = Context<{ Bindings: Bindings; Variables: AuthVariables }>;
+export type AppContext = Context<{ Bindings: Bindings }>;
 
 export function authenticationFor(env: Bindings, request: Request) {
   const origin = canonicalOrigin(request, env.SITE_ORIGIN);
