@@ -68,7 +68,7 @@
     }
   ],
   "vars": {
-    "AI_GATEWAY_ID": "demo",
+    "AI_GATEWAY_ID": "marquee",
     "AI_MODEL": "@cf/moonshotai/kimi-k2.6"
   },
   "secrets": {

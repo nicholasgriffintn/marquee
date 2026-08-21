@@ -19,6 +19,16 @@ function assertConfiguration(env: Bindings) {
   }
 }
 
+export class AiGatewayError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = "AiGatewayError";
+  }
+}
+
 export async function requestAiCompletion(
   env: Bindings,
   messages: ChatMessage[],
@@ -54,7 +64,10 @@ export async function requestAiCompletion(
   );
 
   if (!response.ok) {
-    throw new Error(`Cloudflare AI Gateway request failed with status ${response.status}`);
+    throw new AiGatewayError(
+      `Cloudflare AI Gateway request failed with status ${response.status}`,
+      response.status,
+    );
   }
 
   const message = parseAssistantMessage(await response.json());

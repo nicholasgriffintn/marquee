@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 
 import { requireAuthentication, type AuthVariables } from "../auth/session.ts";
+import { AiGatewayError } from "../clients/ai-gateway.ts";
 import { clientRateLimitKey, jsonResponse, readJsonObject } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
 import { curate } from "../services/curator.ts";
@@ -38,6 +39,18 @@ curatorRoutes.post("/", async (context) => {
     return jsonResponse(result);
   } catch (error) {
     logError("curator_request_failed", error);
+
+    if (error instanceof AiGatewayError && (error.status === 402 || error.status === 429)) {
+      return jsonResponse(
+        {
+          error:
+            error.status === 402
+              ? "The AI curator has used up its Cloudflare AI allowance."
+              : "The AI curator is rate limited. Try again shortly.",
+        },
+        503,
+      );
+    }
 
     return jsonResponse({ error: "Cloudflare AI curator is unavailable" }, 502);
   }
