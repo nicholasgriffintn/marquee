@@ -1,7 +1,9 @@
+import type { MediaType } from "../../src/domain/catalog.ts";
 import { isRecord } from "../lib/values.ts";
 import type { Bindings, TitleRatings } from "../types.ts";
 
 const API_BASE = "https://www.omdbapi.com/";
+const POSTER_BASE = "https://img.omdbapi.com/";
 
 export class OmdbError extends Error {
   constructor(
@@ -77,4 +79,99 @@ export async function getOmdbRatings(env: Bindings, imdbId: string): Promise<Tit
     rottenTomatoes: ratingValue(payload, "Rotten Tomatoes"),
     metascore: numeric(payload.Metascore),
   };
+}
+
+export async function getOmdbPoster(env: Bindings, imdbId: string) {
+  if (!env.OMDB_API_KEY) {
+    throw new OmdbError("OMDb is not configured", 503);
+  }
+
+  const url = new URL(POSTER_BASE);
+
+  url.search = new URLSearchParams({ apikey: env.OMDB_API_KEY, i: imdbId }).toString();
+
+  const response = await fetch(url, {
+    signal: AbortSignal.timeout(20_000),
+    cf: { cacheEverything: true, cacheTtl: 86_400 },
+  });
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new OmdbError(`OMDb poster request failed (${response.status})`, response.status);
+  }
+
+  const contentType = response.headers.get("content-type") ?? "";
+
+  if (!contentType.startsWith("image/")) {
+    return null;
+  }
+
+  const body = await response.arrayBuffer();
+
+  return body.byteLength > 0 ? { body, contentType } : null;
+}
+
+export type OmdbSearchResult = {
+  imdbId: string;
+  title: string;
+  year: number | null;
+  mediaType: MediaType;
+  posterUrl: string | null;
+};
+
+export async function searchOmdb(env: Bindings, query: string, page = 1) {
+  if (!env.OMDB_API_KEY) {
+    return [];
+  }
+
+  const url = new URL(API_BASE);
+
+  url.search = new URLSearchParams({
+    apikey: env.OMDB_API_KEY,
+    s: query,
+    page: String(page),
+  }).toString();
+
+  const response = await fetch(url, {
+    headers: { accept: "application/json" },
+    signal: AbortSignal.timeout(8_000),
+    cf: { cacheEverything: true, cacheTtl: 3_600 },
+  });
+
+  if (!response.ok) {
+    throw new OmdbError(`OMDb search failed (${response.status})`, response.status);
+  }
+
+  const payload = await response.json();
+
+  if (!isRecord(payload) || !Array.isArray(payload.Search)) {
+    return [];
+  }
+
+  return payload.Search.flatMap((entry): OmdbSearchResult[] => {
+    if (!isRecord(entry) || typeof entry.imdbID !== "string") {
+      return [];
+    }
+
+    if (!/^tt\d+$/u.test(entry.imdbID) || typeof entry.Title !== "string") {
+      return [];
+    }
+
+    const year = typeof entry.Year === "string" ? Number(entry.Year.slice(0, 4)) : Number.NaN;
+    const poster =
+      typeof entry.Poster === "string" && entry.Poster.startsWith("https://") ? entry.Poster : null;
+
+    return [
+      {
+        imdbId: entry.imdbID,
+        title: entry.Title,
+        year: Number.isInteger(year) ? year : null,
+        mediaType: entry.Type === "series" ? "tv" : "movie",
+        posterUrl: poster,
+      },
+    ];
+  });
 }

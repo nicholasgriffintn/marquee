@@ -3,6 +3,8 @@ export type Bindings = {
   DB: D1Database;
   AUTH_RATE_LIMITER: RateLimit;
   CURATOR_RATE_LIMITER: RateLimit;
+  SEARCH_RATE_LIMITER: RateLimit;
+  SEARCH_MEMBER_RATE_LIMITER: RateLimit;
   CLOUDFLARE_ACCOUNT_ID: string;
   CLOUDFLARE_API_TOKEN?: string;
   WATCHMODE_API_KEY?: string;
@@ -20,9 +22,11 @@ export type Bindings = {
   RATINGS_QUEUE: Queue<IngestionJob>;
   TRAKT_QUEUE: Queue<IngestionJob>;
   SIMKL_QUEUE: Queue<IngestionJob>;
+  POSTER_QUEUE: Queue<IngestionJob>;
+  MEDIA: R2Bucket;
 };
 
-export type EnrichmentSource = "watchmode" | "omdb" | "trakt" | "simkl";
+export type EnrichmentSource = "watchmode" | "omdb" | "poster" | "trakt" | "simkl";
 
 export type TitleRatings = {
   imdbScore: number | null;
@@ -57,7 +61,9 @@ export type IngestionJob =
   | { type: "enrich-availability"; titleId: string }
   | { type: "enrich-ratings"; titleId: string }
   | { type: "enrich-trakt"; titleId: string }
-  | { type: "enrich-simkl"; titleId: string };
+  | { type: "enrich-simkl"; titleId: string }
+  | { type: "cache-poster"; titleId: string }
+  | { type: "import-imdb-title"; imdbId: string };
 
 export type EntryStatus = "watchlist" | "watching" | "watched" | "dropped";
 

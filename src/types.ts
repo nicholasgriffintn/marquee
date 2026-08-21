@@ -1,5 +1,3 @@
-export type View = "tonight" | "library" | "sources";
-
 export type User = {
   id: string;
   name: string;

@@ -1,6 +1,12 @@
-import { getOmdbRatings } from "../clients/omdb.ts";
+import { getOmdbPoster, getOmdbRatings } from "../clients/omdb.ts";
 import { getSimklIds } from "../clients/simkl.ts";
-import { getCatalog, getDiscoverPage, getDiscoverPageCount, getItems } from "../clients/tmdb.ts";
+import {
+  findByImdbId,
+  getCatalog,
+  getDiscoverPage,
+  getDiscoverPageCount,
+  getItems,
+} from "../clients/tmdb.ts";
 import { getTraktStats } from "../clients/trakt.ts";
 import { getWatchmodeAvailability } from "../clients/watchmode.ts";
 import { isKnownTitle } from "../lib/validation.ts";
@@ -8,7 +14,7 @@ import { enrichAvailability } from "../repositories/availability.ts";
 import { claimBudget } from "../repositories/budgets.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
 import { storeCatalog, storeItems } from "../repositories/catalog-writer.ts";
-import { selectUnenriched, storeEnrichment } from "../repositories/enrichment.ts";
+import { selectUnenriched, storeEnrichment, storePoster } from "../repositories/enrichment.ts";
 import { storeProviders } from "../repositories/providers.ts";
 import type { Bindings, EnrichmentSource, IngestionJob } from "../types.ts";
 import { getProviderLedger } from "./provider-ledger.ts";
@@ -22,6 +28,7 @@ const ENRICHERS = [
   { source: "omdb", job: "enrich-ratings", maxAgeDays: 30, perRun: 900 },
   { source: "trakt", job: "enrich-trakt", maxAgeDays: 7, perRun: 2_000 },
   { source: "simkl", job: "enrich-simkl", maxAgeDays: 90, perRun: 2_000 },
+  { source: "poster", job: "cache-poster", maxAgeDays: 365, perRun: 2_000 },
 ] as const satisfies readonly {
   source: EnrichmentSource;
   job: IngestionJob["type"];
@@ -34,6 +41,10 @@ function enrichmentQueue(env: Bindings, source: EnrichmentSource) {
     return env.RATINGS_QUEUE;
   }
 
+  if (source === "poster") {
+    return env.POSTER_QUEUE;
+  }
+
   if (source === "trakt") {
     return env.TRAKT_QUEUE;
   }
@@ -42,7 +53,7 @@ function enrichmentQueue(env: Bindings, source: EnrichmentSource) {
 }
 
 function sourceConfigured(env: Bindings, source: EnrichmentSource) {
-  if (source === "omdb") {
+  if (source === "omdb" || source === "poster") {
     return Boolean(env.OMDB_API_KEY);
   }
 
@@ -206,13 +217,18 @@ async function enrichTitleAvailability(env: Bindings, titleId: string) {
   await enrichAvailability(env.DB, titleId, availability);
 }
 
-async function enrichRatings(env: Bindings, titleId: string) {
+async function imdbIdFor(env: Bindings, titleId: string) {
   if (!env.OMDB_API_KEY) {
-    return;
+    return null;
   }
 
   const [title] = await readItems(env.DB, [titleId]);
-  const imdbId = title?.imdbUrl ? /\/(tt\d+)/u.exec(title.imdbUrl)?.[1] : null;
+
+  return title?.imdbUrl ? (/\/(tt\d+)/u.exec(title.imdbUrl)?.[1] ?? null) : null;
+}
+
+async function enrichRatings(env: Bindings, titleId: string) {
+  const imdbId = await imdbIdFor(env, titleId);
 
   if (!imdbId) {
     return;
@@ -225,6 +241,45 @@ async function enrichRatings(env: Bindings, titleId: string) {
   }
 
   await storeEnrichment(env, titleId, "omdb", { ratings: await getOmdbRatings(env, imdbId) });
+}
+
+async function importImdbTitle(env: Bindings, imdbId: string) {
+  const titleId = await findByImdbId(env, imdbId);
+
+  if (!titleId) {
+    console.log(JSON.stringify({ event: "imdb_import_unmatched", imdbId }));
+
+    return;
+  }
+
+  const [title] = await getItems(env, [titleId]);
+
+  if (!title) {
+    return;
+  }
+
+  await storeItems(env.DB, [title], new Date().toISOString());
+  await queueAvailability(env, [titleId]);
+}
+
+async function cachePoster(env: Bindings, titleId: string) {
+  const imdbId = await imdbIdFor(env, titleId);
+
+  if (!imdbId) {
+    return;
+  }
+
+  if (!(await claimBudget(env, "poster"))) {
+    console.log(JSON.stringify({ event: "budget_exhausted", source: "poster", titleId }));
+
+    return;
+  }
+
+  const poster = await getOmdbPoster(env, imdbId);
+
+  if (poster) {
+    await storePoster(env, titleId, poster.body, poster.contentType);
+  }
 }
 
 async function enrichTrakt(env: Bindings, titleId: string) {
@@ -302,6 +357,18 @@ export async function executeIngestionJob(env: Bindings, job: IngestionJob) {
 
   if (job.type === "enrich-simkl") {
     await enrichSimkl(env, job.titleId);
+
+    return;
+  }
+
+  if (job.type === "cache-poster") {
+    await cachePoster(env, job.titleId);
+
+    return;
+  }
+
+  if (job.type === "import-imdb-title") {
+    await importImdbTitle(env, job.imdbId);
 
     return;
   }

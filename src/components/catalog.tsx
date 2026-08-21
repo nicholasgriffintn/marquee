@@ -7,9 +7,15 @@ import { ArrowIcon, PlusIcon, Poster, ProviderBadge } from "./ui";
 
 const RAIL_PROVIDER_LIMIT = 3;
 
-function RailCard({ item, onOpen }: { item: MediaTitle; onOpen: (title: MediaTitle) => void }) {
+export function TitleCard({
+  item,
+  onOpen,
+}: {
+  item: MediaTitle;
+  onOpen: (title: MediaTitle) => void;
+}) {
   return (
-    <article className="rail-card">
+    <article className={`rail-card${item.pending ? " rail-card-pending" : ""}`}>
       <button
         type="button"
         className="rail-card-hit"
@@ -18,7 +24,9 @@ function RailCard({ item, onOpen }: { item: MediaTitle; onOpen: (title: MediaTit
       >
         <div className={`rail-art${item.backdropUrl ? "" : " rail-art-missing"}`}>
           {item.backdropUrl && <img src={item.backdropUrl} alt="" loading="lazy" />}
-          <span className="rail-number">{item.mediaType === "movie" ? "FILM" : "TV"}</span>
+          <span className="rail-number">
+            {item.pending ? "FETCHING" : item.mediaType === "movie" ? "FILM" : "TV"}
+          </span>
           <strong>{item.title}</strong>
           <div className="rail-provider-row">
             {item.providers.slice(0, RAIL_PROVIDER_LIMIT).map((provider) => (
@@ -67,7 +75,7 @@ export function ContentRail({
       <div className="rail-track" ref={trackRef}>
         {section.items.length ? (
           section.items.map((item) => (
-            <RailCard key={`${section.id}-${item.id}`} item={item} onOpen={onOpen} />
+            <TitleCard key={`${section.id}-${item.id}`} item={item} onOpen={onOpen} />
           ))
         ) : (
           <p className="rail-empty">No titles found.</p>

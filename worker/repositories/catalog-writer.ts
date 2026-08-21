@@ -45,8 +45,8 @@ function upsertTitle(db: D1Database, title: MediaTitle, sourceUpdatedAt: string)
     .prepare(
       `INSERT INTO catalog_titles
          (id, media_type, tmdb_id, title, original_title, year, popularity,
-          provider_ids, payload, source_updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          provider_ids, payload, source_updated_at, imdb_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          media_type = excluded.media_type,
          tmdb_id = excluded.tmdb_id,
@@ -57,6 +57,7 @@ function upsertTitle(db: D1Database, title: MediaTitle, sourceUpdatedAt: string)
          provider_ids = excluded.provider_ids,
          payload = excluded.payload,
          source_updated_at = excluded.source_updated_at,
+         imdb_id = excluded.imdb_id,
          updated_at = CURRENT_TIMESTAMP`,
     )
     .bind(
@@ -70,5 +71,6 @@ function upsertTitle(db: D1Database, title: MediaTitle, sourceUpdatedAt: string)
       JSON.stringify(title.providers.map((provider) => provider.id)),
       JSON.stringify(title),
       sourceUpdatedAt,
+      title.imdbUrl ? (/\/(tt\d+)/u.exec(title.imdbUrl)?.[1] ?? null) : null,
     );
 }

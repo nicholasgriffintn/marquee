@@ -1,29 +1,58 @@
 import { useCallback, useMemo, useState } from "react";
+import { Link, Route, Routes, useLocation, useMatch, useNavigate } from "react-router-dom";
 
 import { DetailPanel } from "./components/catalog";
+import { SearchBox } from "./components/SearchBox";
 import { GitHubIcon, MarqueeLogo } from "./components/ui";
 import type { MediaTitle } from "./domain/catalog";
 import { useCatalog } from "./hooks/useCatalog";
 import { useCurator } from "./hooks/useCurator";
 import { useProfile } from "./hooks/useProfile";
+import { useSearch } from "./hooks/useSearch";
 import { useSession } from "./hooks/useSession";
+import { useTitle } from "./hooks/useTitle";
 import { LibraryPage } from "./pages/LibraryPage";
+import { SearchPage } from "./pages/SearchPage";
 import { SourcesPage } from "./pages/SourcesPage";
 import { TonightPage } from "./pages/TonightPage";
-import type { View } from "./types";
+
+const NAV: { to: string; label: string; private: boolean }[] = [
+  { to: "/", label: "Tonight", private: false },
+  { to: "/shelf", label: "My shelf", private: true },
+  { to: "/sources", label: "Sources", private: false },
+];
 
 export function App() {
-  const [view, setView] = useState<View>("tonight");
-  const [selected, setSelected] = useState<MediaTitle | null>(null);
-  const [query, setQuery] = useState("");
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [query, setQuery] = useState(
+    () => new URLSearchParams(window.location.search).get("q") ?? "",
+  );
   const session = useSession();
   const isSignedIn = Boolean(session.user);
   const profile = useProfile(isSignedIn);
-  const catalog = useCatalog(query, profile.selectedProviderIds, profile.savedIds);
+  const catalog = useCatalog(profile.selectedProviderIds, profile.savedIds);
+  const search = useSearch(query, profile.selectedProviderIds);
   const curator = useCurator();
-  const closeDetails = useCallback(() => setSelected(null), []);
+  const titleMatch = useMatch("/title/:titleId");
+  const background = (location.state as { background?: typeof location } | null)?.background;
+  const pageLocation =
+    background ?? (titleMatch ? { ...location, pathname: "/", search: "" } : location);
+  const openTitle = useCallback(
+    (item: MediaTitle) => {
+      void navigate(`/title/${encodeURIComponent(item.id)}`, { state: { background: location } });
+    },
+    [location, navigate],
+  );
+  const closeDetails = useCallback(() => {
+    if (background) {
+      void navigate(-1);
 
-  const activeView = !isSignedIn && view === "library" ? "tonight" : view;
+      return;
+    }
+
+    void navigate("/");
+  }, [background, navigate]);
   const sections = useMemo(() => {
     if (!curator.curator) {
       return catalog.catalogue.sections;
@@ -51,8 +80,7 @@ export function App() {
     );
 
     if (saved) {
-      setSelected(null);
-      setView("library");
+      void navigate("/shelf");
     }
   }
 
@@ -63,46 +91,37 @@ export function App() {
   return (
     <main className="site-shell">
       <header className="site-header">
-        <button type="button" className="brand" onClick={() => setView("tonight")}>
+        <Link to="/" className="brand">
           <MarqueeLogo />
           <span>Marquee</span>
-        </button>
+        </Link>
         <nav aria-label="Primary navigation">
-          <button
-            className={activeView === "tonight" ? "active" : ""}
-            onClick={() => setView("tonight")}
-          >
-            Tonight
-          </button>
-          {isSignedIn && (
-            <button
-              className={activeView === "library" ? "active" : ""}
-              onClick={() => setView("library")}
+          {NAV.filter((item) => !item.private || isSignedIn).map((item) => (
+            <Link
+              key={item.to}
+              to={item.to}
+              className={location.pathname === item.to ? "active" : ""}
+              aria-current={location.pathname === item.to ? "page" : undefined}
             >
-              My shelf <sup>{profile.savedIds.length}</sup>
-            </button>
-          )}
-          <button
-            className={activeView === "sources" ? "active" : ""}
-            onClick={() => setView("sources")}
-          >
-            Sources
-          </button>
+              {item.label}
+              {item.to === "/shelf" && <sup>{profile.savedIds.length}</sup>}
+            </Link>
+          ))}
         </nav>
         <div className="header-tools">
-          <label className="search-box">
-            <span>⌕</span>
-            <input
-              value={query}
-              onChange={(event) => {
-                setQuery(event.target.value);
-                setView("tonight");
+          <SearchBox
+            query={query}
+            results={search.items}
+            isSearching={search.isSearching}
+            onQueryChange={setQuery}
+            onOpen={openTitle}
+            onSubmit={() => {
+              if (query.trim()) {
                 curator.clear();
-              }}
-              placeholder="Search"
-              aria-label="Search films and television"
-            />
-          </label>
+                void navigate(`/search?q=${encodeURIComponent(query.trim())}`);
+              }
+            }}
+          />
           {session.isLoading ? (
             <span className="session-loading">Checking session</span>
           ) : session.user ? (
@@ -150,48 +169,95 @@ export function App() {
         {profile.message}
       </p>
 
-      {activeView === "tonight" && (
-        <TonightPage
-          curator={curator.curator}
-          curatorError={curator.error}
-          isAsking={curator.isAsking}
-          isLoading={catalog.isLoading}
-          error={catalog.error}
-          providerError={catalog.providerError}
-          isSignedIn={isSignedIn}
-          sections={sections}
-          providers={catalog.providers}
-          selectedProviderIds={profile.selectedProviderIds}
-          onAsk={askCurator}
-          onClearCurator={curator.clear}
-          onOpen={setSelected}
-          onSelectProviders={(ids) => void profile.savePreferences(ids)}
-          onShowSources={() => setView("sources")}
+      <Routes location={pageLocation}>
+        <Route
+          path="/"
+          element={
+            <TonightPage
+              curator={curator.curator}
+              curatorError={curator.error}
+              isAsking={curator.isAsking}
+              isLoading={catalog.isLoading}
+              error={catalog.error}
+              providerError={catalog.providerError}
+              isSignedIn={isSignedIn}
+              sections={sections}
+              providers={catalog.providers}
+              selectedProviderIds={profile.selectedProviderIds}
+              onAsk={askCurator}
+              onClearCurator={curator.clear}
+              onOpen={openTitle}
+              onSelectProviders={(ids) => void profile.savePreferences(ids)}
+              onShowSources={() => void navigate("/sources")}
+            />
+          }
         />
-      )}
 
-      {activeView === "library" && (
-        <LibraryPage
+        <Route
+          path="/search"
+          element={
+            <SearchPage
+              query={query}
+              items={search.items}
+              error={search.error}
+              isSearching={search.isSearching}
+              onOpen={openTitle}
+              onShowTonight={() => {
+                setQuery("");
+                void navigate("/");
+              }}
+            />
+          }
+        />
+
+        <Route
+          path="/shelf"
+          element={
+            isSignedIn ? (
+              <LibraryPage
+                entries={profile.entries}
+                titles={catalog.savedTitles}
+                catalogueError={catalog.error}
+                onOpen={openTitle}
+                onRemove={(id) => void profile.removeEntry(id)}
+                onSave={(entry) => void profile.saveEntry(entry)}
+                onShowTonight={() => void navigate("/")}
+                onStatus={profile.setStatus}
+                onUpdateDraft={profile.updateDraft}
+              />
+            ) : (
+              <SignedOutShelf />
+            )
+          }
+        />
+
+        <Route
+          path="/sources"
+          element={
+            <SourcesPage
+              providers={catalog.providers}
+              providerError={catalog.providerError}
+              stats={catalog.providerStats}
+              isSignedIn={isSignedIn}
+              selectedProviderIds={profile.selectedProviderIds}
+              onSelectProviders={(ids) => void profile.savePreferences(ids)}
+            />
+          }
+        />
+
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
+
+      {titleMatch?.params.titleId && (
+        <TitleOverlay
+          titleId={titleMatch.params.titleId}
+          titlesById={catalog.titlesById}
+          searchItems={search.items}
+          canSave={isSignedIn}
           entries={profile.entries}
-          titles={catalog.savedTitles}
-          catalogueError={catalog.error}
-          onOpen={setSelected}
-          onRemove={(id) => void profile.removeEntry(id)}
-          onSave={(entry) => void profile.saveEntry(entry)}
-          onShowTonight={() => setView("tonight")}
-          onStatus={profile.setStatus}
-          onUpdateDraft={profile.updateDraft}
-        />
-      )}
-
-      {activeView === "sources" && (
-        <SourcesPage
-          providers={catalog.providers}
-          providerError={catalog.providerError}
-          stats={catalog.providerStats}
-          isSignedIn={isSignedIn}
-          selectedProviderIds={profile.selectedProviderIds}
-          onSelectProviders={(ids) => void profile.savePreferences(ids)}
+          watchmodeEnabled={catalog.providerSources.includes("Watchmode")}
+          onClose={closeDetails}
+          onSave={(item) => void saveTitle(item)}
         />
       )}
 
@@ -203,17 +269,88 @@ export function App() {
         <p>Data by TMDB · Availability by Watchmode and JustWatch</p>
         <span>Made for movie night</span>
       </footer>
-
-      {selected && (
-        <DetailPanel
-          item={selected}
-          canSave={isSignedIn}
-          isSaved={Boolean(profile.entries[selected.id])}
-          watchmodeEnabled={catalog.providerSources.includes("Watchmode")}
-          onClose={closeDetails}
-          onSave={(item) => void saveTitle(item)}
-        />
-      )}
     </main>
+  );
+}
+
+function SignedOutShelf() {
+  return (
+    <section className="page-section">
+      <div className="page-title-row">
+        <div>
+          <h1>My shelf</h1>
+        </div>
+        <p>Sign in to keep a shelf of what you have watched.</p>
+      </div>
+      <div className="search-empty">
+        <h2>You are signed out.</h2>
+        <p>Your shelf lives with your account, so sign in to see it.</p>
+        <a className="hero-play" href="/api/auth/github?returnTo=%2Fshelf">
+          Sign in with GitHub
+        </a>
+      </div>
+    </section>
+  );
+}
+
+function NotFoundPage() {
+  return (
+    <section className="page-section">
+      <div className="page-title-row">
+        <div>
+          <h1>Not found</h1>
+        </div>
+        <p>That page does not exist.</p>
+      </div>
+      <div className="search-empty">
+        <h2>Nothing here.</h2>
+        <p>The page you asked for is not part of Marquee.</p>
+        <Link className="hero-play" to="/">
+          Back to tonight
+        </Link>
+      </div>
+    </section>
+  );
+}
+
+function TitleOverlay({
+  titleId,
+  titlesById,
+  searchItems,
+  canSave,
+  entries,
+  watchmodeEnabled,
+  onClose,
+  onSave,
+}: {
+  titleId: string;
+  titlesById: Map<string, MediaTitle>;
+  searchItems: MediaTitle[];
+  canSave: boolean;
+  entries: Record<string, unknown>;
+  watchmodeEnabled: boolean;
+  onClose: () => void;
+  onSave: (item: MediaTitle) => void;
+}) {
+  const known = useMemo(
+    () =>
+      new Map([...titlesById, ...searchItems.map((item): [string, MediaTitle] => [item.id, item])]),
+    [searchItems, titlesById],
+  );
+  const { title, isLoading } = useTitle(titleId, known);
+
+  if (isLoading || !title) {
+    return null;
+  }
+
+  return (
+    <DetailPanel
+      item={title}
+      canSave={canSave}
+      isSaved={Boolean(entries[title.id])}
+      watchmodeEnabled={watchmodeEnabled}
+      onClose={onClose}
+      onSave={onSave}
+    />
   );
 }

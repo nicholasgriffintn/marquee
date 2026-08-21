@@ -30,6 +30,29 @@ app.use("/api/*", async (context, next) => {
 
 app.get("/health", (context) => context.json({ ok: true, service: "marquee" }));
 
+app.get("/media/posters/:file", async (context) => {
+  const file = context.req.param("file");
+
+  if (!/^[\w-]{1,80}$/u.test(file)) {
+    return context.json({ error: "Not found" }, 404);
+  }
+
+  const object = await context.env.MEDIA.get(`posters/${file}`);
+
+  if (!object) {
+    return context.json({ error: "Not found" }, 404);
+  }
+
+  return new Response(object.body, {
+    headers: {
+      "cache-control": "public, max-age=31536000, immutable",
+      "content-type": object.httpMetadata?.contentType ?? "image/jpeg",
+      etag: object.httpEtag,
+      "x-content-type-options": "nosniff",
+    },
+  });
+});
+
 app.route("/api/catalog", catalogRoutes);
 
 app.route("/api/auth", authRoutes);

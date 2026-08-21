@@ -60,3 +60,43 @@ export async function selectUnenriched(
 
   return rows.results.map((row) => row.titleId);
 }
+
+export function posterKey(titleId: string) {
+  return `posters/${titleId.replace(":", "-")}`;
+}
+
+export async function storePoster(
+  env: Bindings,
+  titleId: string,
+  body: ArrayBuffer,
+  contentType: string,
+) {
+  const [title] = await readItems(env.DB, [titleId]);
+
+  if (!title) {
+    return false;
+  }
+
+  const key = posterKey(titleId);
+
+  await env.MEDIA.put(key, body, { httpMetadata: { contentType } });
+
+  const enrichedTitle = { ...title, posterUrl: `/media/${key}` } satisfies MediaTitle;
+
+  await env.DB.batch([
+    env.DB.prepare(
+      `UPDATE catalog_titles
+       SET payload = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+    ).bind(JSON.stringify(enrichedTitle), titleId),
+    env.DB.prepare(
+      `INSERT INTO title_enrichment (title_id, source, payload)
+       VALUES (?, 'poster', ?)
+       ON CONFLICT(title_id, source) DO UPDATE SET
+         payload = excluded.payload,
+         fetched_at = CURRENT_TIMESTAMP`,
+    ).bind(titleId, JSON.stringify({ key, contentType })),
+  ]);
+
+  return true;
+}

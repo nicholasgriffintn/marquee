@@ -58,7 +58,9 @@ export function TonightPage({
   return (
     <>
       <section
-        className={`hero-section${featured?.backdropUrl ? "" : " hero-empty"}${isSignedIn ? "" : " hero-public"}`}
+        className={`hero-section${featured?.backdropUrl ? "" : " hero-empty"}${
+          !featured && isLoading ? " hero-loading" : ""
+        }`}
       >
         {featured?.backdropUrl && (
           <div className="hero-art" aria-hidden="true">
@@ -80,29 +82,18 @@ export function TonightPage({
                 </button>
               </div>
             </>
-          ) : isSignedIn ? (
-            <div className="honest-empty" aria-live="polite">
-              <h1>{isLoading ? "Loading your catalogue." : "Nothing matched."}</h1>
-              <p>{error || "Try another search or change your services."}</p>
+          ) : isLoading ? (
+            <div className="hero-skeleton" aria-hidden="true">
+              <span className="skeleton skeleton-title" />
+              <span className="skeleton skeleton-meta" />
+              <span className="skeleton skeleton-line" />
+              <span className="skeleton skeleton-line short" />
+              <span className="skeleton skeleton-button" />
             </div>
           ) : (
-            <div className="public-welcome">
-              <h1>
-                What’s on, and <em>where to watch it.</em>
-              </h1>
-              <p className="hero-lede">
-                Search a film or show to see which services carry it. Sign in to keep a shelf of
-                what you’ve watched, filter to the services you pay for, and get suggestions from
-                what’s on them.
-              </p>
-              <div className="hero-actions">
-                <a href="/api/auth/github?returnTo=%2F" className="hero-play">
-                  Sign in with GitHub
-                </a>
-                <button type="button" onClick={onShowSources}>
-                  Browse sources
-                </button>
-              </div>
+            <div className="honest-empty" aria-live="polite">
+              <h1>Nothing matched.</h1>
+              <p>{error || "Try another search or change your services."}</p>
             </div>
           )}
         </div>
@@ -192,12 +183,35 @@ export function TonightPage({
           {error}
         </p>
       )}
-      {sections.length > 0 && (
+      {sections.length > 0 ? (
         <div className="rails-section">
           {sections.map((section) => (
             <ContentRail key={section.id} section={section} onOpen={onOpen} />
           ))}
         </div>
+      ) : (
+        isLoading && (
+          <div className="rails-section" aria-hidden="true">
+            {[0, 1].map((rail) => (
+              <div className="content-rail" key={rail}>
+                <div className="rail-heading">
+                  <div>
+                    <span className="skeleton skeleton-eyebrow" />
+                    <span className="skeleton skeleton-heading" />
+                  </div>
+                </div>
+                <div className="rail-track">
+                  {[0, 1, 2, 3, 4].map((card) => (
+                    <div className="rail-card" key={card}>
+                      <span className="skeleton skeleton-art" />
+                      <span className="skeleton skeleton-meta" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )
       )}
     </>
   );

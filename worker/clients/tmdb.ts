@@ -10,7 +10,7 @@ import {
   parseTmdbTitle,
   type TmdbSummary,
 } from "../lib/tmdb-payload.ts";
-import { isRecord } from "../lib/values.ts";
+import { isRecord, numberAt, records } from "../lib/values.ts";
 import type { Bindings } from "../types.ts";
 
 const API_BASE = "https://api.themoviedb.org/3";
@@ -255,4 +255,19 @@ export async function getCatalog(
     availabilitySource: "JustWatch via TMDB",
     fetchedAt,
   };
+}
+
+export async function findByImdbId(env: Bindings, imdbId: string) {
+  const response = await requestTmdb(env, `/find/${imdbId}`, { external_source: "imdb_id" });
+
+  if (!isRecord(response)) {
+    return null;
+  }
+
+  const movie = records(response.movie_results)[0];
+  const television = records(response.tv_results)[0];
+  const mediaType: MediaType | null = movie ? "movie" : television ? "tv" : null;
+  const tmdbId = numberAt(movie ?? television ?? {}, "id");
+
+  return mediaType && tmdbId ? `${mediaType}:${tmdbId}` : null;
 }

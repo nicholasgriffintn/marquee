@@ -8,6 +8,9 @@ type ProfileResponse = {
   selectedProviderIds: string[] | null;
 };
 
+const NO_IDS: string[] = [];
+const NO_ENTRIES: Record<string, ViewingEntry> = {};
+
 const emptyEntry = (titleId: string): ViewingEntry => ({
   titleId,
   status: "watchlist",
@@ -139,9 +142,9 @@ export function useProfile(isSignedIn: boolean) {
   }
 
   return {
-    entries: isSignedIn ? entries : {},
-    savedIds: isSignedIn ? savedIds : [],
-    selectedProviderIds: isSignedIn ? selectedProviderIds : [],
+    entries: isSignedIn ? entries : NO_ENTRIES,
+    savedIds: isSignedIn ? savedIds : NO_IDS,
+    selectedProviderIds: isSignedIn ? selectedProviderIds : NO_IDS,
     message: isSignedIn ? message : "",
     removeEntry,
     saveEntry,

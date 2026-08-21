@@ -18,12 +18,19 @@
     "not_found_handling": "single-page-application",
     "run_worker_first": true
   },
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "marquee-media"
+    }
+  ],
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "marquee",
       "database_id": "4bdf8e03-0ac3-496c-8e69-c8dedd116976",
-      "migrations_dir": "./migrations"
+      "migrations_dir": "./migrations",
+      "remote": true
     }
   ],
   "ratelimits": [
@@ -40,6 +47,22 @@
       "namespace_id": "764215",
       "simple": {
         "limit": 10,
+        "period": 60
+      }
+    },
+    {
+      "name": "SEARCH_RATE_LIMITER",
+      "namespace_id": "764217",
+      "simple": {
+        "limit": 30,
+        "period": 60
+      }
+    },
+    {
+      "name": "SEARCH_MEMBER_RATE_LIMITER",
+      "namespace_id": "764218",
+      "simple": {
+        "limit": 120,
         "period": 60
       }
     }
@@ -88,6 +111,10 @@
       {
         "binding": "SIMKL_QUEUE",
         "queue": "marquee-simkl"
+      },
+      {
+        "binding": "POSTER_QUEUE",
+        "queue": "marquee-posters"
       }
     ],
     "consumers": [
@@ -134,6 +161,15 @@
         "max_retries": 5,
         "dead_letter_queue": "marquee-ingestion-dead-letter",
         "max_concurrency": 2,
+        "retry_delay": 30
+      },
+      {
+        "queue": "marquee-posters",
+        "max_batch_size": 3,
+        "max_batch_timeout": 5,
+        "max_retries": 5,
+        "dead_letter_queue": "marquee-ingestion-dead-letter",
+        "max_concurrency": 3,
         "retry_delay": 30
       }
     ]

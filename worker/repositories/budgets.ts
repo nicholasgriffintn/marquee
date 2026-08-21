@@ -12,7 +12,8 @@ export const SOURCE_BUDGETS: Record<
   { windowKind: "day" | "month"; callLimit: number }
 > = {
   watchmode: { windowKind: "month", callLimit: 1_000 },
-  omdb: { windowKind: "day", callLimit: 1_000 },
+  omdb: { windowKind: "day", callLimit: 500_000 },
+  poster: { windowKind: "day", callLimit: 500_000 },
   trakt: { windowKind: "day", callLimit: 100_000 },
   simkl: { windowKind: "day", callLimit: 50_000 },
 };
