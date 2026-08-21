@@ -43,7 +43,14 @@
     "AI_MODEL": "@cf/moonshotai/kimi-k2.6"
   },
   "secrets": {
-    "required": ["GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET"]
+    "required": [
+      "TMDB_API_TOKEN",
+      "WATCHMODE_API_KEY",
+      "CLOUDFLARE_ACCOUNT_ID",
+      "CLOUDFLARE_API_TOKEN",
+      "GITHUB_CLIENT_ID",
+      "GITHUB_CLIENT_SECRET"
+    ]
   },
   "observability": {
     "enabled": true

@@ -13,6 +13,10 @@
   --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
   --sans: "Avenir Next", Avenir, Futura, "Helvetica Neue", sans-serif;
   --mono: "SFMono-Regular", "Cascadia Mono", Consolas, monospace;
+  --gutter: clamp(24px, 5vw, 82px);
+  --panel: #1b1f19;
+  --panel-tile: #23281f;
+  --panel-line: #363b33;
 }
 
 * {
@@ -74,7 +78,7 @@ svg {
   column-gap: clamp(16px, 3vw, 44px);
   display: flex;
   height: 78px;
-  padding: 0 clamp(18px, 4vw, 68px);
+  padding: 0 var(--gutter);
   position: sticky;
   top: 0;
   z-index: 30;
@@ -295,7 +299,9 @@ svg {
   position: relative;
 }
 .hero-art {
-  inset: 0 0 0 38%;
+  inset: 0 0 0 32%;
+  mask-image: linear-gradient(90deg, transparent 0, #000 30%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 30%);
   overflow: hidden;
   position: absolute;
 }
@@ -324,10 +330,10 @@ svg {
   background:
     linear-gradient(
       90deg,
-      #11130f 0 28%,
-      rgba(17, 19, 15, 0.9) 45%,
-      rgba(17, 19, 15, 0.16) 76%,
-      rgba(17, 19, 15, 0.3)
+      #11130f 0 26%,
+      rgba(17, 19, 15, 0.62) 50%,
+      rgba(17, 19, 15, 0.12) 78%,
+      rgba(17, 19, 15, 0.28)
     ),
     linear-gradient(0deg, rgba(17, 19, 15, 0.96), transparent 45%);
   inset: 0;
@@ -335,7 +341,7 @@ svg {
 }
 .hero-copy {
   max-width: 690px;
-  padding: 72px clamp(24px, 6vw, 104px) 118px;
+  padding: 72px var(--gutter) 118px;
   position: relative;
   z-index: 2;
 }
@@ -383,12 +389,12 @@ h2 em {
   min-height: 43px;
   padding: 0 16px;
 }
-.hero-actions a {
+.hero-actions .hero-play {
   background: var(--acid);
   border-color: var(--acid);
   color: var(--ink);
 }
-.hero-actions button {
+.hero-actions button:not(.hero-play) {
   background: rgba(255, 255, 255, 0.12);
   backdrop-filter: blur(10px);
 }
@@ -397,20 +403,21 @@ h2 em {
 }
 .curator-dock {
   align-items: stretch;
-  background: var(--paper);
+  background: var(--panel);
+  border: 1px solid var(--panel-line);
   bottom: 25px;
   box-shadow: 7px 7px 0 var(--blue);
-  color: var(--ink);
+  color: var(--white);
   display: grid;
   grid-template-columns: auto minmax(180px, 1fr) 52px;
   position: absolute;
-  right: clamp(24px, 5vw, 82px);
+  right: var(--gutter);
   width: min(520px, 48vw);
   z-index: 3;
 }
 .curator-dock > span {
   align-items: center;
-  border-right: 1px solid var(--ink);
+  border-right: 1px solid var(--panel-line);
   display: flex;
   font: 800 10px var(--mono);
   gap: 8px;
@@ -430,19 +437,19 @@ h2 em {
 .curator-dock input {
   background: transparent;
   border: 0;
-  color: var(--ink);
+  color: var(--white);
   min-width: 0;
   outline: 0;
   padding: 15px;
 }
 .curator-dock input::placeholder {
-  color: #6f726a;
+  color: var(--muted);
 }
 .curator-dock button {
   align-items: center;
   background: var(--acid);
   border: 0;
-  border-left: 1px solid var(--ink);
+  border-left: 1px solid var(--panel-line);
   color: var(--ink);
   display: flex;
   justify-content: center;
@@ -452,16 +459,17 @@ h2 em {
   opacity: 0.55;
 }
 .curator-response {
-  background: var(--paper);
+  background: var(--panel);
+  border: 1px solid var(--panel-line);
   border-left: 7px solid var(--coral);
   box-shadow: 7px 7px 0 var(--blue);
-  color: var(--ink);
-  margin: 24px clamp(24px, 5vw, 82px);
+  color: var(--white);
+  margin: 24px var(--gutter);
   max-width: 720px;
   padding: 15px 18px;
 }
 .curator-response span {
-  color: var(--blue);
+  color: var(--acid);
   font: 8px var(--mono);
   letter-spacing: 0.1em;
 }
@@ -475,16 +483,17 @@ h2 em {
   background: none;
   border: 0;
   border-bottom: 1px solid;
-  color: var(--ink);
+  color: var(--white);
   font: 800 9px var(--mono);
   padding: 0 0 2px;
   text-transform: uppercase;
 }
 
 .provider-strip {
-  background: var(--paper);
-  color: var(--ink);
-  padding: 24px clamp(24px, 5vw, 82px) 28px;
+  background: var(--panel);
+  border-block: 1px solid var(--panel-line);
+  color: var(--white);
+  padding: 24px var(--gutter) 28px;
 }
 .provider-strip-heading {
   align-items: end;
@@ -504,19 +513,19 @@ h2 em {
   gap: 8px;
 }
 .provider-picker {
-  border-bottom: 1px solid var(--paper-line);
-  border-left: 1px solid var(--paper-line);
+  border-bottom: 1px solid var(--panel-line);
+  border-left: 1px solid var(--panel-line);
   display: grid;
   grid-auto-columns: minmax(88px, 110px);
   grid-auto-flow: column;
   overflow-x: auto;
 }
 .provider-picker button {
-  background: var(--white);
+  background: var(--panel-tile);
   border: 0;
-  border-right: 1px solid var(--paper-line);
-  border-top: 1px solid var(--paper-line);
-  color: var(--ink);
+  border-right: 1px solid var(--panel-line);
+  border-top: 1px solid var(--panel-line);
+  color: var(--white);
   display: flex;
   flex-direction: column;
   height: 72px;
@@ -531,14 +540,14 @@ h2 em {
   letter-spacing: -0.03em;
 }
 .provider-picker button small {
-  color: #777a72;
+  color: var(--muted);
   font: 8px var(--mono);
 }
 .provider-picker button.selected {
   box-shadow: inset 0 -6px 0 var(--acid);
 }
 .provider-picker button.selected small {
-  color: var(--blue);
+  color: var(--acid);
 }
 
 .rails-section {
@@ -551,7 +560,7 @@ h2 em {
   align-items: end;
   display: flex;
   justify-content: space-between;
-  padding: 0 clamp(24px, 5vw, 82px) 17px;
+  padding: 0 var(--gutter) 17px;
 }
 .rail-heading span {
   color: var(--acid);
@@ -584,8 +593,8 @@ h2 em {
   grid-auto-columns: minmax(260px, 24vw);
   grid-auto-flow: column;
   overflow-x: auto;
-  padding: 0 clamp(24px, 5vw, 82px) 13px;
-  scroll-padding-inline: clamp(24px, 5vw, 82px);
+  padding: 0 var(--gutter) 13px;
+  scroll-padding-inline: var(--gutter);
   scroll-snap-type: x proximity;
   scrollbar-color: var(--line) transparent;
 }
@@ -641,36 +650,49 @@ h2 em {
   top: 14px;
 }
 .rail-art > strong {
-  bottom: 20px;
-  font-size: clamp(24px, 2.6vw, 38px);
+  bottom: 18px;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  font-size: clamp(21px, 2.1vw, 31px);
   left: 16px;
-  letter-spacing: -0.06em;
-  line-height: 0.86;
-  max-width: 72%;
+  letter-spacing: -0.055em;
+  line-height: 0.92;
+  overflow: hidden;
+  overflow-wrap: break-word;
   position: absolute;
+  right: 16px;
   z-index: 2;
 }
 .rail-provider-row {
-  bottom: 14px;
+  align-items: center;
   display: flex;
   gap: 5px;
   position: absolute;
   right: 14px;
+  top: 12px;
   z-index: 3;
 }
+.rail-provider-more {
+  color: var(--white);
+  font: 9px var(--mono);
+  opacity: 0.72;
+}
 .rail-meta {
-  align-items: center;
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 5px;
   padding: 11px 2px 0;
 }
 .rail-meta > span:last-child {
   color: var(--muted);
-  font: 8px var(--mono);
+  font: 9px var(--mono);
+  line-height: 1.6;
 }
 
 .selection-section {
-  padding: 100px clamp(24px, 6vw, 104px) 120px;
+  padding: 100px var(--gutter) 120px;
 }
 .section-heading {
   align-items: end;
@@ -756,9 +778,9 @@ h2 em {
 }
 .provider-badge {
   align-items: center;
-  background: var(--white);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  color: var(--ink);
+  background: rgba(127, 130, 122, 0.18);
+  border: 1px solid rgba(127, 130, 122, 0.35);
+  color: inherit;
   display: inline-flex;
   font-size: 10px;
   font-weight: 900;
@@ -766,18 +788,26 @@ h2 em {
   justify-content: center;
   min-width: 32px;
   overflow: hidden;
-  padding: 0;
+  padding: 3px;
 }
 .provider-badge img {
   height: 100%;
-  object-fit: cover;
-  width: 100%;
+  max-width: 100%;
+  object-fit: contain;
+  width: auto;
 }
 .provider-badge-compact {
   font-size: 8px;
   height: 23px;
+  max-width: 74px;
   min-width: 23px;
-  padding: 0 5px;
+  padding: 2px 4px;
+}
+/* In the picker every tile gets the same logo area, so the marks line up in a row. */
+.provider-picker .provider-badge {
+  height: 34px;
+  padding: 4px 6px;
+  width: 100%;
 }
 .title-card-title {
   background: none;
@@ -799,7 +829,7 @@ h2 em {
 
 .page-section {
   min-height: calc(100vh - 78px);
-  padding: 86px clamp(24px, 6vw, 104px) 120px;
+  padding: 86px var(--gutter) 120px;
 }
 .page-title-row {
   align-items: end;
@@ -1236,7 +1266,7 @@ h2 em {
   background: #39201c;
   border-left: 5px solid var(--coral);
   color: var(--white);
-  margin: 20px clamp(24px, 5vw, 82px);
+  margin: 20px var(--gutter);
   padding: 14px 18px;
 }
 .curator-error {
@@ -1265,7 +1295,7 @@ h2 em {
   font: 9px var(--mono);
   margin: 0;
   opacity: 0;
-  padding: 0 clamp(24px, 5vw, 82px);
+  padding: 0 var(--gutter);
   position: fixed;
   right: 0;
   top: 78px;
@@ -1278,7 +1308,7 @@ h2 em {
   border-left: 5px solid var(--coral);
   color: var(--white);
   margin: 0;
-  padding: 12px clamp(24px, 5vw, 82px);
+  padding: 12px var(--gutter);
 }
 .sync-message.visible {
   opacity: 1;
@@ -1307,7 +1337,7 @@ h2 em {
   display: flex;
   gap: 30px;
   margin-top: auto;
-  padding: 30px clamp(24px, 5vw, 82px);
+  padding: 30px var(--gutter);
 }
 .site-footer p {
   color: #696b62;

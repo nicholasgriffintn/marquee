@@ -5,6 +5,8 @@ import { useAvailability } from "../hooks/useAvailability";
 import { mediaMeta, scoreLabel } from "../lib/media";
 import { ArrowIcon, PlusIcon, Poster, ProviderBadge } from "./ui";
 
+const RAIL_PROVIDER_LIMIT = 3;
+
 function RailCard({ item, onOpen }: { item: MediaTitle; onOpen: (title: MediaTitle) => void }) {
   return (
     <article className="rail-card">
@@ -19,9 +21,14 @@ function RailCard({ item, onOpen }: { item: MediaTitle; onOpen: (title: MediaTit
           <span className="rail-number">{item.mediaType === "movie" ? "FILM" : "TV"}</span>
           <strong>{item.title}</strong>
           <div className="rail-provider-row">
-            {item.providers.slice(0, 3).map((provider) => (
+            {item.providers.slice(0, RAIL_PROVIDER_LIMIT).map((provider) => (
               <ProviderBadge provider={provider} compact key={provider.id} />
             ))}
+            {item.providers.length > RAIL_PROVIDER_LIMIT && (
+              <span className="rail-provider-more">
+                +{item.providers.length - RAIL_PROVIDER_LIMIT}
+              </span>
+            )}
           </div>
         </div>
       </button>

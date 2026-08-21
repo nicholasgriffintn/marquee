@@ -75,17 +75,8 @@ export function TonightPage({
               </p>
               <p className="hero-lede">{featured.overview || "No synopsis available."}</p>
               <div className="hero-actions">
-                <a
-                  href={featured.watchLink ?? featured.tmdbUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="hero-play"
-                >
-                  <span className="play-icon">↗</span>{" "}
-                  {featured.watchLink ? "See where to watch" : "Open on TMDB"}
-                </a>
-                <button type="button" onClick={() => onOpen(featured)}>
-                  More info
+                <button type="button" className="hero-play" onClick={() => onOpen(featured)}>
+                  <span className="play-icon">↗</span> See where to watch
                 </button>
               </div>
             </>
