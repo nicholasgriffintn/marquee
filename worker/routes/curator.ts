@@ -4,7 +4,10 @@ import { requireAuthentication, type AuthVariables } from "../auth/session.ts";
 import { AiGatewayError } from "../clients/ai-gateway.ts";
 import { clientRateLimitKey, jsonResponse, readJsonObject } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
+import { isKnownTitle } from "../lib/validation.ts";
+import { generateRails, getPersonalRails } from "../services/ai-rails.ts";
 import { curateStream } from "../services/curator.ts";
+import { getTitleInsight } from "../services/title-insight.ts";
 import type { Bindings } from "../types.ts";
 
 export const curatorRoutes = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
@@ -28,6 +31,9 @@ curatorRoutes.post("/", async (context) => {
   }
 
   const prompt = typeof body.prompt === "string" ? body.prompt.trim().slice(0, 1_000) : "";
+  const refineOf = Array.isArray(body.refineOf)
+    ? body.refineOf.filter((id): id is string => isKnownTitle(id)).slice(0, 8)
+    : [];
 
   if (!prompt) {
     return jsonResponse({ error: "Describe what kind of watch you want" }, 400);
@@ -42,7 +48,7 @@ curatorRoutes.post("/", async (context) => {
   context.executionCtx.waitUntil(
     (async () => {
       try {
-        for await (const event of curateStream(context.env, prompt, user.id)) {
+        for await (const event of curateStream(context.env, prompt, user.id, refineOf)) {
           await send(event);
         }
       } catch (error) {
@@ -61,6 +67,60 @@ curatorRoutes.post("/", async (context) => {
       "x-content-type-options": "nosniff",
     },
   });
+});
+
+curatorRoutes.get("/rails", async (context) => {
+  const user = context.get("authenticatedUser");
+
+  try {
+    context.header("cache-control", "no-store");
+
+    const { sections, isFresh, signature, viewer } = await getPersonalRails(context.env, user.id);
+
+    if (isFresh) {
+      return jsonResponse({ sections, status: "ready" });
+    }
+
+    if (context.req.query("generate") !== "1") {
+      return jsonResponse({ sections, status: "generating" });
+    }
+
+    context.executionCtx.waitUntil(
+      generateRails(context.env, user.id, signature, viewer).catch((error: unknown) =>
+        logError("ai_rails_failed", error),
+      ),
+    );
+
+    return jsonResponse({ sections, status: "generating" });
+  } catch (error) {
+    logError("ai_rails_failed", error);
+
+    return jsonResponse({ sections: [], status: "error" });
+  }
+});
+
+curatorRoutes.get("/insight/:titleId", async (context) => {
+  const titleId = context.req.param("titleId");
+
+  if (!isKnownTitle(titleId)) {
+    return jsonResponse({ error: "Unknown title" }, 400);
+  }
+
+  const { success } = await context.env.CURATOR_RATE_LIMITER.limit({
+    key: clientRateLimitKey(context.req.raw, context.get("authenticatedUser").id),
+  });
+
+  if (!success) {
+    return jsonResponse({ error: "Too many requests" }, 429);
+  }
+
+  try {
+    return jsonResponse({ insight: await getTitleInsight(context.env, titleId) });
+  } catch (error) {
+    logError("title_insight_failed", error);
+
+    return jsonResponse({ insight: null });
+  }
 });
 
 function curatorErrorMessage(error: unknown) {

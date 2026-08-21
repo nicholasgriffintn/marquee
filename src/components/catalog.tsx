@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 
 import type { CatalogSection, MediaTitle } from "../domain/catalog";
 import { useAvailability } from "../hooks/useAvailability";
+import { useTitleInsight } from "../hooks/useTitleInsight";
 import { mediaMeta, scoreLabel } from "../lib/media";
 import { ArrowIcon, PlusIcon, Poster, ProviderBadge } from "./ui";
 
@@ -102,6 +103,7 @@ export function DetailPanel({
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const providers = useAvailability(item, watchmodeEnabled);
+  const { insight, isLoading: isInsightLoading } = useTitleInsight(item.id, canSave);
   const watchDestinations = providers.flatMap((provider) => {
     const href = provider.webUrl ?? item.watchLink;
 
@@ -144,6 +146,30 @@ export function DetailPanel({
           <p className="detail-meta">
             {item.mediaType === "movie" ? "Film" : "Television"} · {mediaMeta(item)}
           </p>
+          {(insight || isInsightLoading) && (
+            <div className="detail-insight">
+              <span>
+                <i>AI</i> Marquee read
+              </span>
+              {insight ? (
+                <>
+                  <p>{insight.hook}</p>
+                  {insight.moods.length > 0 && (
+                    <div className="detail-moods">
+                      {insight.moods.map((mood) => (
+                        <em key={mood}>{mood}</em>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <span className="skeleton skeleton-line" />
+                  <span className="skeleton skeleton-line short" />
+                </>
+              )}
+            </div>
+          )}
           <p className="detail-synopsis">{item.overview || "No synopsis available."}</p>
           <div className="score-row">
             <div>

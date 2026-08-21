@@ -20,7 +20,7 @@ export const CURATOR_TOOLS: ChatCompletionTool[] = [
     function: {
       name: "search_catalogue",
       description:
-        "Search Marquee's catalogue. Call this before recommending titles and refine it when needed.",
+        "Search Marquee's whole catalogue. Call it repeatedly with different genres, keywords, sort orders and score floors to dig past the obvious hits.",
       parameters: {
         type: "object",
         properties: {
@@ -37,7 +37,14 @@ export const CURATOR_TOOLS: ChatCompletionTool[] = [
             description:
               "Default true. Exclude watched and dropped titles unless a rewatch is requested.",
           },
-          limit: { type: "integer", minimum: 1, maximum: 20 },
+          releasedAfter: { type: "integer", minimum: 1900, maximum: 2100 },
+          sort: {
+            type: "string",
+            enum: ["popularity", "score", "recent"],
+            description:
+              "Order results. Use score to surface acclaimed titles beyond the obvious hits.",
+          },
+          limit: { type: "integer", minimum: 1, maximum: 30 },
         },
         additionalProperties: false,
       },
@@ -71,6 +78,7 @@ export async function executeCuratorTool(
   call: ToolCall,
   viewer: ViewerContext,
   availableIds: Set<string>,
+  alwaysExclude: string[] = [],
 ) {
   const parsedArguments = parseJson(call.function.arguments);
   const argumentsValue = isRecord(parsedArguments) ? parsedArguments : {};
@@ -85,7 +93,10 @@ export async function executeCuratorTool(
   }
 
   if (call.function.name === "search_catalogue") {
-    const results = await searchCatalogue(env.DB, buildSearch(argumentsValue, viewer));
+    const results = await searchCatalogue(
+      env.DB,
+      buildSearch(argumentsValue, viewer, alwaysExclude),
+    );
 
     for (const item of results) {
       availableIds.add(item.id);
@@ -113,13 +124,16 @@ export async function executeCuratorTool(
 function buildSearch(
   argumentsValue: Record<string, unknown>,
   viewer: ViewerContext,
+  alwaysExclude: string[] = [],
 ): CatalogueSearch {
-  const excludeIds =
-    argumentsValue.excludeWatched === false
+  const excludeIds = [
+    ...alwaysExclude,
+    ...(argumentsValue.excludeWatched === false
       ? []
       : viewer.entries
           .filter((entry) => entry.status === "watched" || entry.status === "dropped")
-          .map((entry) => entry.titleId);
+          .map((entry) => entry.titleId)),
+  ];
 
   return {
     query: typeof argumentsValue.query === "string" ? argumentsValue.query : undefined,
@@ -133,6 +147,12 @@ function buildSearch(
     providerIds:
       argumentsValue.availableOnSelectedServices === false ? [] : viewer.selectedProviderIds,
     minScore: typeof argumentsValue.minScore === "number" ? argumentsValue.minScore : undefined,
+    releasedAfter:
+      typeof argumentsValue.releasedAfter === "number" ? argumentsValue.releasedAfter : undefined,
+    sort:
+      argumentsValue.sort === "score" || argumentsValue.sort === "recent"
+        ? argumentsValue.sort
+        : undefined,
     excludeIds,
     limit: typeof argumentsValue.limit === "number" ? argumentsValue.limit : undefined,
   };

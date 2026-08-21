@@ -59,7 +59,7 @@ export function ProviderBadge({
 }
 
 export function Poster({ item, wide = false }: { item: MediaTitle; wide?: boolean }) {
-  const image = wide ? (item.backdropUrl ?? item.posterUrl) : item.posterUrl;
+  const image = wide ? (item.posterUrl ?? item.backdropUrl) : item.posterUrl;
 
   return (
     <div className={`poster${wide ? " poster-wide" : ""}${image ? "" : " poster-missing"}`}>

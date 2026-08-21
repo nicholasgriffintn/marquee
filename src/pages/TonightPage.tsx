@@ -6,11 +6,22 @@ import type { CatalogSection, MediaTitle, Provider } from "../domain/catalog";
 import type { CuratorState } from "../hooks/useCurator";
 import { mediaMeta, scoreLabel } from "../lib/media";
 
+const SEED_PROMPTS = [
+  "Something short and funny",
+  "A slow burn for a rainy night",
+  "Smart sci-fi I have not seen",
+  "Watch with my kids",
+];
+
+const REFINEMENTS = ["Shorter", "Lighter", "Older", "Weirder", "More acclaimed"];
+
 export function TonightPage({
   curator,
   curatorError,
   isAsking,
   isLoading,
+  isBuildingRails,
+  isSessionLoading,
   error,
   providerError,
   isSignedIn,
@@ -27,13 +38,15 @@ export function TonightPage({
   curatorError: string;
   isAsking: boolean;
   isLoading: boolean;
+  isBuildingRails: boolean;
+  isSessionLoading: boolean;
   error: string;
   providerError: string;
   isSignedIn: boolean;
   sections: CatalogSection[];
   providers: Provider[];
   selectedProviderIds: string[];
-  onAsk: (prompt: string) => Promise<void>;
+  onAsk: (prompt: string, refineOf?: string[]) => Promise<void>;
   onClearCurator: () => void;
   onOpen: (item: MediaTitle) => void;
   onSelectProviders: (ids: string[]) => void;
@@ -124,6 +137,22 @@ export function TonightPage({
             </button>
           </form>
         )}
+        {isSignedIn && !curator.prompt && (
+          <div className="curator-seeds">
+            {SEED_PROMPTS.map((seed) => (
+              <button
+                key={seed}
+                type="button"
+                onClick={() => {
+                  setPrompt(seed);
+                  void onAsk(seed);
+                }}
+              >
+                {seed}
+              </button>
+            ))}
+          </div>
+        )}
       </section>
 
       {isSignedIn && (curator.prompt || curatorError) && (
@@ -139,13 +168,33 @@ export function TonightPage({
             {curatorError || curator.summary}
             {curator.isStreaming && !curatorError && <i className="curator-caret" />}
           </p>
-          <button type="button" onClick={onClearCurator}>
+          {curator.items.length > 0 && !curator.isStreaming && (
+            <div className="curator-refine">
+              <span>Refine</span>
+              {REFINEMENTS.map((refinement) => (
+                <button
+                  key={refinement}
+                  type="button"
+                  disabled={isAsking}
+                  onClick={() =>
+                    void onAsk(
+                      refinement,
+                      curator.items.map((item) => item.id),
+                    )
+                  }
+                >
+                  {refinement}
+                </button>
+              ))}
+            </div>
+          )}
+          <button type="button" className="curator-clear" onClick={onClearCurator}>
             Clear
           </button>
         </div>
       )}
 
-      {isSignedIn && (
+      {isSignedIn && !isSessionLoading && (
         <section className="provider-strip">
           <div className="provider-strip-heading">
             <div>
@@ -188,6 +237,31 @@ export function TonightPage({
         <p className="catalogue-error" role="alert">
           {error}
         </p>
+      )}
+      {isBuildingRails && (
+        <div className="rails-section" aria-live="polite">
+          <p className="rails-building">
+            <i>AI</i> Building your shelves…
+          </p>
+          {[0, 1].map((rail) => (
+            <div className="content-rail" key={rail} aria-hidden="true">
+              <div className="rail-heading">
+                <div>
+                  <span className="skeleton skeleton-eyebrow" />
+                  <span className="skeleton skeleton-heading" />
+                </div>
+              </div>
+              <div className="rail-track">
+                {[0, 1, 2, 3, 4].map((card) => (
+                  <div className="rail-card" key={card}>
+                    <span className="skeleton skeleton-art" />
+                    <span className="skeleton skeleton-meta" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       )}
       {sections.length > 0 ? (
         <div className="rails-section">

@@ -682,6 +682,125 @@ h2 em {
   font-style: normal;
   margin-left: 10px;
 }
+.rails-building {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  font: 700 10px var(--mono);
+  gap: 9px;
+  letter-spacing: 0.1em;
+  margin: 0;
+  padding: 26px var(--gutter) 0;
+  text-transform: uppercase;
+}
+.rails-building i {
+  align-items: center;
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+  background: var(--blue);
+  color: white;
+  display: inline-flex;
+  font-style: normal;
+  height: 20px;
+  justify-content: center;
+  width: 20px;
+}
+.curator-seeds {
+  bottom: 88px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  position: absolute;
+  justify-content: flex-end;
+  right: var(--gutter);
+  width: min(520px, 48vw);
+  z-index: 3;
+}
+.curator-seeds button {
+  background: rgba(17, 19, 15, 0.72);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--panel-line);
+  color: var(--white);
+  font: 700 10px var(--mono);
+  padding: 7px 11px;
+}
+.curator-seeds button:hover {
+  border-color: var(--acid);
+  color: var(--acid);
+}
+.curator-refine {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 4px 0 12px;
+}
+.curator-refine > span {
+  color: var(--muted);
+  font: 8px var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.curator-refine button {
+  background: none;
+  border: 1px solid var(--panel-line);
+  color: var(--white);
+  font: 700 10px var(--mono);
+  padding: 6px 10px;
+}
+.curator-refine button:hover:not(:disabled) {
+  border-color: var(--acid);
+  color: var(--acid);
+}
+.curator-refine button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+.detail-insight {
+  border-left: 3px solid var(--blue);
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin: 18px 0;
+  padding: 2px 0 2px 15px;
+}
+.detail-insight > span {
+  align-items: center;
+  color: #6f7268;
+  display: flex;
+  font: 800 9px var(--mono);
+  gap: 8px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.detail-insight > span i {
+  align-items: center;
+  background: var(--blue);
+  color: white;
+  display: inline-flex;
+  font-style: normal;
+  height: 20px;
+  justify-content: center;
+  width: 20px;
+}
+.detail-insight p {
+  font-family: var(--serif);
+  font-size: 17px;
+  line-height: 1.45;
+  margin: 0;
+}
+.detail-moods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.detail-moods em {
+  border: 1px solid var(--blue);
+  color: var(--blue);
+  font: 700 9px var(--mono);
+  font-style: normal;
+  padding: 4px 9px;
+  text-transform: uppercase;
+}
 .curator-response span {
   color: var(--acid);
   font: 8px var(--mono);
@@ -1361,10 +1480,12 @@ h2 em {
   color: var(--ink);
   display: grid;
   grid-template-columns: minmax(280px, 0.75fr) minmax(420px, 1.25fr);
+  height: 100dvh;
   margin: 0;
-  max-height: none;
+  max-height: 100dvh;
   max-width: 1060px;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 0;
   position: relative;
   width: min(92vw, 1060px);
@@ -1387,11 +1508,16 @@ h2 em {
   z-index: 3;
 }
 .detail-panel .poster-wide {
+  align-self: start;
   aspect-ratio: auto;
-  height: 100%;
-  min-height: 100vh;
+  height: 100dvh;
+  min-height: 0;
   position: sticky;
   top: 0;
+}
+.detail-panel .poster-wide > img {
+  object-fit: cover;
+  object-position: left top;
 }
 .detail-copy {
   padding: 62px 42px;

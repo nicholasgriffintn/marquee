@@ -5,6 +5,7 @@ import { DetailPanel } from "./components/catalog";
 import { SearchBox } from "./components/SearchBox";
 import { GitHubIcon, MarqueeLogo } from "./components/ui";
 import type { MediaTitle } from "./domain/catalog";
+import { useAiRails } from "./hooks/useAiRails";
 import { useCatalog } from "./hooks/useCatalog";
 import { useCurator } from "./hooks/useCurator";
 import { useProfile } from "./hooks/useProfile";
@@ -31,9 +32,11 @@ export function App() {
   const session = useSession();
   const isSignedIn = Boolean(session.user);
   const profile = useProfile(isSignedIn);
-  const catalog = useCatalog(profile.selectedProviderIds, profile.savedIds);
+  const isViewerReady = !session.isLoading && profile.isLoaded;
+  const catalog = useCatalog(profile.selectedProviderIds, profile.savedIds, isViewerReady);
   const search = useSearch(query, profile.selectedProviderIds);
   const curator = useCurator();
+  const aiRails = useAiRails(isSignedIn && isViewerReady, profile.savedIds.join(","));
   const titleMatch = useMatch("/title/:titleId");
   const background = (location.state as { background?: typeof location } | null)?.background;
   const pageLocation =
@@ -53,21 +56,23 @@ export function App() {
 
     void navigate("/");
   }, [background, navigate]);
-  const sections = useMemo(() => {
-    if (!curator.state.items.length) {
-      return catalog.catalogue.sections;
-    }
-
-    return [
-      {
-        id: "ai",
-        title: "Picked for you",
-        description: curator.state.prompt,
-        items: curator.state.items,
-      },
+  const sections = useMemo(
+    () => [
+      ...(curator.state.items.length
+        ? [
+            {
+              id: "ai",
+              title: "Picked for you",
+              description: curator.state.prompt,
+              items: curator.state.items,
+            },
+          ]
+        : []),
+      ...aiRails.sections,
       ...catalog.catalogue.sections,
-    ];
-  }, [catalog.catalogue, curator.state.items, curator.state.prompt]);
+    ],
+    [aiRails.sections, catalog.catalogue, curator.state.items, curator.state.prompt],
+  );
 
   async function saveTitle(item: MediaTitle) {
     const saved = await profile.saveEntry(
@@ -177,7 +182,9 @@ export function App() {
               curator={curator.state}
               curatorError={curator.error}
               isAsking={curator.isAsking}
-              isLoading={catalog.isLoading}
+              isLoading={catalog.isLoading || !isViewerReady}
+              isBuildingRails={aiRails.isGenerating}
+              isSessionLoading={!isViewerReady}
               error={catalog.error}
               providerError={catalog.providerError}
               isSignedIn={isSignedIn}

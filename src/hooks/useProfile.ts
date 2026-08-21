@@ -22,6 +22,7 @@ export function useProfile(isSignedIn: boolean) {
   const [entries, setEntries] = useState<Record<string, ViewingEntry>>({});
   const [selectedProviderIds, setSelectedProviderIds] = useState<string[]>([]);
   const [message, setMessage] = useState("");
+  const [isLoaded, setIsLoaded] = useState(false);
   const savedIds = useMemo(() => Object.keys(entries), [entries]);
 
   useEffect(() => {
@@ -47,6 +48,8 @@ export function useProfile(isSignedIn: boolean) {
         if (!(error instanceof DOMException && error.name === "AbortError")) {
           setMessage("Could not load your saved profile. New changes may not sync.");
         }
+      } finally {
+        setIsLoaded(true);
       }
     }
 
@@ -146,6 +149,7 @@ export function useProfile(isSignedIn: boolean) {
     savedIds: isSignedIn ? savedIds : NO_IDS,
     selectedProviderIds: isSignedIn ? selectedProviderIds : NO_IDS,
     message: isSignedIn ? message : "",
+    isLoaded: isSignedIn ? isLoaded : true,
     removeEntry,
     saveEntry,
     savePreferences,

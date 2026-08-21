@@ -41,7 +41,7 @@ export function useCurator() {
     setIsAsking(false);
   }, []);
 
-  const ask = useCallback(async (prompt: string) => {
+  const ask = useCallback(async (prompt: string, refineOf: string[] = []) => {
     const trimmed = prompt.trim();
 
     if (!trimmed) {
@@ -55,13 +55,19 @@ export function useCurator() {
     abortRef.current = controller;
     setError("");
     setIsAsking(true);
-    setState({ ...EMPTY, prompt: trimmed, status: "Thinking", isStreaming: true });
+    setState((current) => ({
+      ...EMPTY,
+      prompt: trimmed,
+      items: refineOf.length ? current.items : [],
+      status: "Thinking",
+      isStreaming: true,
+    }));
 
     try {
       const response = await fetch("/api/curator", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ prompt: trimmed }),
+        body: JSON.stringify({ prompt: trimmed, refineOf }),
         signal: controller.signal,
       });
 

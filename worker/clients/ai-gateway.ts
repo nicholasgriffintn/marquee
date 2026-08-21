@@ -20,6 +20,12 @@ function assertConfiguration(env: Bindings) {
   }
 }
 
+export function fastModel(env: Bindings) {
+  return /^@cf\/[a-z0-9._/-]{1,120}$/u.test(env.AI_FAST_MODEL ?? "")
+    ? (env.AI_FAST_MODEL as string)
+    : env.AI_MODEL;
+}
+
 export class AiGatewayError extends Error {
   constructor(
     message: string,
@@ -35,8 +41,18 @@ export async function requestAiCompletion(
   messages: ChatMessage[],
   tools: ChatCompletionTool[],
   allowTools: boolean,
+  options: {
+    model?: string;
+    timeoutMs?: number;
+    maxTokens?: number;
+    json?: boolean;
+    toolChoice?: "auto" | "required" | "none";
+  } = {},
 ) {
   assertConfiguration(env);
+
+  const model = options.model ?? env.AI_MODEL;
+  const timeoutMs = options.timeoutMs ?? 16_000;
 
   const response = await fetch(
     `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/ai/v1/chat/completions`,
@@ -45,22 +61,27 @@ export async function requestAiCompletion(
       headers: {
         accept: "application/json",
         authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
-        "cf-aig-collect-log": "false",
+        "cf-aig-collect-log": "true",
         "cf-aig-gateway-id": env.AI_GATEWAY_ID,
-        "cf-aig-request-timeout": "15000",
-        "cf-aig-skip-cache": "true",
+        "cf-aig-request-timeout": String(timeoutMs - 1_000),
+        "cf-aig-skip-cache": "false",
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: env.AI_MODEL,
+        model,
         messages,
         temperature: 0.2,
-        max_completion_tokens: 500,
-        tools,
-        tool_choice: allowTools ? "auto" : "none",
-        parallel_tool_calls: false,
+        max_completion_tokens: options.maxTokens ?? 500,
+        ...(tools.length
+          ? {
+              tools,
+              tool_choice: allowTools ? (options.toolChoice ?? "auto") : "none",
+              parallel_tool_calls: false,
+            }
+          : {}),
+        ...(options.json ? { response_format: { type: "json_object" } } : {}),
       }),
-      signal: AbortSignal.timeout(16_000),
+      signal: AbortSignal.timeout(timeoutMs),
     },
   );
 
@@ -71,10 +92,17 @@ export async function requestAiCompletion(
     );
   }
 
-  const message = parseAssistantMessage(await response.json());
+  const payload = await response.json();
+  const message = parseAssistantMessage(payload);
 
   if (!message) {
     throw new Error("Cloudflare AI returned an invalid response");
+  }
+
+  if (!message.content && !message.tool_calls?.length) {
+    throw new Error(
+      `Cloudflare AI returned no content (finish_reason: ${finishReason(payload) ?? "unknown"}, model: ${model})`,
+    );
   }
 
   return message;
@@ -167,4 +195,14 @@ function parseStreamDelta(data: string) {
   } catch {
     return null;
   }
+}
+
+function finishReason(payload: unknown) {
+  if (!isRecord(payload) || !Array.isArray(payload.choices)) {
+    return null;
+  }
+
+  const choice = payload.choices[0];
+
+  return isRecord(choice) && typeof choice.finish_reason === "string" ? choice.finish_reason : null;
 }

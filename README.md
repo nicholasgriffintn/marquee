@@ -53,7 +53,6 @@ Put your secrets:
 pnpm exec wrangler secret put TMDB_API_TOKEN
 pnpm exec wrangler secret put WATCHMODE_API_KEY
 pnpm exec wrangler secret put OMDB_API_KEY
-pnpm exec wrangler secret put TRAKT_CLIENT_ID
 pnpm exec wrangler secret put SIMKL_CLIENT_ID
 pnpm exec wrangler secret put CLOUDFLARE_ACCOUNT_ID
 pnpm exec wrangler secret put CLOUDFLARE_API_TOKEN
