@@ -1,0 +1,138 @@
+import type { CatalogResponse, CatalogSection, MediaTitle } from "../../src/domain/catalog.ts";
+import { parseStoredTitle, parseStoredTitleIds } from "../lib/catalog-payload.ts";
+import { isKnownTitle } from "../lib/validation.ts";
+
+type PayloadRow = { payload: string };
+
+type SectionRow = {
+  id: string;
+  title: string;
+  description: string;
+  titleIds: string;
+  sourceUpdatedAt: string;
+};
+
+function includesProvider(title: MediaTitle, providerIds: string[]) {
+  return (
+    providerIds.length === 0 ||
+    title.providers.some((provider) => providerIds.includes(provider.id))
+  );
+}
+
+export async function readItems(db: D1Database, ids: string[]) {
+  const uniqueIds = [...new Set(ids.filter(isKnownTitle))].slice(0, 30);
+
+  if (uniqueIds.length === 0) {
+    return [];
+  }
+
+  const placeholders = uniqueIds.map(() => "?").join(",");
+  const rows = await db
+    .prepare(`SELECT payload FROM catalog_titles WHERE id IN (${placeholders})`)
+    .bind(...uniqueIds)
+    .all<PayloadRow>();
+  const titlesById = new Map(
+    rows.results.flatMap((row): Array<[string, MediaTitle]> => {
+      const title = parseStoredTitle(row.payload);
+
+      return title ? [[title.id, title]] : [];
+    }),
+  );
+
+  return uniqueIds.flatMap((id) => {
+    const title = titlesById.get(id);
+
+    return title ? [title] : [];
+  });
+}
+
+export async function readCatalog(db: D1Database, query: string, providerIds: string[]) {
+  if (query) {
+    return readSearchResults(db, query, providerIds);
+  }
+
+  const rows = await db
+    .prepare(
+      `SELECT
+         id,
+         title,
+         description,
+         title_ids AS titleIds,
+         source_updated_at AS sourceUpdatedAt
+       FROM catalog_sections
+       ORDER BY rowid`,
+    )
+    .all<SectionRow>();
+
+  if (rows.results.length === 0) {
+    return null;
+  }
+
+  const titleIds = rows.results.flatMap((section) => parseStoredTitleIds(section.titleIds));
+  const titles = await readItems(db, titleIds);
+  const titlesById = new Map(titles.map((title) => [title.id, title]));
+  const sections: CatalogSection[] = rows.results.map((section) => ({
+    id: section.id,
+    title: section.title,
+    description: section.description,
+    items: parseStoredTitleIds(section.titleIds)
+      .flatMap((id) => {
+        const title = titlesById.get(id);
+
+        return title ? [title] : [];
+      })
+      .filter((title) => includesProvider(title, providerIds)),
+  }));
+  const fetchedAt = rows.results.reduce(
+    (latest, section) => (section.sourceUpdatedAt > latest ? section.sourceUpdatedAt : latest),
+    "",
+  );
+
+  return {
+    sections,
+    source: "TMDB",
+    availabilitySource: "JustWatch via TMDB",
+    fetchedAt,
+  } satisfies CatalogResponse;
+}
+
+export async function readAvailability(db: D1Database, titleId: string) {
+  const [title] = await readItems(db, [titleId]);
+
+  return title?.providers ?? null;
+}
+
+async function readSearchResults(db: D1Database, query: string, providerIds: string[]) {
+  const rows = await db
+    .prepare(
+      `SELECT payload
+       FROM catalog_titles
+       WHERE instr(lower(title), lower(?)) > 0
+          OR instr(lower(original_title), lower(?)) > 0
+       ORDER BY popularity DESC
+       LIMIT 30`,
+    )
+    .bind(query, query)
+    .all<PayloadRow>();
+  const items = rows.results
+    .flatMap((row) => {
+      const title = parseStoredTitle(row.payload);
+
+      return title ? [title] : [];
+    })
+    .filter((title) => includesProvider(title, providerIds));
+
+  return {
+    sections: [
+      {
+        id: "search",
+        title: "Search results",
+        description: `Results from the Marquee catalogue for “${query}”`,
+        items,
+      },
+    ],
+    source: "TMDB",
+    availabilitySource: "JustWatch via TMDB",
+    fetchedAt: new Date().toISOString(),
+  } satisfies CatalogResponse;
+}

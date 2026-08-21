@@ -1,0 +1,7 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["@cloudflare/workers-types", "vite/client"]
+  },
+  "include": ["worker/**/*.ts", "src/domain/catalog.ts", "worker-configuration.d.ts"]
+}

@@ -1,0 +1,73 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "marquee",
+  "main": "./worker/index.ts",
+  "compatibility_date": "2026-08-21",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": true,
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": true
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "marquee",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "./migrations"
+    }
+  ],
+  "ratelimits": [
+    {
+      "name": "AUTH_RATE_LIMITER",
+      "namespace_id": "764216",
+      "simple": {
+        "limit": 20,
+        "period": 60
+      }
+    },
+    {
+      "name": "CURATOR_RATE_LIMITER",
+      "namespace_id": "764215",
+      "simple": {
+        "limit": 10,
+        "period": 60
+      }
+    }
+  ],
+  "vars": {
+    "AI_GATEWAY_ID": "demo",
+    "AI_MODEL": "@cf/moonshotai/kimi-k2.6"
+  },
+  "secrets": {
+    "required": ["GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET"]
+  },
+  "observability": {
+    "enabled": true
+  },
+  "triggers": {
+    "crons": ["17 */6 * * *"]
+  },
+  "queues": {
+    "producers": [
+      {
+        "binding": "INGESTION_QUEUE",
+        "queue": "marquee-ingestion"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "marquee-ingestion",
+        "max_batch_size": 5,
+        "max_batch_timeout": 5,
+        "max_retries": 5,
+        "dead_letter_queue": "marquee-ingestion-dead-letter",
+        "max_concurrency": 1,
+        "retry_delay": 30
+      }
+    ]
+  }
+}
