@@ -38,14 +38,19 @@ export function App() {
   const curator = useCurator();
   const aiRails = useAiRails(isSignedIn && isViewerReady, profile.savedIds.join(","));
   const titleMatch = useMatch("/title/:titleId");
-  const background = (location.state as { background?: typeof location } | null)?.background;
+  const storedBackground = (location.state as { background?: typeof location } | null)?.background;
+  const background = storedBackground?.pathname.startsWith("/title/")
+    ? undefined
+    : storedBackground;
   const pageLocation =
     background ?? (titleMatch ? { ...location, pathname: "/", search: "" } : location);
   const openTitle = useCallback(
     (item: MediaTitle) => {
-      void navigate(`/title/${encodeURIComponent(item.id)}`, { state: { background: location } });
+      void navigate(`/title/${encodeURIComponent(item.id)}`, {
+        state: { background: background ?? (titleMatch ? undefined : location) },
+      });
     },
-    [location, navigate],
+    [background, location, navigate, titleMatch],
   );
   const closeDetails = useCallback(() => {
     if (background) {
@@ -264,6 +269,7 @@ export function App() {
           entries={profile.entries}
           watchmodeEnabled={catalog.providerSources.includes("Watchmode")}
           onClose={closeDetails}
+          onOpen={openTitle}
           onSave={(item) => void saveTitle(item)}
         />
       )}
@@ -328,6 +334,7 @@ function TitleOverlay({
   entries,
   watchmodeEnabled,
   onClose,
+  onOpen,
   onSave,
 }: {
   titleId: string;
@@ -337,6 +344,7 @@ function TitleOverlay({
   entries: Record<string, unknown>;
   watchmodeEnabled: boolean;
   onClose: () => void;
+  onOpen: (item: MediaTitle) => void;
   onSave: (item: MediaTitle) => void;
 }) {
   const known = useMemo(
@@ -357,6 +365,7 @@ function TitleOverlay({
       isSaved={Boolean(entries[title.id])}
       watchmodeEnabled={watchmodeEnabled}
       onClose={onClose}
+      onOpen={onOpen}
       onSave={onSave}
     />
   );

@@ -92,6 +92,7 @@ export function DetailPanel({
   watchmodeEnabled,
   canSave,
   onClose,
+  onOpen,
   onSave,
 }: {
   item: MediaTitle;
@@ -99,11 +100,12 @@ export function DetailPanel({
   watchmodeEnabled: boolean;
   canSave: boolean;
   onClose: () => void;
+  onOpen: (item: MediaTitle) => void;
   onSave: (item: MediaTitle) => void;
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const providers = useAvailability(item, watchmodeEnabled);
-  const { insight, isLoading: isInsightLoading } = useTitleInsight(item.id, canSave);
+  const { insight, pairs, isLoading: isInsightLoading } = useTitleInsight(item.id, canSave);
   const watchDestinations = providers.flatMap((provider) => {
     const href = provider.webUrl ?? item.watchLink;
 
@@ -211,6 +213,32 @@ export function DetailPanel({
             >
               <PlusIcon /> {isSaved ? "Already on my shelf" : "Save to my shelf"}
             </button>
+          )}
+          {pairs.length > 0 && (
+            <div className="detail-pairs">
+              <span>
+                <i>AI</i> Watch next
+              </span>
+              {pairs.map((pair) => (
+                <button
+                  type="button"
+                  key={pair.item.id}
+                  className="detail-pair"
+                  onClick={() => onOpen(pair.item)}
+                >
+                  {pair.item.posterUrl ? (
+                    <img src={pair.item.posterUrl} alt="" loading="lazy" />
+                  ) : (
+                    <i aria-hidden="true" />
+                  )}
+                  <span>
+                    <strong>{pair.item.title}</strong>
+                    <small>{pair.reason}</small>
+                  </span>
+                  <ArrowIcon />
+                </button>
+              ))}
+            </div>
           )}
           <div className="resource-links">
             <span>SOURCE LINKS</span>

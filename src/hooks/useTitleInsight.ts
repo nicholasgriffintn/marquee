@@ -1,15 +1,18 @@
 import { useEffect, useState } from "react";
 
+import type { MediaTitle } from "../domain/catalog";
 import { requestJson } from "../lib/api";
 
 export type TitleInsight = {
   hook: string;
   moods: string[];
-  pairs: { titleId: string; reason: string }[];
 };
+
+export type InsightPair = { item: MediaTitle; reason: string };
 
 export function useTitleInsight(titleId: string | null, enabled: boolean) {
   const [insight, setInsight] = useState<TitleInsight | null>(null);
+  const [pairs, setPairs] = useState<InsightPair[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -24,17 +27,19 @@ export function useTitleInsight(titleId: string | null, enabled: boolean) {
       setIsLoading(true);
 
       try {
-        const response = await requestJson<{ insight: TitleInsight | null }>(
+        const response = await requestJson<{ insight: TitleInsight | null; pairs: InsightPair[] }>(
           `/api/curator/insight/${encodeURIComponent(titleId as string)}`,
           { signal: controller.signal },
         );
 
         if (active) {
           setInsight(response.insight);
+          setPairs(response.pairs ?? []);
         }
       } catch {
         if (active) {
           setInsight(null);
+          setPairs([]);
         }
       } finally {
         if (active) {
@@ -51,5 +56,5 @@ export function useTitleInsight(titleId: string | null, enabled: boolean) {
     };
   }, [enabled, titleId]);
 
-  return { insight, isLoading };
+  return { insight, pairs, isLoading };
 }

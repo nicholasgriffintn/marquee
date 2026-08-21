@@ -239,7 +239,7 @@ export function TonightPage({
         </p>
       )}
       {isBuildingRails && (
-        <div className="rails-section" aria-live="polite">
+        <div className="rails-section rails-section-pending" aria-live="polite">
           <p className="rails-building">
             <i>AI</i> Building your shelves…
           </p>

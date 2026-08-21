@@ -8,7 +8,7 @@ type RailsResponse = {
   status: "ready" | "generating" | "error";
 };
 
-const RETRY_DELAYS = [4_000, 9_000];
+const RETRY_DELAYS = [5_000, 10_000, 20_000, 30_000];
 
 export function useAiRails(isSignedIn: boolean, savedKey: string) {
   const [sections, setSections] = useState<CatalogSection[]>([]);

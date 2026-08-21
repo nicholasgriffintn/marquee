@@ -111,6 +111,10 @@
       {
         "binding": "POSTER_QUEUE",
         "queue": "marquee-posters"
+      },
+      {
+        "binding": "AI_QUEUE",
+        "queue": "marquee-ai"
       }
     ],
     "consumers": [
@@ -155,6 +159,15 @@
         "max_batch_size": 3,
         "max_batch_timeout": 5,
         "max_retries": 5,
+        "dead_letter_queue": "marquee-ingestion-dead-letter",
+        "max_concurrency": 3,
+        "retry_delay": 30
+      },
+      {
+        "queue": "marquee-ai",
+        "max_batch_size": 1,
+        "max_batch_timeout": 2,
+        "max_retries": 2,
         "dead_letter_queue": "marquee-ingestion-dead-letter",
         "max_concurrency": 3,
         "retry_delay": 30

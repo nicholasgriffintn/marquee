@@ -15,6 +15,8 @@ import { readItems } from "../repositories/catalog-reader.ts";
 import { storeCatalog, storeItems } from "../repositories/catalog-writer.ts";
 import { selectUnenriched, storeEnrichment, storePoster } from "../repositories/enrichment.ts";
 import { storeProviders } from "../repositories/providers.ts";
+import { readViewerContext } from "../repositories/viewer-context.ts";
+import { generateRails, getPersonalRails } from "../services/ai-rails.ts";
 import type { Bindings, EnrichmentSource, IngestionJob } from "../types.ts";
 import { getProviderLedger } from "./provider-ledger.ts";
 
@@ -333,6 +335,15 @@ export async function executeIngestionJob(env: Bindings, job: IngestionJob) {
 
   if (job.type === "import-imdb-title") {
     await importImdbTitle(env, job.imdbId);
+
+    return;
+  }
+
+  if (job.type === "build-rails") {
+    const viewer = await readViewerContext(env.DB, job.viewerId);
+    const { signature } = await getPersonalRails(env, job.viewerId);
+
+    await generateRails(env, job.viewerId, signature, viewer);
 
     return;
   }

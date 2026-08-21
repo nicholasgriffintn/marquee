@@ -5,6 +5,28 @@ import { readItems } from "../repositories/catalog-reader.ts";
 import { type CatalogueSearch, searchCatalogue } from "../repositories/catalog-search.ts";
 import type { Bindings, ViewerContext } from "../types.ts";
 
+export const SEARCH_TOOL: ChatCompletionTool = {
+  type: "function",
+  function: {
+    name: "search_catalogue",
+    description:
+      "Search Marquee's whole catalogue. Call it repeatedly with different genres, keywords, sort orders and score floors to dig past the obvious hits.",
+    parameters: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Words expected in the title or synopsis." },
+        genres: { type: "array", items: { type: "string" }, maxItems: 10 },
+        mediaType: { type: "string", enum: ["movie", "tv"] },
+        minScore: { type: "number", minimum: 0, maximum: 10 },
+        releasedAfter: { type: "integer", minimum: 1900, maximum: 2100 },
+        sort: { type: "string", enum: ["popularity", "score", "recent"] },
+        limit: { type: "integer", minimum: 1, maximum: 30 },
+      },
+      additionalProperties: false,
+    },
+  },
+};
+
 export const CURATOR_TOOLS: ChatCompletionTool[] = [
   {
     type: "function",
@@ -88,8 +110,24 @@ export async function executeCuratorTool(
       env.DB,
       viewer.entries.map((entry) => entry.titleId),
     );
+    const byId = new Map(titles.map((title) => [title.id, title]));
 
-    return { ...viewer, titles };
+    return {
+      selectedProviderIds: viewer.selectedProviderIds,
+      entries: viewer.entries.map((entry) => {
+        const title = byId.get(entry.titleId);
+
+        return {
+          id: entry.titleId,
+          title: title?.title ?? entry.titleId,
+          year: title?.year ?? null,
+          genres: title?.genres.slice(0, 3) ?? [],
+          status: entry.status,
+          rating: entry.rating,
+          thoughts: entry.thoughts.slice(0, 120),
+        };
+      }),
+    };
   }
 
   if (call.function.name === "search_catalogue") {
@@ -102,7 +140,18 @@ export async function executeCuratorTool(
       availableIds.add(item.id);
     }
 
-    return { results };
+    return {
+      results: results.map((item) => ({
+        id: item.id,
+        title: item.title,
+        year: item.year,
+        mediaType: item.mediaType,
+        genres: item.genres.slice(0, 3),
+        tmdbScore: item.tmdbScore,
+        tmdbVoteCount: item.tmdbVoteCount,
+        overview: item.overview.slice(0, 160),
+      })),
+    };
   }
 
   if (call.function.name === "get_title_details") {
@@ -115,7 +164,17 @@ export async function executeCuratorTool(
       availableIds.add(item.id);
     }
 
-    return { items };
+    return {
+      items: items.map((item) => ({
+        id: item.id,
+        title: item.title,
+        year: item.year,
+        genres: item.genres,
+        tmdbScore: item.tmdbScore,
+        runtimeMinutes: item.runtimeMinutes,
+        overview: item.overview.slice(0, 400),
+      })),
+    };
   }
 
   return { error: "Unknown tool" };

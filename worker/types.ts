@@ -22,6 +22,7 @@ export type Bindings = {
   RATINGS_QUEUE: Queue<IngestionJob>;
   SIMKL_QUEUE: Queue<IngestionJob>;
   POSTER_QUEUE: Queue<IngestionJob>;
+  AI_QUEUE: Queue<IngestionJob>;
   MEDIA: R2Bucket;
 };
 
@@ -50,7 +51,8 @@ export type IngestionJob =
   | { type: "enrich-ratings"; titleId: string }
   | { type: "enrich-simkl"; titleId: string }
   | { type: "cache-poster"; titleId: string }
-  | { type: "import-imdb-title"; imdbId: string };
+  | { type: "import-imdb-title"; imdbId: string }
+  | { type: "build-rails"; viewerId: string };
 
 export type EntryStatus = "watchlist" | "watching" | "watched" | "dropped";
 

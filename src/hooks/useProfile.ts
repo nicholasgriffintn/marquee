@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { jsonRequest, requestJson } from "../lib/api";
 import type { EntryStatus, ViewingEntry } from "../types";
@@ -8,6 +8,8 @@ type ProfileResponse = {
   selectedProviderIds: string[] | null;
 };
 
+const SUCCESS_HOLD_MS = 3_500;
+const ERROR_HOLD_MS = 8_000;
 const NO_IDS: string[] = [];
 const NO_ENTRIES: Record<string, ViewingEntry> = {};
 
@@ -23,6 +25,17 @@ export function useProfile(isSignedIn: boolean) {
   const [selectedProviderIds, setSelectedProviderIds] = useState<string[]>([]);
   const [message, setMessage] = useState("");
   const [isLoaded, setIsLoaded] = useState(false);
+  const messageTimer = useRef(0);
+  const announce = useCallback((text: string, holdMs = SUCCESS_HOLD_MS) => {
+    window.clearTimeout(messageTimer.current);
+    setMessage(text);
+
+    if (text && holdMs > 0) {
+      messageTimer.current = window.setTimeout(() => setMessage(""), holdMs);
+    }
+  }, []);
+
+  useEffect(() => () => window.clearTimeout(messageTimer.current), []);
   const savedIds = useMemo(() => Object.keys(entries), [entries]);
 
   useEffect(() => {
@@ -43,10 +56,10 @@ export function useProfile(isSignedIn: boolean) {
           setSelectedProviderIds(profile.selectedProviderIds);
         }
 
-        setMessage("");
+        announce("");
       } catch (error) {
         if (!(error instanceof DOMException && error.name === "AbortError")) {
-          setMessage("Could not load your saved profile. New changes may not sync.");
+          announce("Could not load your saved profile. New changes may not sync.", ERROR_HOLD_MS);
         }
       } finally {
         setIsLoaded(true);
@@ -62,13 +75,13 @@ export function useProfile(isSignedIn: boolean) {
     const previous = selectedProviderIds;
 
     setSelectedProviderIds(nextIds);
-    setMessage("Saving services…");
+    announce("Saving services…", 0);
     try {
       await requestJson("/api/profile", jsonRequest("POST", { selectedProviderIds: nextIds }));
-      setMessage("Services saved");
+      announce("Services saved");
     } catch {
       setSelectedProviderIds(previous);
-      setMessage("Services could not be saved. Try again.");
+      announce("Services could not be saved. Try again.", ERROR_HOLD_MS);
     }
   }
 
@@ -76,7 +89,7 @@ export function useProfile(isSignedIn: boolean) {
     const previous = entries[entry.titleId];
 
     setEntries((current) => ({ ...current, [entry.titleId]: entry }));
-    setMessage("Saving shelf…");
+    announce("Saving shelf…", 0);
     try {
       const payload = await requestJson<{ entry: ViewingEntry }>(
         "/api/profile",
@@ -84,7 +97,7 @@ export function useProfile(isSignedIn: boolean) {
       );
 
       setEntries((current) => ({ ...current, [entry.titleId]: payload.entry }));
-      setMessage("Shelf saved");
+      announce("Shelf saved");
 
       return true;
     } catch {
@@ -99,7 +112,7 @@ export function useProfile(isSignedIn: boolean) {
 
         return next;
       });
-      setMessage("Shelf could not be saved. Try again.");
+      announce("Shelf could not be saved. Try again.", ERROR_HOLD_MS);
 
       return false;
     }
@@ -115,16 +128,16 @@ export function useProfile(isSignedIn: boolean) {
 
       return next;
     });
-    setMessage("Removing from shelf…");
+    announce("Removing from shelf…", 0);
     try {
       await requestJson(`/api/profile/${encodeURIComponent(titleId)}`, jsonRequest("DELETE"));
-      setMessage("Removed from shelf");
+      announce("Removed from shelf");
     } catch {
       if (previous) {
         setEntries((current) => ({ ...current, [titleId]: previous }));
       }
 
-      setMessage("Could not remove that title. Try again.");
+      announce("Could not remove that title. Try again.", ERROR_HOLD_MS);
     }
   }
 

@@ -5,7 +5,8 @@ import { AiGatewayError } from "../clients/ai-gateway.ts";
 import { clientRateLimitKey, jsonResponse, readJsonObject } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
 import { isKnownTitle } from "../lib/validation.ts";
-import { generateRails, getPersonalRails } from "../services/ai-rails.ts";
+import { readItems } from "../repositories/catalog-reader.ts";
+import { getPersonalRails } from "../services/ai-rails.ts";
 import { curateStream } from "../services/curator.ts";
 import { getTitleInsight } from "../services/title-insight.ts";
 import type { Bindings } from "../types.ts";
@@ -75,21 +76,18 @@ curatorRoutes.get("/rails", async (context) => {
   try {
     context.header("cache-control", "no-store");
 
-    const { sections, isFresh, signature, viewer } = await getPersonalRails(context.env, user.id);
+    const { sections, isFresh } = await getPersonalRails(context.env, user.id);
 
     if (isFresh) {
       return jsonResponse({ sections, status: "ready" });
     }
 
-    if (context.req.query("generate") !== "1") {
-      return jsonResponse({ sections, status: "generating" });
+    if (context.req.query("generate") === "1") {
+      await context.env.AI_QUEUE.send(
+        { type: "build-rails", viewerId: user.id },
+        { contentType: "json" },
+      );
     }
-
-    context.executionCtx.waitUntil(
-      generateRails(context.env, user.id, signature, viewer).catch((error: unknown) =>
-        logError("ai_rails_failed", error),
-      ),
-    );
 
     return jsonResponse({ sections, status: "generating" });
   } catch (error) {
@@ -115,11 +113,30 @@ curatorRoutes.get("/insight/:titleId", async (context) => {
   }
 
   try {
-    return jsonResponse({ insight: await getTitleInsight(context.env, titleId) });
+    const insight = await getTitleInsight(context.env, titleId);
+
+    if (!insight) {
+      return jsonResponse({ insight: null, pairs: [] });
+    }
+
+    const paired = await readItems(
+      context.env.DB,
+      insight.pairs.map((pair) => pair.titleId),
+    );
+    const byId = new Map(paired.map((item) => [item.id, item]));
+
+    return jsonResponse({
+      insight,
+      pairs: insight.pairs.flatMap((pair) => {
+        const item = byId.get(pair.titleId);
+
+        return item ? [{ item, reason: pair.reason }] : [];
+      }),
+    });
   } catch (error) {
     logError("title_insight_failed", error);
 
-    return jsonResponse({ insight: null });
+    return jsonResponse({ insight: null, pairs: [] });
   }
 });
 

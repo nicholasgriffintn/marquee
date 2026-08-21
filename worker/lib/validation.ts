@@ -48,6 +48,14 @@ export function isIngestionJob(value: unknown): value is IngestionJob {
     );
   }
 
+  if (value.type === "build-rails") {
+    return (
+      typeof value.viewerId === "string" &&
+      value.viewerId.length > 0 &&
+      value.viewerId.length <= 128
+    );
+  }
+
   if (value.type === "import-imdb-title") {
     return typeof value.imdbId === "string" && /^tt\d+$/u.test(value.imdbId);
   }
