@@ -55,7 +55,6 @@ export function isIngestionJob(value: unknown): value is IngestionJob {
   if (
     value.type === "enrich-availability" ||
     value.type === "enrich-ratings" ||
-    value.type === "enrich-trakt" ||
     value.type === "enrich-simkl" ||
     value.type === "cache-poster"
   ) {

@@ -21,12 +21,3 @@ export type ViewingEntry = {
   thoughts: string;
   updatedAt?: string;
 };
-
-export type CuratorResponse = {
-  titleIds: string[];
-  summary: string;
-  reasons: Record<string, string>;
-  items: import("./domain/catalog").MediaTitle[];
-  source: "Cloudflare AI";
-  model: string;
-};

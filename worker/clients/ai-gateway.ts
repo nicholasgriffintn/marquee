@@ -1,4 +1,5 @@
 import { parseAssistantMessage, type ChatMessage } from "../lib/curator-payload.ts";
+import { isRecord } from "../lib/values.ts";
 import type { Bindings } from "../types.ts";
 
 function assertConfiguration(env: Bindings) {
@@ -77,4 +78,93 @@ export async function requestAiCompletion(
   }
 
   return message;
+}
+
+export async function* streamAiCompletion(env: Bindings, messages: ChatMessage[]) {
+  assertConfiguration(env);
+
+  const response = await fetch(
+    `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/ai/v1/chat/completions`,
+    {
+      method: "POST",
+      headers: {
+        accept: "text/event-stream",
+        authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
+        "cf-aig-collect-log": "false",
+        "cf-aig-gateway-id": env.AI_GATEWAY_ID,
+        "cf-aig-request-timeout": "30000",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: env.AI_MODEL,
+        messages,
+        temperature: 0.4,
+        max_completion_tokens: 400,
+        stream: true,
+      }),
+      signal: AbortSignal.timeout(30_000),
+    },
+  );
+
+  if (!response.ok || !response.body) {
+    throw new AiGatewayError(
+      `Cloudflare AI stream failed with status ${response.status}`,
+      response.status,
+    );
+  }
+
+  const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+
+    if (done) {
+      break;
+    }
+
+    buffer += value;
+
+    const lines = buffer.split("\n");
+
+    buffer = lines.pop() ?? "";
+
+    for (const line of lines) {
+      if (!line.startsWith("data:")) {
+        continue;
+      }
+
+      const data = line.slice(5).trim();
+
+      if (!data || data === "[DONE]") {
+        continue;
+      }
+
+      const delta = parseStreamDelta(data);
+
+      if (delta) {
+        yield delta;
+      }
+    }
+  }
+}
+
+function parseStreamDelta(data: string) {
+  try {
+    const parsed: unknown = JSON.parse(data);
+
+    if (!isRecord(parsed) || !Array.isArray(parsed.choices)) {
+      return null;
+    }
+
+    const choice = parsed.choices[0];
+
+    if (!isRecord(choice) || !isRecord(choice.delta)) {
+      return null;
+    }
+
+    return typeof choice.delta.content === "string" ? choice.delta.content : null;
+  } catch {
+    return null;
+  }
 }

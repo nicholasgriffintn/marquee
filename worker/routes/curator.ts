@@ -4,7 +4,7 @@ import { requireAuthentication, type AuthVariables } from "../auth/session.ts";
 import { AiGatewayError } from "../clients/ai-gateway.ts";
 import { clientRateLimitKey, jsonResponse, readJsonObject } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
-import { curate } from "../services/curator.ts";
+import { curateStream } from "../services/curator.ts";
 import type { Bindings } from "../types.ts";
 
 export const curatorRoutes = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
@@ -33,25 +33,44 @@ curatorRoutes.post("/", async (context) => {
     return jsonResponse({ error: "Describe what kind of watch you want" }, 400);
   }
 
-  try {
-    const result = await curate(context.env, prompt, user.id);
+  const { readable, writable } = new TransformStream();
+  const writer = writable.getWriter();
+  const encoder = new TextEncoder();
+  const send = (payload: unknown) =>
+    writer.write(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
 
-    return jsonResponse(result);
-  } catch (error) {
-    logError("curator_request_failed", error);
+  context.executionCtx.waitUntil(
+    (async () => {
+      try {
+        for await (const event of curateStream(context.env, prompt, user.id)) {
+          await send(event);
+        }
+      } catch (error) {
+        logError("curator_request_failed", error);
+        await send({ type: "error", message: curatorErrorMessage(error) });
+      } finally {
+        await writer.close();
+      }
+    })(),
+  );
 
-    if (error instanceof AiGatewayError && (error.status === 402 || error.status === 429)) {
-      return jsonResponse(
-        {
-          error:
-            error.status === 402
-              ? "The AI curator has used up its Cloudflare AI allowance."
-              : "The AI curator is rate limited. Try again shortly.",
-        },
-        503,
-      );
-    }
-
-    return jsonResponse({ error: "Cloudflare AI curator is unavailable" }, 502);
-  }
+  return new Response(readable, {
+    headers: {
+      "cache-control": "no-store",
+      "content-type": "text/event-stream",
+      "x-content-type-options": "nosniff",
+    },
+  });
 });
+
+function curatorErrorMessage(error: unknown) {
+  if (error instanceof AiGatewayError && error.status === 402) {
+    return "The AI curator has used up its Cloudflare AI allowance.";
+  }
+
+  if (error instanceof AiGatewayError && error.status === 429) {
+    return "The AI curator is rate limited. Try again shortly.";
+  }
+
+  return "Cloudflare AI curator is unavailable";
+}

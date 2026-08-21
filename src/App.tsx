@@ -54,7 +54,7 @@ export function App() {
     void navigate("/");
   }, [background, navigate]);
   const sections = useMemo(() => {
-    if (!curator.curator) {
+    if (!curator.state.items.length) {
       return catalog.catalogue.sections;
     }
 
@@ -62,12 +62,12 @@ export function App() {
       {
         id: "ai",
         title: "Picked for you",
-        description: curator.curator.summary,
-        items: curator.curator.items,
+        description: curator.state.prompt,
+        items: curator.state.items,
       },
       ...catalog.catalogue.sections,
     ];
-  }, [catalog.catalogue, curator.curator]);
+  }, [catalog.catalogue, curator.state.items, curator.state.prompt]);
 
   async function saveTitle(item: MediaTitle) {
     const saved = await profile.saveEntry(
@@ -174,7 +174,7 @@ export function App() {
           path="/"
           element={
             <TonightPage
-              curator={curator.curator}
+              curator={curator.state}
               curatorError={curator.error}
               isAsking={curator.isAsking}
               isLoading={catalog.isLoading}

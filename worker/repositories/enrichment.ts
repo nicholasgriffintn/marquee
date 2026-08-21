@@ -4,9 +4,7 @@ import { readItems } from "./catalog-reader.ts";
 
 type FieldsFor<S extends EnrichmentSource> = S extends "omdb"
   ? Pick<MediaTitle, "ratings">
-  : S extends "trakt"
-    ? Pick<MediaTitle, "traktStats">
-    : Pick<MediaTitle, "externalIds">;
+  : Pick<MediaTitle, "externalIds">;
 
 export async function storeEnrichment<S extends Exclude<EnrichmentSource, "watchmode">>(
   env: Bindings,

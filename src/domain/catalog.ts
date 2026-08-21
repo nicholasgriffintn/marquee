@@ -53,16 +53,7 @@ export type MediaTitle = {
     rottenTomatoes: string | null;
     metascore: number | null;
   };
-  traktStats?: {
-    slug: string;
-    traktId: number | null;
-    imdbId: string | null;
-    watchers: number | null;
-    plays: number | null;
-    collectors: number | null;
-    rating: number | null;
-    votes: number | null;
-  };
+
   externalIds?: {
     simklId: number | null;
     imdbId: string | null;

@@ -7,7 +7,6 @@ import {
   getDiscoverPageCount,
   getItems,
 } from "../clients/tmdb.ts";
-import { getTraktStats } from "../clients/trakt.ts";
 import { getWatchmodeAvailability } from "../clients/watchmode.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { enrichAvailability } from "../repositories/availability.ts";
@@ -26,7 +25,6 @@ const QUEUE_BATCH = 100;
 
 const ENRICHERS = [
   { source: "omdb", job: "enrich-ratings", maxAgeDays: 30, perRun: 900 },
-  { source: "trakt", job: "enrich-trakt", maxAgeDays: 7, perRun: 2_000 },
   { source: "simkl", job: "enrich-simkl", maxAgeDays: 90, perRun: 2_000 },
   { source: "poster", job: "cache-poster", maxAgeDays: 365, perRun: 2_000 },
 ] as const satisfies readonly {
@@ -45,20 +43,12 @@ function enrichmentQueue(env: Bindings, source: EnrichmentSource) {
     return env.POSTER_QUEUE;
   }
 
-  if (source === "trakt") {
-    return env.TRAKT_QUEUE;
-  }
-
   return env.SIMKL_QUEUE;
 }
 
 function sourceConfigured(env: Bindings, source: EnrichmentSource) {
   if (source === "omdb" || source === "poster") {
     return Boolean(env.OMDB_API_KEY);
-  }
-
-  if (source === "trakt") {
-    return Boolean(env.TRAKT_CLIENT_ID);
   }
 
   return Boolean(env.SIMKL_CLIENT_ID);
@@ -282,26 +272,6 @@ async function cachePoster(env: Bindings, titleId: string) {
   }
 }
 
-async function enrichTrakt(env: Bindings, titleId: string) {
-  const parts = env.TRAKT_CLIENT_ID ? titleParts(titleId) : null;
-
-  if (!parts) {
-    return;
-  }
-
-  if (!(await claimBudget(env, "trakt"))) {
-    console.log(JSON.stringify({ event: "budget_exhausted", source: "trakt", titleId }));
-
-    return;
-  }
-
-  const traktStats = await getTraktStats(env, parts.mediaType, parts.tmdbId);
-
-  if (traktStats) {
-    await storeEnrichment(env, titleId, "trakt", { traktStats });
-  }
-}
-
 async function enrichSimkl(env: Bindings, titleId: string) {
   const parts = env.SIMKL_CLIENT_ID ? titleParts(titleId) : null;
 
@@ -345,12 +315,6 @@ export async function executeIngestionJob(env: Bindings, job: IngestionJob) {
 
   if (job.type === "enrich-ratings") {
     await enrichRatings(env, job.titleId);
-
-    return;
-  }
-
-  if (job.type === "enrich-trakt") {
-    await enrichTrakt(env, job.titleId);
 
     return;
   }

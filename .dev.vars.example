@@ -1,7 +1,6 @@
 TMDB_API_TOKEN=your-tmdb-api-read-access-token
 WATCHMODE_API_KEY=your-watchmode-api-key
 OMDB_API_KEY=your-omdb-api-key
-TRAKT_CLIENT_ID=your-trakt-client-id
 SIMKL_CLIENT_ID=your-simkl-client-id
 
 CLOUDFLARE_ACCOUNT_ID=your-cloudflare-account-id

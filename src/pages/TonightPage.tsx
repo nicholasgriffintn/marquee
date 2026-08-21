@@ -3,8 +3,8 @@ import { useState } from "react";
 import { ContentRail } from "../components/catalog";
 import { ArrowIcon, ProviderBadge } from "../components/ui";
 import type { CatalogSection, MediaTitle, Provider } from "../domain/catalog";
+import type { CuratorState } from "../hooks/useCurator";
 import { mediaMeta, scoreLabel } from "../lib/media";
-import type { CuratorResponse } from "../types";
 
 export function TonightPage({
   curator,
@@ -23,7 +23,7 @@ export function TonightPage({
   onSelectProviders,
   onShowSources,
 }: {
-  curator: CuratorResponse | null;
+  curator: CuratorState;
   curatorError: string;
   isAsking: boolean;
   isLoading: boolean;
@@ -126,13 +126,19 @@ export function TonightPage({
         )}
       </section>
 
-      {isSignedIn && (curator || curatorError) && (
+      {isSignedIn && (curator.prompt || curatorError) && (
         <div
           className={`curator-response${curatorError ? " curator-error" : ""}`}
           aria-live="polite"
         >
-          <span>{curator ? "MARQUEE CURATOR" : "COULDN’T MAKE A SELECTION"}</span>
-          <p>{curator ? curator.summary : curatorError}</p>
+          <span>
+            {curatorError ? "COULDN’T MAKE A SELECTION" : "MARQUEE CURATOR"}
+            {curator.status && <em className="curator-status">{curator.status}…</em>}
+          </span>
+          <p>
+            {curatorError || curator.summary}
+            {curator.isStreaming && !curatorError && <i className="curator-caret" />}
+          </p>
           <button type="button" onClick={onClearCurator}>
             Clear
           </button>

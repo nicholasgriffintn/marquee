@@ -659,6 +659,29 @@ h2 em {
   max-width: 720px;
   padding: 15px 18px;
 }
+@keyframes curator-caret {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+.curator-caret {
+  animation: curator-caret 1s step-end infinite;
+  background: var(--acid);
+  display: inline-block;
+  height: 15px;
+  margin-left: 3px;
+  vertical-align: text-bottom;
+  width: 8px;
+}
+.curator-status {
+  color: var(--muted);
+  font-style: normal;
+  margin-left: 10px;
+}
 .curator-response span {
   color: var(--acid);
   font: 8px var(--mono);
