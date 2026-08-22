@@ -40,7 +40,12 @@ export function DigestPage({
         </p>
       </div>
 
-      {!isSignedIn && <p className="catalogue-error">Sign in to get a weekly digest.</p>}
+      {!isSignedIn && (
+        <div className="honest-empty">
+          <h2>Sign in first.</h2>
+          <p>The digest is built from your own shelf, so it needs to know who you are.</p>
+        </div>
+      )}
 
       {isSignedIn && isLoading && <p className="rails-building">Reading your digest…</p>}
 
