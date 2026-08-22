@@ -54,6 +54,7 @@ async function runCurator(
   prompt: string,
   viewer: ViewerContext,
   turns: CuratorTurn[],
+  viewerId: string,
 ) {
   const messages: ChatMessage[] = [
     { role: "system", content: SYSTEM_PROMPT },
@@ -68,7 +69,7 @@ async function runCurator(
       model: fastModel(env),
       timeoutMs: 25_000,
       toolChoice: availableIds.size === 0 ? "required" : "auto",
-      metadata: { feature: "curator", round: String(round) },
+      metadata: { feature: "curator", round: String(round), viewer: viewerId },
     });
 
     if (!response.tool_calls?.length) {
@@ -115,7 +116,7 @@ async function runCurator(
     model: fastModel(env),
     timeoutMs: 25_000,
     json: true,
-    metadata: { feature: "curator", round: "final" },
+    metadata: { feature: "curator", round: "final", viewer: viewerId },
   });
   const result = response.content ? parseCuratorResult(response.content, availableIds) : null;
 
@@ -148,6 +149,7 @@ export async function* curateStream(
       : prompt,
     viewer,
     turns,
+    viewerId,
   );
   const items = await readItems(env.DB, result.titleIds);
 

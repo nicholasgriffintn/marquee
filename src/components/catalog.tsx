@@ -316,6 +316,15 @@ export function DetailPanel({
           )}
           <div className="resource-links">
             <span>SOURCE LINKS</span>
+            {item.trailerKey && (
+              <a
+                href={`https://www.youtube.com/watch?v=${item.trailerKey}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Trailer <ArrowIcon />
+              </a>
+            )}
             <a href={item.tmdbUrl} target="_blank" rel="noreferrer">
               TMDB <ArrowIcon />
             </a>

@@ -38,7 +38,7 @@ const MIN_POSTER_BYTES = 40_000;
 
 const ENRICHERS = [
   { source: "omdb", job: "enrich-ratings", maxAgeDays: 30, perRun: 900 },
-  { source: "simkl", job: "enrich-simkl", maxAgeDays: 90, perRun: 2_000 },
+  { source: "simkl", job: "enrich-simkl", maxAgeDays: 90, perRun: 150 },
   { source: "poster", job: "cache-poster", maxAgeDays: 365, perRun: 2_000 },
   { source: "anilist", job: "enrich-anilist", maxAgeDays: 14, perRun: 400 },
 ] as const satisfies readonly {

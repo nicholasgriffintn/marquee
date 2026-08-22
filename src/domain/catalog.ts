@@ -48,6 +48,7 @@ export type MediaTitle = {
   imdbUrl: string | null;
   keywords?: string[];
   people?: string[];
+  trailerKey?: string | null;
   pending?: boolean;
   ratings?: {
     imdbScore: number | null;

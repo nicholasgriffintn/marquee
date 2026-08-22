@@ -1,3 +1,4 @@
+import { articlesForImdbIds } from "../clients/wikidata.ts";
 import { findArticle, getPageviews } from "../clients/wikimedia.ts";
 import { logError } from "../lib/logging.ts";
 import type { Bindings } from "../types.ts";
@@ -6,12 +7,18 @@ const SAMPLE_SIZE = 120;
 const CONCURRENCY = 6;
 const MAX_BOOST = 1.5;
 
-type BuzzCandidate = { titleId: string; title: string; year: number | null; isFilm: boolean };
+type BuzzCandidate = {
+  titleId: string;
+  title: string;
+  year: number | null;
+  isFilm: boolean;
+  imdbId: string | null;
+};
 type BuzzRow = { titleId: string; article: string; views: number; previousViews: number };
 
 async function candidates(env: Bindings) {
   const rows = await env.DB.prepare(
-    `SELECT t.id AS titleId, t.title, t.year, t.media_type AS mediaType
+    `SELECT t.id AS titleId, t.title, t.year, t.media_type AS mediaType, t.imdb_id AS imdbId
      FROM catalog_titles AS t
      LEFT JOIN title_buzz AS b ON b.title_id = t.id
      WHERE b.title_id IS NULL OR b.measured_at < datetime('now', '-2 days')
@@ -19,22 +26,35 @@ async function candidates(env: Bindings) {
      LIMIT ?`,
   )
     .bind(SAMPLE_SIZE)
-    .all<{ titleId: string; title: string; year: number | null; mediaType: string }>();
+    .all<{
+      titleId: string;
+      title: string;
+      year: number | null;
+      mediaType: string;
+      imdbId: string | null;
+    }>();
 
   return rows.results.map((row): BuzzCandidate => ({
     titleId: row.titleId,
     title: row.title,
     year: row.year,
     isFilm: row.mediaType === "movie",
+    imdbId: row.imdbId,
   }));
 }
 
-async function measure(env: Bindings, candidate: BuzzCandidate): Promise<BuzzRow | null> {
+async function measure(
+  env: Bindings,
+  candidate: BuzzCandidate,
+  byImdb: Map<string, string>,
+): Promise<BuzzRow | null> {
   const existing = await env.DB.prepare(`SELECT article FROM title_buzz WHERE title_id = ?`)
     .bind(candidate.titleId)
     .first<{ article: string }>();
   const article =
-    existing?.article ?? (await findArticle(candidate.title, candidate.year, candidate.isFilm));
+    existing?.article ??
+    (candidate.imdbId ? byImdb.get(candidate.imdbId) : null) ??
+    (await findArticle(candidate.title, candidate.year, candidate.isFilm));
 
   if (!article) {
     return null;
@@ -54,12 +74,27 @@ async function measure(env: Bindings, candidate: BuzzCandidate): Promise<BuzzRow
 
 export async function syncBuzz(env: Bindings) {
   const pending = await candidates(env);
+  const byImdb = await articlesForImdbIds(
+    pending.flatMap((candidate) => (candidate.imdbId ? [candidate.imdbId] : [])),
+  ).catch((error: unknown): Map<string, string> => {
+    logError("wikidata_lookup_failed", error);
+
+    return new Map();
+  });
   const measured: BuzzRow[] = [];
+
+  console.log(
+    JSON.stringify({
+      event: "buzz_articles_resolved",
+      exact: byImdb.size,
+      candidates: pending.length,
+    }),
+  );
 
   for (let index = 0; index < pending.length; index += CONCURRENCY) {
     const wave = pending.slice(index, index + CONCURRENCY);
     // oxlint-disable-next-line no-await-in-loop
-    const settled = await Promise.allSettled(wave.map((entry) => measure(env, entry)));
+    const settled = await Promise.allSettled(wave.map((entry) => measure(env, entry, byImdb)));
 
     for (const result of settled) {
       if (result.status === "rejected") {

@@ -47,7 +47,12 @@ export async function consumeIngestion(batch: MessageBatch<unknown>, env: Bindin
         continue;
       }
 
-      message.retry({ delaySeconds: Math.min(300, 30 * message.attempts) });
+      message.retry({
+        delaySeconds:
+          status === 429
+            ? Math.min(900, 180 * message.attempts)
+            : Math.min(300, 30 * message.attempts),
+      });
     }
   }
 }

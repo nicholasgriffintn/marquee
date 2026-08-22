@@ -206,6 +206,7 @@ export async function buildOneRail(
   vector: number[] | null,
   angle: Angle,
   exclude: string[],
+  viewerId = "unknown",
 ): Promise<StoredRail | null> {
   const shortlist = await shortlistFor(env, viewer, vector, angle, exclude);
 
@@ -230,7 +231,7 @@ export async function buildOneRail(
     timeoutMs: 20_000,
     maxTokens: 300,
     json: true,
-    metadata: { feature: "rails", angle: angle.id },
+    metadata: { feature: "rails", angle: angle.id, viewer: viewerId },
   });
 
   return parseRail(response.content, shortlist);
@@ -364,7 +365,7 @@ export async function generateRails(
 ) {
   const { vector, exclude } = await prepareRails(env, viewer);
   const settled = await Promise.allSettled(
-    ANGLES.map((angle) => buildOneRail(env, viewer, vector, angle, exclude)),
+    ANGLES.map((angle) => buildOneRail(env, viewer, vector, angle, exclude, viewerId)),
   );
   const rails = dedupeRails(
     settled.flatMap((result) => {

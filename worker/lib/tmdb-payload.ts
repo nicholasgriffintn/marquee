@@ -131,6 +131,18 @@ function names(value: unknown, limit: number) {
     .slice(0, limit);
 }
 
+function parseTrailer(details: Record<string, unknown>) {
+  const videos = records(recordAt(details, "videos")?.results).filter(
+    (video) => stringAt(video, "site") === "YouTube" && stringAt(video, "key"),
+  );
+  const best =
+    videos.find((video) => stringAt(video, "type") === "Trailer" && video.official === true) ??
+    videos.find((video) => stringAt(video, "type") === "Trailer") ??
+    videos.find((video) => stringAt(video, "type") === "Teaser");
+
+  return best ? stringAt(best, "key") : null;
+}
+
 function parseKeywords(details: Record<string, unknown>) {
   const container = recordAt(details, "keywords");
 
@@ -222,6 +234,7 @@ export function parseTmdbTitle(mediaType: MediaType, value: unknown): MediaTitle
     imdbUrl: imdbId && /^tt\d+$/u.test(imdbId) ? `https://www.imdb.com/title/${imdbId}/` : null,
     keywords: parseKeywords(value),
     people: parsePeople(mediaType, value),
+    trailerKey: parseTrailer(value),
   };
 }
 

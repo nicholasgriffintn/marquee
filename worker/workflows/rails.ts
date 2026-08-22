@@ -35,6 +35,7 @@ export class RailsWorkflow extends WorkflowEntrypoint<Bindings, RailsParameters>
               prepared.vector,
               angle,
               prepared.exclude,
+              viewerId,
             );
 
             return rail ?? null;
