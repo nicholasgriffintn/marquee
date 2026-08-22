@@ -2481,7 +2481,7 @@ h2 em {
   }
   .results-grid {
     gap: 22px 14px;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   }
   .search-suggestions {
     min-width: 0;
