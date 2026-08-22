@@ -48,6 +48,20 @@ export function isIngestionJob(value: unknown): value is IngestionJob {
     );
   }
 
+  if (value.type === "sync-schedule" || value.type === "sync-buzz") {
+    return true;
+  }
+
+  if (value.type === "import-trakt-history") {
+    return (
+      typeof value.viewerId === "string" &&
+      value.viewerId.length > 0 &&
+      value.viewerId.length <= 128 &&
+      typeof value.origin === "string" &&
+      value.origin.startsWith("http")
+    );
+  }
+
   if (value.type === "embed-titles") {
     return (
       Array.isArray(value.titleIds) &&

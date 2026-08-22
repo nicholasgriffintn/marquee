@@ -6,6 +6,7 @@ import { scheduleIngestion } from "./jobs/ingestion-scheduler.ts";
 import { hasTrustedOrigin } from "./lib/http.ts";
 import { catalogRoutes } from "./routes/catalog.ts";
 import { curatorRoutes } from "./routes/curator.ts";
+import { linkRoutes } from "./routes/links.ts";
 import { mediaRoutes } from "./routes/media.ts";
 import { profileRoutes } from "./routes/profile.ts";
 import type { Bindings, IngestionJob } from "./types.ts";
@@ -42,6 +43,8 @@ app.route("/api/auth", authRoutes);
 app.route("/api/profile", profileRoutes);
 
 app.route("/api/curator", curatorRoutes);
+
+app.route("/api/links", linkRoutes);
 
 app.notFound(async (context) => {
   if (context.req.path.startsWith("/api/")) {

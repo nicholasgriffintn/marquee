@@ -9,6 +9,8 @@ import {
 } from "../jobs/ingestion.ts";
 import { getProviderLedger } from "../jobs/provider-ledger.ts";
 import { storeProviders } from "../repositories/providers.ts";
+import { syncBuzz } from "../services/buzz.ts";
+import { syncSchedule } from "../services/schedule.ts";
 import type { Bindings } from "../types.ts";
 
 const RETRIES = { limit: 4, delay: "30 seconds", backoff: "exponential" } as const;
@@ -42,6 +44,10 @@ export class CatalogSweep extends WorkflowEntrypoint<Bindings, unknown> {
 
       return true;
     });
+
+    await step.do("sync schedule", { retries: RETRIES }, async () => syncSchedule(this.env));
+
+    await step.do("sync buzz", { retries: RETRIES }, async () => syncBuzz(this.env));
 
     await step.sleep("let discover pages land", "10 minutes");
 

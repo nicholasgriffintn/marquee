@@ -4,11 +4,14 @@ import { readAvailability, readCatalog, readItems } from "../repositories/catalo
 import {
   readGenres,
   readKeywords,
+  readRanked,
   searchCatalogue as queryCatalogue,
 } from "../repositories/catalog-search.ts";
 import { readProviders } from "../repositories/providers.ts";
 import type { Bindings } from "../types.ts";
+import { readTrending } from "./buzz.ts";
 import { findPendingTitles } from "./discovery.ts";
+import { readTonight } from "./schedule.ts";
 
 export async function getCatalogue(env: Bindings, providerIds: string[]) {
   return readCatalog(env.DB, "", providerIds);
@@ -94,4 +97,18 @@ export async function getGenres(env: Bindings) {
 
 export async function getKeywords(env: Bindings) {
   return readKeywords(env.DB);
+}
+
+export async function getTonight(env: Bindings, viewerId: string | null) {
+  return { episodes: await readTonight(env, viewerId), fetchedAt: new Date().toISOString() };
+}
+
+export async function getTrending(env: Bindings) {
+  const titleIds = await readTrending(env);
+
+  return {
+    items: await readRanked(env.DB, titleIds),
+    source: "Wikipedia pageview trend",
+    fetchedAt: new Date().toISOString(),
+  };
 }

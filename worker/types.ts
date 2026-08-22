@@ -60,7 +60,10 @@ export type IngestionJob =
   | { type: "enrich-simkl"; titleId: string }
   | { type: "cache-poster"; titleId: string }
   | { type: "import-imdb-title"; imdbId: string }
-  | { type: "embed-titles"; titleIds: string[] };
+  | { type: "embed-titles"; titleIds: string[] }
+  | { type: "import-trakt-history"; viewerId: string; origin: string }
+  | { type: "sync-schedule" }
+  | { type: "sync-buzz" };
 
 export type EntryStatus = "watchlist" | "watching" | "watched" | "dropped";
 

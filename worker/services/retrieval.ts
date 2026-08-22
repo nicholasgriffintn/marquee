@@ -3,6 +3,7 @@ import { logError } from "../lib/logging.ts";
 import { isRecord } from "../lib/values.ts";
 import { searchCatalogue, type CatalogueSearch } from "../repositories/catalog-search.ts";
 import type { Bindings } from "../types.ts";
+import { buzzBoosts } from "./buzz.ts";
 import { embedQuery } from "./embeddings.ts";
 
 const RERANK_MODEL = "@cf/baai/bge-reranker-base";
@@ -130,6 +131,11 @@ async function rank(
   limit: number,
   boosts?: Map<string, number>,
 ) {
+  const buzz = await buzzBoosts(
+    env,
+    candidates.map((title) => title.id),
+  ).catch(() => new Map<string, number>());
+
   try {
     const result = await reranker(env).run(RERANK_MODEL, {
       query: text.slice(0, 512),
@@ -145,7 +151,14 @@ async function rank(
     const scored = ranking.flatMap((entry) => {
       const title = candidates[entry.index];
 
-      return title ? [{ title, score: entry.score + (boosts?.get(title.id) ?? 0) }] : [];
+      return title
+        ? [
+            {
+              title,
+              score: entry.score + (boosts?.get(title.id) ?? 0) + (buzz.get(title.id) ?? 0),
+            },
+          ]
+        : [];
     });
 
     scored.sort((left, right) => right.score - left.score);

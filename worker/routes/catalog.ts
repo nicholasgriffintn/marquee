@@ -11,6 +11,8 @@ import {
   getCatalogue,
   getGenres,
   getKeywords,
+  getTonight,
+  getTrending,
   searchCatalogue,
   getCatalogueItems,
   getProviderCatalogue,
@@ -90,6 +92,30 @@ catalogRoutes.get("/genres", edgeCache(3_600), async (context) => {
     logError("genres_read_failed", error, { area: "browse" });
 
     return context.json({ genres: [] });
+  }
+});
+
+catalogRoutes.get("/tonight", async (context) => {
+  const principal = await sessionPrincipal(context.env, context.req.raw);
+
+  try {
+    context.header("cache-control", "no-store");
+
+    return context.json(await getTonight(context.env, principal?.user.id ?? null));
+  } catch (error) {
+    logError("tonight_read_failed", error, { area: "schedule" });
+
+    return context.json({ episodes: [], fetchedAt: "" });
+  }
+});
+
+catalogRoutes.get("/trending", edgeCache(1_800), async (context) => {
+  try {
+    return context.json(await getTrending(context.env));
+  } catch (error) {
+    logError("trending_read_failed", error, { area: "buzz" });
+
+    return context.json({ items: [], source: "Wikipedia pageview trend", fetchedAt: "" });
   }
 });
 
