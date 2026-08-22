@@ -133,7 +133,7 @@ const VIEWER_QUERY = `SELECT s.title_id AS titleId, s.show_name AS showName, s.s
            ON v.title_id = s.title_id AND v.viewer_id = ? AND v.status IN ('watching', 'watchlist')
          WHERE s.airs_at BETWEEN datetime('now', '-6 hours') AND datetime('now', ?)
          ORDER BY s.airs_at
-         LIMIT 40`;
+         LIMIT ?`;
 
 const POPULAR_QUERY = `SELECT s.title_id AS titleId, s.show_name AS showName, s.season, s.episode,
                 s.episode_name AS episodeName, s.airs_at AS airsAt, s.network
@@ -141,22 +141,27 @@ const POPULAR_QUERY = `SELECT s.title_id AS titleId, s.show_name AS showName, s.
          JOIN catalog_titles AS t ON t.id = s.title_id
          WHERE s.airs_at BETWEEN datetime('now', '-6 hours') AND datetime('now', ?)
          ORDER BY t.popularity DESC, s.airs_at
-         LIMIT 40`;
+         LIMIT ?`;
 
-export async function readTonight(env: Bindings, viewerId: string | null, hours = 36) {
+export async function readTonight(
+  env: Bindings,
+  viewerId: string | null,
+  limit: number,
+  hours = 36,
+) {
   const window = `+${hours} hours`;
   let rows = viewerId
-    ? (await env.DB.prepare(VIEWER_QUERY).bind(viewerId, window).all<ScheduleRow>()).results
+    ? (await env.DB.prepare(VIEWER_QUERY).bind(viewerId, window, limit).all<ScheduleRow>()).results
     : [];
 
   if (rows.length === 0) {
-    rows = (await env.DB.prepare(POPULAR_QUERY).bind(window).all<ScheduleRow>()).results;
+    rows = (await env.DB.prepare(POPULAR_QUERY).bind(window, limit).all<ScheduleRow>()).results;
   }
 
   const titles = await readItems(
     env.DB,
     rows.flatMap((row) => (row.titleId ? [row.titleId] : [])),
-    40,
+    limit,
   );
   const byId = new Map(titles.map((title) => [title.id, title]));
 

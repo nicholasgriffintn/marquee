@@ -1,4 +1,4 @@
-import type { MediaTitle } from "../../src/domain/catalog.ts";
+import type { MediaTitle, TitleBuzz } from "../../src/domain/catalog.ts";
 import { logError } from "../lib/logging.ts";
 import { readAvailability, readCatalog, readItems } from "../repositories/catalog-reader.ts";
 import {
@@ -10,13 +10,50 @@ import {
 } from "../repositories/catalog-search.ts";
 import { readProviders } from "../repositories/providers.ts";
 import type { Bindings } from "../types.ts";
-import { readTrending } from "./buzz.ts";
+import { applyBuzz, readBuzz, readTrendingBuzz } from "./buzz.ts";
 import { findPendingTitles } from "./discovery.ts";
 import { readNextEpisode, readTonight } from "./schedule.ts";
 import { traktUpcoming } from "./trakt.ts";
 
+async function readBuzzFor(db: D1Database, ids: string[]) {
+  try {
+    return await readBuzz(db, ids);
+  } catch (error) {
+    logError("buzz_read_failed", error, { area: "buzz" });
+
+    return new Map<string, TitleBuzz>();
+  }
+}
+
+async function withBuzz<Item extends MediaTitle>(db: D1Database, items: Item[]) {
+  return applyBuzz(
+    items,
+    await readBuzzFor(
+      db,
+      items.map((item) => item.id),
+    ),
+  );
+}
+
 export async function getCatalogue(env: Bindings, providerIds: string[]) {
-  return readCatalog(env.DB, "", providerIds);
+  const catalogue = await readCatalog(env.DB, "", providerIds);
+
+  if (!catalogue) {
+    return catalogue;
+  }
+
+  const buzz = await readBuzzFor(
+    env.DB,
+    catalogue.sections.flatMap((section) => section.items.map((item) => item.id)),
+  );
+
+  return {
+    ...catalogue,
+    sections: catalogue.sections.map((section) => ({
+      ...section,
+      items: applyBuzz(section.items, buzz),
+    })),
+  };
 }
 
 export async function searchCatalogue(env: Bindings, query: string, providerIds: string[]) {
@@ -31,7 +68,7 @@ export async function searchCatalogue(env: Bindings, query: string, providerIds:
   }
 
   return {
-    items: [...items, ...pending],
+    items: [...(await withBuzz(env.DB, items)), ...pending],
     query,
     source: "Marquee catalogue",
     fetchedAt: new Date().toISOString(),
@@ -40,7 +77,7 @@ export async function searchCatalogue(env: Bindings, query: string, providerIds:
 
 export async function getCatalogueItems(db: D1Database, ids: string[]) {
   return {
-    items: await readItems(db, ids),
+    items: await withBuzz(db, await readItems(db, ids)),
     source: "Marquee catalogue",
     fetchedAt: new Date().toISOString(),
   };
@@ -75,7 +112,7 @@ export type BrowseQuery = {
   keywords: string[];
   providerIds: string[];
   query: string;
-  sort: "popularity" | "score" | "recent";
+  sort: "trending" | "popularity" | "score" | "recent";
   page: number;
 };
 
@@ -99,22 +136,27 @@ export async function browseCatalogue(env: Bindings, browse: BrowseQuery) {
     : await queryCatalogue(env.DB, search);
 
   return {
-    items: items.slice(0, PAGE_SIZE),
+    items: await withBuzz(env.DB, items.slice(0, PAGE_SIZE)),
     hasMore: items.length > PAGE_SIZE,
     page: browse.page,
   };
 }
 
-export async function getGenres(env: Bindings) {
-  return readGenres(env.DB);
+export async function getGenres(env: Bindings, limit: number) {
+  return readGenres(env.DB, limit);
 }
 
-export async function getKeywords(env: Bindings) {
-  return readKeywords(env.DB);
+export async function getKeywords(env: Bindings, limit: number) {
+  return readKeywords(env.DB, limit);
 }
 
-export async function getTonight(env: Bindings, viewerId: string | null, origin: string) {
-  const scheduled = await readTonight(env, viewerId);
+export async function getTonight(
+  env: Bindings,
+  viewerId: string | null,
+  origin: string,
+  limit: number,
+) {
+  const scheduled = await readTonight(env, viewerId, limit);
 
   if (!viewerId) {
     return { episodes: scheduled, fetchedAt: new Date().toISOString() };
@@ -141,6 +183,7 @@ export async function getTonight(env: Bindings, viewerId: string | null, origin:
   );
 
   merged.sort((left, right) => Date.parse(left.airsAt) - Date.parse(right.airsAt));
+  merged.length = Math.min(merged.length, limit);
 
   const hydrated = await readRanked(
     env.DB,
@@ -158,10 +201,15 @@ export async function getTonight(env: Bindings, viewerId: string | null, origin:
 }
 
 export async function getTrending(env: Bindings) {
-  const titleIds = await readTrending(env);
+  const ranked = await readTrendingBuzz(env);
+  const items = await readRanked(
+    env.DB,
+    ranked.map((entry) => entry.titleId),
+  );
+  const byId = new Map(ranked.map((entry) => [entry.titleId, entry.buzz]));
 
   return {
-    items: await readRanked(env.DB, titleIds),
+    items: items.map((item) => ({ ...item, buzz: byId.get(item.id) })),
     source: "Wikipedia pageview trend",
     fetchedAt: new Date().toISOString(),
   };

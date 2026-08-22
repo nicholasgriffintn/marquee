@@ -58,6 +58,20 @@ export function moneyLabel(value: number) {
   return value >= 1_000_000 ? `$${Math.round(value / 1_000_000)}m` : `$${value.toLocaleString()}`;
 }
 
+export function compactCount(value: number) {
+  if (value >= 1_000_000) {
+    return `${(value / 1_000_000).toFixed(value >= 10_000_000 ? 0 : 1)}m`;
+  }
+
+  return value >= 1_000 ? `${(value / 1_000).toFixed(value >= 10_000 ? 0 : 1)}k` : `${value}`;
+}
+
+export function changeLabel(delta: number) {
+  const percent = Math.round(delta * 100);
+
+  return `${percent >= 0 ? "+" : ""}${percent.toLocaleString()}%`;
+}
+
 export function scoreLabel(item: MediaTitle) {
   return item.tmdbScore === null ? "Not yet rated" : `${item.tmdbScore.toFixed(1)} / 10`;
 }

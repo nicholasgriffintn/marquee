@@ -24,6 +24,8 @@ import { SourcesPage } from "./pages/SourcesPage";
 import { TonightPage } from "./pages/TonightPage";
 import type { EntryStatus, ViewingEntry } from "./types";
 
+const TONIGHT_EPISODES = 16;
+
 const NAV: { to: string; label: string; private: boolean; admin?: boolean }[] = [
   { to: "/", label: "Tonight", private: false },
   { to: "/films", label: "Films", private: false },
@@ -82,7 +84,7 @@ export function App() {
   const search = useSearch(query, selectedProviderIds);
   const curator = useCurator();
   const aiRails = useAiRails(isSignedIn && isViewerReady && isHome, profile.savedIds.join(","));
-  const episodes = useTonight(isViewerReady);
+  const episodes = useTonight(isViewerReady, TONIGHT_EPISODES);
   const trending = useTrending(isViewerReady && isHome);
   const titleMatch = useMatch("/title/:titleId");
   const storedBackground = (location.state as { background?: typeof location } | null)?.background;

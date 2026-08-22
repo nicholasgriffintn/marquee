@@ -19,14 +19,48 @@ function stamp(date: Date) {
   return date.toISOString().slice(0, 10).replaceAll("-", "");
 }
 
-export async function findArticle(title: string, year: number | null, isFilm: boolean) {
+function normalise(value: string) {
+  return value
+    .normalize("NFKD")
+    .replaceAll(/[\u0300-\u036f]/gu, "")
+    .toLowerCase()
+    .replaceAll(/[^\p{L}\p{N}\s]+/gu, " ")
+    .replaceAll(/\s+/gu, " ")
+    .trim();
+}
+
+function withoutArticle(value: string) {
+  return value.startsWith("the ") ? value.slice(4) : value;
+}
+
+export function articleMatchesTitle(article: string, names: (string | null)[]) {
+  const subject = withoutArticle(normalise(article.replace(/\s*\([^)]*\)\s*$/u, "")));
+
+  return names.some((name) => {
+    const wanted = withoutArticle(normalise(name ?? ""));
+
+    return wanted.length > 0 && wanted === subject;
+  });
+}
+
+export function articleUrl(article: string) {
+  return `https://en.wikipedia.org/wiki/${encodeURIComponent(article.replaceAll(" ", "_"))}`;
+}
+
+export async function findArticle(names: (string | null)[], year: number | null, isFilm: boolean) {
+  const [title] = names;
+
+  if (!title) {
+    return null;
+  }
+
   const url = new URL(SEARCH_BASE);
 
   url.search = new URLSearchParams({
     action: "query",
     list: "search",
     srsearch: `${title} ${year ?? ""} ${isFilm ? "film" : "television series"}`.trim(),
-    srlimit: "1",
+    srlimit: "5",
     format: "json",
     origin: "*",
   }).toString();
@@ -43,9 +77,13 @@ export async function findArticle(title: string, year: number | null, isFilm: bo
 
   const payload = await response.json();
   const query = isRecord(payload) && isRecord(payload.query) ? payload.query : null;
-  const [first] = query ? records(query.search) : [];
+  const found = (query ? records(query.search) : []).flatMap((result) => {
+    const name = stringAt(result, "title");
 
-  return first ? stringAt(first, "title") : null;
+    return name ? [name] : [];
+  });
+
+  return found.find((name) => articleMatchesTitle(name, names)) ?? null;
 }
 
 export async function getPageviews(article: string, days = 14) {

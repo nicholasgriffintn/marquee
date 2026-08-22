@@ -272,15 +272,14 @@ export async function queueAvailability(env: Bindings, titleIds: string[]) {
   }
 
   const unique = [...new Set(titleIds)];
-  const placeholders = unique.map(() => "?").join(", ");
   const fresh = await env.DB.prepare(
     `SELECT id AS titleId
      FROM catalog_titles
-     WHERE id IN (${placeholders})
+     WHERE id IN (SELECT value FROM json_each(?))
        AND enriched_at IS NOT NULL
        AND enriched_at > datetime('now', ?)`,
   )
-    .bind(...unique, `-${AVAILABILITY_MAX_AGE_DAYS} days`)
+    .bind(JSON.stringify(unique), `-${AVAILABILITY_MAX_AGE_DAYS} days`)
     .all<SavedTitleRow>();
   const skip = new Set(fresh.results.map((row) => row.titleId));
 

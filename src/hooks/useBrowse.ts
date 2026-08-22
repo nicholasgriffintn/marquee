@@ -5,7 +5,7 @@ import { requestJson } from "../lib/api";
 
 export type BrowseFilters = {
   mediaType?: "movie" | "tv";
-  sort: "popularity" | "score" | "recent";
+  sort: "trending" | "popularity" | "score" | "recent";
   genres: string[];
   keywords: string[];
   providerIds: string[];
@@ -112,7 +112,7 @@ export function useBrowse(filters: BrowseFilters) {
   };
 }
 
-export function useKeywords() {
+export function useKeywords(limit: number) {
   const [keywords, setKeywords] = useState<string[]>([]);
 
   useEffect(() => {
@@ -121,9 +121,10 @@ export function useKeywords() {
 
     async function load() {
       try {
-        const response = await requestJson<{ keywords: string[] }>("/api/catalog/keywords", {
-          signal: controller.signal,
-        });
+        const response = await requestJson<{ keywords: string[] }>(
+          `/api/catalog/keywords?limit=${limit}`,
+          { signal: controller.signal },
+        );
 
         if (active) {
           setKeywords(response.keywords);
@@ -141,12 +142,12 @@ export function useKeywords() {
       active = false;
       controller.abort();
     };
-  }, []);
+  }, [limit]);
 
   return keywords;
 }
 
-export function useGenres() {
+export function useGenres(limit: number) {
   const [genres, setGenres] = useState<string[]>([]);
 
   useEffect(() => {
@@ -155,9 +156,10 @@ export function useGenres() {
 
     async function load() {
       try {
-        const response = await requestJson<{ genres: string[] }>("/api/catalog/genres", {
-          signal: controller.signal,
-        });
+        const response = await requestJson<{ genres: string[] }>(
+          `/api/catalog/genres?limit=${limit}`,
+          { signal: controller.signal },
+        );
 
         if (active) {
           setGenres(response.genres);
@@ -175,7 +177,7 @@ export function useGenres() {
       active = false;
       controller.abort();
     };
-  }, []);
+  }, [limit]);
 
   return genres;
 }

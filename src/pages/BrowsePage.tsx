@@ -9,11 +9,15 @@ export type BrowsePreset = {
   title: string;
   description: string;
   mediaType?: "movie" | "tv";
-  sort: "popularity" | "score" | "recent";
+  sort: "trending" | "popularity" | "score" | "recent";
 };
 
+const BROWSE_GENRES = 18;
+const BROWSE_KEYWORDS = 28;
+
 const SORTS: { value: BrowsePreset["sort"]; label: string }[] = [
-  { value: "popularity", label: "Trending" },
+  { value: "trending", label: "Trending" },
+  { value: "popularity", label: "Popular" },
   { value: "score", label: "Highest rated" },
   { value: "recent", label: "Newest" },
 ];
@@ -32,15 +36,18 @@ export function BrowsePage({
   onOpen: (item: MediaTitle) => void;
 }) {
   const [params, setParams] = useSearchParams();
-  const genres = useGenres();
-  const keywords = useKeywords();
+  const genres = useGenres(BROWSE_GENRES);
+  const keywords = useKeywords(BROWSE_KEYWORDS);
   const selectedGenres = (params.get("genres") ?? "").split(",").filter(Boolean);
   const selectedKeywords = (params.get("keywords") ?? "").split(",").filter(Boolean);
   const selectedProviders = (params.get("providers") ?? "").split(",").filter(Boolean);
   const query = params.get("q") ?? "";
   const sortParam = params.get("sort");
   const sort: BrowsePreset["sort"] =
-    sortParam === "score" || sortParam === "recent" || sortParam === "popularity"
+    sortParam === "score" ||
+    sortParam === "recent" ||
+    sortParam === "popularity" ||
+    sortParam === "trending"
       ? sortParam
       : preset.sort;
   const filterable = providers.filter(
@@ -50,7 +57,7 @@ export function BrowsePage({
   );
   const shownKeywords = [
     ...selectedKeywords,
-    ...keywords.filter((keyword) => !selectedKeywords.includes(keyword)).slice(0, 28),
+    ...keywords.filter((keyword) => !selectedKeywords.includes(keyword)),
   ];
   const browse = useBrowse({
     mediaType: preset.mediaType,
@@ -122,7 +129,7 @@ export function BrowsePage({
         <div className="browse-facet">
           <span>Genre</span>
           <div className="browse-chips">
-            {genres.slice(0, 18).map((genre) => (
+            {genres.map((genre) => (
               <button
                 type="button"
                 key={genre}
@@ -196,7 +203,7 @@ export function BrowsePage({
               key={item.id}
               item={item}
               onOpen={onOpen}
-              rank={sort === "popularity" ? index + 1 : undefined}
+              rank={sort === "popularity" || sort === "trending" ? index + 1 : undefined}
             />
           ))}
         </div>

@@ -15,8 +15,6 @@ const SEED_PROMPTS = [
   "Watch with my kids",
 ];
 
-const SCHEDULE_LIMIT = 8;
-
 const REFINEMENTS = ["Shorter", "Lighter", "Older", "Weirder", "More acclaimed"];
 
 function formatAirTime(value: string) {
@@ -273,23 +271,21 @@ export function TonightPage({
               section={{
                 id: "trending",
                 title: "Trending now",
-                description: "Ranked by how fast Wikipedia readers are arriving",
+                description: "Wikipedia readers this week against last",
                 items: trending,
               }}
+              ranked
               onOpen={onOpen}
             />
           )}
-          {sections.map((section) => (
-            <ContentRail key={section.id} section={section} onOpen={onOpen} />
-          ))}
           {episodes.length > 0 && (
             <section className="schedule-strip">
               <div className="schedule-heading">
                 <strong>On tonight</strong>
-                <small>Air times from TVmaze</small>
+                <small>Schedule from TVmaze</small>
               </div>
               <div className="schedule-list">
-                {episodes.slice(0, SCHEDULE_LIMIT).map((episode) => (
+                {episodes.map((episode) => (
                   <button
                     type="button"
                     key={`${episode.showName}-${episode.airsAt}-${episode.episode ?? 0}`}
@@ -311,6 +307,9 @@ export function TonightPage({
               </div>
             </section>
           )}
+          {sections.map((section) => (
+            <ContentRail key={section.id} section={section} onOpen={onOpen} />
+          ))}
         </div>
       ) : (
         isLoading && (

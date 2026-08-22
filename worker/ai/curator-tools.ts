@@ -8,6 +8,8 @@ import { similarTo } from "../services/embeddings.ts";
 import { retrieveTitles } from "../services/retrieval.ts";
 import type { Bindings, ViewerContext } from "../types.ts";
 
+const SIMILAR_CANDIDATES = 60;
+
 export const CURATOR_TOOLS: ChatCompletionTool[] = [
   {
     type: "function",
@@ -152,12 +154,10 @@ export async function executeCuratorTool(
     }
 
     const search = buildSearch(argumentsValue, viewer, [...alwaysExclude, titleId]);
-    const neighbours = await similarTo(env, titleId, 60);
-    const results = neighbours.length
-      ? (await readRanked(env.DB, neighbours))
-          .filter((item) => !search.excludeIds?.includes(item.id))
-          .slice(0, search.limit ?? 12)
-      : [];
+    const neighbours = (await similarTo(env, titleId, SIMILAR_CANDIDATES))
+      .filter((id) => !search.excludeIds?.includes(id))
+      .slice(0, search.limit ?? 12);
+    const results = neighbours.length ? await readRanked(env.DB, neighbours) : [];
 
     return summarise(results, availableIds);
   }

@@ -21,6 +21,10 @@ import {
 } from "../services/catalog.ts";
 import type { Bindings } from "../types.ts";
 
+const TONIGHT_DEFAULT_LIMIT = 12;
+const KEYWORDS_DEFAULT_LIMIT = 120;
+const GENRES_DEFAULT_LIMIT = 40;
+
 export const catalogRoutes = new Hono<{ Bindings: Bindings }>();
 
 catalogRoutes.get("/", edgeCache(900), async (context) => {
@@ -85,12 +89,18 @@ catalogRoutes.get("/search", async (context) => {
 });
 
 catalogRoutes.get("/genres", edgeCache(3_600), async (context) => {
+  const requestedLimit = Number.parseInt(context.req.query("limit") ?? "", 10);
+  const limit = Number.isInteger(requestedLimit)
+    ? Math.max(1, Math.min(200, requestedLimit))
+    : GENRES_DEFAULT_LIMIT;
+
   try {
     context.header("cache-control", "public, max-age=3600");
 
-    return context.json({ genres: await getGenres(context.env) });
+    return context.json({ genres: await getGenres(context.env, limit) });
   } catch (error) {
     logError("genres_read_failed", error, { area: "browse" });
+    context.header("cache-control", "no-store");
 
     return context.json({ genres: [] });
   }
@@ -98,6 +108,10 @@ catalogRoutes.get("/genres", edgeCache(3_600), async (context) => {
 
 catalogRoutes.get("/tonight", async (context) => {
   const principal = await sessionPrincipal(context.env, context.req.raw);
+  const requestedLimit = Number.parseInt(context.req.query("limit") ?? "", 10);
+  const limit = Number.isInteger(requestedLimit)
+    ? Math.max(1, Math.min(40, requestedLimit))
+    : TONIGHT_DEFAULT_LIMIT;
 
   try {
     context.header("cache-control", "no-store");
@@ -107,6 +121,7 @@ catalogRoutes.get("/tonight", async (context) => {
         context.env,
         principal?.user.id ?? null,
         canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN),
+        limit,
       ),
     );
   } catch (error) {
@@ -121,16 +136,23 @@ catalogRoutes.get("/trending", edgeCache(1_800), async (context) => {
     return context.json(await getTrending(context.env));
   } catch (error) {
     logError("trending_read_failed", error, { area: "buzz" });
+    context.header("cache-control", "no-store");
 
     return context.json({ items: [], source: "Wikipedia pageview trend", fetchedAt: "" });
   }
 });
 
 catalogRoutes.get("/keywords", edgeCache(3_600), async (context) => {
+  const requestedLimit = Number.parseInt(context.req.query("limit") ?? "", 10);
+  const limit = Number.isInteger(requestedLimit)
+    ? Math.max(1, Math.min(400, requestedLimit))
+    : KEYWORDS_DEFAULT_LIMIT;
+
   try {
-    return context.json({ keywords: await getKeywords(context.env) });
+    return context.json({ keywords: await getKeywords(context.env, limit) });
   } catch (error) {
     logError("keywords_read_failed", error, { area: "browse" });
+    context.header("cache-control", "no-store");
 
     return context.json({ keywords: [] });
   }
@@ -160,7 +182,10 @@ catalogRoutes.get("/browse", edgeCache(120), async (context) => {
           .slice(0, 6),
         providerIds: validProviderIds((context.req.query("providers") ?? "").split(",")),
         query: (context.req.query("query") ?? "").trim().slice(0, 120),
-        sort: sortParam === "score" || sortParam === "recent" ? sortParam : "popularity",
+        sort:
+          sortParam === "score" || sortParam === "recent" || sortParam === "trending"
+            ? sortParam
+            : "popularity",
         page: Number.isInteger(page) && page > 0 ? Math.min(page, 80) : 0,
       }),
     );

@@ -2,9 +2,19 @@ import { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 
 import type { CatalogSection, MediaTitle } from "../domain/catalog";
+import { blendedRating, ratingSources } from "../domain/ratings";
 import { useAvailability } from "../hooks/useAvailability";
 import { useTitleInsight } from "../hooks/useTitleInsight";
-import { artwork, artworkSrcSet, mediaMeta, moneyLabel, scoreLabel, voteLabel } from "../lib/media";
+import {
+  artwork,
+  artworkSrcSet,
+  changeLabel,
+  compactCount,
+  mediaMeta,
+  moneyLabel,
+  scoreLabel,
+  voteLabel,
+} from "../lib/media";
 import { track } from "../lib/telemetry";
 import type { EntryStatus, ViewingEntry } from "../types";
 import { ArtPlaceholder } from "./ArtPlaceholder";
@@ -13,6 +23,15 @@ import { TrailerBlock } from "./TrailerBlock";
 import { ArrowIcon, PlusIcon, Poster, ProviderBadge } from "./ui";
 
 const RAIL_PROVIDER_LIMIT = 3;
+const RAIL_RATING_LIMIT = 3;
+
+function measuredOn(value: string) {
+  const date = new Date(value.includes("T") ? value : `${value.replace(" ", "T")}Z`);
+
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+}
 
 export function TitleCard({
   item,
@@ -63,22 +82,50 @@ export function TitleCard({
         </div>
       </button>
       <div className="rail-meta">
-        <span className="source-label">
-          TMDB {scoreLabel(item)}
-          {voteLabel(item) && <em>{voteLabel(item)}</em>}
-        </span>
+        {item.buzz && (
+          <span className="rail-buzz">
+            Wikipedia {changeLabel(item.buzz.delta)}
+            <em>{compactCount(item.buzz.views)} readers this week</em>
+          </span>
+        )}
+        <RatingLine item={item} limit={RAIL_RATING_LIMIT} />
         <span>{mediaMeta(item)}</span>
       </div>
     </article>
   );
 }
 
+function RatingLine({ item, limit }: { item: MediaTitle; limit?: number }) {
+  const sources = ratingSources(item);
+
+  if (sources.length === 0) {
+    return <span className="source-label">Not yet rated</span>;
+  }
+
+  const shown = limit ? sources.slice(0, limit) : sources;
+  const votes = shown.find((source) => source.votes)?.votes ?? null;
+
+  return (
+    <span className="source-label">
+      {shown
+        .map(
+          (source, index) =>
+            `${source.label} ${source.display}${index === 0 && source.outOfTen ? " / 10" : ""}`,
+        )
+        .join(" · ")}
+      {votes !== null && <em>{compactCount(votes)} votes</em>}
+    </span>
+  );
+}
+
 export function ContentRail({
   section,
   onOpen,
+  ranked,
 }: {
   section: CatalogSection;
   onOpen: (title: MediaTitle) => void;
+  ranked?: boolean;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const railRef = useRef<HTMLElement>(null);
@@ -124,10 +171,11 @@ export function ContentRail({
       </div>
       <div className="rail-track" ref={trackRef}>
         {section.items.length ? (
-          section.items.map((item) => (
+          section.items.map((item, index) => (
             <TitleCard
               key={`${section.id}-${item.id}`}
               item={item}
+              rank={ranked ? index + 1 : undefined}
               onOpen={(title) => {
                 track("rail_click", section.id, title.id);
                 onOpen(title);
@@ -168,6 +216,7 @@ export function DetailPanel({
   onSaveEntry: (entry: ViewingEntry) => void;
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
+  const consensus = blendedRating(item);
   const { providers, nextEpisode } = useAvailability(item, availabilityEnabled);
   const { insight, pairs, isLoading: isInsightLoading } = useTitleInsight(item.id);
   const watchDestinations = providers.flatMap((provider) => {
@@ -247,6 +296,25 @@ export function DetailPanel({
               )}
             </div>
           )}
+          {item.buzz && (
+            <div className="detail-buzz">
+              <span>Trending signal</span>
+              <p>
+                <strong>{item.buzz.views.toLocaleString()}</strong> Wikipedia readers in the last 7
+                days, {changeLabel(item.buzz.delta)} on the{" "}
+                {item.buzz.previousViews.toLocaleString()} the week before.
+              </p>
+              <small>
+                Article{" "}
+                <a href={item.buzz.articleUrl} target="_blank" rel="noreferrer">
+                  {item.buzz.article}
+                </a>{" "}
+                · matched by{" "}
+                {item.buzz.match === "wikidata" ? "Wikidata IMDb link" : "title search"} · measured{" "}
+                {measuredOn(item.buzz.measuredAt)}
+              </small>
+            </div>
+          )}
           {nextEpisode && (
             <p className="detail-next">
               <span>Next episode</span>
@@ -293,6 +361,15 @@ export function DetailPanel({
             </div>
           ) : null}
           <div className="score-row">
+            {consensus && consensus.sources.length > 1 && (
+              <div>
+                <strong>{consensus.score.toFixed(1)}</strong>
+                <span>
+                  Marquee consensus · {consensus.sources.length} source
+                  {consensus.sources.length === 1 ? "" : "s"}
+                </span>
+              </div>
+            )}
             <div>
               <strong>{scoreLabel(item)}</strong>
               <span>TMDB user score</span>
@@ -330,13 +407,13 @@ export function DetailPanel({
                 <span>AniList</span>
               </div>
             )}
-            {item.ratings?.boxOffice != null && (
+            {item.ratings?.boxOffice != null && item.ratings.boxOffice > 0 && (
               <div>
                 <strong>{moneyLabel(item.ratings.boxOffice)}</strong>
                 <span>Box office</span>
               </div>
             )}
-            {item.revenue != null && item.ratings?.boxOffice == null && (
+            {item.revenue != null && item.revenue > 0 && !item.ratings?.boxOffice && (
               <div>
                 <strong>{moneyLabel(item.revenue)}</strong>
                 <span>Worldwide gross</span>
@@ -427,6 +504,11 @@ export function DetailPanel({
             <a href={item.tmdbUrl} target="_blank" rel="noreferrer">
               TMDB <ArrowIcon />
             </a>
+            {item.buzz && (
+              <a href={item.buzz.articleUrl} target="_blank" rel="noreferrer">
+                Wikipedia <ArrowIcon />
+              </a>
+            )}
             {item.imdbUrl && (
               <a href={item.imdbUrl} target="_blank" rel="noreferrer">
                 IMDb <ArrowIcon />

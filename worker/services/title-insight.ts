@@ -75,12 +75,10 @@ function parseInsight(content: string, candidates: MediaTitle[]): TitleInsight |
 }
 
 async function pairCandidates(env: Bindings, title: MediaTitle) {
-  const neighbours = await similarTo(env, title.id, PAIR_CANDIDATES * 3);
+  const neighbours = await similarTo(env, title.id, PAIR_CANDIDATES + 1);
 
   if (neighbours.length) {
-    const ranked = (await readRanked(env.DB, neighbours))
-      .filter((item) => item.id !== title.id)
-      .slice(0, PAIR_CANDIDATES);
+    const ranked = (await readRanked(env.DB, neighbours)).slice(0, PAIR_CANDIDATES);
 
     if (ranked.length >= 2) {
       return ranked;

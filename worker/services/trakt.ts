@@ -108,9 +108,10 @@ async function hydrateMissing(env: Bindings, titleIds: string[]) {
     return;
   }
 
-  const placeholders = titleIds.map(() => "?").join(", ");
-  const known = await env.DB.prepare(`SELECT id FROM catalog_titles WHERE id IN (${placeholders})`)
-    .bind(...titleIds)
+  const known = await env.DB.prepare(
+    `SELECT id FROM catalog_titles WHERE id IN (SELECT value FROM json_each(?))`,
+  )
+    .bind(JSON.stringify(titleIds))
     .all<{ id: string }>();
   const have = new Set(known.results.map((row) => row.id));
   const missing = titleIds.filter((titleId) => !have.has(titleId)).slice(0, HYDRATE_LIMIT);

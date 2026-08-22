@@ -21,6 +21,7 @@ export const mcpRoutes = new Hono<{ Bindings: Bindings }>();
 
 const PROTOCOL_VERSION = "2025-06-18";
 const SERVER_INFO = { name: "marquee", version: "1.0.0" };
+const TONIGHT_EPISODES = 20;
 
 const TOOLS = [
   {
@@ -146,10 +147,10 @@ async function callTool(
       return textResult({ error: "titleId must look like movie:550" }, true);
     }
 
-    const neighbours = await similarTo(env, input.titleId, 40);
     const limit = typeof input.limit === "number" ? Math.min(25, input.limit) : 10;
+    const neighbours = (await similarTo(env, input.titleId, limit + 1)).slice(0, limit);
 
-    return textResult({ results: compact((await readRanked(env.DB, neighbours)).slice(0, limit)) });
+    return textResult({ results: compact(await readRanked(env.DB, neighbours)) });
   }
 
   if (name === "get_title") {
@@ -203,7 +204,7 @@ async function callTool(
   }
 
   if (name === "whats_on_tonight") {
-    const tonight = await getTonight(env, user.id, origin);
+    const tonight = await getTonight(env, user.id, origin, TONIGHT_EPISODES);
 
     return textResult({
       episodes: tonight.episodes.map((episode) => ({

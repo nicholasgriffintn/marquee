@@ -4,6 +4,16 @@ import type { Bindings } from "../types.ts";
 
 const edgeCaches = caches as unknown as { default: Cache };
 
+const CACHE_VERSION = "2";
+
+function versionedKey(url: string) {
+  const key = new URL(url);
+
+  key.searchParams.set("cache-version", CACHE_VERSION);
+
+  return new Request(key, { method: "GET" });
+}
+
 export function edgeCache(seconds: number): MiddlewareHandler<{ Bindings: Bindings }> {
   return async (context, next) => {
     if (context.req.method !== "GET") {
@@ -11,7 +21,7 @@ export function edgeCache(seconds: number): MiddlewareHandler<{ Bindings: Bindin
     }
 
     const cache = edgeCaches.default;
-    const cacheKey = new Request(context.req.url, { method: "GET" });
+    const cacheKey = versionedKey(context.req.url);
     const hit = await cache.match(cacheKey);
 
     if (hit) {
@@ -26,7 +36,7 @@ export function edgeCache(seconds: number): MiddlewareHandler<{ Bindings: Bindin
 
     const response = context.res;
 
-    if (response.status !== 200) {
+    if (response.status !== 200 || response.headers.get("cache-control")?.includes("no-store")) {
       return response;
     }
 

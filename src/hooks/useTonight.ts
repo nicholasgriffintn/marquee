@@ -16,7 +16,7 @@ export type ScheduledEpisode = {
 
 type TonightResponse = { episodes: ScheduledEpisode[]; fetchedAt: string };
 
-export function useTonight(isReady: boolean) {
+export function useTonight(isReady: boolean, limit: number) {
   const [episodes, setEpisodes] = useState<ScheduledEpisode[]>([]);
 
   useEffect(() => {
@@ -26,12 +26,14 @@ export function useTonight(isReady: boolean) {
 
     const controller = new AbortController();
 
-    requestJson<TonightResponse>("/api/catalog/tonight", { signal: controller.signal })
+    requestJson<TonightResponse>(`/api/catalog/tonight?limit=${limit}`, {
+      signal: controller.signal,
+    })
       .then((response) => setEpisodes(response.episodes))
       .catch(() => setEpisodes([]));
 
     return () => controller.abort();
-  }, [isReady]);
+  }, [isReady, limit]);
 
   return episodes;
 }

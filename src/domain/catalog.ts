@@ -24,6 +24,17 @@ export type ProviderAvailability = {
   source: "Watchmode" | "JustWatch" | "TMDB / JustWatch";
 };
 
+export type TitleBuzz = {
+  article: string;
+  articleUrl: string;
+  match: "wikidata" | "search";
+  views: number;
+  previousViews: number;
+  delta: number;
+  score: number;
+  measuredAt: string;
+};
+
 export type MediaTitle = {
   id: string;
   tmdbId: number;
@@ -62,6 +73,7 @@ export type MediaTitle = {
   lastAirDate?: string | null;
   nextAirDate?: string | null;
   recommendationIds?: string[];
+  buzz?: TitleBuzz;
   ratings?: {
     imdbScore: number | null;
     imdbVotes: number | null;

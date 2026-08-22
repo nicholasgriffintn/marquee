@@ -8,7 +8,8 @@ import { readTrending } from "./buzz.ts";
 import { readTonight } from "./schedule.ts";
 
 const FRESH_PICKS = 6;
-const NEIGHBOUR_TOP_K = 120;
+const DIGEST_EPISODES = 12;
+const NEIGHBOUR_TOP_K = 100;
 
 export type Digest = {
   createdAt: string;
@@ -42,12 +43,12 @@ async function freshForViewer(env: Bindings, vector: number[] | null, exclude: s
   const rows = await env.DB.prepare(
     `SELECT id
      FROM catalog_titles
-     WHERE id IN (${ids.map(() => "?").join(", ")})
+     WHERE id IN (SELECT value FROM json_each(?))
        AND COALESCE(year, 0) >= ?
      ORDER BY popularity DESC
      LIMIT ?`,
   )
-    .bind(...ids, new Date().getUTCFullYear() - 1, FRESH_PICKS)
+    .bind(JSON.stringify(ids), new Date().getUTCFullYear() - 1, FRESH_PICKS)
     .all<{ id: string }>();
 
   return rows.results.map((row) => row.id);
@@ -71,13 +72,13 @@ export async function buildDigest(env: Bindings, viewerId: string) {
       return [];
     }),
     readTrending(env, 6),
-    readTonight(env, viewerId, 168),
+    readTonight(env, viewerId, DIGEST_EPISODES, 168),
   ]);
   const digest: Digest = {
     createdAt: new Date().toISOString(),
     fresh,
     trending,
-    episodes: episodes.slice(0, 12).map((episode) => ({
+    episodes: episodes.map((episode) => ({
       titleId: episode.titleId,
       showName: episode.showName,
       season: episode.season,

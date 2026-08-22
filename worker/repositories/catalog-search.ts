@@ -1,22 +1,22 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
+import { buzzScoreSql } from "../lib/buzz.ts";
 import { parseStoredTitle } from "../lib/catalog-payload.ts";
+import { blendedRatingSql, weightedRatingSql } from "../lib/ratings.ts";
 import { isKnownTitle, validProviderIds } from "../lib/validation.ts";
 
 type PayloadRow = { payload: string; posterKey?: string | null };
 
-export type CatalogueSort = "popularity" | "score" | "recent" | "relevance";
+export type CatalogueSort = "trending" | "popularity" | "score" | "recent" | "relevance";
 
 export type SearchScope = "title" | "everything";
 
-const VOTE_PRIOR = 250;
-const MEAN_SCORE = 6.5;
 const SCORE_SORT_MIN_VOTES = 50;
 const MAX_QUERY_TOKENS = 8;
 
-const WEIGHTED_RATING = `(
-  (COALESCE(json_extract(t.payload, '$.tmdbVoteCount'), 0) * COALESCE(json_extract(t.payload, '$.tmdbScore'), 0))
-  + (${VOTE_PRIOR} * ${MEAN_SCORE})
-) / (COALESCE(json_extract(t.payload, '$.tmdbVoteCount'), 0) + ${VOTE_PRIOR})`;
+const WEIGHTED_RATING = weightedRatingSql("t.payload");
+const BLENDED_RATING = blendedRatingSql("t.payload");
+
+const BUZZ_SCORE = buzzScoreSql("t.id");
 
 const RELEVANCE = `bm25(catalog_search, 12.0, 8.0, 1.0, 4.0, 3.0, 0.0)`;
 
@@ -41,6 +41,7 @@ export type CatalogueSearch = {
 const TITLE_EXACTNESS = `(CASE WHEN lower(t.title) = ? OR lower(t.original_title) = ? THEN 0 ELSE 1 END)`;
 
 const ORDER_BY: Record<CatalogueSort, string> = {
+  trending: `${BUZZ_SCORE} DESC, t.popularity DESC`,
   popularity: "t.popularity DESC",
   score: `${WEIGHTED_RATING} DESC, t.popularity DESC`,
   recent: "COALESCE(t.year, 0) DESC, t.popularity DESC",
@@ -138,14 +139,14 @@ export async function searchCatalogue(db: D1Database, search: CatalogueSearch) {
     conditions.push(
       `EXISTS (
          SELECT 1 FROM json_each(t.provider_ids)
-         WHERE json_each.value IN (${providerIds.map(() => "?").join(", ")})
+         WHERE json_each.value IN (SELECT value FROM json_each(?))
        )`,
     );
-    bindings.push(...providerIds);
+    bindings.push(JSON.stringify(providerIds));
   }
 
   if (Number.isFinite(search.minScore)) {
-    conditions.push("COALESCE(json_extract(t.payload, '$.tmdbScore'), 0) >= ?");
+    conditions.push(`${BLENDED_RATING} >= ?`);
     bindings.push(Math.max(0, Math.min(10, search.minScore ?? 0)));
   }
 
@@ -246,15 +247,17 @@ export async function readRanked(db: D1Database, ids: string[]) {
   });
 }
 
-export async function readGenres(db: D1Database) {
+export async function readGenres(db: D1Database, limit = 100) {
   const rows = await db
     .prepare(
       `SELECT json_each.value AS genre, count(*) AS titles
        FROM catalog_titles, json_each(payload, '$.genres')
        GROUP BY json_each.value
        HAVING titles >= 5
-       ORDER BY titles DESC`,
+       ORDER BY titles DESC
+       LIMIT ?`,
     )
+    .bind(Math.max(1, Math.min(200, limit)))
     .all<{ genre: string; titles: number }>();
 
   return rows.results

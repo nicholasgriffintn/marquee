@@ -1,4 +1,5 @@
 import { logError } from "../lib/logging.ts";
+import { blendedRatingSql } from "../lib/ratings.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import type { Bindings } from "../types.ts";
 
@@ -15,7 +16,7 @@ const JUNK_KEYWORDS = ["duringcreditsstinger", "aftercreditsstinger", "woman dir
 
 type Section = { id: string; title: string; description: string; titleIds: string[] };
 
-const SCORE = `COALESCE(json_extract(payload, '$.tmdbScore'), 0)`;
+const SCORE = blendedRatingSql("payload");
 const VOTES = `COALESCE(json_extract(payload, '$.tmdbVoteCount'), 0)`;
 const RUNTIME = `json_extract(payload, '$.runtimeMinutes')`;
 const SEASONS = `json_extract(payload, '$.numberOfSeasons')`;
