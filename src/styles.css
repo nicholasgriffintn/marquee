@@ -2683,3 +2683,16 @@ h2 em {
   border-color: var(--blue);
   color: var(--blue);
 }
+
+.detail-media-out {
+  align-self: center;
+  color: var(--muted);
+  font: 700 10px var(--mono);
+  letter-spacing: 0.06em;
+  margin-left: auto;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+.detail-media-out:hover {
+  color: var(--blue);
+}

@@ -51,9 +51,9 @@ export function TrailerBlock({ item }: { item: MediaTitle }) {
           </button>
         )}
       </div>
-      {videos.length > 1 && (
-        <div className="detail-media-picks">
-          {videos.map((video) => (
+      <div className="detail-media-picks">
+        {videos.length > 1 &&
+          videos.map((video) => (
             <button
               type="button"
               key={video.key}
@@ -63,8 +63,15 @@ export function TrailerBlock({ item }: { item: MediaTitle }) {
               {video.name.length > 26 ? `${video.name.slice(0, 26)}…` : video.name}
             </button>
           ))}
-        </div>
-      )}
+        <a
+          className="detail-media-out"
+          href={`https://www.youtube.com/watch?v=${(active ?? videos[0]).key}`}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Watch on YouTube ↗
+        </a>
+      </div>
     </div>
   );
 }

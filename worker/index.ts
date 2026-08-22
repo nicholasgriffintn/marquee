@@ -73,9 +73,20 @@ app.notFound(async (context) => {
 
   response.headers.set(
     "content-security-policy",
-    `default-src 'self'; style-src 'self' 'unsafe-inline'; script-src ${scriptSource}; img-src 'self' data: https://image.tmdb.org https://www.themoviedb.org https://avatars.githubusercontent.com https://i.ytimg.com; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; frame-src https://www.youtube-nocookie.com; form-action 'self'`,
+    `default-src 'self'; style-src 'self' 'unsafe-inline'; script-src ${scriptSource}; img-src 'self' data: https://image.tmdb.org https://www.themoviedb.org https://avatars.githubusercontent.com https://i.ytimg.com; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; frame-src https://www.youtube-nocookie.com https://www.youtube.com; worker-src 'self' blob:; form-action 'self'`,
   );
-  response.headers.set("permissions-policy", "camera=(), microphone=(), geolocation=()");
+  response.headers.set(
+    "permissions-policy",
+    [
+      "camera=()",
+      "microphone=()",
+      "geolocation=()",
+      'autoplay=(self "https://www.youtube-nocookie.com" "https://www.youtube.com")',
+      'fullscreen=(self "https://www.youtube-nocookie.com" "https://www.youtube.com")',
+      'encrypted-media=(self "https://www.youtube-nocookie.com" "https://www.youtube.com")',
+      'picture-in-picture=(self "https://www.youtube-nocookie.com" "https://www.youtube.com")',
+    ].join(", "),
+  );
   response.headers.set("referrer-policy", "strict-origin-when-cross-origin");
   response.headers.set("x-content-type-options", "nosniff");
 
