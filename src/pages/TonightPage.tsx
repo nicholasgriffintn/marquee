@@ -42,6 +42,7 @@ export function TonightPage({
   isSignedIn,
   sections,
   episodes,
+  trending,
   providers,
   selectedProviderIds,
   onAsk,
@@ -61,6 +62,7 @@ export function TonightPage({
   isSignedIn: boolean;
   sections: CatalogSection[];
   episodes: ScheduledEpisode[];
+  trending: MediaTitle[];
   providers: Provider[];
   selectedProviderIds: string[];
   onAsk: (prompt: string, refineOf?: string[]) => Promise<void>;
@@ -289,6 +291,20 @@ export function TonightPage({
             ))}
           </div>
         </section>
+      )}
+
+      {trending.length > 1 && (
+        <div className="rails-section">
+          <ContentRail
+            section={{
+              id: "trending",
+              title: "Trending now",
+              description: "Ranked by how fast Wikipedia readers are arriving",
+              items: trending,
+            }}
+            onOpen={onOpen}
+          />
+        </div>
       )}
 
       {error && featured && (

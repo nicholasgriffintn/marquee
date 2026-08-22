@@ -22,6 +22,7 @@ export type CatalogueSearch = {
   query?: string;
   minVotes?: number;
   genres?: string[];
+  keywords?: string[];
   mediaType?: "movie" | "tv";
   providerIds?: string[];
   minScore?: number;
@@ -94,6 +95,21 @@ export async function searchCatalogue(db: D1Database, search: CatalogueSearch) {
        )`,
     );
     bindings.push(...genres);
+  }
+
+  const keywords = (search.keywords ?? [])
+    .map((keyword) => keyword.trim().toLowerCase())
+    .filter(Boolean)
+    .slice(0, 6);
+
+  if (keywords.length) {
+    conditions.push(
+      `EXISTS (
+         SELECT 1 FROM json_each(t.payload, '$.keywords')
+         WHERE lower(json_each.value) IN (${keywords.map(() => "?").join(", ")})
+       )`,
+    );
+    bindings.push(...keywords);
   }
 
   if (providerIds.length) {

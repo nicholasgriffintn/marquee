@@ -4,6 +4,7 @@ import { bearerUser } from "../auth/api-tokens.ts";
 import type { MarqueeUser } from "../auth/model.ts";
 import { readJsonObject } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
+import { canonicalOrigin } from "../lib/security.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { isRecord } from "../lib/values.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
@@ -125,6 +126,7 @@ async function callTool(
   user: MarqueeUser,
   name: string,
   input: Record<string, unknown>,
+  origin: string,
 ) {
   if (name === "search_catalogue") {
     const viewer = await readViewerContext(env.DB, user.id);
@@ -207,7 +209,7 @@ async function callTool(
   }
 
   if (name === "whats_on_tonight") {
-    const tonight = await getTonight(env, user.id);
+    const tonight = await getTonight(env, user.id, origin);
 
     return textResult({
       episodes: tonight.episodes.map((episode) => ({
@@ -274,7 +276,18 @@ mcpRoutes.all("/", async (context) => {
     const input = isRecord(parameters.arguments) ? parameters.arguments : {};
 
     try {
-      return context.json(ok(id, await callTool(context.env, user, name, input)));
+      return context.json(
+        ok(
+          id,
+          await callTool(
+            context.env,
+            user,
+            name,
+            input,
+            canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN),
+          ),
+        ),
+      );
     } catch (error) {
       logError("mcp_tool_failed", error, { tool: name });
 

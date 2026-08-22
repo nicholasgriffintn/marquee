@@ -13,7 +13,9 @@ import { useSearch } from "./hooks/useSearch";
 import { useSession } from "./hooks/useSession";
 import { useTitle } from "./hooks/useTitle";
 import { useTonight } from "./hooks/useTonight";
+import { useTrending } from "./hooks/useTrending";
 import { BrowsePage, type BrowsePreset } from "./pages/BrowsePage";
+import { DigestPage } from "./pages/DigestPage";
 import { LibraryPage } from "./pages/LibraryPage";
 import { SearchPage } from "./pages/SearchPage";
 import { SourcesPage } from "./pages/SourcesPage";
@@ -27,6 +29,7 @@ const NAV: { to: string; label: string; private: boolean }[] = [
   { to: "/new", label: "New", private: false },
   { to: "/popular", label: "Popular", private: false },
   { to: "/shelf", label: "My shelf", private: true },
+  { to: "/this-week", label: "This week", private: true },
   { to: "/sources", label: "Sources", private: false },
 ];
 
@@ -76,6 +79,7 @@ export function App() {
   const curator = useCurator();
   const aiRails = useAiRails(isSignedIn && isViewerReady && isHome, profile.savedIds.join(","));
   const episodes = useTonight(isViewerReady);
+  const trending = useTrending(isViewerReady && isHome);
   const titleMatch = useMatch("/title/:titleId");
   const storedBackground = (location.state as { background?: typeof location } | null)?.background;
   const background = storedBackground?.pathname.startsWith("/title/")
@@ -236,6 +240,7 @@ export function App() {
               isSignedIn={isSignedIn}
               sections={sections}
               episodes={episodes}
+              trending={trending}
               providers={catalog.providers}
               selectedProviderIds={profile.selectedProviderIds}
               onAsk={askCurator}
@@ -245,6 +250,11 @@ export function App() {
               onShowSources={() => void navigate("/sources")}
             />
           }
+        />
+
+        <Route
+          path="/this-week"
+          element={<DigestPage isSignedIn={isSignedIn} onOpen={openTitle} />}
         />
 
         <Route

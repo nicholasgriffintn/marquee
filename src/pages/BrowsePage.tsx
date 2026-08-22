@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { TitleCard } from "../components/catalog";
 import { ProviderBadge } from "../components/ui";
 import type { MediaTitle, Provider } from "../domain/catalog";
-import { useBrowse, useGenres } from "../hooks/useBrowse";
+import { useBrowse, useGenres, useKeywords } from "../hooks/useBrowse";
 
 export type BrowsePreset = {
   title: string;
@@ -33,7 +33,9 @@ export function BrowsePage({
 }) {
   const [params, setParams] = useSearchParams();
   const genres = useGenres();
+  const keywords = useKeywords();
   const selectedGenres = (params.get("genres") ?? "").split(",").filter(Boolean);
+  const selectedKeywords = (params.get("keywords") ?? "").split(",").filter(Boolean);
   const selectedProviders = (params.get("providers") ?? "").split(",").filter(Boolean);
   const query = params.get("q") ?? "";
   const sortParam = params.get("sort");
@@ -50,6 +52,7 @@ export function BrowsePage({
     mediaType: preset.mediaType,
     sort,
     genres: selectedGenres,
+    keywords: selectedKeywords,
     providerIds: selectedProviders,
     query,
   });
@@ -69,6 +72,7 @@ export function BrowsePage({
   }
 
   const hasFilters =
+    selectedKeywords.length > 0 ||
     selectedGenres.length > 0 ||
     selectedProviders.length > 0 ||
     Boolean(query) ||
@@ -128,6 +132,25 @@ export function BrowsePage({
           </div>
         </div>
 
+        {keywords.length > 0 && (
+          <div className="browse-facet">
+            <span>Tag</span>
+            <div className="browse-chips">
+              {keywords.slice(0, 28).map((keyword) => (
+                <button
+                  type="button"
+                  key={keyword}
+                  className={selectedKeywords.includes(keyword) ? "selected" : ""}
+                  aria-pressed={selectedKeywords.includes(keyword)}
+                  onClick={() => update({ keywords: toggle(selectedKeywords, keyword).join(",") })}
+                >
+                  {keyword}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {filterable.length > 0 && (
           <div className="browse-facet">
             <span>Source</span>
@@ -155,7 +178,7 @@ export function BrowsePage({
           <button
             type="button"
             className="browse-clear"
-            onClick={() => update({ genres: "", providers: "", q: "", sort: "" })}
+            onClick={() => update({ genres: "", keywords: "", providers: "", q: "", sort: "" })}
           >
             Clear filters
           </button>

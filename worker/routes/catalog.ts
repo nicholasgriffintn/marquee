@@ -5,6 +5,7 @@ import { edgeCache } from "../lib/cache.ts";
 import { recordEvent } from "../lib/events.ts";
 import { clientRateLimitKey } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
+import { canonicalOrigin } from "../lib/security.ts";
 import { validProviderIds } from "../lib/validation.ts";
 import {
   browseCatalogue,
@@ -101,7 +102,13 @@ catalogRoutes.get("/tonight", async (context) => {
   try {
     context.header("cache-control", "no-store");
 
-    return context.json(await getTonight(context.env, principal?.user.id ?? null));
+    return context.json(
+      await getTonight(
+        context.env,
+        principal?.user.id ?? null,
+        canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN),
+      ),
+    );
   } catch (error) {
     logError("tonight_read_failed", error, { area: "schedule" });
 
@@ -144,6 +151,11 @@ catalogRoutes.get("/browse", edgeCache(120), async (context) => {
         genres: (context.req.query("genres") ?? "")
           .split(",")
           .map((genre) => genre.trim())
+          .filter(Boolean)
+          .slice(0, 6),
+        keywords: (context.req.query("keywords") ?? "")
+          .split(",")
+          .map((keyword) => keyword.trim())
           .filter(Boolean)
           .slice(0, 6),
         providerIds: validProviderIds((context.req.query("providers") ?? "").split(",")),

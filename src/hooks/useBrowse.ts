@@ -7,6 +7,7 @@ export type BrowseFilters = {
   mediaType?: "movie" | "tv";
   sort: "popularity" | "score" | "recent";
   genres: string[];
+  keywords: string[];
   providerIds: string[];
   query: string;
 };
@@ -27,6 +28,7 @@ export function useBrowse(filters: BrowseFilters) {
     filters.mediaType ?? "",
     filters.sort,
     filters.genres.join(","),
+    filters.keywords.join(","),
     filters.providerIds.join(","),
     filters.query.trim(),
   ].join("|");
@@ -40,7 +42,7 @@ export function useBrowse(filters: BrowseFilters) {
         async function load() {
           setIsLoading(true);
 
-          const [mediaType, sort, genres, providers, query] = key.split("|");
+          const [mediaType, sort, genres, keywords, providers, query] = key.split("|");
           const parameters = new URLSearchParams({ sort, page: String(page) });
 
           if (mediaType) {
@@ -49,6 +51,10 @@ export function useBrowse(filters: BrowseFilters) {
 
           if (genres) {
             parameters.set("genres", genres);
+          }
+
+          if (keywords) {
+            parameters.set("keywords", keywords);
           }
 
           if (providers) {
@@ -104,6 +110,40 @@ export function useBrowse(filters: BrowseFilters) {
     error,
     loadMore: () => setPageState({ key, page: page + 1 }),
   };
+}
+
+export function useKeywords() {
+  const [keywords, setKeywords] = useState<string[]>([]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+
+    async function load() {
+      try {
+        const response = await requestJson<{ keywords: string[] }>("/api/catalog/keywords", {
+          signal: controller.signal,
+        });
+
+        if (active) {
+          setKeywords(response.keywords);
+        }
+      } catch {
+        if (active) {
+          setKeywords([]);
+        }
+      }
+    }
+
+    void load();
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, []);
+
+  return keywords;
 }
 
 export function useGenres() {

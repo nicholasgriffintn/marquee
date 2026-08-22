@@ -12,6 +12,7 @@ import type { Bindings } from "../types.ts";
 import { readTrending } from "./buzz.ts";
 import { findPendingTitles } from "./discovery.ts";
 import { readTonight } from "./schedule.ts";
+import { traktUpcoming } from "./trakt.ts";
 
 export async function getCatalogue(env: Bindings, providerIds: string[]) {
   return readCatalog(env.DB, "", providerIds);
@@ -63,6 +64,7 @@ export async function getTitleAvailability(db: D1Database, titleId: string) {
 export type BrowseQuery = {
   mediaType?: "movie" | "tv";
   genres: string[];
+  keywords: string[];
   providerIds: string[];
   query: string;
   sort: "popularity" | "score" | "recent";
@@ -76,6 +78,7 @@ export async function browseCatalogue(env: Bindings, browse: BrowseQuery) {
   const items = await queryCatalogue(env.DB, {
     mediaType: browse.mediaType,
     genres: browse.genres,
+    keywords: browse.keywords,
     providerIds: browse.providerIds,
     query: browse.query,
     sort: browse.sort,
@@ -99,8 +102,48 @@ export async function getKeywords(env: Bindings) {
   return readKeywords(env.DB);
 }
 
-export async function getTonight(env: Bindings, viewerId: string | null) {
-  return { episodes: await readTonight(env, viewerId), fetchedAt: new Date().toISOString() };
+export async function getTonight(env: Bindings, viewerId: string | null, origin: string) {
+  const scheduled = await readTonight(env, viewerId);
+
+  if (!viewerId) {
+    return { episodes: scheduled, fetchedAt: new Date().toISOString() };
+  }
+
+  const seen = new Set(
+    scheduled.map((episode) => `${episode.showName}|${episode.airsAt.slice(0, 10)}`),
+  );
+  const calendar = await traktUpcoming(env, viewerId, origin);
+  const extra = calendar
+    .filter((episode) => !seen.has(`${episode.showName}|${episode.airsAt.slice(0, 10)}`))
+    .map((episode) => ({
+      titleId: episode.tmdbId ? `tv:${episode.tmdbId}` : null,
+      showName: episode.showName,
+      season: episode.season,
+      episode: episode.episode,
+      episodeName: episode.episodeName,
+      airsAt: episode.airsAt,
+      network: null,
+      item: null,
+    }));
+  const merged = [...scheduled, ...extra].filter(
+    (episode) => Date.parse(episode.airsAt) < Date.now() + 36 * 3_600_000,
+  );
+
+  merged.sort((left, right) => Date.parse(left.airsAt) - Date.parse(right.airsAt));
+
+  const hydrated = await readRanked(
+    env.DB,
+    merged.flatMap((episode) => (episode.titleId && !episode.item ? [episode.titleId] : [])),
+  );
+  const byId = new Map(hydrated.map((item) => [item.id, item]));
+
+  return {
+    episodes: merged.map((episode) => ({
+      ...episode,
+      item: episode.item ?? (episode.titleId ? (byId.get(episode.titleId) ?? null) : null),
+    })),
+    fetchedAt: new Date().toISOString(),
+  };
 }
 
 export async function getTrending(env: Bindings) {
