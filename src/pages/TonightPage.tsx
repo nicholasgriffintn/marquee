@@ -288,20 +288,6 @@ export function TonightPage({
         </section>
       )}
 
-      {trending.length > 1 && (
-        <div className="rails-section">
-          <ContentRail
-            section={{
-              id: "trending",
-              title: "Trending now",
-              description: "Ranked by how fast Wikipedia readers are arriving",
-              items: trending,
-            }}
-            onOpen={onOpen}
-          />
-        </div>
-      )}
-
       {error && featured && (
         <p className="catalogue-error" role="alert">
           {error}
@@ -312,8 +298,19 @@ export function TonightPage({
           <i>AI</i> Building your shelves…
         </p>
       )}
-      {sections.length > 0 ? (
+      {trending.length > 1 || sections.length > 0 ? (
         <div className="rails-section">
+          {trending.length > 1 && (
+            <ContentRail
+              section={{
+                id: "trending",
+                title: "Trending now",
+                description: "Ranked by how fast Wikipedia readers are arriving",
+                items: trending,
+              }}
+              onOpen={onOpen}
+            />
+          )}
           {sections.map((section) => (
             <ContentRail key={section.id} section={section} onOpen={onOpen} />
           ))}

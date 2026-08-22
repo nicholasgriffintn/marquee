@@ -2560,8 +2560,8 @@ h2 em {
   margin-top: 16px;
 }
 .detail-chip {
-  border: 1px solid var(--panel-line);
-  color: var(--white);
+  border: 1px solid var(--paper-line);
+  color: var(--ink);
   font: 700 10px var(--mono);
   letter-spacing: 0.06em;
   padding: 6px 10px;
@@ -2569,7 +2569,8 @@ h2 em {
   text-transform: uppercase;
 }
 .detail-chip:hover {
-  border-color: var(--acid);
+  border-color: var(--blue);
+  color: var(--blue);
 }
 .detail-chip-person {
   border-style: dashed;
