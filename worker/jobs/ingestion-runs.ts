@@ -15,10 +15,6 @@ export function jobSubject(job: IngestionJob) {
     return job.imdbId;
   }
 
-  if (job.type === "build-rails") {
-    return job.viewerId;
-  }
-
   if (job.type === "sync-discover-page") {
     return `${job.mediaType}#${job.page}`;
   }

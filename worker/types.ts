@@ -26,8 +26,9 @@ export type Bindings = {
   RATINGS_QUEUE: Queue<IngestionJob>;
   SIMKL_QUEUE: Queue<IngestionJob>;
   POSTER_QUEUE: Queue<IngestionJob>;
-  AI_QUEUE: Queue<IngestionJob>;
   EMBEDDING_QUEUE: Queue<IngestionJob>;
+  CATALOG_SWEEP: Workflow;
+  RAILS_WORKFLOW: Workflow<{ viewerId: string }>;
   MEDIA: R2Bucket;
   TRAKT_CLIENT_ID?: string;
   TRAKT_CLIENT_SECRET?: string;
@@ -59,7 +60,6 @@ export type IngestionJob =
   | { type: "enrich-simkl"; titleId: string }
   | { type: "cache-poster"; titleId: string }
   | { type: "import-imdb-title"; imdbId: string }
-  | { type: "build-rails"; viewerId: string }
   | { type: "embed-titles"; titleIds: string[] };
 
 export type EntryStatus = "watchlist" | "watching" | "watched" | "dropped";

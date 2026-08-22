@@ -15,8 +15,6 @@ import { readItems } from "../repositories/catalog-reader.ts";
 import { storeCatalog, storeItems } from "../repositories/catalog-writer.ts";
 import { selectUnenriched, storeEnrichment, storePoster } from "../repositories/enrichment.ts";
 import { storeProviders } from "../repositories/providers.ts";
-import { readViewerContext } from "../repositories/viewer-context.ts";
-import { generateRails, getPersonalRails } from "../services/ai-rails.ts";
 import { embedTitles, selectUnembedded } from "../services/embeddings.ts";
 import type { Bindings, EnrichmentSource, IngestionJob } from "../types.ts";
 import { getProviderLedger } from "./provider-ledger.ts";
@@ -71,7 +69,7 @@ function titleParts(titleId: string) {
     : null;
 }
 
-async function syncCatalog(env: Bindings) {
+export async function syncCatalogHead(env: Bindings) {
   const catalogue = await getCatalog(env, "", []);
   const catalogueTitles = await storeCatalog(env.DB, catalogue);
   const savedTitles = await env.DB.prepare(
@@ -88,6 +86,13 @@ async function syncCatalog(env: Bindings) {
 
   await storeItems(env.DB, missingSavedTitles, catalogue.fetchedAt);
 
+  return [
+    ...catalogueTitles.map((title) => title.id),
+    ...savedTitles.results.map((row) => row.titleId).filter(isKnownTitle),
+  ];
+}
+
+export async function queueDiscoverPages(env: Bindings) {
   const [moviePages, televisionPages] = await Promise.all([
     getDiscoverPageCount(env, "movie"),
     getDiscoverPageCount(env, "tv"),
@@ -108,15 +113,20 @@ async function syncCatalog(env: Bindings) {
   console.log(JSON.stringify({ event: "discover_sweep_queued", moviePages, televisionPages }));
 
   await enqueue(env.INGESTION_QUEUE, pageJobs);
-  await queueAvailability(
-    env,
-    catalogueTitles.map((title) => title.id),
-  );
+
+  return { moviePages, televisionPages };
+}
+
+async function syncCatalog(env: Bindings) {
+  const titleIds = await syncCatalogHead(env);
+
+  await queueDiscoverPages(env);
+  await queueAvailability(env, titleIds);
   await queueEnrichment(env);
   await queueEmbeddings(env);
 }
 
-async function queueEmbeddings(env: Bindings) {
+export async function queueEmbeddings(env: Bindings) {
   const titleIds = await selectUnembedded(env, EMBED_PER_RUN);
   const jobs: IngestionJob[] = [];
 
@@ -129,7 +139,7 @@ async function queueEmbeddings(env: Bindings) {
   await enqueue(env.EMBEDDING_QUEUE, jobs);
 }
 
-async function queueEnrichment(env: Bindings) {
+export async function queueEnrichment(env: Bindings) {
   for (const enricher of ENRICHERS) {
     if (!sourceConfigured(env, enricher.source)) {
       continue;
@@ -163,10 +173,6 @@ async function syncDiscoverPage(env: Bindings, mediaType: "movie" | "tv", page: 
   const titles = await getDiscoverPage(env, mediaType, page);
 
   await storeItems(env.DB, titles, new Date().toISOString());
-  await queueAvailability(
-    env,
-    titles.map((title) => title.id),
-  );
 }
 
 async function queueTitleEmbeddings(env: Bindings, titleIds: string[]) {
@@ -185,7 +191,7 @@ async function queueTitleEmbeddings(env: Bindings, titleIds: string[]) {
   await enqueue(env.EMBEDDING_QUEUE, jobs);
 }
 
-async function queueAvailability(env: Bindings, titleIds: string[]) {
+export async function queueAvailability(env: Bindings, titleIds: string[]) {
   if (!env.WATCHMODE_API_KEY || titleIds.length === 0) {
     return;
   }
@@ -405,15 +411,6 @@ export async function executeIngestionJob(env: Bindings, job: IngestionJob) {
 
   if (job.type === "import-imdb-title") {
     await importImdbTitle(env, job.imdbId);
-
-    return;
-  }
-
-  if (job.type === "build-rails") {
-    const viewer = await readViewerContext(env.DB, job.viewerId);
-    const { signature } = await getPersonalRails(env, job.viewerId);
-
-    await generateRails(env, job.viewerId, signature, viewer);
 
     return;
   }

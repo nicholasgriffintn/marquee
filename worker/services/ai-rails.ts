@@ -27,7 +27,7 @@ const SYSTEM_PROMPT = [
   'Reply with JSON only: {"name":"","reason":"","picks":[1,2]}.',
 ].join(" ");
 
-type Angle = {
+export type Angle = {
   id: string;
   brief: string;
   fallbackText: string;
@@ -35,7 +35,7 @@ type Angle = {
   slice: "near" | "far";
 };
 
-const ANGLES: Angle[] = [
+export const ANGLES: Angle[] = [
   {
     id: "close",
     brief: "Titles close to what this viewer already saves and rates highly.",
@@ -59,7 +59,7 @@ const ANGLES: Angle[] = [
   },
 ];
 
-type StoredRail = { name: string; reason: string; titleIds: string[] };
+export type StoredRail = { name: string; reason: string; titleIds: string[] };
 
 type RailRow = { signature: string; payload: string; ageHours: number };
 
@@ -199,7 +199,7 @@ function parseRail(content: string | null, shortlist: MediaTitle[]): StoredRail 
   }
 }
 
-async function buildOneRail(
+export async function buildOneRail(
   env: Bindings,
   viewer: ViewerContext,
   vector: number[] | null,
@@ -279,7 +279,7 @@ async function hydrate(env: Bindings, rails: StoredRail[]): Promise<CatalogSecti
   });
 }
 
-async function persistRails(
+export async function persistRails(
   env: Bindings,
   viewerId: string,
   signature: string,
@@ -321,33 +321,24 @@ export async function getPersonalRails(env: Bindings, viewerId: string) {
   };
 }
 
-export async function generateRails(
-  env: Bindings,
-  viewerId: string,
-  signature: string,
-  viewer: ViewerContext,
-) {
+export async function prepareRails(env: Bindings, viewer: ViewerContext) {
   const [onHomepage, vector] = await Promise.all([homepageTitleIds(env), tasteVector(env, viewer)]);
-  const exclude = [
-    ...onHomepage,
-    ...viewer.entries
-      .filter((entry) => entry.status === "watched" || entry.status === "dropped")
-      .map((entry) => entry.titleId),
-  ];
-  const settled = await Promise.allSettled(
-    ANGLES.map((angle) => buildOneRail(env, viewer, vector, angle, exclude)),
-  );
+
+  return {
+    vector,
+    exclude: [
+      ...onHomepage,
+      ...viewer.entries
+        .filter((entry) => entry.status === "watched" || entry.status === "dropped")
+        .map((entry) => entry.titleId),
+    ],
+  };
+}
+
+export function dedupeRails(rails: StoredRail[]) {
   const used = new Set<string>();
-  const rails = settled
-    .flatMap((result) => {
-      if (result.status === "rejected") {
-        logError("rail_angle_failed", result.reason);
 
-        return [];
-      }
-
-      return result.value ? [result.value] : [];
-    })
+  return rails
     .map((rail) => ({
       ...rail,
       titleIds: rail.titleIds.filter((titleId) => {
@@ -362,6 +353,29 @@ export async function generateRails(
     }))
     .filter((rail) => rail.titleIds.length >= RAIL_MIN)
     .slice(0, RAIL_LIMIT);
+}
+
+export async function generateRails(
+  env: Bindings,
+  viewerId: string,
+  signature: string,
+  viewer: ViewerContext,
+) {
+  const { vector, exclude } = await prepareRails(env, viewer);
+  const settled = await Promise.allSettled(
+    ANGLES.map((angle) => buildOneRail(env, viewer, vector, angle, exclude)),
+  );
+  const rails = dedupeRails(
+    settled.flatMap((result) => {
+      if (result.status === "rejected") {
+        logError("rail_angle_failed", result.reason);
+
+        return [];
+      }
+
+      return result.value ? [result.value] : [];
+    }),
+  );
 
   if (rails.length === 0) {
     logError("ai_rails_unresolved", new Error("no shelf survived across all angles"));

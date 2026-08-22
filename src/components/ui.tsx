@@ -1,6 +1,7 @@
 import type { MediaTitle, Provider, ProviderAvailability } from "../domain/catalog";
 import { providerLogo } from "../domain/provider-logos";
 import { providerMark } from "../domain/providers";
+import { artwork, artworkSrcSet } from "../lib/media";
 import { ArtPlaceholder } from "./ArtPlaceholder";
 
 export function ArrowIcon() {
@@ -61,14 +62,18 @@ export function ProviderBadge({
 
 export function Poster({ item, wide = false }: { item: MediaTitle; wide?: boolean }) {
   const image = wide ? (item.posterUrl ?? item.backdropUrl) : item.posterUrl;
+  const kind = wide && !item.posterUrl ? "backdrop" : "poster";
+  const width = wide ? 780 : 320;
 
   return (
     <div className={`poster${wide ? " poster-wide" : ""}${image ? "" : " poster-missing"}`}>
       {image && (
         <img
-          src={image}
+          src={artwork(image, width, kind) ?? image}
+          srcSet={artworkSrcSet(image, width, kind)}
           alt={`${item.title} ${wide ? "backdrop" : "poster"}`}
           loading={wide ? "eager" : "lazy"}
+          decoding="async"
         />
       )}
       {!image && <ArtPlaceholder seed={item.id} label={item.title} wide={wide} />}

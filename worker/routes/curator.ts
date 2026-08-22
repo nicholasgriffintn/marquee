@@ -2,6 +2,7 @@ import { Hono } from "hono";
 
 import { requireAuthentication, type AuthVariables } from "../auth/session.ts";
 import { AiGatewayError } from "../clients/ai-gateway.ts";
+import { recordEvent } from "../lib/events.ts";
 import { clientRateLimitKey, jsonResponse, readJsonObject } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
 import { isKnownTitle } from "../lib/validation.ts";
@@ -39,6 +40,8 @@ curatorRoutes.post("/", async (context) => {
   if (!prompt) {
     return jsonResponse({ error: "Describe what kind of watch you want" }, 400);
   }
+
+  recordEvent(context.env, { name: "curator_ask", viewerId: user.id, detail: prompt });
 
   const { readable, writable } = new TransformStream();
   const writer = writable.getWriter();
@@ -79,14 +82,17 @@ curatorRoutes.get("/rails", async (context) => {
     const { sections, isFresh } = await getPersonalRails(context.env, user.id);
 
     if (isFresh) {
+      recordEvent(context.env, {
+        name: "rails_served",
+        viewerId: user.id,
+        value: sections.length,
+      });
+
       return jsonResponse({ sections, status: "ready" });
     }
 
     if (context.req.query("generate") === "1") {
-      await context.env.AI_QUEUE.send(
-        { type: "build-rails", viewerId: user.id },
-        { contentType: "json" },
-      );
+      await context.env.RAILS_WORKFLOW.create({ params: { viewerId: user.id } });
     }
 
     return jsonResponse({ sections, status: "generating" });

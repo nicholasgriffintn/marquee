@@ -5,7 +5,7 @@ import { ContentRail } from "../components/catalog";
 import { ArrowIcon, ProviderBadge } from "../components/ui";
 import type { CatalogSection, MediaTitle, Provider } from "../domain/catalog";
 import type { CuratorState } from "../hooks/useCurator";
-import { mediaMeta, scoreLabel } from "../lib/media";
+import { artwork, artworkSrcSet, mediaMeta, scoreLabel } from "../lib/media";
 
 const SEED_PROMPTS = [
   "Something short and funny",
@@ -79,7 +79,12 @@ export function TonightPage({
         {featured && (
           <div className="hero-art" aria-hidden="true">
             {featured.backdropUrl ? (
-              <img src={featured.backdropUrl} alt="" />
+              <img
+                src={artwork(featured.backdropUrl, 1280, "backdrop") ?? featured.backdropUrl}
+                srcSet={artworkSrcSet(featured.backdropUrl, 1280, "backdrop")}
+                alt=""
+                decoding="async"
+              />
             ) : (
               <ArtPlaceholder seed={featured.id} label={featured.title} wide />
             )}

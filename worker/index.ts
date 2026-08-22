@@ -9,6 +9,8 @@ import { curatorRoutes } from "./routes/curator.ts";
 import { mediaRoutes } from "./routes/media.ts";
 import { profileRoutes } from "./routes/profile.ts";
 import type { Bindings, IngestionJob } from "./types.ts";
+import { CatalogSweep } from "./workflows/catalog-sweep.ts";
+import { RailsWorkflow } from "./workflows/rails.ts";
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -66,6 +68,8 @@ app.onError((error, context) => {
 
   return context.json({ error: "Unexpected server error" }, 500);
 });
+
+export { CatalogSweep, RailsWorkflow };
 
 export default {
   fetch: app.fetch,

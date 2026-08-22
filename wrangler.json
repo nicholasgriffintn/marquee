@@ -3,7 +3,9 @@
   "name": "marquee",
   "main": "./worker/index.ts",
   "compatibility_date": "2026-08-21",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
   "workers_dev": false,
   "preview_urls": false,
   "routes": [
@@ -90,7 +92,9 @@
     "enabled": true
   },
   "triggers": {
-    "crons": ["17 */6 * * *"]
+    "crons": [
+      "17 */6 * * *"
+    ]
   },
   "queues": {
     "producers": [
@@ -113,10 +117,6 @@
       {
         "binding": "POSTER_QUEUE",
         "queue": "marquee-posters"
-      },
-      {
-        "binding": "AI_QUEUE",
-        "queue": "marquee-ai"
       },
       {
         "binding": "EMBEDDING_QUEUE",
@@ -170,15 +170,6 @@
         "retry_delay": 30
       },
       {
-        "queue": "marquee-ai",
-        "max_batch_size": 1,
-        "max_batch_timeout": 2,
-        "max_retries": 2,
-        "dead_letter_queue": "marquee-ingestion-dead-letter",
-        "max_concurrency": 3,
-        "retry_delay": 30
-      },
-      {
         "queue": "marquee-embeddings",
         "max_batch_size": 25,
         "max_batch_timeout": 10,
@@ -215,6 +206,18 @@
     {
       "binding": "EVENTS",
       "dataset": "marquee_events"
+    }
+  ],
+  "workflows": [
+    {
+      "name": "marquee-catalog-sweep",
+      "binding": "CATALOG_SWEEP",
+      "class_name": "CatalogSweep"
+    },
+    {
+      "name": "marquee-rails",
+      "binding": "RAILS_WORKFLOW",
+      "class_name": "RailsWorkflow"
     }
   ]
 }

@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import type { CatalogSection, MediaTitle } from "../domain/catalog";
 import { useAvailability } from "../hooks/useAvailability";
 import { useTitleInsight } from "../hooks/useTitleInsight";
-import { mediaMeta, scoreLabel, voteLabel } from "../lib/media";
+import { artwork, artworkSrcSet, mediaMeta, scoreLabel, voteLabel } from "../lib/media";
 import type { EntryStatus, ViewingEntry } from "../types";
 import { ArtPlaceholder } from "./ArtPlaceholder";
 import { ShelfForm } from "./ShelfForm";
@@ -30,7 +30,13 @@ export function TitleCard({
       >
         <div className={`rail-art${item.backdropUrl ? "" : " rail-art-missing"}`}>
           {item.backdropUrl ? (
-            <img src={item.backdropUrl} alt="" loading="lazy" />
+            <img
+              src={artwork(item.backdropUrl, 780, "backdrop") ?? item.backdropUrl}
+              srcSet={artworkSrcSet(item.backdropUrl, 780, "backdrop")}
+              alt=""
+              loading="lazy"
+              decoding="async"
+            />
           ) : (
             <ArtPlaceholder seed={item.id} label={item.title} wide />
           )}
@@ -222,9 +228,7 @@ export function DetailPanel({
             />
           )}
           <div className="watch-actions">
-            <span>
-              Watch Now
-            </span>
+            <span>Watch Now</span>
             {watchDestinations.map(({ provider, href }) => (
               <a
                 href={href}
@@ -258,7 +262,13 @@ export function DetailPanel({
                   onClick={() => onOpen(pair.item)}
                 >
                   {pair.item.posterUrl ? (
-                    <img src={pair.item.posterUrl} alt="" loading="lazy" />
+                    <img
+                      src={artwork(pair.item.posterUrl, 160) ?? pair.item.posterUrl}
+                      srcSet={artworkSrcSet(pair.item.posterUrl, 160)}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                    />
                   ) : (
                     <ArtPlaceholder seed={pair.item.id} label={pair.item.title} />
                   )}

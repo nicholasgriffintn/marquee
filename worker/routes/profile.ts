@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 
 import { requireAuthentication, type AuthVariables } from "../auth/session.ts";
+import { recordEvent } from "../lib/events.ts";
 import { jsonResponse, readJsonObject } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
 import { getProfile, removeFromProfile, updateProfile } from "../services/profile.ts";
@@ -35,6 +36,15 @@ profileRoutes.post("/", async (context) => {
   try {
     const result = await updateProfile(context.env.DB, user.id, body);
 
+    if (result.ok) {
+      recordEvent(context.env, {
+        name: "shelf_save",
+        viewerId: user.id,
+        titleId: typeof body.titleId === "string" ? body.titleId : undefined,
+        detail: typeof body.status === "string" ? body.status : undefined,
+      });
+    }
+
     return result.ok ? jsonResponse(result.payload) : jsonResponse({ error: result.error }, 400);
   } catch (error) {
     logError("profile_write_failed", error);
@@ -49,6 +59,10 @@ profileRoutes.delete("/:titleId", async (context) => {
 
   try {
     const deleted = await removeFromProfile(context.env.DB, user.id, titleId);
+
+    if (deleted) {
+      recordEvent(context.env, { name: "shelf_remove", viewerId: user.id, titleId });
+    }
 
     return deleted
       ? jsonResponse({ deleted: true })

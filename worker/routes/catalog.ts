@@ -2,6 +2,7 @@ import { Hono } from "hono";
 
 import { sessionPrincipal } from "../auth/session.ts";
 import { edgeCache } from "../lib/cache.ts";
+import { recordEvent } from "../lib/events.ts";
 import { clientRateLimitKey } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
 import { validProviderIds } from "../lib/validation.ts";
@@ -63,7 +64,16 @@ catalogRoutes.get("/search", async (context) => {
   try {
     context.header("cache-control", "no-store");
 
-    return context.json(await searchCatalogue(context.env, query, providerIds));
+    const results = await searchCatalogue(context.env, query, providerIds);
+
+    recordEvent(context.env, {
+      name: "search",
+      viewerId: principal?.user.id,
+      detail: query,
+      value: results.items.length,
+    });
+
+    return context.json(results);
   } catch (error) {
     logError("catalogue_search_failed", error, { area: "search" });
 
@@ -169,6 +179,8 @@ catalogRoutes.get("/:mediaType/:tmdbId/availability", edgeCache(900), async (con
     if (!availability) {
       return context.json({ error: "Unknown title" }, 404);
     }
+
+    recordEvent(context.env, { name: "title_view", titleId: `${mediaType}:${tmdbId}` });
 
     context.header("cache-control", "public, max-age=900");
 
