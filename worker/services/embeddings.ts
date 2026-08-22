@@ -5,12 +5,11 @@ import { readItems } from "../repositories/catalog-reader.ts";
 import type { Bindings } from "../types.ts";
 
 export const EMBEDDING_MODEL = "@cf/baai/bge-m3";
-export const EMBEDDING_DIMENSIONS = 1_024;
 
 const MAX_TEXT_LENGTH = 1_200;
 const EMBED_BATCH = 25;
 
-export function embeddingText(title: MediaTitle) {
+function embeddingText(title: MediaTitle) {
   return [
     title.title,
     title.originalTitle === title.title ? "" : title.originalTitle,
@@ -36,7 +35,7 @@ function parseVectors(result: unknown) {
   );
 }
 
-export async function embedTexts(env: Bindings, texts: string[]) {
+async function embedTexts(env: Bindings, texts: string[]) {
   if (texts.length === 0) {
     return [];
   }

@@ -47,7 +47,7 @@ const ORDER_BY: Record<CatalogueSort, string> = {
   relevance: `${RELEVANCE}, t.popularity DESC`,
 };
 
-export function ftsMatchQuery(raw: string, scope: SearchScope = "everything", matchAny = false) {
+function ftsMatchQuery(raw: string, scope: SearchScope = "everything", matchAny = false) {
   const tokens = raw
     .toLowerCase()
     .replaceAll(/[^\p{L}\p{N}\s]+/gu, " ")

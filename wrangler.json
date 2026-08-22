@@ -192,11 +192,13 @@
   "vectorize": [
     {
       "binding": "VECTORS",
-      "index_name": "marquee-titles"
+      "index_name": "marquee-titles",
+      "remote": true
     }
   ],
   "ai": {
-    "binding": "AI"
+    "binding": "AI",
+    "remote": true
   },
   "analytics_engine_datasets": [
     {

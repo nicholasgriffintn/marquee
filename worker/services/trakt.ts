@@ -21,7 +21,7 @@ export function traktRedirectUri(origin: string) {
   return `${origin}/api/links/trakt/callback`;
 }
 
-export async function traktAccessToken(env: Bindings, viewerId: string, origin: string) {
+async function traktAccessToken(env: Bindings, viewerId: string, origin: string) {
   const link = await readLink(env, viewerId, "trakt");
 
   if (!link) {

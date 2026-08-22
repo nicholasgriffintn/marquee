@@ -35,7 +35,7 @@ const SYSTEM_PROMPT = [
   'When you are ready, reply with JSON only: {"name":"","reason":"","titleIds":[]}.',
 ].join(" ");
 
-const MAX_TOOL_ROUNDS = 2;
+const MAX_TOOL_ROUNDS = 3;
 
 const RAIL_TOOL_NAMES = new Set(["search_catalogue", "find_similar"]);
 
@@ -48,6 +48,7 @@ export type ShelfDetail = Awaited<ReturnType<typeof readShelfDetail>>[number];
 
 export type Angle = {
   id: string;
+  claimOrder: number;
   brief: string;
   fallbackText: string;
   search: { minScore?: number; minVotes?: number; sort?: "score" | "recent" | "popularity" };
@@ -57,6 +58,7 @@ export type Angle = {
 export const ANGLES: Angle[] = [
   {
     id: "close",
+    claimOrder: 1,
     brief: "Titles close to what this viewer already saves and rates highly.",
     fallbackText: "acclaimed recent films and series people are talking about",
     search: {},
@@ -64,6 +66,7 @@ export const ANGLES: Angle[] = [
   },
   {
     id: "acclaimed",
+    claimOrder: 0,
     brief: "Well regarded titles in their taste that they are unlikely to have come across.",
     fallbackText: "quietly acclaimed films and series that were widely missed",
     search: { minScore: 7.5, minVotes: 500, sort: "score" },
@@ -71,6 +74,7 @@ export const ANGLES: Angle[] = [
   },
   {
     id: "widen",
+    claimOrder: 2,
     brief: "A mood, era or format at the edge of their habits, to widen what they watch.",
     fallbackText: "unusual formats and eras worth trying for the first time",
     search: {},
@@ -212,6 +216,15 @@ async function seedCandidates(
     claimed.add(title.id);
   }
 
+  console.log(
+    JSON.stringify({
+      event: "rail_seeds",
+      angle: angle.id,
+      seeds: seeds.length,
+      claimed: claimed.size,
+    }),
+  );
+
   return seeds;
 }
 
@@ -305,6 +318,8 @@ export async function buildOneRail(
   shelf: ShelfDetail[] = [],
 ): Promise<StoredRail | null> {
   if (seeds.length < RAIL_MIN) {
+    console.log(JSON.stringify({ event: "rail_skipped", angle: angle.id, seeds: seeds.length }));
+
     return null;
   }
 
@@ -331,6 +346,9 @@ export async function buildOneRail(
     },
   ];
 
+  const nudge = () =>
+    `Reply with JSON only, no tool calls and no prose: {"name":"","reason":"","titleIds":[]}. Choose at least ${RAIL_MIN} ids from this list: ${[...availableIds].join(", ")}.`;
+
   for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
     // oxlint-disable-next-line no-await-in-loop
     const response = await requestAiCompletion(env, messages, RAIL_TOOLS, true, {
@@ -341,34 +359,63 @@ export async function buildOneRail(
       metadata: { feature: "rails", angle: angle.id, viewer: viewerId },
     });
 
-    if (!response.tool_calls?.length) {
-      return parseRail(response.content, availableIds);
+    if (response.tool_calls?.length) {
+      messages.push(response);
+
+      // oxlint-disable-next-line no-await-in-loop
+      const toolMessages = await Promise.all(
+        response.tool_calls.slice(0, 2).map(async (call) => ({
+          role: "tool" as const,
+          tool_call_id: call.id,
+          name: call.function.name,
+          content: JSON.stringify(
+            await executeCuratorTool(env, call, viewer, availableIds, exclude),
+          ),
+        })),
+      );
+
+      messages.push(...toolMessages);
+      continue;
     }
 
-    messages.push(response);
+    const rail = parseRail(response.content, availableIds);
 
-    // oxlint-disable-next-line no-await-in-loop
-    const toolMessages = await Promise.all(
-      response.tool_calls.slice(0, 2).map(async (call) => ({
-        role: "tool" as const,
-        tool_call_id: call.id,
-        name: call.function.name,
-        content: JSON.stringify(await executeCuratorTool(env, call, viewer, availableIds, exclude)),
-      })),
+    if (rail) {
+      return rail;
+    }
+
+    console.log(
+      JSON.stringify({
+        event: "rail_retry",
+        angle: angle.id,
+        round,
+        available: availableIds.size,
+        raw: response.content?.slice(0, 160),
+      }),
     );
-
-    messages.push(...toolMessages);
+    messages.push(response, { role: "user", content: nudge() });
   }
 
-  const response = await requestAiCompletion(env, messages, RAIL_TOOLS, false, {
+  const response = await requestAiCompletion(env, messages, [], false, {
     model: fastModel(env),
     timeoutMs: 20_000,
     maxTokens: 300,
     json: true,
     metadata: { feature: "rails", angle: angle.id, viewer: viewerId },
   });
+  const rail = parseRail(response.content, availableIds);
 
-  return parseRail(response.content, availableIds);
+  console.log(
+    JSON.stringify({
+      event: "rail_final",
+      angle: angle.id,
+      ok: Boolean(rail),
+      available: availableIds.size,
+      raw: rail ? undefined : response.content?.slice(0, 200),
+    }),
+  );
+
+  return rail;
 }
 
 async function homepageTitleIds(env: Bindings) {
@@ -476,7 +523,7 @@ export async function prepareRails(env: Bindings, viewer: ViewerContext, viewerI
   const claimed = new Set<string>();
   const seeds: Record<string, MediaTitle[]> = {};
 
-  for (const angle of ANGLES) {
+  for (const angle of [...ANGLES].sort((a, b) => a.claimOrder - b.claimOrder)) {
     // oxlint-disable-next-line no-await-in-loop
     seeds[angle.id] = await seedCandidates(
       env,
@@ -517,45 +564,4 @@ export function dedupeRails(rails: StoredRail[]) {
     }))
     .filter((rail) => rail.titleIds.length >= RAIL_MIN)
     .slice(0, RAIL_LIMIT);
-}
-
-export async function generateRails(
-  env: Bindings,
-  viewerId: string,
-  signature: string,
-  viewer: ViewerContext,
-) {
-  const prepared = await prepareRails(env, viewer, viewerId);
-  const settled = await Promise.allSettled(
-    ANGLES.map((angle) =>
-      buildOneRail(
-        env,
-        viewer,
-        angle,
-        prepared.exclude,
-        viewerId,
-        prepared.seeds[angle.id] ?? [],
-        prepared.shelf,
-      ),
-    ),
-  );
-  const rails = dedupeRails(
-    settled.flatMap((result) => {
-      if (result.status === "rejected") {
-        logError("rail_angle_failed", result.reason);
-
-        return [];
-      }
-
-      return result.value ? [result.value] : [];
-    }),
-  );
-
-  if (rails.length === 0) {
-    logError("ai_rails_unresolved", new Error("no shelf survived across all angles"));
-
-    return;
-  }
-
-  await persistRails(env, viewerId, signature, rails);
 }

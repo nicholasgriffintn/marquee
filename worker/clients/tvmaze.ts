@@ -1,4 +1,4 @@
-import { isRecord, numberAt, records, recordAt, stringAt } from "../lib/values.ts";
+import { numberAt, records, recordAt, stringAt } from "../lib/values.ts";
 
 const API_BASE = "https://api.tvmaze.com";
 
@@ -83,28 +83,4 @@ export async function getTvmazeSchedule(countryCode: string, date: string) {
       },
     ];
   });
-}
-
-export async function findTvmazeShow(imdbId: string) {
-  const url = new URL(`${API_BASE}/lookup/shows`);
-
-  url.search = new URLSearchParams({ imdb: imdbId }).toString();
-
-  const response = await fetch(url, {
-    headers: { accept: "application/json" },
-    signal: AbortSignal.timeout(12_000),
-    cf: { cacheEverything: true, cacheTtl: 86_400 },
-  });
-
-  if (response.status === 404) {
-    return null;
-  }
-
-  if (!response.ok) {
-    throw new TvmazeError(`TVmaze lookup failed (${response.status})`, response.status);
-  }
-
-  const payload = await response.json();
-
-  return isRecord(payload) ? numberAt(payload, "id") : null;
 }

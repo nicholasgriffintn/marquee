@@ -18,6 +18,16 @@ function bestFormat(accept: string) {
   return accept.includes("image/webp") ? ("image/webp" as const) : ("image/jpeg" as const);
 }
 
+function withHeaders(response: Response, extra: Record<string, string>) {
+  const headers = new Headers(response.headers);
+
+  for (const [name, value] of Object.entries(extra)) {
+    headers.set(name, value);
+  }
+
+  return new Response(response.body, { status: response.status, headers });
+}
+
 function rawResponse(object: R2ObjectBody) {
   return new Response(object.body, {
     headers: {
@@ -57,12 +67,10 @@ mediaRoutes.get("/posters/:file", async (context) => {
       .transform({ width, fit: "scale-down" })
       .output({ format, quality: 82 });
 
-    return result.response({
-      headers: {
-        "cache-control": IMMUTABLE,
-        vary: "accept",
-        "x-content-type-options": "nosniff",
-      },
+    return withHeaders(result.response(), {
+      "cache-control": IMMUTABLE,
+      vary: "accept",
+      "x-content-type-options": "nosniff",
     });
   } catch (error) {
     logError("poster_transform_failed", error, { area: "media" });
@@ -104,11 +112,9 @@ mediaRoutes.get("/og/:titleId", async (context) => {
       .transform({ width: OG_WIDTH, height: OG_HEIGHT, fit: "cover" })
       .output({ format: "image/png" });
 
-    return result.response({
-      headers: {
-        "cache-control": "public, max-age=86400",
-        "x-content-type-options": "nosniff",
-      },
+    return withHeaders(result.response(), {
+      "cache-control": "public, max-age=86400",
+      "x-content-type-options": "nosniff",
     });
   } catch (error) {
     logError("og_image_failed", error, { area: "media", titleId });

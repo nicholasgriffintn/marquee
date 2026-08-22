@@ -104,13 +104,3 @@ export async function deleteLink(env: Bindings, viewerId: string, provider: Link
 
   return result.meta.changes > 0;
 }
-
-export async function viewersWithLink(env: Bindings, provider: LinkProvider) {
-  const rows = await env.DB.prepare(
-    `SELECT viewer_id AS viewerId FROM linked_accounts WHERE provider = ?`,
-  )
-    .bind(provider)
-    .all<{ viewerId: string }>();
-
-  return rows.results.map((row) => row.viewerId);
-}

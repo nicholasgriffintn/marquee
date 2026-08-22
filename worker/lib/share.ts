@@ -75,6 +75,21 @@ export async function withShareCard(
     .join("");
 
   return new HTMLRewriter()
+    .on('meta[property^="og:"]', {
+      element(element) {
+        element.remove();
+      },
+    })
+    .on('meta[name^="twitter:"]', {
+      element(element) {
+        element.remove();
+      },
+    })
+    .on('meta[name="description"]', {
+      element(element) {
+        element.setAttribute("content", card.description);
+      },
+    })
     .on("title", {
       element(element) {
         element.setInnerContent(card.title);
