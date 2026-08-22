@@ -3,7 +3,6 @@ import { Hono } from "hono";
 import { sessionPrincipal } from "../auth/session.ts";
 import { edgeCache } from "../lib/cache.ts";
 import { recordEvent } from "../lib/events.ts";
-import { clientRateLimitKey } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
 import { canonicalOrigin } from "../lib/security.ts";
 import { validProviderIds } from "../lib/validation.ts";
@@ -57,16 +56,6 @@ catalogRoutes.get("/search", async (context) => {
   }
 
   const principal = await sessionPrincipal(context.env, context.req.raw);
-  const limiter = principal
-    ? context.env.SEARCH_MEMBER_RATE_LIMITER
-    : context.env.SEARCH_RATE_LIMITER;
-  const { success } = await limiter.limit({
-    key: clientRateLimitKey(context.req.raw, principal?.user.id ?? "anonymous"),
-  });
-
-  if (!success) {
-    return context.json({ error: "Too many searches. Try again in a minute." }, 429);
-  }
 
   try {
     context.header("cache-control", "no-store");

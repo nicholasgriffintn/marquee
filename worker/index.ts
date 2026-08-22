@@ -15,6 +15,7 @@ import { linkRoutes } from "./routes/links.ts";
 import { mcpRoutes } from "./routes/mcp.ts";
 import { mediaRoutes } from "./routes/media.ts";
 import { profileRoutes } from "./routes/profile.ts";
+import { apiGuard } from "./security/guard.ts";
 import type { Bindings, IngestionJob } from "./types.ts";
 import { CatalogSweep } from "./workflows/catalog-sweep.ts";
 import { DigestWorkflow } from "./workflows/digest.ts";
@@ -38,6 +39,8 @@ app.use("/api/*", async (context, next) => {
 
   return context.res;
 });
+
+app.use("*", apiGuard);
 
 app.get("/health", (context) => context.json({ ok: true, service: "marquee" }));
 

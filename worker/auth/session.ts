@@ -32,7 +32,25 @@ export function authenticationFor(env: Bindings, request: Request) {
   return createAuthentication(env.DB, env, origin);
 }
 
-export async function sessionPrincipal(env: Bindings, request: Request) {
+type Principal = { token: string; user: MarqueeUser };
+
+const principals = new WeakMap<Request, Promise<Principal | null>>();
+
+export function sessionPrincipal(env: Bindings, request: Request) {
+  const cached = principals.get(request);
+
+  if (cached) {
+    return cached;
+  }
+
+  const pending = resolvePrincipal(env, request);
+
+  principals.set(request, pending);
+
+  return pending;
+}
+
+async function resolvePrincipal(env: Bindings, request: Request): Promise<Principal | null> {
   const token = parseCookies(request.headers.get("cookie") ?? "").get(SESSION_COOKIE);
 
   if (!token) {

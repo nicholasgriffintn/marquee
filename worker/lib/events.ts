@@ -11,7 +11,9 @@ export type MarqueeEvent = {
     | "rails_served"
     | "rails_built"
     | "rail_impression"
-    | "rail_click";
+    | "rail_click"
+    | "guard_blocked"
+    | "guard_throttled";
   viewerId?: string;
   titleId?: string;
   detail?: string;

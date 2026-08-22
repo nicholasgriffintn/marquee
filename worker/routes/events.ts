@@ -2,7 +2,7 @@ import { Hono } from "hono";
 
 import { sessionPrincipal } from "../auth/session.ts";
 import { recordEvent } from "../lib/events.ts";
-import { clientRateLimitKey, readJsonObject } from "../lib/http.ts";
+import { readJsonObject } from "../lib/http.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import type { Bindings } from "../types.ts";
 
@@ -19,13 +19,6 @@ eventRoutes.post("/", async (context) => {
   }
 
   const principal = await sessionPrincipal(context.env, context.req.raw);
-  const { success } = await context.env.SEARCH_RATE_LIMITER.limit({
-    key: clientRateLimitKey(context.req.raw, principal?.user.id ?? "anonymous"),
-  });
-
-  if (!success) {
-    return context.body(null, 429);
-  }
 
   recordEvent(context.env, {
     name: name as "rail_impression" | "rail_click",

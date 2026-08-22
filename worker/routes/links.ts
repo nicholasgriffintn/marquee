@@ -2,7 +2,7 @@ import { Hono } from "hono";
 
 import { requireAuthentication, type AuthVariables } from "../auth/session.ts";
 import { exchangeTraktCode, getTraktUser, traktAuthorizeUrl } from "../clients/trakt.ts";
-import { clientRateLimitKey, jsonResponse } from "../lib/http.ts";
+import { jsonResponse } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
 import { canonicalOrigin, safeReturnPath } from "../lib/security.ts";
 import {
@@ -45,13 +45,6 @@ linkRoutes.get("/", async (context) => {
 
 linkRoutes.get("/trakt/start", async (context) => {
   const user = context.get("authenticatedUser");
-  const { success } = await context.env.AUTH_RATE_LIMITER.limit({
-    key: clientRateLimitKey(context.req.raw, user.id),
-  });
-
-  if (!success) {
-    return jsonResponse({ error: "Too many attempts. Try again shortly." }, 429);
-  }
 
   if (!context.env.TRAKT_CLIENT_ID || !context.env.TRAKT_CLIENT_SECRET) {
     return jsonResponse({ error: "Trakt is not configured" }, 503);

@@ -3,10 +3,11 @@ import { isRecord } from "./values.ts";
 
 const MAX_JSON_BYTES = 24_000;
 
-export function jsonResponse(payload: unknown, status = 200) {
+export function jsonResponse(payload: unknown, status = 200, extra?: Record<string, string>) {
   const headers = new Headers({
     "cache-control": "private, no-store",
     "content-type": "application/json; charset=UTF-8",
+    ...extra,
   });
 
   return new Response(JSON.stringify(payload), { headers, status });
