@@ -13,6 +13,10 @@ const RETRY_DELAYS = [5_000, 10_000, 20_000, 30_000];
 export function useAiRails(isSignedIn: boolean, savedKey: string) {
   const [sections, setSections] = useState<CatalogSection[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [settled, setSettled] = useState<{ done: boolean; sections: CatalogSection[] }>({
+    done: false,
+    sections: [],
+  });
 
   useEffect(() => {
     if (!isSignedIn) {
@@ -39,6 +43,10 @@ export function useAiRails(isSignedIn: boolean, savedKey: string) {
         setSections(response.sections);
         setIsGenerating(response.status === "generating");
 
+        setSettled((current) =>
+          current.done ? current : { done: true, sections: response.sections },
+        );
+
         const delay = RETRY_DELAYS[attempt];
 
         if (response.status === "error") {
@@ -51,6 +59,7 @@ export function useAiRails(isSignedIn: boolean, savedKey: string) {
       } catch {
         if (active) {
           setIsGenerating(false);
+          setSettled((current) => (current.done ? current : { done: true, sections: [] }));
         }
       }
     }
@@ -64,5 +73,10 @@ export function useAiRails(isSignedIn: boolean, savedKey: string) {
     };
   }, [isSignedIn, savedKey]);
 
-  return { sections, isGenerating };
+  return {
+    sections,
+    isGenerating,
+    isResolved: !isSignedIn || settled.done,
+    heroSections: settled.sections,
+  };
 }

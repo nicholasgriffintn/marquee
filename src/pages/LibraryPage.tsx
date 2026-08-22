@@ -1,7 +1,10 @@
+import { useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { ArrowIcon, Poster } from "../components/ui";
+import { UsherCard } from "../components/usher/UsherCard";
 import type { MediaTitle } from "../domain/catalog";
+import type { UsherMoment } from "../domain/usher";
 import type { EntryStatus, ViewingEntry } from "../types";
 
 type ShelfSort = "added" | "year" | "genre" | "rating" | "status";
@@ -75,17 +78,31 @@ export function LibraryPage({
   entries,
   titles,
   catalogueError,
+  usherMoment,
   onOpen,
   onShowTonight,
+  onUsherRequest,
+  onUsherAction,
+  onUsherDismiss,
 }: {
   entries: Record<string, ViewingEntry>;
   titles: MediaTitle[];
   catalogueError: string;
+  usherMoment: UsherMoment | null;
   onOpen: (item: MediaTitle) => void;
   onShowTonight: () => void;
+  onUsherRequest: () => void;
+  onUsherAction: (moment: UsherMoment, actionId: string) => void;
+  onUsherDismiss: (scope: "once" | "kind") => void;
 }) {
   const [params, setParams] = useSearchParams();
   const savedCount = Object.keys(entries).length;
+
+  useEffect(() => {
+    if (savedCount >= 5) {
+      onUsherRequest();
+    }
+  }, [onUsherRequest, savedCount]);
   const query = (params.get("q") ?? "").trim().toLowerCase();
   const statusFilter = params.get("status") ?? "";
   const genreFilter = params.get("genre") ?? "";
@@ -152,6 +169,10 @@ export function LibraryPage({
             : "Ratings and notes stay in your account and shape your recommendations."}
         </p>
       </div>
+
+      {usherMoment && (
+        <UsherCard moment={usherMoment} onAction={onUsherAction} onDismiss={onUsherDismiss} />
+      )}
 
       {catalogueError && savedCount > 0 && !titles.length && (
         <p className="catalogue-error" role="alert">

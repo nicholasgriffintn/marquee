@@ -4,10 +4,13 @@ import { Link, Route, Routes, useLocation, useMatch, useNavigate } from "react-r
 import { DetailPanel } from "./components/catalog";
 import { SearchBox } from "./components/SearchBox";
 import { GitHubIcon, MarqueeLogo } from "./components/ui";
-import type { MediaTitle } from "./domain/catalog";
+import { UsherCard } from "./components/usher/UsherCard";
+import type { CatalogSection, MediaTitle } from "./domain/catalog";
+import type { UsherMoment } from "./domain/usher";
 import { useAiRails } from "./hooks/useAiRails";
 import { useCatalog } from "./hooks/useCatalog";
 import { useCurator } from "./hooks/useCurator";
+import { usePinned } from "./hooks/usePinned";
 import { useProfile } from "./hooks/useProfile";
 import { useProviderPreferences } from "./hooks/useProviderPreferences";
 import { useSearch } from "./hooks/useSearch";
@@ -15,6 +18,7 @@ import { useSession } from "./hooks/useSession";
 import { useTitle } from "./hooks/useTitle";
 import { useTonight } from "./hooks/useTonight";
 import { useTrending } from "./hooks/useTrending";
+import { useUsher } from "./hooks/useUsher";
 import { AdminPage } from "./pages/AdminPage";
 import { BrowsePage, type BrowsePreset } from "./pages/BrowsePage";
 import { DigestPage } from "./pages/DigestPage";
@@ -25,6 +29,7 @@ import { TonightPage } from "./pages/TonightPage";
 import type { EntryStatus, ViewingEntry } from "./types";
 
 const TONIGHT_EPISODES = 16;
+const HOME_DRIP_DELAY_MS = 45_000;
 
 const NAV: { to: string; label: string; private: boolean; admin?: boolean }[] = [
   { to: "/", label: "Tonight", private: false },
@@ -83,6 +88,8 @@ export function App() {
   );
   const search = useSearch(query, selectedProviderIds);
   const curator = useCurator();
+  const usher = useUsher(isSignedIn);
+  const pinned = usePinned(isSignedIn);
   const aiRails = useAiRails(isSignedIn && isViewerReady && isHome, profile.savedIds.join(","));
   const episodes = useTonight(isViewerReady, TONIGHT_EPISODES);
   const trending = useTrending(isViewerReady && isHome);
@@ -98,6 +105,28 @@ export function App() {
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "instant" });
   }, [pagePath]);
+
+  const trimmedQuery = query.trim();
+  const hasEmptySearch =
+    pagePath === "/search" && Boolean(trimmedQuery) && !search.isSearching && !search.items.length;
+
+  useEffect(() => {
+    if (hasEmptySearch) {
+      void usher.request("search-empty", { query: trimmedQuery });
+    }
+  }, [hasEmptySearch, trimmedQuery, usher]);
+
+  const wantsDrip = isSignedIn && isHome && isViewerReady && !usher.isOnboarding;
+
+  useEffect(() => {
+    if (!wantsDrip) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => void usher.request("home"), HOME_DRIP_DELAY_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [usher, wantsDrip]);
 
   const openTitle = useCallback(
     (item: MediaTitle) => {
@@ -117,21 +146,110 @@ export function App() {
     void navigate("/");
   }, [background, navigate]);
   const sections = useMemo(
-    () => [
-      ...(curator.state.items.length
-        ? [
-            {
-              id: "ai",
-              title: "Picked for you",
-              description: curator.state.prompt,
-              items: curator.state.items,
-            },
-          ]
-        : []),
-      ...aiRails.sections,
-      ...catalog.catalogue.sections,
-    ],
-    [aiRails.sections, catalog.catalogue, curator.state.items, curator.state.prompt],
+    () => [...pinned.sections, ...aiRails.sections, ...catalog.catalogue.sections],
+    [aiRails.sections, catalog.catalogue, pinned.sections],
+  );
+  const heroSections = useMemo(
+    () => [...pinned.sections, ...aiRails.heroSections, ...catalog.catalogue.sections],
+    [aiRails.heroSections, catalog.catalogue, pinned.sections],
+  );
+  const isHeroReady =
+    isViewerReady && !catalog.isLoading && aiRails.isResolved && pinned.isResolved;
+  const isPinned = Boolean(curator.state.prompt && pinned.pinnedPrompt === curator.state.prompt);
+
+  const pinCurrentShelf = useCallback(() => {
+    if (curator.state.items.length < 2) {
+      return;
+    }
+
+    void pinned.pin({
+      name: curator.state.prompt.slice(0, 60),
+      prompt: curator.state.prompt,
+      reason: curator.state.summary.slice(0, 200),
+      titleIds: curator.state.items.map((item) => item.id),
+    });
+  }, [curator.state, pinned]);
+
+  const askCurator = useCallback(
+    async (prompt: string, isRefinement = false) => {
+      usher.clearPick();
+      await curator.ask(prompt, isRefinement, selectedProviderIds);
+    },
+    [curator, selectedProviderIds, usher],
+  );
+
+  const onUsherAction = useCallback(
+    (moment: UsherMoment, actionId: string) => {
+      if (moment.kind === "rail-feedback") {
+        const railId = moment.id.replace("rail-feedback:", "");
+
+        void usher.railVerdict(railId, actionId === "bad" ? "bad" : "good");
+
+        return;
+      }
+
+      if (moment.kind === "search-rescue" && actionId === "rescue") {
+        void usher.dismiss("once");
+        void askCurator(query);
+
+        return;
+      }
+
+      if (moment.kind === "stale-watchlist") {
+        const titleId = moment.id.replace("stale-watchlist:", "");
+
+        if (actionId === "drop") {
+          void profile.removeEntry(titleId);
+        }
+
+        if (actionId === "watched") {
+          profile.setStatus(titleId, "watched");
+        }
+      }
+
+      void usher.dismiss("once");
+    },
+    [askCurator, profile, query, usher],
+  );
+
+  const clearAll = useCallback(() => {
+    curator.clear();
+    usher.clearPick();
+  }, [curator, usher]);
+
+  const onUsherAnswer = useCallback(
+    async (questionId: string, value: unknown) => {
+      const saved = await usher.answer(questionId, value);
+
+      if (questionId === "providers" && Array.isArray(saved)) {
+        selectProviders(saved.filter((id): id is string => typeof id === "string"));
+      }
+
+      return saved;
+    },
+    [selectProviders, usher],
+  );
+
+  const onTitleMoment = useCallback(
+    (titleId: string) => void usher.request("title", { titleId }),
+    [usher],
+  );
+
+  const onShelfMoment = useCallback(
+    () =>
+      void usher.request("shelf", {
+        savedCount: profile.savedIds.length,
+        unratedCount: Object.values(profile.entries).filter((entry) => entry.rating === null)
+          .length,
+      }),
+    [profile.entries, profile.savedIds.length, usher],
+  );
+
+  const onRailSeen = useCallback(
+    (section: CatalogSection) => {
+      void usher.request("rail", { railId: section.id, railName: section.title });
+    },
+    [usher],
   );
 
   async function saveTitle(item: MediaTitle) {
@@ -143,10 +261,6 @@ export function App() {
         thoughts: "",
       },
     );
-  }
-
-  async function askCurator(prompt: string, isRefinement = false) {
-    await curator.ask(prompt, isRefinement, selectedProviderIds);
   }
 
   return (
@@ -247,15 +361,28 @@ export function App() {
               error={catalog.error}
               providerError={catalog.providerError}
               sections={sections}
+              heroSections={heroSections}
+              isHeroReady={isHeroReady}
               episodes={episodes}
               trending={trending}
               providers={catalog.providers}
               selectedProviderIds={selectedProviderIds}
+              isPinned={isPinned}
+              usherMoment={usher.moment}
+              pick={usher.pick}
               onAsk={askCurator}
-              onClearCurator={curator.clear}
+              onClearCurator={clearAll}
               onOpen={openTitle}
+              onPin={pinCurrentShelf}
+              onPick={() => void usher.askForPick(selectedProviderIds)}
+              onRejectPick={() => void usher.rejectPick(selectedProviderIds)}
               onSelectProviders={selectProviders}
               onShowSources={() => void navigate("/sources")}
+              onUsherAction={onUsherAction}
+              onUsherAnswer={onUsherAnswer}
+              onUsherDismiss={(scope) => void usher.dismiss(scope)}
+              onUsherSkip={(questionId) => void usher.skip(questionId)}
+              onRailSeen={onRailSeen}
             />
           }
         />
@@ -273,6 +400,9 @@ export function App() {
               items={search.items}
               error={search.error}
               isSearching={search.isSearching}
+              usherMoment={usher.moment?.surface === "search-empty" ? usher.moment : null}
+              onUsherAction={onUsherAction}
+              onUsherDismiss={(scope) => void usher.dismiss(scope)}
               onOpen={openTitle}
               onShowTonight={() => {
                 setQuery("");
@@ -290,6 +420,10 @@ export function App() {
                 entries={profile.entries}
                 titles={catalog.savedTitles}
                 catalogueError={catalog.error}
+                usherMoment={usher.moment?.surface === "shelf" ? usher.moment : null}
+                onUsherRequest={onShelfMoment}
+                onUsherAction={onUsherAction}
+                onUsherDismiss={(scope) => void usher.dismiss(scope)}
                 onOpen={openTitle}
                 onShowTonight={() => void navigate("/")}
               />
@@ -336,6 +470,10 @@ export function App() {
       {titleMatch?.params.titleId && (
         <TitleOverlay
           titleId={titleMatch.params.titleId}
+          usherMoment={usher.moment?.surface === "title" ? usher.moment : null}
+          onUsherRequest={onTitleMoment}
+          onUsherAction={onUsherAction}
+          onUsherDismiss={(scope) => void usher.dismiss(scope)}
           titlesById={catalog.titlesById}
           searchItems={search.items}
           canSave={isSignedIn}
@@ -409,6 +547,10 @@ function TitleOverlay({
   searchItems,
   canSave,
   entries,
+  usherMoment,
+  onUsherRequest,
+  onUsherAction,
+  onUsherDismiss,
   availabilityEnabled,
   onClose,
   onOpen,
@@ -423,6 +565,10 @@ function TitleOverlay({
   searchItems: MediaTitle[];
   canSave: boolean;
   entries: Record<string, ViewingEntry>;
+  usherMoment: UsherMoment | null;
+  onUsherRequest: (titleId: string) => void;
+  onUsherAction: (moment: UsherMoment, actionId: string) => void;
+  onUsherDismiss: (scope: "once" | "kind") => void;
   availabilityEnabled: boolean;
   onClose: () => void;
   onOpen: (item: MediaTitle) => void;
@@ -438,6 +584,13 @@ function TitleOverlay({
     [searchItems, titlesById],
   );
   const { title, isLoading } = useTitle(titleId, known);
+  const isSaved = Boolean(entries[titleId]);
+
+  useEffect(() => {
+    if (isSaved) {
+      onUsherRequest(titleId);
+    }
+  }, [isSaved, onUsherRequest, titleId]);
 
   if (isLoading || !title) {
     return null;
@@ -448,6 +601,11 @@ function TitleOverlay({
       item={title}
       canSave={canSave}
       entry={entries[title.id]}
+      usherSlot={
+        usherMoment ? (
+          <UsherCard moment={usherMoment} onAction={onUsherAction} onDismiss={onUsherDismiss} />
+        ) : undefined
+      }
       availabilityEnabled={availabilityEnabled}
       onClose={onClose}
       onOpen={onOpen}

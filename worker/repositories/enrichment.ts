@@ -29,10 +29,12 @@ export async function storeEnrichment<S extends Exclude<EnrichmentSource, "watch
        WHERE id = ?`,
     ).bind(JSON.stringify(enrichedTitle), titleId),
     env.DB.prepare(
-      `INSERT INTO title_enrichment (title_id, source, payload)
-       VALUES (?, ?, ?)
+      `INSERT INTO title_enrichment (title_id, source, payload, miss, attempts)
+       VALUES (?, ?, ?, 0, 0)
        ON CONFLICT(title_id, source) DO UPDATE SET
          payload = excluded.payload,
+         miss = 0,
+         attempts = 0,
          fetched_at = CURRENT_TIMESTAMP`,
     ).bind(titleId, source, JSON.stringify(fields)),
   ]);
@@ -40,13 +42,43 @@ export async function storeEnrichment<S extends Exclude<EnrichmentSource, "watch
   return true;
 }
 
+export async function storeEnrichmentMiss(
+  env: Bindings,
+  titleId: string,
+  source: EnrichmentSource,
+  reason: string,
+) {
+  await env.DB.prepare(
+    `INSERT INTO title_enrichment (title_id, source, payload, miss, attempts)
+     VALUES (?, ?, ?, 1, 1)
+     ON CONFLICT(title_id, source) DO UPDATE SET
+       payload = excluded.payload,
+       miss = 1,
+       attempts = title_enrichment.attempts + 1,
+       fetched_at = CURRENT_TIMESTAMP`,
+  )
+    .bind(titleId, source, JSON.stringify({ miss: reason }))
+    .run();
+}
+
+const MISS_BACKOFF_DAYS = 3;
+const MISS_BACKOFF_CAP_DAYS = 120;
+
+const DUE_FOR_ENRICHMENT = `e.title_id IS NULL
+       OR (e.miss = 0 AND e.fetched_at < datetime('now', ?))
+       OR (e.miss = 1
+           AND e.fetched_at < datetime(
+             'now',
+             '-' || min(e.attempts * ${MISS_BACKOFF_DAYS}, ${MISS_BACKOFF_CAP_DAYS}) || ' days'
+           ))`;
+
 export async function selectAnilistCandidates(env: Bindings, maxAgeDays: number, limit: number) {
   const rows = await env.DB.prepare(
     `SELECT t.id AS titleId
      FROM catalog_titles AS t
      LEFT JOIN title_enrichment AS e ON e.title_id = t.id AND e.source = 'anilist'
      WHERE json_extract(t.payload, '$.externalIds.anilistId') IS NOT NULL
-       AND (e.title_id IS NULL OR e.fetched_at < datetime('now', ?))
+       AND (${DUE_FOR_ENRICHMENT})
      ORDER BY t.popularity DESC
      LIMIT ?`,
   )
@@ -67,7 +99,7 @@ export async function selectUnenriched(
      FROM catalog_titles AS t
      LEFT JOIN title_enrichment AS e
        ON e.title_id = t.id AND e.source = ?
-     WHERE e.title_id IS NULL OR e.fetched_at < datetime('now', ?)
+     WHERE ${DUE_FOR_ENRICHMENT}
      ORDER BY t.popularity DESC
      LIMIT ?`,
   )
@@ -98,10 +130,12 @@ export async function storePoster(
        WHERE id = ?`,
     ).bind(key, titleId),
     env.DB.prepare(
-      `INSERT INTO title_enrichment (title_id, source, payload)
-       VALUES (?, 'poster', ?)
+      `INSERT INTO title_enrichment (title_id, source, payload, miss, attempts)
+       VALUES (?, 'poster', ?, 0, 0)
        ON CONFLICT(title_id, source) DO UPDATE SET
          payload = excluded.payload,
+         miss = 0,
+         attempts = 0,
          fetched_at = CURRENT_TIMESTAMP`,
     ).bind(titleId, JSON.stringify({ key, contentType })),
   ]);

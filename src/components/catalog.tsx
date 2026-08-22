@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import type { CatalogSection, MediaTitle } from "../domain/catalog";
@@ -22,6 +22,7 @@ import { ArtPlaceholder } from "./ArtPlaceholder";
 import { ShelfForm } from "./ShelfForm";
 import { TrailerBlock } from "./TrailerBlock";
 import { ArrowIcon, PlusIcon, Poster, ProviderBadge } from "./ui";
+import { UsherMark } from "./usher/UsherMark";
 
 const RAIL_PROVIDER_LIMIT = 3;
 const SIMILAR_LIMIT = 12;
@@ -124,14 +125,25 @@ export function ContentRail({
   section,
   onOpen,
   ranked,
+  byUsher,
+  trailing,
+  onSeen,
 }: {
   section: CatalogSection;
   onOpen: (title: MediaTitle) => void;
   ranked?: boolean;
+  byUsher?: boolean;
+  trailing?: ReactNode;
+  onSeen?: (section: CatalogSection) => void;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const railRef = useRef<HTMLElement>(null);
   const seenRef = useRef(false);
+  const seenCallback = useRef(onSeen);
+
+  useEffect(() => {
+    seenCallback.current = onSeen;
+  }, [onSeen]);
 
   useEffect(() => {
     const rail = railRef.current;
@@ -145,6 +157,7 @@ export function ContentRail({
         if (entries.some((entry) => entry.isIntersecting) && !seenRef.current) {
           seenRef.current = true;
           track("rail_impression", section.id);
+          seenCallback.current?.(section);
           observer.disconnect();
         }
       },
@@ -157,10 +170,18 @@ export function ContentRail({
   }, [section.id, section.items.length]);
 
   return (
-    <section className="content-rail" ref={railRef}>
+    <section className={`content-rail${byUsher ? " rail-by-usher" : ""}`} ref={railRef}>
       <div className="rail-heading">
         <div>
-          <span>{section.description}</span>
+          {byUsher ? (
+            <span className="rail-eyebrow">
+              <UsherMark face="idle" crop="head" className="rail-usher" />
+              <b>The Usher</b>
+              {section.description && <em>· {section.description}</em>}
+            </span>
+          ) : (
+            <span>{section.description}</span>
+          )}
           <h2>{section.title}</h2>
         </div>
         <button
@@ -187,6 +208,7 @@ export function ContentRail({
         ) : (
           <p className="rail-empty">No titles found.</p>
         )}
+        {trailing}
       </div>
     </section>
   );
@@ -201,12 +223,14 @@ export function DetailPanel({
   onSave,
   onSaveEntry,
   entry,
+  usherSlot,
   onRemove,
   onStatus,
   onUpdateDraft,
 }: {
   item: MediaTitle;
   entry?: ViewingEntry;
+  usherSlot?: ReactNode;
   onRemove: (titleId: string) => void;
   onStatus: (titleId: string, status: EntryStatus) => void;
   onUpdateDraft: (titleId: string, patch: Partial<ViewingEntry>) => void;
@@ -346,6 +370,7 @@ export function DetailPanel({
               onUpdateDraft={onUpdateDraft}
             />
           )}
+          {usherSlot}
           <TrailerBlock item={item} />
           <p className="detail-synopsis">{item.overview || "No synopsis available."}</p>
           <div className="score-row">

@@ -791,6 +791,19 @@ svg {
   position: relative;
   z-index: 2;
 }
+.hero-title {
+  -webkit-box-orient: vertical;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  overflow: hidden;
+}
+.hero-copy h1.hero-title-small {
+  font-size: clamp(42px, 4.8vw, 66px);
+}
+.hero-copy h1.hero-title-tiny {
+  font-size: clamp(32px, 3.4vw, 48px);
+  line-height: 1.02;
+}
 .hero-copy h1,
 .page-title-row h1 {
   font-size: clamp(58px, 7vw, 94px);
@@ -1231,6 +1244,25 @@ h2 em {
 .provider-strip-heading strong {
   font-size: 16px;
 }
+.provider-filter-all {
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--white);
+  cursor: pointer;
+  flex: 0 0 auto;
+  font: 700 11px/1 var(--mono);
+  letter-spacing: 1px;
+  padding: 0 14px;
+  text-transform: uppercase;
+}
+.provider-filter-all.active {
+  background: var(--acid);
+  border-color: var(--acid);
+  color: var(--ink);
+}
+.provider-picker.filtering button:not(.selected) .provider-badge {
+  opacity: 0.4;
+}
 .provider-strip-heading > button {
   align-items: center;
   background: none;
@@ -1268,6 +1300,32 @@ h2 em {
 .provider-picker button small {
   color: var(--muted);
   font: 8px var(--mono);
+}
+.provider-picker button {
+  cursor: pointer;
+  transition:
+    background 0.14s ease,
+    transform 0.14s ease;
+}
+.provider-picker button:hover {
+  background: var(--panel-line);
+  transform: translateY(-2px);
+}
+.provider-picker button:hover .provider-badge {
+  opacity: 1;
+}
+.provider-picker .provider-badge {
+  transition: opacity 0.14s ease;
+}
+.provider-filter-all {
+  transition:
+    background 0.14s ease,
+    border-color 0.14s ease,
+    color 0.14s ease;
+}
+.provider-filter-all:hover:not(.active) {
+  border-color: var(--acid);
+  color: var(--acid);
 }
 .provider-picker button.selected {
   box-shadow: inset 0 -6px 0 var(--acid);
@@ -2383,6 +2441,9 @@ h2 em {
 }
 
 @media (max-width: 620px) {
+  .results-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
   .sign-in-button {
     grid-template-columns: 40px;
     min-width: 40px;
@@ -3032,4 +3093,912 @@ h2 em {
 }
 .detail-media-out:hover {
   color: var(--blue);
+}
+
+/* The Usher */
+
+.visually-hidden {
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+.hero-shell {
+  position: relative;
+}
+
+.usher-mark {
+  display: block;
+  fill: none;
+  height: auto;
+  stroke: var(--ink);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+  width: 100%;
+}
+
+/* Onboarding takes the hero */
+
+.usher-onboarding {
+  align-items: center;
+  background:
+    radial-gradient(120% 90% at 18% 100%, rgba(201, 243, 93, 0.13), transparent 60%),
+    var(--ink-soft);
+  border-bottom: 1px solid var(--panel-line);
+  display: flex;
+  min-height: 580px;
+  overflow: hidden;
+  position: relative;
+}
+.usher-bulbs {
+  display: flex;
+  gap: 0;
+  justify-content: space-between;
+  left: 0;
+  padding: 0 var(--gutter);
+  position: absolute;
+  right: 0;
+  top: 18px;
+}
+.usher-bulbs i {
+  animation: usher-bulb 2.4s infinite;
+  background: var(--acid);
+  border-radius: 50%;
+  display: block;
+  height: 9px;
+  opacity: 0.25;
+  width: 9px;
+}
+.usher-bulbs i:nth-child(3n) {
+  animation-delay: 0.8s;
+}
+.usher-bulbs i:nth-child(3n + 1) {
+  animation-delay: 1.6s;
+}
+@keyframes usher-bulb {
+  0%,
+  70%,
+  100% {
+    opacity: 0.22;
+  }
+  35% {
+    opacity: 1;
+  }
+}
+.usher-onboarding-inner {
+  align-items: center;
+  display: grid;
+  gap: clamp(28px, 4vw, 64px);
+  grid-template-columns: minmax(0, 300px) minmax(0, 1fr);
+  margin: 0 auto;
+  max-width: 1240px;
+  padding: 70px var(--gutter) 56px;
+  width: 100%;
+}
+.usher-onboarding-figure {
+  align-self: end;
+  position: relative;
+}
+.usher-onboarding-figure::after {
+  background: radial-gradient(50% 50% at 50% 50%, rgba(201, 243, 93, 0.28), transparent 70%);
+  bottom: -14px;
+  content: "";
+  height: 46px;
+  left: 6%;
+  position: absolute;
+  right: 6%;
+}
+.usher-figure {
+  margin-left: -12%;
+  position: relative;
+  width: 124%;
+  z-index: 1;
+}
+.usher-onboarding-body {
+  min-width: 0;
+  transition: opacity 0.18s ease;
+}
+.usher-progress {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.usher-progress span {
+  color: var(--acid);
+  font: 700 11px/1 var(--mono);
+  letter-spacing: 2.4px;
+  text-transform: uppercase;
+}
+.usher-progress-bar {
+  background: var(--panel-line);
+  flex: 1 1 auto;
+  height: 3px;
+  max-width: 260px;
+  overflow: hidden;
+}
+.usher-progress-bar i {
+  background: var(--acid);
+  display: block;
+  height: 100%;
+  transition: width 0.35s ease;
+}
+.usher-progress small {
+  color: var(--muted);
+  font: 500 11px/1 var(--mono);
+}
+.usher-step {
+  animation: usher-step 0.34s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+@keyframes usher-step {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.usher-onboarding-body.saving {
+  opacity: 0.6;
+}
+.usher-greeting {
+  color: var(--muted);
+  font: italic 400 17px/1.3 var(--serif);
+  margin: 0 0 8px;
+}
+.usher-question {
+  color: var(--white);
+  font: 500 clamp(30px, 3.6vw, 46px) / 1.05 var(--serif);
+  letter-spacing: -0.02em;
+  margin: 0 0 8px;
+  max-width: 20ch;
+}
+.usher-onboarding .usher-hint {
+  font-size: 14px;
+  margin-bottom: 22px;
+}
+.usher-onboarding-foot {
+  border-top: 1px solid var(--panel-line);
+  display: flex;
+  gap: 18px;
+  margin-top: 26px;
+  padding-top: 14px;
+}
+.usher-onboarding-foot button {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font: 500 12px/1 var(--sans);
+  padding: 0;
+  text-decoration: underline;
+}
+.usher-onboarding-foot button:hover:not(:disabled) {
+  color: var(--white);
+}
+
+/* Answer controls */
+
+.usher-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.usher-options-wrap {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+.usher-options button,
+.usher-matches button,
+.usher-picked button {
+  align-items: center;
+  background: var(--panel-tile);
+  border: 1px solid var(--panel-line);
+  color: var(--white);
+  cursor: pointer;
+  display: inline-flex;
+  font: 500 14px/1 var(--sans);
+  gap: 8px;
+  padding: 12px 15px;
+  text-align: left;
+  transition: transform 0.12s ease;
+}
+.usher-onboarding .usher-options button {
+  font-size: 15px;
+  padding: 14px 18px;
+}
+.usher-options button:hover:not(:disabled),
+.usher-matches button:hover {
+  border-color: var(--acid);
+  transform: translateY(-1px);
+}
+.usher-options button.picked {
+  background: var(--acid);
+  border-color: var(--acid);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.usher-services {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(122px, 1fr));
+  margin-bottom: 18px;
+  max-width: 640px;
+}
+.usher-services button {
+  align-items: center;
+  background: var(--panel-tile);
+  border: 1px solid var(--panel-line);
+  color: var(--white);
+  cursor: pointer;
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+  transition: transform 0.12s ease;
+}
+.usher-services button:hover:not(:disabled) {
+  border-color: var(--acid);
+  transform: translateY(-1px);
+}
+.usher-services button span {
+  font: 600 13px/1.1 var(--sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.usher-services button.picked {
+  background: rgba(201, 243, 93, 0.14);
+  border-color: var(--acid);
+}
+.usher-services button.picked span {
+  color: var(--acid);
+}
+.usher-services .provider-badge {
+  flex: 0 0 auto;
+}
+
+.usher-input {
+  background: var(--panel-tile);
+  border: 1px solid var(--panel-line);
+  color: var(--white);
+  font: 400 15px/1 var(--sans);
+  margin-bottom: 10px;
+  max-width: 420px;
+  padding: 12px;
+  width: 100%;
+}
+.usher-input:focus-visible {
+  border-color: var(--acid);
+  outline: none;
+}
+.usher-picked {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.usher-picked button {
+  background: var(--acid);
+  border-color: var(--acid);
+  color: var(--ink);
+  font-weight: 700;
+}
+.usher-typeahead {
+  margin-bottom: 14px;
+  max-width: 420px;
+  position: relative;
+}
+.usher-typeahead .usher-input {
+  margin-bottom: 0;
+  padding-right: 62px;
+}
+.usher-count {
+  color: var(--muted);
+  font: 500 11px/1 var(--mono);
+  pointer-events: none;
+  position: absolute;
+  right: 12px;
+  top: 15px;
+}
+.usher-matches {
+  background: var(--panel);
+  border: 1px solid var(--acid);
+  border-top: 0;
+  display: flex;
+  flex-direction: column;
+  left: 0;
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 5;
+}
+.usher-matches button {
+  border: 0;
+  border-radius: 0;
+  justify-content: flex-start;
+  width: 100%;
+}
+.usher-matches button:hover {
+  background: var(--acid);
+  color: var(--ink);
+  transform: none;
+}
+.usher-note {
+  color: var(--muted);
+  font: 400 12px/1 var(--sans);
+  margin: 8px 0 0;
+}
+.usher-suggests {
+  margin-bottom: 16px;
+}
+.usher-suggests > span {
+  color: var(--muted);
+  display: block;
+  font: 700 10px/1 var(--mono);
+  letter-spacing: 1.6px;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+.usher-suggests > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.usher-suggests button {
+  background: none;
+  border: 1px dashed var(--panel-line);
+  color: var(--white);
+  cursor: pointer;
+  font: 500 13px/1 var(--sans);
+  padding: 10px 13px;
+}
+.usher-suggests button:hover:not(:disabled) {
+  border-color: var(--acid);
+  border-style: solid;
+  color: var(--acid);
+}
+.usher-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  margin-bottom: 16px;
+  max-height: 330px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.usher-grid-card {
+  background: none;
+  border: 2px solid transparent;
+  cursor: pointer;
+  display: block;
+  padding: 0;
+  position: relative;
+  text-align: left;
+}
+.usher-grid-card.picked {
+  border-color: var(--acid);
+}
+.usher-grid-card.picked::after {
+  align-items: center;
+  background: var(--acid);
+  color: var(--ink);
+  content: "✓";
+  display: flex;
+  font: 700 13px/1 var(--sans);
+  height: 22px;
+  justify-content: center;
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 22px;
+}
+.usher-grid-card img {
+  display: block;
+  height: auto;
+  width: 100%;
+}
+.usher-grid-card small {
+  color: var(--muted);
+  display: block;
+  font: 400 10px/1.2 var(--sans);
+  overflow: hidden;
+  padding-top: 4px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.usher-grid-card.picked small {
+  color: var(--acid);
+}
+.usher-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.usher-confirm button {
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--white);
+  cursor: pointer;
+  font: 700 12px/1 var(--mono);
+  letter-spacing: 1px;
+  padding: 13px 18px;
+  text-transform: uppercase;
+}
+.usher-confirm button:hover:not(:disabled) {
+  border-color: var(--acid);
+  color: var(--acid);
+}
+.usher-confirm .usher-primary {
+  background: var(--acid);
+  border-color: var(--acid);
+  color: var(--ink);
+}
+.usher-confirm .usher-primary:hover:not(:disabled) {
+  background: var(--white);
+  border-color: var(--white);
+  color: var(--ink);
+}
+.usher-confirm button:disabled {
+  color: var(--muted);
+  cursor: default;
+  opacity: 0.55;
+}
+.usher-hint {
+  color: var(--muted);
+  font: 400 13px/1.45 var(--sans);
+  margin: 0 0 14px;
+}
+
+/* The console in the hero */
+
+.usher-console {
+  bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: absolute;
+  right: var(--gutter);
+  width: min(560px, 50vw);
+  z-index: 3;
+}
+.usher-nudge {
+  align-self: flex-end;
+  color: var(--acid);
+  font: italic 400 15px/1 var(--serif);
+  margin: 0;
+  padding: 0 2px 2px;
+}
+.usher-ask {
+  background: var(--panel);
+  border: 1px solid var(--panel-line);
+  box-shadow: 7px 7px 0 var(--blue);
+  display: grid;
+  grid-template-columns: 54px minmax(140px, 1fr) 54px;
+}
+.usher-ask-face {
+  align-items: center;
+  border-right: 1px solid var(--panel-line);
+  display: flex;
+  justify-content: center;
+  padding: 8px;
+}
+.usher-ask input {
+  background: none;
+  border: none;
+  color: var(--white);
+  font: 400 15px/1 var(--sans);
+  min-width: 0;
+  padding: 15px 14px;
+}
+.usher-ask input::placeholder {
+  color: var(--muted);
+}
+.usher-ask input:focus-visible {
+  outline: none;
+}
+.usher-ask button {
+  background: none;
+  border: none;
+  border-left: 1px solid var(--panel-line);
+  color: var(--white);
+  cursor: pointer;
+}
+.usher-ask button:hover:not(:disabled) {
+  background: var(--acid);
+  color: var(--ink);
+}
+.usher-ask button svg {
+  fill: none;
+  height: 20px;
+  stroke: var(--white);
+  stroke-width: 2;
+  width: 20px;
+}
+.usher-ask button:hover:not(:disabled) svg {
+  stroke: var(--ink);
+}
+.usher-ask button:disabled svg {
+  stroke: var(--muted);
+}
+.usher-console-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.usher-decide {
+  background: rgba(27, 31, 25, 0.82);
+  border: 1px solid var(--acid);
+  color: var(--acid);
+  cursor: pointer;
+  font: 700 12px/1 var(--mono);
+  letter-spacing: 1px;
+  padding: 12px 16px;
+  text-transform: uppercase;
+}
+.usher-decide:hover:not(:disabled) {
+  background: var(--acid);
+  color: var(--ink);
+}
+.usher-decide.nudging {
+  animation: usher-pulse 1.8s ease-in-out 3;
+}
+@keyframes usher-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(201, 243, 93, 0.55);
+  }
+  50% {
+    box-shadow: 0 0 0 7px rgba(201, 243, 93, 0);
+  }
+}
+.usher-seed {
+  background: rgba(27, 31, 25, 0.82);
+  border: 1px solid var(--panel-line);
+  color: var(--white);
+  cursor: pointer;
+  font: 500 12px/1 var(--sans);
+  padding: 12px 12px;
+}
+.usher-seed:hover:not(:disabled) {
+  border-color: var(--acid);
+  color: var(--acid);
+}
+
+/* The answer hero */
+
+.usher-hero .hero-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 640px;
+  padding-bottom: 78px;
+  padding-top: 86px;
+}
+.usher-hero .hero-copy h1 {
+  font-size: clamp(44px, 5vw, 72px);
+}
+.usher-hero-pick .hero-copy {
+  padding-bottom: 78px;
+}
+.usher-hero-figure {
+  bottom: 0;
+  pointer-events: none;
+  position: absolute;
+  right: clamp(24px, 6vw, 120px);
+  width: clamp(170px, 20vw, 250px);
+  z-index: 2;
+}
+.usher-hero-head {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  margin-bottom: 2px;
+}
+.usher-hero-head .usher-mark {
+  flex: 0 0 auto;
+  height: 42px;
+  width: 58px;
+}
+.usher-hero-head p {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 0;
+  min-width: 0;
+}
+.usher-hero-head span {
+  color: var(--acid);
+  font: 700 11px/1 var(--mono);
+  letter-spacing: 2.4px;
+  text-transform: uppercase;
+}
+.usher-hero-head em {
+  color: var(--muted);
+  font: italic 400 14px/1.3 var(--serif);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.usher-exit {
+  background: rgba(17, 19, 15, 0.72);
+  border: 1px solid var(--line);
+  color: var(--white);
+  cursor: pointer;
+  font: 700 11px/1 var(--mono);
+  letter-spacing: 1px;
+  padding: 11px 15px;
+  position: absolute;
+  right: var(--gutter);
+  top: 26px;
+  white-space: nowrap;
+  z-index: 4;
+}
+.usher-exit:hover {
+  background: var(--acid);
+  border-color: var(--acid);
+  color: var(--ink);
+}
+.usher-narration {
+  border-left: 3px solid var(--acid);
+  color: var(--white);
+  font: 400 clamp(16px, 1.5vw, 19px) / 1.5 var(--serif);
+  margin: 0;
+  max-width: 46ch;
+  padding-left: 14px;
+}
+.usher-pin {
+  background: none;
+  border: 1px solid var(--acid);
+  color: var(--acid);
+  cursor: pointer;
+  font: 700 12px/1 var(--mono);
+  letter-spacing: 1px;
+  padding: 0 20px;
+  text-transform: uppercase;
+}
+.usher-pin:disabled {
+  border-color: var(--line);
+  color: var(--muted);
+  cursor: default;
+}
+.usher-strip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+.usher-strip::-webkit-scrollbar {
+  display: none;
+}
+.usher-strip button {
+  background: none;
+  border: 2px solid transparent;
+  cursor: pointer;
+  flex: 0 0 auto;
+  padding: 0;
+  width: 58px;
+}
+.usher-strip button.active {
+  border-color: var(--acid);
+}
+.usher-strip img {
+  display: block;
+  height: 87px;
+  object-fit: cover;
+  width: 100%;
+}
+
+/* The in-flow banner */
+
+.usher-banner {
+  align-items: center;
+  background: var(--ink-soft);
+  border-bottom: 1px solid var(--panel-line);
+  border-left: 4px solid var(--acid);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  padding: 18px var(--gutter);
+}
+.usher-banner > .usher-mark {
+  background: var(--acid);
+  flex: 0 0 auto;
+  height: 44px;
+  padding: 3px 5px;
+  width: 62px;
+}
+.usher-banner-body {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+.usher-banner-line {
+  color: var(--white);
+  font: 400 18px/1.3 var(--serif);
+  margin: 0 0 10px;
+}
+.usher-banner .usher-options,
+.usher-banner .usher-input,
+.usher-banner .usher-picked,
+.usher-banner .usher-matches {
+  margin-bottom: 10px;
+}
+.usher-banner .usher-options {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+.usher-banner-foot {
+  display: flex;
+  gap: 14px;
+  margin-left: auto;
+}
+.usher-banner-foot button {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font: 500 12px/1 var(--sans);
+  padding: 0;
+  text-decoration: underline;
+}
+.usher-banner-foot button:hover {
+  color: var(--white);
+}
+
+/* His shelves */
+
+.rail-by-usher .rail-heading > div {
+  margin-right: auto;
+  min-width: 0;
+}
+.rail-eyebrow {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+.rail-eyebrow b {
+  flex: 0 0 auto;
+  font-weight: inherit;
+  white-space: nowrap;
+}
+.rail-eyebrow em {
+  font-style: normal;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rail-usher {
+  flex: 0 0 auto;
+  height: 26px;
+  width: 36px;
+}
+
+.usher-card {
+  align-self: center;
+  background: var(--panel);
+  border: 1px solid var(--panel-line);
+  border-left: 3px solid var(--acid);
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 10px;
+  justify-content: center;
+  padding: 18px;
+  width: 250px;
+}
+.usher-card .usher-mark {
+  background: var(--acid);
+  height: 38px;
+  padding: 3px 5px;
+  width: 54px;
+}
+.usher-card p {
+  color: var(--white);
+  font: 400 16px/1.35 var(--serif);
+  margin: 0;
+}
+.usher-card .usher-confirm button {
+  padding: 9px 12px;
+}
+.usher-card-mute {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font: 500 11px/1 var(--sans);
+  padding: 0;
+  text-decoration: underline;
+}
+.usher-card-mute:hover {
+  color: var(--white);
+}
+.page-section > .usher-card,
+.search-empty > .usher-card {
+  margin-top: 20px;
+  width: min(440px, 100%);
+}
+.detail-body > .usher-card {
+  margin: 0 0 18px;
+  width: 100%;
+}
+
+@media (max-width: 1100px) {
+  .usher-console {
+    width: min(520px, 58vw);
+  }
+  .usher-onboarding-inner {
+    grid-template-columns: minmax(0, 190px) minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 860px) {
+  .usher-onboarding-inner {
+    grid-template-columns: minmax(0, 1fr);
+    padding-top: 56px;
+  }
+  .usher-question {
+    max-width: none;
+  }
+  .usher-services {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .usher-onboarding-figure {
+    display: none;
+  }
+  .usher-console {
+    bottom: 16px;
+    left: var(--gutter);
+    right: var(--gutter);
+    width: auto;
+  }
+  .usher-console-row {
+    justify-content: flex-start;
+  }
+  .usher-hero-figure {
+    display: none;
+  }
+  .usher-banner {
+    padding: 16px var(--gutter);
+  }
+  .usher-banner-foot {
+    margin-left: 0;
+  }
+  .usher-exit {
+    top: 16px;
+  }
+  .usher-hero .hero-copy {
+    padding-bottom: 40px;
+    padding-top: 76px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .usher-bulbs i,
+  .usher-decide.nudging {
+    animation: none;
+  }
+  .usher-options button:hover:not(:disabled),
+  .usher-services button:hover:not(:disabled) {
+    transform: none;
+  }
+  .usher-progress-bar i {
+    transition: none;
+  }
+  .usher-step {
+    animation: none;
+  }
 }

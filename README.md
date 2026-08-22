@@ -26,6 +26,12 @@ your watch history, ratings and watchlist come with you.
 
 > Everyone's watching that one. Doesn't mean it's good.
 
+He does the asking. On your first visit he works out what you pay for, what you reach for and why
+you pick what you pick, one question at a time, and after that he stays quiet — one uninvited word
+per session, and he takes a hint after three. He turns up where he is relevant: at the end of a
+shelf to ask whether it landed, on a title that has sat unwatched since spring, on a search that
+found nothing. And if you cannot decide, he will simply pick something and tell you why.
+
 He has five faces — attentive, thinking, pleased, unimpressed, asleep — and gets by on about two of
 them. The artwork is in `public/`, all of it cut from `usher.svg`, in ink, paper, acid and coral and
 nothing else. He is drawn to survive on his own dark background, so anything you add to him wants a
@@ -39,7 +45,13 @@ paper core and an ink keyline or it will disappear into the page.
 
 Search is hybrid. An FTS5 index over titles, synopses, TMDB keywords and credited names supplies keyword precision; a Vectorize index of bge-m3 embeddings supplies meaning. The two result sets are interleaved and scored by `@cf/baai/bge-reranker-base`, with a small additive boost from a title's Wikipedia pageview trend.
 
-The AI shelves and the curator sit on top of that rather than driving it. A viewer's taste vector is the mean of the embeddings of what they save, and each shelf is a different slice of its neighbourhood. The model only names the shelf and picks from a shortlist it can see.
+The AI shelves and the curator sit on top of that rather than driving it. A viewer's taste vector is
+the mean of the embeddings of what they save, blended with an embedding of what they have told the
+Usher — all stated taste on day one, mostly behaviour by the time a dozen things are on the shelf.
+Each shelf is a different slice of that neighbourhood, and which slices get built depends on why
+they said they watch: follow the cast and one shelf is built from their people, watch to switch off
+and the acclaimed shelf becomes a comfortable one. The model only names the shelf and picks from a
+shortlist it can see.
 
 ## Local development
 

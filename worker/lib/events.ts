@@ -11,7 +11,13 @@ export type MarqueeEvent = {
     | "rails_served"
     | "rails_built"
     | "rail_impression"
-    | "rail_click";
+    | "rail_click"
+    | "rail_feedback"
+    | "usher_shown"
+    | "usher_answered"
+    | "usher_dismissed"
+    | "usher_pick"
+    | "shelf_pinned";
   viewerId?: string;
   titleId?: string;
   detail?: string;

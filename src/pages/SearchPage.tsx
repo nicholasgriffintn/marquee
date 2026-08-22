@@ -1,20 +1,28 @@
 import { TitleCard } from "../components/catalog";
+import { UsherCard } from "../components/usher/UsherCard";
 import type { MediaTitle } from "../domain/catalog";
+import type { UsherMoment } from "../domain/usher";
 
 export function SearchPage({
   query,
   items,
   error,
   isSearching,
+  usherMoment,
   onOpen,
   onShowTonight,
+  onUsherAction,
+  onUsherDismiss,
 }: {
   query: string;
   items: MediaTitle[];
   error: string;
   isSearching: boolean;
+  usherMoment: UsherMoment | null;
   onOpen: (item: MediaTitle) => void;
   onShowTonight: () => void;
+  onUsherAction: (moment: UsherMoment, actionId: string) => void;
+  onUsherDismiss: (scope: "once" | "kind") => void;
 }) {
   const trimmed = query.trim();
   const pendingCount = items.filter((item) => item.pending).length;
@@ -68,6 +76,9 @@ export function SearchPage({
           <button type="button" onClick={onShowTonight}>
             Back to tonight
           </button>
+          {usherMoment && (
+            <UsherCard moment={usherMoment} onAction={onUsherAction} onDismiss={onUsherDismiss} />
+          )}
         </div>
       )}
     </section>

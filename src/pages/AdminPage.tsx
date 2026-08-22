@@ -8,7 +8,7 @@ const ACTION_GROUPS: {
 }[] = [
   {
     title: "Schedules",
-    note: "The same workflows the crons start. A light sweep runs every three hours, a deep sweep nightly, the digest on Monday mornings.",
+    note: "The same workflows the crons start. A light sweep runs every three hours, a deep sweep nightly, the digest on Monday mornings. Every sweep advances the catalogue backfill by a bounded number of pages.",
     actions: [
       { id: "sweep-light", label: "Run light sweep" },
       { id: "sweep-deep", label: "Run deep sweep" },
@@ -17,12 +17,12 @@ const ACTION_GROUPS: {
   },
   {
     title: "Backfills",
-    note: "Queue work without waiting for a sweep. Each one respects the call budgets below.",
+    note: "Queue work without waiting for a sweep. Each one respects the call budgets below. The backfill walks TMDB in dated windows, so every run picks up where the last one stopped.",
     actions: [
       { id: "availability", label: "Refresh availability" },
       { id: "enrichment", label: "Queue enrichment" },
       { id: "embeddings", label: "Queue embeddings" },
-      { id: "discover", label: "Sweep discover pages" },
+      { id: "discover", label: "Advance backfill" },
     ],
   },
   {
@@ -30,6 +30,7 @@ const ACTION_GROUPS: {
     note: "Fast jobs that go straight onto the ingestion queue.",
     actions: [
       { id: "sections", label: "Rebuild homepage" },
+      { id: "working-set", label: "Rebuild working set" },
       { id: "schedule", label: "Refresh air dates" },
       { id: "buzz", label: "Refresh trending" },
       { id: "providers", label: "Refresh providers" },
@@ -41,6 +42,7 @@ const COUNT_LABELS: { key: string; label: string }[] = [
   { key: "titles", label: "titles" },
   { key: "movies", label: "films" },
   { key: "shows", label: "series" },
+  { key: "workingSet", label: "tracked for availability" },
   { key: "availabilityFresh", label: "availability fresh" },
   { key: "embeddings", label: "embedded" },
   { key: "posters", label: "posters cached" },
@@ -49,6 +51,45 @@ const COUNT_LABELS: { key: string; label: string }[] = [
   { key: "sections", label: "homepage rails" },
   { key: "users", label: "accounts" },
 ];
+
+type BackfillRow = {
+  mediaType: string;
+  status: string;
+  partitions: number;
+  titles: number;
+  pagesDone: number;
+  totalPages: number;
+};
+
+function backfillSummary(rows: BackfillRow[]) {
+  const byMedia = new Map<
+    string,
+    { mapped: number; splitting: number; titles: number; pagesDone: number; totalPages: number }
+  >();
+
+  for (const row of rows) {
+    const entry = byMedia.get(row.mediaType) ?? {
+      mapped: 0,
+      splitting: 0,
+      titles: 0,
+      pagesDone: 0,
+      totalPages: 0,
+    };
+
+    if (row.status === "split") {
+      entry.splitting += row.partitions;
+    } else {
+      entry.mapped += row.partitions;
+      entry.titles += row.titles ?? 0;
+      entry.pagesDone += row.pagesDone ?? 0;
+      entry.totalPages += row.totalPages ?? 0;
+    }
+
+    byMedia.set(row.mediaType, entry);
+  }
+
+  return [...byMedia.entries()];
+}
 
 function stamp(value: string) {
   return value ? new Date(`${value.replace(" ", "T")}Z`).toLocaleString() : "never";
@@ -84,6 +125,12 @@ export function AdminPage({ user }: { user: User }) {
       {overview && (
         <section className="panel-block" aria-labelledby="admin-counts-title">
           <h2 id="admin-counts-title">Catalogue</h2>
+          <p className="admin-note">
+            Availability is only kept fresh for the working set — everything on a shelf or a pinned
+            list, everything a rail can surface, anything with an insight or an air date ahead of
+            it, plus the most popular titles. The rest of the catalogue is searchable and fills in
+            its providers when something actually reaches for it.
+          </p>
           <div className="admin-counts">
             {COUNT_LABELS.map((count) => (
               <div key={count.key}>
@@ -92,6 +139,38 @@ export function AdminPage({ user }: { user: User }) {
               </div>
             ))}
           </div>
+        </section>
+      )}
+
+      {overview && overview.backfill.length > 0 && (
+        <section className="panel-block" aria-labelledby="admin-backfill-title">
+          <h2 id="admin-backfill-title">Catalogue backfill</h2>
+          <p className="admin-note">
+            TMDB stops paginating any single query at page 500, so the sweep walks it as dated
+            windows and halves any window that overflows that cap. Each window keeps its own cursor,
+            so every sweep resumes the crawl instead of restarting it.
+          </p>
+          <ul className="admin-list">
+            {backfillSummary(overview.backfill).map(([mediaType, row]) => (
+              <li key={mediaType}>
+                <strong>{mediaType === "movie" ? "Films" : "Series"}</strong>
+                <small>
+                  {row.pagesDone.toLocaleString()} / {row.totalPages.toLocaleString()} pages ·{" "}
+                  {row.mapped.toLocaleString()} windows
+                  {row.splitting > 0 ? ` · ${row.splitting.toLocaleString()} split` : ""}
+                </small>
+                <span className="spacer" />
+                <code>{row.titles.toLocaleString()} titles in range</code>
+                <div className="budget-bar" aria-hidden="true">
+                  <i
+                    style={{
+                      width: `${Math.min(100, (row.pagesDone / Math.max(1, row.totalPages)) * 100)}%`,
+                    }}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 
@@ -156,6 +235,7 @@ export function AdminPage({ user }: { user: User }) {
               <li key={source.source}>
                 <strong>{source.source}</strong>
                 <small>{source.titles.toLocaleString()} titles</small>
+                {source.misses > 0 && <code>{source.misses.toLocaleString()} no data</code>}
                 <span className="spacer" />
                 <time dateTime={source.newest}>{stamp(source.newest)}</time>
               </li>

@@ -83,6 +83,18 @@ export function changeLabel(delta: number) {
   return `${percent >= 0 ? "+" : ""}${percent.toLocaleString()}%`;
 }
 
+export function heroTitleClass(title: string) {
+  if (title.length > 46) {
+    return "hero-title hero-title-tiny";
+  }
+
+  if (title.length > 26) {
+    return "hero-title hero-title-small";
+  }
+
+  return "hero-title";
+}
+
 export function scoreLabel(item: MediaTitle) {
   return item.tmdbScore === null ? "Not yet rated" : `${item.tmdbScore.toFixed(1)} / 10`;
 }
