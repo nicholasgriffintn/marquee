@@ -1,11 +1,12 @@
 import { Hono } from "hono";
 
 import { authRoutes } from "./auth/routes.ts";
-import { consumeIngestion } from "./jobs/ingestion-consumer.ts";
+import { consumeDeadLetters, consumeIngestion } from "./jobs/ingestion-consumer.ts";
 import { scheduleIngestion } from "./jobs/ingestion-scheduler.ts";
 import { hasTrustedOrigin } from "./lib/http.ts";
 import { catalogRoutes } from "./routes/catalog.ts";
 import { curatorRoutes } from "./routes/curator.ts";
+import { mediaRoutes } from "./routes/media.ts";
 import { profileRoutes } from "./routes/profile.ts";
 import type { Bindings, IngestionJob } from "./types.ts";
 
@@ -30,28 +31,7 @@ app.use("/api/*", async (context, next) => {
 
 app.get("/health", (context) => context.json({ ok: true, service: "marquee" }));
 
-app.get("/media/posters/:file", async (context) => {
-  const file = context.req.param("file");
-
-  if (!/^[\w-]{1,80}$/u.test(file)) {
-    return context.json({ error: "Not found" }, 404);
-  }
-
-  const object = await context.env.MEDIA.get(`posters/${file}`);
-
-  if (!object) {
-    return context.json({ error: "Not found" }, 404);
-  }
-
-  return new Response(object.body, {
-    headers: {
-      "cache-control": "public, max-age=31536000, immutable",
-      "content-type": object.httpMetadata?.contentType ?? "image/jpeg",
-      etag: object.httpEtag,
-      "x-content-type-options": "nosniff",
-    },
-  });
-});
+app.route("/media", mediaRoutes);
 
 app.route("/api/catalog", catalogRoutes);
 
@@ -93,6 +73,10 @@ export default {
     context.waitUntil(scheduleIngestion(env));
   },
   queue(batch, env, context) {
-    context.waitUntil(consumeIngestion(batch, env));
+    context.waitUntil(
+      batch.queue === "marquee-ingestion-dead-letter"
+        ? consumeDeadLetters(batch, env)
+        : consumeIngestion(batch, env),
+    );
   },
 } satisfies ExportedHandler<Bindings, IngestionJob>;

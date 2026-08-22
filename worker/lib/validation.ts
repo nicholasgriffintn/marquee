@@ -56,6 +56,15 @@ export function isIngestionJob(value: unknown): value is IngestionJob {
     );
   }
 
+  if (value.type === "embed-titles") {
+    return (
+      Array.isArray(value.titleIds) &&
+      value.titleIds.length > 0 &&
+      value.titleIds.length <= 100 &&
+      value.titleIds.every(isKnownTitle)
+    );
+  }
+
   if (value.type === "import-imdb-title") {
     return typeof value.imdbId === "string" && /^tt\d+$/u.test(value.imdbId);
   }

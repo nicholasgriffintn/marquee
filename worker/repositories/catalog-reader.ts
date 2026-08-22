@@ -1,6 +1,7 @@
 import type { CatalogResponse, CatalogSection, MediaTitle } from "../../src/domain/catalog.ts";
 import { parseStoredTitle, parseStoredTitleIds } from "../lib/catalog-payload.ts";
 import { isKnownTitle } from "../lib/validation.ts";
+import { searchCatalogue } from "./catalog-search.ts";
 
 type PayloadRow = { payload: string; posterKey?: string | null };
 
@@ -23,8 +24,8 @@ function includesProvider(title: MediaTitle, providerIds: string[]) {
   );
 }
 
-export async function readItems(db: D1Database, ids: string[]) {
-  const uniqueIds = [...new Set(ids.filter(isKnownTitle))].slice(0, 30);
+export async function readItems(db: D1Database, ids: string[], limit = 30) {
+  const uniqueIds = [...new Set(ids.filter(isKnownTitle))].slice(0, Math.min(limit, 200));
 
   if (uniqueIds.length === 0) {
     return [];
@@ -109,24 +110,9 @@ export async function readAvailability(db: D1Database, titleId: string) {
 }
 
 async function readSearchResults(db: D1Database, query: string, providerIds: string[]) {
-  const rows = await db
-    .prepare(
-      `SELECT payload, poster_key AS posterKey
-       FROM catalog_titles
-       WHERE instr(lower(title), lower(?)) > 0
-          OR instr(lower(original_title), lower(?)) > 0
-       ORDER BY popularity DESC
-       LIMIT 30`,
-    )
-    .bind(query, query)
-    .all<PayloadRow>();
-  const items = rows.results
-    .flatMap((row) => {
-      const title = parseStoredTitle(row.payload);
-
-      return title ? [withStoredPoster(title, row.posterKey)] : [];
-    })
-    .filter((title) => includesProvider(title, providerIds));
+  const items = (await searchCatalogue(db, { query, limit: 30 })).filter((title) =>
+    includesProvider(title, providerIds),
+  );
 
   return {
     sections: [

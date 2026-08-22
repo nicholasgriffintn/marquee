@@ -1,6 +1,6 @@
 import { isIngestionJob } from "../lib/validation.ts";
-import type { Bindings } from "../types.ts";
-import { recordIngestionRun } from "./ingestion-runs.ts";
+import type { Bindings, IngestionJob } from "../types.ts";
+import { jobSubject, recordIngestionRun } from "./ingestion-runs.ts";
 
 export async function consumeIngestion(batch: MessageBatch<unknown>, env: Bindings) {
   for (const message of batch.messages) {
@@ -11,6 +11,7 @@ export async function consumeIngestion(batch: MessageBatch<unknown>, env: Bindin
     }
 
     try {
+      // oxlint-disable-next-line no-await-in-loop
       await recordIngestionRun(env, message.body);
       message.ack();
     } catch (error) {
@@ -18,12 +19,38 @@ export async function consumeIngestion(batch: MessageBatch<unknown>, env: Bindin
         JSON.stringify({
           event: "ingestion_job_failed",
           jobType: message.body.type,
-          subjectId: message.body.type === "enrich-availability" ? message.body.titleId : null,
+          subjectId: jobSubject(message.body),
           attempt: message.attempts,
           kind: error instanceof Error ? error.name : "UnknownError",
         }),
       );
       message.retry({ delaySeconds: Math.min(300, 30 * message.attempts) });
     }
+  }
+}
+
+export async function consumeDeadLetters(batch: MessageBatch<unknown>, env: Bindings) {
+  const statements = batch.messages.map((message) => {
+    const job: IngestionJob | null = isIngestionJob(message.body) ? message.body : null;
+
+    return env.DB.prepare(
+      `INSERT INTO ingestion_runs (id, job_type, subject_id, status, error, completed_at)
+       VALUES (?, ?, ?, 'failed', ?, CURRENT_TIMESTAMP)`,
+    ).bind(
+      crypto.randomUUID(),
+      `dead-letter:${job?.type ?? "unknown"}`,
+      job ? jobSubject(job) : null,
+      `Gave up after ${message.attempts} attempt${message.attempts === 1 ? "" : "s"}`,
+    );
+  });
+
+  if (statements.length) {
+    await env.DB.batch(statements);
+  }
+
+  console.error(JSON.stringify({ event: "dead_letters_recorded", count: statements.length }));
+
+  for (const message of batch.messages) {
+    message.ack();
   }
 }

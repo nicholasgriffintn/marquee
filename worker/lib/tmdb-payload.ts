@@ -120,6 +120,52 @@ function imageUrl(path: string | null, size: string) {
   return path?.startsWith("/") ? `${IMAGE_BASE}/${size}${path}` : null;
 }
 
+const KEYWORD_LIMIT = 24;
+const CAST_LIMIT = 6;
+
+function names(value: unknown, limit: number) {
+  return records(value)
+    .map((item) => stringAt(item, "name"))
+    .filter((name): name is string => Boolean(name?.trim()))
+    .map((name) => name.trim().slice(0, 80))
+    .slice(0, limit);
+}
+
+function parseKeywords(details: Record<string, unknown>) {
+  const container = recordAt(details, "keywords");
+
+  if (!container) {
+    return [];
+  }
+
+  const entries = names(container.keywords ?? container.results, KEYWORD_LIMIT);
+
+  return [...new Set(entries.map((keyword) => keyword.toLowerCase()))];
+}
+
+function parsePeople(mediaType: MediaType, details: Record<string, unknown>) {
+  const credits = recordAt(details, mediaType === "movie" ? "credits" : "aggregate_credits");
+  const directors = credits
+    ? records(credits.crew)
+        .filter((member) => {
+          const job = stringAt(member, "job");
+
+          return (
+            job === "Director" ||
+            job === "Creator" ||
+            records(member.jobs).some((entry) => stringAt(entry, "job") === "Director")
+          );
+        })
+        .map((member) => stringAt(member, "name"))
+        .filter((name): name is string => Boolean(name))
+        .slice(0, 3)
+    : [];
+  const creators = names(details.created_by, 3);
+  const cast = credits ? names(credits.cast, CAST_LIMIT) : [];
+
+  return [...new Set([...directors, ...creators, ...cast])].slice(0, 10);
+}
+
 function cleanDate(value: string | null) {
   return value && /^\d{4}-\d{2}-\d{2}$/u.test(value) ? value : null;
 }
@@ -174,6 +220,8 @@ export function parseTmdbTitle(mediaType: MediaType, value: unknown): MediaTitle
     watchLink,
     tmdbUrl: `https://www.themoviedb.org/${mediaType}/${tmdbId}`,
     imdbUrl: imdbId && /^tt\d+$/u.test(imdbId) ? `https://www.imdb.com/title/${imdbId}/` : null,
+    keywords: parseKeywords(value),
+    people: parsePeople(mediaType, value),
   };
 }
 

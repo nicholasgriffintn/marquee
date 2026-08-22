@@ -1,9 +1,34 @@
 import type { Bindings, IngestionJob } from "../types.ts";
 import { executeIngestionJob } from "./ingestion.ts";
 
+export function jobSubject(job: IngestionJob) {
+  if (
+    job.type === "enrich-availability" ||
+    job.type === "enrich-ratings" ||
+    job.type === "enrich-simkl" ||
+    job.type === "cache-poster"
+  ) {
+    return job.titleId;
+  }
+
+  if (job.type === "import-imdb-title") {
+    return job.imdbId;
+  }
+
+  if (job.type === "build-rails") {
+    return job.viewerId;
+  }
+
+  if (job.type === "sync-discover-page") {
+    return `${job.mediaType}#${job.page}`;
+  }
+
+  return null;
+}
+
 export async function recordIngestionRun(env: Bindings, job: IngestionJob) {
   const runId = crypto.randomUUID();
-  const subjectId = job.type === "enrich-availability" ? job.titleId : null;
+  const subjectId = jobSubject(job);
 
   await env.DB.prepare(
     `INSERT INTO ingestion_runs (id, job_type, subject_id, status)

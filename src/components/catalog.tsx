@@ -4,7 +4,9 @@ import type { CatalogSection, MediaTitle } from "../domain/catalog";
 import { useAvailability } from "../hooks/useAvailability";
 import { useTitleInsight } from "../hooks/useTitleInsight";
 import { mediaMeta, scoreLabel, voteLabel } from "../lib/media";
+import type { EntryStatus, ViewingEntry } from "../types";
 import { ArtPlaceholder } from "./ArtPlaceholder";
+import { ShelfForm } from "./ShelfForm";
 import { ArrowIcon, PlusIcon, Poster, ProviderBadge } from "./ui";
 
 const RAIL_PROVIDER_LIMIT = 3;
@@ -101,20 +103,28 @@ export function ContentRail({
 
 export function DetailPanel({
   item,
-  isSaved,
   watchmodeEnabled,
   canSave,
   onClose,
   onOpen,
   onSave,
+  onSaveEntry,
+  entry,
+  onRemove,
+  onStatus,
+  onUpdateDraft,
 }: {
   item: MediaTitle;
-  isSaved: boolean;
+  entry?: ViewingEntry;
+  onRemove: (titleId: string) => void;
+  onStatus: (titleId: string, status: EntryStatus) => void;
+  onUpdateDraft: (titleId: string, patch: Partial<ViewingEntry>) => void;
   watchmodeEnabled: boolean;
   canSave: boolean;
   onClose: () => void;
   onOpen: (item: MediaTitle) => void;
   onSave: (item: MediaTitle) => void;
+  onSaveEntry: (entry: ViewingEntry) => void;
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const providers = useAvailability(item, watchmodeEnabled);
@@ -217,15 +227,20 @@ export function DetailPanel({
               <p className="availability-empty">No streaming options found.</p>
             )}
           </div>
-          {canSave && (
-            <button
-              type="button"
-              className="save-button"
-              onClick={() => onSave(item)}
-              disabled={isSaved}
-            >
-              <PlusIcon /> {isSaved ? "Already on my shelf" : "Save to my shelf"}
+          {canSave && !entry && (
+            <button type="button" className="save-button" onClick={() => onSave(item)}>
+              <PlusIcon /> Save to my shelf
             </button>
+          )}
+          {canSave && entry && (
+            <ShelfForm
+              entry={entry}
+              title={item.title}
+              onRemove={onRemove}
+              onSave={onSaveEntry}
+              onStatus={onStatus}
+              onUpdateDraft={onUpdateDraft}
+            />
           )}
           {pairs.length > 0 && (
             <div className="detail-pairs">

@@ -398,6 +398,101 @@ svg {
   scroll-snap-align: none;
 }
 
+.shelf-group {
+  margin-bottom: 46px;
+}
+.shelf-group h2 {
+  align-items: baseline;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  font-size: clamp(19px, 2vw, 26px);
+  gap: 10px;
+  letter-spacing: -0.04em;
+  margin: 0 0 22px;
+  padding-bottom: 12px;
+}
+.shelf-group h2 em {
+  color: var(--muted);
+  font: 700 10px var(--mono);
+  font-style: normal;
+}
+.shelf-grid {
+  display: grid;
+  gap: 26px 16px;
+  grid-template-columns: repeat(auto-fill, minmax(clamp(120px, 12vw, 168px), 1fr));
+}
+.shelf-item {
+  background: none;
+  border: 0;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0;
+  text-align: left;
+}
+.shelf-item .poster {
+  transition: transform 0.2s ease;
+}
+.shelf-item:hover .poster {
+  transform: translateY(-6px);
+}
+.shelf-item strong {
+  font-size: 13px;
+  letter-spacing: -0.02em;
+  margin-top: 9px;
+}
+.shelf-item small {
+  color: var(--muted);
+  font: 9px var(--mono);
+  text-transform: uppercase;
+}
+.shelf-form {
+  border-top: 1px solid var(--paper-line);
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-top: 26px;
+  padding-top: 24px;
+}
+.shelf-form-label {
+  color: #6f7268;
+  font: 800 9px var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.shelf-form textarea {
+  background: var(--white);
+  border: 1px solid var(--paper-line);
+  color: var(--ink);
+  min-height: 96px;
+  padding: 12px;
+  resize: vertical;
+}
+.shelf-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+.shelf-form-actions button {
+  background: var(--acid);
+  border: 0;
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 800;
+  min-height: 42px;
+  padding: 0 18px;
+}
+.shelf-form-actions button.danger {
+  background: none;
+  border: 1px solid var(--paper-line);
+  color: var(--ink);
+}
+.shelf-form-actions button.danger:hover {
+  border-color: var(--coral);
+  color: var(--coral);
+}
+
 .browse-filters {
   border-bottom: 1px solid var(--line);
   display: flex;

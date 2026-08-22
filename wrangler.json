@@ -81,7 +81,9 @@
       "GITHUB_CLIENT_ID",
       "GITHUB_CLIENT_SECRET",
       "OMDB_API_KEY",
-      "SIMKL_CLIENT_ID"
+      "SIMKL_CLIENT_ID",
+      "TRAKT_CLIENT_ID",
+      "TRAKT_CLIENT_SECRET"
     ]
   },
   "observability": {
@@ -115,6 +117,10 @@
       {
         "binding": "AI_QUEUE",
         "queue": "marquee-ai"
+      },
+      {
+        "binding": "EMBEDDING_QUEUE",
+        "queue": "marquee-embeddings"
       }
     ],
     "consumers": [
@@ -171,7 +177,44 @@
         "dead_letter_queue": "marquee-ingestion-dead-letter",
         "max_concurrency": 3,
         "retry_delay": 30
+      },
+      {
+        "queue": "marquee-embeddings",
+        "max_batch_size": 25,
+        "max_batch_timeout": 10,
+        "max_retries": 3,
+        "dead_letter_queue": "marquee-ingestion-dead-letter",
+        "max_concurrency": 4,
+        "retry_delay": 30
+      },
+      {
+        "queue": "marquee-ingestion-dead-letter",
+        "max_batch_size": 25,
+        "max_batch_timeout": 30,
+        "max_retries": 1,
+        "max_concurrency": 1
       }
     ]
-  }
+  },
+  "placement": {
+    "mode": "smart"
+  },
+  "images": {
+    "binding": "IMAGES"
+  },
+  "vectorize": [
+    {
+      "binding": "VECTORS",
+      "index_name": "marquee-titles"
+    }
+  ],
+  "ai": {
+    "binding": "AI"
+  },
+  "analytics_engine_datasets": [
+    {
+      "binding": "EVENTS",
+      "dataset": "marquee_events"
+    }
+  ]
 }

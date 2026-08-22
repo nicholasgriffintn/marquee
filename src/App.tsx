@@ -17,6 +17,7 @@ import { LibraryPage } from "./pages/LibraryPage";
 import { SearchPage } from "./pages/SearchPage";
 import { SourcesPage } from "./pages/SourcesPage";
 import { TonightPage } from "./pages/TonightPage";
+import type { EntryStatus, ViewingEntry } from "./types";
 
 const NAV: { to: string; label: string; private: boolean }[] = [
   { to: "/", label: "Tonight", private: false },
@@ -267,11 +268,7 @@ export function App() {
                 titles={catalog.savedTitles}
                 catalogueError={catalog.error}
                 onOpen={openTitle}
-                onRemove={(id) => void profile.removeEntry(id)}
-                onSave={(entry) => void profile.saveEntry(entry)}
                 onShowTonight={() => void navigate("/")}
-                onStatus={profile.setStatus}
-                onUpdateDraft={profile.updateDraft}
               />
             ) : (
               <SignedOutShelf />
@@ -317,6 +314,10 @@ export function App() {
           onClose={closeDetails}
           onOpen={openTitle}
           onSave={(item) => void saveTitle(item)}
+          onSaveEntry={(entry) => void profile.saveEntry(entry)}
+          onRemove={(id) => void profile.removeEntry(id)}
+          onStatus={profile.setStatus}
+          onUpdateDraft={profile.updateDraft}
         />
       )}
 
@@ -382,16 +383,24 @@ function TitleOverlay({
   onClose,
   onOpen,
   onSave,
+  onSaveEntry,
+  onRemove,
+  onStatus,
+  onUpdateDraft,
 }: {
   titleId: string;
   titlesById: Map<string, MediaTitle>;
   searchItems: MediaTitle[];
   canSave: boolean;
-  entries: Record<string, unknown>;
+  entries: Record<string, ViewingEntry>;
   watchmodeEnabled: boolean;
   onClose: () => void;
   onOpen: (item: MediaTitle) => void;
   onSave: (item: MediaTitle) => void;
+  onSaveEntry: (entry: ViewingEntry) => void;
+  onRemove: (titleId: string) => void;
+  onStatus: (titleId: string, status: EntryStatus) => void;
+  onUpdateDraft: (titleId: string, patch: Partial<ViewingEntry>) => void;
 }) {
   const known = useMemo(
     () =>
@@ -408,11 +417,15 @@ function TitleOverlay({
     <DetailPanel
       item={title}
       canSave={canSave}
-      isSaved={Boolean(entries[title.id])}
+      entry={entries[title.id]}
       watchmodeEnabled={watchmodeEnabled}
       onClose={onClose}
       onOpen={onOpen}
       onSave={onSave}
+      onSaveEntry={onSaveEntry}
+      onRemove={onRemove}
+      onStatus={onStatus}
+      onUpdateDraft={onUpdateDraft}
     />
   );
 }

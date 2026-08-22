@@ -17,6 +17,7 @@ import { selectUnenriched, storeEnrichment, storePoster } from "../repositories/
 import { storeProviders } from "../repositories/providers.ts";
 import { readViewerContext } from "../repositories/viewer-context.ts";
 import { generateRails, getPersonalRails } from "../services/ai-rails.ts";
+import { embedTitles, selectUnembedded } from "../services/embeddings.ts";
 import type { Bindings, EnrichmentSource, IngestionJob } from "../types.ts";
 import { getProviderLedger } from "./provider-ledger.ts";
 
@@ -24,6 +25,8 @@ type SavedTitleRow = { titleId: string };
 
 const AVAILABILITY_MAX_AGE_DAYS = 7;
 const QUEUE_BATCH = 100;
+const EMBED_JOB_SIZE = 25;
+const EMBED_PER_RUN = 2_000;
 const MIN_POSTER_BYTES = 40_000;
 
 const ENRICHERS = [
@@ -110,6 +113,20 @@ async function syncCatalog(env: Bindings) {
     catalogueTitles.map((title) => title.id),
   );
   await queueEnrichment(env);
+  await queueEmbeddings(env);
+}
+
+async function queueEmbeddings(env: Bindings) {
+  const titleIds = await selectUnembedded(env, EMBED_PER_RUN);
+  const jobs: IngestionJob[] = [];
+
+  for (let index = 0; index < titleIds.length; index += EMBED_JOB_SIZE) {
+    jobs.push({ type: "embed-titles", titleIds: titleIds.slice(index, index + EMBED_JOB_SIZE) });
+  }
+
+  console.log(JSON.stringify({ event: "embeddings_queued", titles: titleIds.length }));
+
+  await enqueue(env.EMBEDDING_QUEUE, jobs);
 }
 
 async function queueEnrichment(env: Bindings) {
@@ -150,6 +167,22 @@ async function syncDiscoverPage(env: Bindings, mediaType: "movie" | "tv", page: 
     env,
     titles.map((title) => title.id),
   );
+}
+
+async function queueTitleEmbeddings(env: Bindings, titleIds: string[]) {
+  const unique = [...new Set(titleIds)];
+
+  if (unique.length === 0) {
+    return;
+  }
+
+  const jobs: IngestionJob[] = [];
+
+  for (let index = 0; index < unique.length; index += EMBED_JOB_SIZE) {
+    jobs.push({ type: "embed-titles", titleIds: unique.slice(index, index + EMBED_JOB_SIZE) });
+  }
+
+  await enqueue(env.EMBEDDING_QUEUE, jobs);
 }
 
 async function queueAvailability(env: Bindings, titleIds: string[]) {
@@ -253,6 +286,7 @@ async function importImdbTitle(env: Bindings, imdbId: string) {
 
   await storeItems(env.DB, [title], new Date().toISOString());
   await queueAvailability(env, [titleId]);
+  await queueTitleEmbeddings(env, [titleId]);
 }
 
 async function originPosterUrl(env: Bindings, titleId: string) {
@@ -384,5 +418,7 @@ export async function executeIngestionJob(env: Bindings, job: IngestionJob) {
     return;
   }
 
-  await enrichTitleAvailability(env, job.titleId);
+  if (job.type === "enrich-availability") {
+    await enrichTitleAvailability(env, job.titleId);
+  }
 }

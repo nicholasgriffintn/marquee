@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 
 import { sessionPrincipal } from "../auth/session.ts";
+import { edgeCache } from "../lib/cache.ts";
 import { clientRateLimitKey } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
 import { validProviderIds } from "../lib/validation.ts";
@@ -8,6 +9,7 @@ import {
   browseCatalogue,
   getCatalogue,
   getGenres,
+  getKeywords,
   searchCatalogue,
   getCatalogueItems,
   getProviderCatalogue,
@@ -17,7 +19,7 @@ import type { Bindings } from "../types.ts";
 
 export const catalogRoutes = new Hono<{ Bindings: Bindings }>();
 
-catalogRoutes.get("/", async (context) => {
+catalogRoutes.get("/", edgeCache(900), async (context) => {
   const query = (context.req.query("query") ?? "").trim().slice(0, 120);
   const providerIds = validProviderIds((context.req.query("providers") ?? "").split(","));
 
@@ -69,7 +71,7 @@ catalogRoutes.get("/search", async (context) => {
   }
 });
 
-catalogRoutes.get("/genres", async (context) => {
+catalogRoutes.get("/genres", edgeCache(3_600), async (context) => {
   try {
     context.header("cache-control", "public, max-age=3600");
 
@@ -81,7 +83,17 @@ catalogRoutes.get("/genres", async (context) => {
   }
 });
 
-catalogRoutes.get("/browse", async (context) => {
+catalogRoutes.get("/keywords", edgeCache(3_600), async (context) => {
+  try {
+    return context.json({ keywords: await getKeywords(context.env) });
+  } catch (error) {
+    logError("keywords_read_failed", error, { area: "browse" });
+
+    return context.json({ keywords: [] });
+  }
+});
+
+catalogRoutes.get("/browse", edgeCache(120), async (context) => {
   const mediaTypeParam = context.req.query("mediaType");
   const sortParam = context.req.query("sort");
   const page = Number.parseInt(context.req.query("page") ?? "0", 10);
@@ -111,7 +123,7 @@ catalogRoutes.get("/browse", async (context) => {
   }
 });
 
-catalogRoutes.get("/items", async (context) => {
+catalogRoutes.get("/items", edgeCache(900), async (context) => {
   const ids = (context.req.query("ids") ?? "").split(",").filter(Boolean).slice(0, 30);
 
   try {
@@ -125,7 +137,7 @@ catalogRoutes.get("/items", async (context) => {
   }
 });
 
-catalogRoutes.get("/providers", async (context) => {
+catalogRoutes.get("/providers", edgeCache(300), async (context) => {
   try {
     const providers = await getProviderCatalogue(context.env.DB);
 
@@ -143,7 +155,7 @@ catalogRoutes.get("/providers", async (context) => {
   }
 });
 
-catalogRoutes.get("/:mediaType/:tmdbId/availability", async (context) => {
+catalogRoutes.get("/:mediaType/:tmdbId/availability", edgeCache(900), async (context) => {
   const mediaType = context.req.param("mediaType");
   const tmdbId = Number(context.req.param("tmdbId"));
 

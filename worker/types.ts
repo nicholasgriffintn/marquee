@@ -17,13 +17,20 @@ export type Bindings = {
   TMDB_API_TOKEN?: string;
   OMDB_API_KEY?: string;
   SIMKL_CLIENT_ID?: string;
+  AI: Ai;
+  VECTORS: Vectorize;
+  IMAGES?: ImagesBinding;
+  EVENTS?: AnalyticsEngineDataset;
   INGESTION_QUEUE: Queue<IngestionJob>;
   AVAILABILITY_QUEUE: Queue<IngestionJob>;
   RATINGS_QUEUE: Queue<IngestionJob>;
   SIMKL_QUEUE: Queue<IngestionJob>;
   POSTER_QUEUE: Queue<IngestionJob>;
   AI_QUEUE: Queue<IngestionJob>;
+  EMBEDDING_QUEUE: Queue<IngestionJob>;
   MEDIA: R2Bucket;
+  TRAKT_CLIENT_ID?: string;
+  TRAKT_CLIENT_SECRET?: string;
 };
 
 export type EnrichmentSource = "watchmode" | "omdb" | "poster" | "simkl";
@@ -52,7 +59,8 @@ export type IngestionJob =
   | { type: "enrich-simkl"; titleId: string }
   | { type: "cache-poster"; titleId: string }
   | { type: "import-imdb-title"; imdbId: string }
-  | { type: "build-rails"; viewerId: string };
+  | { type: "build-rails"; viewerId: string }
+  | { type: "embed-titles"; titleIds: string[] };
 
 export type EntryStatus = "watchlist" | "watching" | "watched" | "dropped";
 

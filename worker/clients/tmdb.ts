@@ -99,8 +99,8 @@ export async function getDiscoverPage(env: Bindings, mediaType: MediaType, page:
 async function getTitleDetails(env: Bindings, summary: TmdbSummary) {
   const append =
     summary.mediaType === "movie"
-      ? "watch/providers,release_dates,external_ids"
-      : "watch/providers,content_ratings,external_ids";
+      ? "watch/providers,release_dates,external_ids,keywords,credits"
+      : "watch/providers,content_ratings,external_ids,keywords,aggregate_credits";
   const payload = await requestTmdb(env, `/${summary.mediaType}/${summary.id}`, {
     append_to_response: append,
   });

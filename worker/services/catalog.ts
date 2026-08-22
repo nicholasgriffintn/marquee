@@ -1,7 +1,11 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
 import { logError } from "../lib/logging.ts";
 import { readAvailability, readCatalog, readItems } from "../repositories/catalog-reader.ts";
-import { readGenres, searchCatalogue as queryCatalogue } from "../repositories/catalog-search.ts";
+import {
+  readGenres,
+  readKeywords,
+  searchCatalogue as queryCatalogue,
+} from "../repositories/catalog-search.ts";
 import { readProviders } from "../repositories/providers.ts";
 import type { Bindings } from "../types.ts";
 import { findPendingTitles } from "./discovery.ts";
@@ -86,4 +90,8 @@ export async function browseCatalogue(env: Bindings, browse: BrowseQuery) {
 
 export async function getGenres(env: Bindings) {
   return readGenres(env.DB);
+}
+
+export async function getKeywords(env: Bindings) {
+  return readKeywords(env.DB);
 }

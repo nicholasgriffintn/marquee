@@ -46,6 +46,8 @@ export type MediaTitle = {
   watchLink: string | null;
   tmdbUrl: string;
   imdbUrl: string | null;
+  keywords?: string[];
+  people?: string[];
   pending?: boolean;
   ratings?: {
     imdbScore: number | null;
