@@ -7,7 +7,7 @@ import { artwork, artworkSrcSet } from "../../lib/media";
 import { ArtPlaceholder } from "../ArtPlaceholder";
 import { ProviderBadge } from "../ui";
 
-const SEEN_GRID = 30;
+const SEEN_GRID = 18;
 
 export function UsherAnswer({
   question,

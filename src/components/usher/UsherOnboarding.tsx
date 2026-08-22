@@ -44,6 +44,7 @@ export function UsherOnboarding({
 
         <div className={`usher-onboarding-body${isSaving ? " saving" : ""}`}>
           <div className="usher-progress">
+            <UsherMark face={moment.face} crop="head" className="usher-progress-mark" />
             <span>The Usher</span>
             <div className="usher-progress-bar">
               <i style={{ width: `${Math.round((step / total) * 100)}%` }} />

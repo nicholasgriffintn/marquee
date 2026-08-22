@@ -26,6 +26,7 @@ import { LibraryPage } from "./pages/LibraryPage";
 import { SearchPage } from "./pages/SearchPage";
 import { SourcesPage } from "./pages/SourcesPage";
 import { TonightPage } from "./pages/TonightPage";
+import { UsherPage } from "./pages/UsherPage";
 import type { EntryStatus, ViewingEntry } from "./types";
 
 const TONIGHT_EPISODES = 16;
@@ -387,6 +388,8 @@ export function App() {
           }
         />
 
+        <Route path="/usher" element={<UsherPage />} />
+
         <Route
           path="/this-week"
           element={<DigestPage isSignedIn={isSignedIn} onOpen={openTitle} />}
@@ -495,7 +498,9 @@ export function App() {
           <span>Marquee</span>
         </div>
         <p>Data by TMDB · Availability by Watchmode and JustWatch</p>
-        <span>Made for movie night</span>
+        <Link className="footer-egg" to="/usher">
+          Made for movie night
+        </Link>
       </footer>
     </main>
   );
