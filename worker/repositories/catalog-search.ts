@@ -33,6 +33,7 @@ export type CatalogueSearch = {
   includeIds?: string[];
   sort?: CatalogueSort;
   scope?: SearchScope;
+  matchAny?: boolean;
   limit?: number;
   offset?: number;
 };
@@ -46,7 +47,7 @@ const ORDER_BY: Record<CatalogueSort, string> = {
   relevance: `${RELEVANCE}, t.popularity DESC`,
 };
 
-export function ftsMatchQuery(raw: string, scope: SearchScope = "everything") {
+export function ftsMatchQuery(raw: string, scope: SearchScope = "everything", matchAny = false) {
   const tokens = raw
     .toLowerCase()
     .replaceAll(/[^\p{L}\p{N}\s]+/gu, " ")
@@ -58,7 +59,7 @@ export function ftsMatchQuery(raw: string, scope: SearchScope = "everything") {
     return null;
   }
 
-  const expression = tokens.map((token) => `"${token}"*`).join(" AND ");
+  const expression = tokens.map((token) => `"${token}"*`).join(matchAny ? " OR " : " AND ");
 
   return scope === "title" ? `{title original_title} : (${expression})` : expression;
 }
@@ -77,7 +78,7 @@ export async function searchCatalogue(db: D1Database, search: CatalogueSearch) {
   const conditions: string[] = [];
   const bindings: unknown[] = [];
   const match = search.query?.trim()
-    ? ftsMatchQuery(search.query.trim().slice(0, 120), search.scope)
+    ? ftsMatchQuery(search.query.trim().slice(0, 120), search.scope, search.matchAny)
     : null;
   const genres = (search.genres ?? [])
     .map((genre) => genre.trim().toLowerCase())

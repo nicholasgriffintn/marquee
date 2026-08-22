@@ -91,7 +91,9 @@ export async function retrieveTitles(env: Bindings, query: RetrievalQuery) {
   }
 
   const [keywordResult, vectorResult] = await Promise.allSettled([
-    searchCatalogue(env.DB, keywordSearch),
+    searchCatalogue(env.DB, keywordSearch).then((titles) =>
+      titles.length ? titles : searchCatalogue(env.DB, { ...keywordSearch, matchAny: true }),
+    ),
     vectorCandidates(env, query, text),
   ]);
 

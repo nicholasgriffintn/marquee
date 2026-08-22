@@ -21,7 +21,7 @@ export type ProviderAvailability = {
   name: string;
   offerTypes: string[];
   webUrl: string | null;
-  source: "Watchmode" | "TMDB / JustWatch";
+  source: "Watchmode" | "JustWatch" | "TMDB / JustWatch";
 };
 
 export type MediaTitle = {

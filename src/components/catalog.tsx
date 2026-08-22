@@ -143,7 +143,7 @@ export function ContentRail({
 
 export function DetailPanel({
   item,
-  watchmodeEnabled,
+  availabilityEnabled,
   canSave,
   onClose,
   onOpen,
@@ -159,7 +159,7 @@ export function DetailPanel({
   onRemove: (titleId: string) => void;
   onStatus: (titleId: string, status: EntryStatus) => void;
   onUpdateDraft: (titleId: string, patch: Partial<ViewingEntry>) => void;
-  watchmodeEnabled: boolean;
+  availabilityEnabled: boolean;
   canSave: boolean;
   onClose: () => void;
   onOpen: (item: MediaTitle) => void;
@@ -167,7 +167,7 @@ export function DetailPanel({
   onSaveEntry: (entry: ViewingEntry) => void;
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
-  const providers = useAvailability(item, watchmodeEnabled);
+  const providers = useAvailability(item, availabilityEnabled);
   const { insight, pairs, isLoading: isInsightLoading } = useTitleInsight(item.id, canSave);
   const watchDestinations = providers.flatMap((provider) => {
     const href = provider.webUrl ?? item.watchLink;

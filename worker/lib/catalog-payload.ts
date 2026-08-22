@@ -21,7 +21,9 @@ function isAvailability(value: unknown): value is ProviderAvailability {
     typeof value.name === "string" &&
     isStringArray(value.offerTypes) &&
     isNullableString(value.webUrl) &&
-    (value.source === "Watchmode" || value.source === "TMDB / JustWatch")
+    (value.source === "Watchmode" ||
+      value.source === "JustWatch" ||
+      value.source === "TMDB / JustWatch")
   );
 }
 

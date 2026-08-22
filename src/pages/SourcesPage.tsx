@@ -64,8 +64,9 @@ export function SourcesPage({
         </div>
 
         <p>
-          Watchmode provides availability and deep links. TMDB and JustWatch cover the rest.
-          Services without a feed still link out, so you can see what’s missing.
+          JustWatch provides availability and deep links, with TMDB covering the service directory
+          and Watchmode filling gaps on saved titles. Services without a feed still link out, so you
+          can see what’s missing.
         </p>
       </div>
       {isSignedIn && (
@@ -292,13 +293,13 @@ export function SourcesPage({
             <img className="tmdb-logo" src={TMDB_LOGO} alt="The Movie Database (TMDB)" />
             <span>Titles, artwork and metadata</span>
           </a>
-          <a href="https://www.watchmode.com" target="_blank" rel="noreferrer">
-            <strong>Watchmode</strong>
-            <span>Availability and deep links</span>
-          </a>
           <a href="https://www.justwatch.com" target="_blank" rel="noreferrer">
             <strong>JustWatch</strong>
-            <span>Availability via TMDB</span>
+            <span>Availability and deep links</span>
+          </a>
+          <a href="https://www.watchmode.com" target="_blank" rel="noreferrer">
+            <strong>Watchmode</strong>
+            <span>Service directory and gap filling</span>
           </a>
           <a href="https://www.tvmaze.com" target="_blank" rel="noreferrer">
             <strong>TVmaze</strong>

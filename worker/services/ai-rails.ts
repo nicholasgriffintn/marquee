@@ -6,18 +6,18 @@ import { logError } from "../lib/logging.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { isRecord, parseJson } from "../lib/values.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
-import { searchCatalogue } from "../repositories/catalog-search.ts";
+import { readGenres, searchCatalogue } from "../repositories/catalog-search.ts";
 import {
   readShelfDetail,
   readViewerAffinity,
   readViewerContext,
 } from "../repositories/viewer-context.ts";
 import type { Bindings, ViewerContext } from "../types.ts";
-import { retrieveTitles } from "./retrieval.ts";
 
 const MAX_AGE_HOURS = 12;
 const RAIL_LIMIT = 3;
-const SHORTLIST = 10;
+const SHORTLIST = 12;
+const SEED_POOL = 30;
 const RAIL_MIN = 2;
 const RAIL_MAX = 6;
 const TASTE_SAMPLE = 16;
@@ -149,59 +149,86 @@ async function seedCandidates(
   angle: Angle,
   exclude: string[],
   affinity: ViewerAffinity,
+  wideGenres: string[],
+  claimed: Set<string>,
 ) {
   const base = {
     providerIds: viewer.selectedProviderIds,
-    excludeIds: exclude,
-    limit: SHORTLIST,
+    excludeIds: [...exclude, ...claimed],
+    limit: SEED_POOL,
     ...angle.search,
   };
   const merged = new Map<string, MediaTitle>();
+  const take = (titles: MediaTitle[]) => {
+    for (const title of titles) {
+      if (!merged.has(title.id) && !claimed.has(title.id)) {
+        merged.set(title.id, title);
+      }
+    }
+  };
 
   if (vector) {
     try {
       const ids = await neighbourIds(env, vector, angle.slice);
 
       if (ids.length) {
-        for (const title of await searchCatalogue(env.DB, { ...base, includeIds: ids })) {
-          merged.set(title.id, title);
-        }
+        take(await searchCatalogue(env.DB, { ...base, includeIds: ids }));
       }
     } catch (error) {
       logError("rail_neighbours_failed", error, { angle: angle.id });
     }
   }
 
-  const text = affinityText(affinity, angle);
+  const genres = angle.id === "widen" ? wideGenres.slice(0, 5) : affinity.genres.slice(0, 3);
+  const keywords = angleKeywords(affinity, angle);
 
-  if (merged.size < SHORTLIST) {
+  if (merged.size < SHORTLIST && keywords.length) {
     try {
-      for (const title of await retrieveTitles(env, { ...base, text })) {
-        if (!merged.has(title.id)) {
-          merged.set(title.id, title);
-        }
-      }
+      take(await searchCatalogue(env.DB, { ...base, keywords }));
     } catch (error) {
-      logError("rail_affinity_failed", error, { angle: angle.id });
+      logError("rail_keyword_seed_failed", error, { angle: angle.id });
     }
   }
 
-  return [...merged.values()].slice(0, SHORTLIST * 2);
+  if (merged.size < SHORTLIST && genres.length) {
+    try {
+      take(await searchCatalogue(env.DB, { ...base, genres }));
+    } catch (error) {
+      logError("rail_genre_seed_failed", error, { angle: angle.id });
+    }
+  }
+
+  if (merged.size < RAIL_MIN) {
+    try {
+      take(await searchCatalogue(env.DB, base));
+    } catch (error) {
+      logError("rail_fallback_failed", error, { angle: angle.id });
+    }
+  }
+
+  const seeds = [...merged.values()].slice(0, SEED_POOL);
+
+  for (const title of seeds) {
+    claimed.add(title.id);
+  }
+
+  return seeds;
 }
 
-function affinityText(affinity: ViewerAffinity, angle: Angle) {
-  const genres = affinity.genres.slice(0, 4);
-  const keywords = affinity.keywords.slice(0, 8);
-
-  if (genres.length === 0 && keywords.length === 0) {
-    return angle.fallbackText;
+function angleKeywords(affinity: ViewerAffinity, angle: Angle) {
+  if (angle.id === "widen") {
+    return [];
   }
 
-  if (angle.slice === "far") {
-    return `${angle.fallbackText}, for someone whose usual taste is ${[...genres, ...keywords.slice(0, 3)].join(", ")}`;
+  const keywords = affinity.keywords;
+
+  if (angle.id === "acclaimed") {
+    const tail = keywords.slice(5, 11);
+
+    return tail.length ? tail : keywords.slice(0, 5);
   }
 
-  return [...genres, ...keywords].join(", ");
+  return keywords.slice(0, 5);
 }
 
 function describeViewer(shelf: ShelfDetail[]) {
@@ -271,15 +298,12 @@ function parseRail(content: string | null, availableIds: Set<string>): StoredRai
 export async function buildOneRail(
   env: Bindings,
   viewer: ViewerContext,
-  vector: number[] | null,
   angle: Angle,
   exclude: string[],
   viewerId = "unknown",
-  affinity: ViewerAffinity = { genres: [], keywords: [], people: [] },
+  seeds: MediaTitle[] = [],
   shelf: ShelfDetail[] = [],
 ): Promise<StoredRail | null> {
-  const seeds = await seedCandidates(env, viewer, vector, angle, exclude, affinity);
-
   if (seeds.length < RAIL_MIN) {
     return null;
   }
@@ -434,23 +458,44 @@ export async function getPersonalRails(env: Bindings, viewerId: string) {
 }
 
 export async function prepareRails(env: Bindings, viewer: ViewerContext, viewerId: string) {
-  const [onHomepage, vector, affinity, shelf] = await Promise.all([
+  const [onHomepage, vector, affinity, shelf, allGenres] = await Promise.all([
     homepageTitleIds(env),
     tasteVector(env, viewer),
     readViewerAffinity(env.DB, viewerId),
     readShelfDetail(env.DB, viewerId),
+    readGenres(env.DB).catch((): string[] => []),
   ]);
+  const exclude = [
+    ...onHomepage,
+    ...viewer.entries
+      .filter((entry) => entry.status === "watched" || entry.status === "dropped")
+      .map((entry) => entry.titleId),
+  ];
+  const familiar = new Set(affinity.genres.map((genre) => genre.toLowerCase()));
+  const wideGenres = allGenres.filter((genre) => !familiar.has(genre.toLowerCase()));
+  const claimed = new Set<string>();
+  const seeds: Record<string, MediaTitle[]> = {};
+
+  for (const angle of ANGLES) {
+    // oxlint-disable-next-line no-await-in-loop
+    seeds[angle.id] = await seedCandidates(
+      env,
+      viewer,
+      vector,
+      angle,
+      exclude,
+      affinity,
+      wideGenres,
+      claimed,
+    );
+  }
 
   return {
     vector,
     affinity,
     shelf,
-    exclude: [
-      ...onHomepage,
-      ...viewer.entries
-        .filter((entry) => entry.status === "watched" || entry.status === "dropped")
-        .map((entry) => entry.titleId),
-    ],
+    seeds,
+    exclude,
   };
 }
 
@@ -480,10 +525,18 @@ export async function generateRails(
   signature: string,
   viewer: ViewerContext,
 ) {
-  const { vector, exclude, affinity, shelf } = await prepareRails(env, viewer, viewerId);
+  const prepared = await prepareRails(env, viewer, viewerId);
   const settled = await Promise.allSettled(
     ANGLES.map((angle) =>
-      buildOneRail(env, viewer, vector, angle, exclude, viewerId, affinity, shelf),
+      buildOneRail(
+        env,
+        viewer,
+        angle,
+        prepared.exclude,
+        viewerId,
+        prepared.seeds[angle.id] ?? [],
+        prepared.shelf,
+      ),
     ),
   );
   const rails = dedupeRails(

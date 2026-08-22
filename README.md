@@ -2,7 +2,7 @@
 
 Marquee is a streaming discovery service with live title search, provider-aware discovery, current watch destinations, Cloudflare AI recommendations, and a personal shelf with ratings and notes.
 
-Title metadata and images come from TMDB. Streaming, rental, and purchase availability comes from JustWatch through TMDB's watch-provider API. We also use Watchmode for some additional metadata and images. User authentication is via GitHub OAuth.
+Title metadata and images come from TMDB. Streaming, rental, and purchase availability comes from JustWatch, both through TMDB's watch-provider API and directly for per-service deep links. Watchmode supplies the service directory and fills availability gaps on saved titles. User authentication is via GitHub OAuth.
 
 Air dates come from TVmaze, anime tags from AniList, and the trending rail is ranked by Wikipedia pageview movement. A viewer can link Trakt to import their watch history, ratings and watchlist.
 

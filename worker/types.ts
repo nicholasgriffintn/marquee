@@ -36,7 +36,7 @@ export type Bindings = {
   TRAKT_CLIENT_SECRET?: string;
 };
 
-export type EnrichmentSource = "watchmode" | "omdb" | "poster" | "simkl" | "anilist";
+export type EnrichmentSource = "justwatch" | "watchmode" | "omdb" | "poster" | "simkl" | "anilist";
 
 export type TitleRatings = {
   imdbScore: number | null;

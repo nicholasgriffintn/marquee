@@ -11,6 +11,7 @@ export const SOURCE_BUDGETS: Record<
   EnrichmentSource,
   { windowKind: "day" | "month"; callLimit: number }
 > = {
+  justwatch: { windowKind: "day", callLimit: 20_000 },
   watchmode: { windowKind: "month", callLimit: 1_000 },
   omdb: { windowKind: "day", callLimit: 500_000 },
   poster: { windowKind: "day", callLimit: 500_000 },

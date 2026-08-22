@@ -32,11 +32,10 @@ export class RailsWorkflow extends WorkflowEntrypoint<Bindings, RailsParameters>
             const rail = await buildOneRail(
               this.env,
               viewer,
-              prepared.vector,
               angle,
               prepared.exclude,
               viewerId,
-              prepared.affinity,
+              prepared.seeds[angle.id] ?? [],
               prepared.shelf,
             );
 

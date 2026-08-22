@@ -1,4 +1,6 @@
+import type { MediaType } from "../../src/domain/catalog.ts";
 import { getAnilistDetails } from "../clients/anilist.ts";
+import { getJustwatchAvailability } from "../clients/justwatch.ts";
 import { getOmdbPoster, getOmdbRatings } from "../clients/omdb.ts";
 import { getSimklIds } from "../clients/simkl.ts";
 import {
@@ -217,7 +219,7 @@ async function queueTitleEmbeddings(env: Bindings, titleIds: string[]) {
 }
 
 export async function queueAvailability(env: Bindings, titleIds: string[]) {
-  if (!env.WATCHMODE_API_KEY || titleIds.length === 0) {
+  if (titleIds.length === 0) {
     return;
   }
 
@@ -251,27 +253,61 @@ async function enqueue(queue: Queue<IngestionJob>, jobs: IngestionJob[]) {
   }
 }
 
-async function enrichTitleAvailability(env: Bindings, titleId: string) {
-  if (!env.WATCHMODE_API_KEY) {
-    return;
-  }
+async function isSavedTitle(env: Bindings, titleId: string) {
+  const row = await env.DB.prepare(
+    `SELECT 1 AS saved FROM viewing_entries WHERE title_id = ? LIMIT 1`,
+  )
+    .bind(titleId)
+    .first<{ saved: number }>();
 
-  const match = /^(movie|tv):(\d+)$/u.exec(titleId);
+  return Boolean(row);
+}
 
-  if (!match) {
-    return;
+async function watchmodeAvailability(
+  env: Bindings,
+  titleId: string,
+  mediaType: MediaType,
+  tmdbId: number,
+) {
+  if (!env.WATCHMODE_API_KEY || !(await isSavedTitle(env, titleId))) {
+    return [];
   }
 
   if (!(await claimBudget(env, "watchmode"))) {
     console.log(JSON.stringify({ event: "budget_exhausted", source: "watchmode", titleId }));
 
+    return [];
+  }
+
+  return getWatchmodeAvailability(env, mediaType, tmdbId);
+}
+
+async function enrichTitleAvailability(env: Bindings, titleId: string) {
+  const parts = titleParts(titleId);
+
+  if (!parts) {
     return;
   }
 
-  const mediaType = match[1] === "movie" ? "movie" : "tv";
-  const availability = await getWatchmodeAvailability(env, mediaType, Number(match[2]));
+  const [title] = await readItems(env.DB, [titleId]);
 
-  await enrichAvailability(env.DB, titleId, availability);
+  if (!title) {
+    return;
+  }
+
+  if (!(await claimBudget(env, "justwatch"))) {
+    console.log(JSON.stringify({ event: "budget_exhausted", source: "justwatch", titleId }));
+
+    return;
+  }
+
+  const availability = await getJustwatchAvailability(parts.mediaType, parts.tmdbId, title.title);
+
+  await enrichAvailability(
+    env.DB,
+    titleId,
+    availability ?? (await watchmodeAvailability(env, titleId, parts.mediaType, parts.tmdbId)),
+  );
 }
 
 async function imdbIdFor(env: Bindings, titleId: string) {

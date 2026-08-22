@@ -325,7 +325,7 @@ export function App() {
           searchItems={search.items}
           canSave={isSignedIn}
           entries={profile.entries}
-          watchmodeEnabled={catalog.providerSources.includes("Watchmode")}
+          availabilityEnabled={catalog.providerSources.length > 0}
           onClose={closeDetails}
           onOpen={openTitle}
           onSave={(item) => void saveTitle(item)}
@@ -394,7 +394,7 @@ function TitleOverlay({
   searchItems,
   canSave,
   entries,
-  watchmodeEnabled,
+  availabilityEnabled,
   onClose,
   onOpen,
   onSave,
@@ -408,7 +408,7 @@ function TitleOverlay({
   searchItems: MediaTitle[];
   canSave: boolean;
   entries: Record<string, ViewingEntry>;
-  watchmodeEnabled: boolean;
+  availabilityEnabled: boolean;
   onClose: () => void;
   onOpen: (item: MediaTitle) => void;
   onSave: (item: MediaTitle) => void;
@@ -433,7 +433,7 @@ function TitleOverlay({
       item={title}
       canSave={canSave}
       entry={entries[title.id]}
-      watchmodeEnabled={watchmodeEnabled}
+      availabilityEnabled={availabilityEnabled}
       onClose={onClose}
       onOpen={onOpen}
       onSave={onSave}
