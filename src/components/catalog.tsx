@@ -280,7 +280,9 @@ export function ContentRail({
         <div>
           {byUsher ? (
             <span className="rail-eyebrow">
-              <UsherMark face="idle" crop="head" className="rail-usher" />
+              <Link to="/usher" className="rail-usher-link" aria-label="Who is the Usher?">
+                <UsherMark face="idle" crop="head" className="rail-usher" />
+              </Link>
               <b>The Usher</b>
               {section.description && <em>· {section.description}</em>}
             </span>

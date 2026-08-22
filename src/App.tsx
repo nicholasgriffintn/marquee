@@ -5,6 +5,7 @@ import { DetailPanel } from "./components/catalog";
 import { SearchBox } from "./components/SearchBox";
 import { GitHubIcon, MarqueeLogo } from "./components/ui";
 import { UsherCard } from "./components/usher/UsherCard";
+import { UsherMark } from "./components/usher/UsherMark";
 import type { CatalogSection, MediaTitle } from "./domain/catalog";
 import type { UsherMoment } from "./domain/usher";
 import { useAiRails } from "./hooks/useAiRails";
@@ -518,7 +519,7 @@ function SignedOutShelf() {
       <div className="search-empty">
         <h2>You are signed out.</h2>
         <p>Your shelf lives with your account, so sign in to see it.</p>
-        <a className="hero-play" href="/api/auth/github?returnTo=%2Fshelf">
+        <a className="button-link" href="/api/auth/github?returnTo=%2Fshelf">
           Sign in with GitHub
         </a>
       </div>
@@ -535,12 +536,18 @@ function NotFoundPage() {
         </div>
         <p>That page does not exist.</p>
       </div>
-      <div className="search-empty">
-        <h2>Nothing here.</h2>
-        <p>The page you asked for is not part of Marquee.</p>
-        <Link className="hero-play" to="/">
-          Back to tonight
-        </Link>
+      <div className="search-empty lost">
+        <UsherMark face="unimpressed" crop="head" />
+        <h2>Wrong door.</h2>
+        <p>Nothing showing down here. The screens are the other way.</p>
+        <div className="lost-actions">
+          <Link className="button-link" to="/">
+            Back to tonight
+          </Link>
+          <Link className="lost-aside" to="/usher">
+            Who are you, anyway?
+          </Link>
+        </div>
       </div>
     </section>
   );

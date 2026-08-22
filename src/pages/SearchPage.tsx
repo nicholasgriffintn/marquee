@@ -1,5 +1,8 @@
+import { Link } from "react-router-dom";
+
 import { TitleCard } from "../components/catalog";
 import { UsherCard } from "../components/usher/UsherCard";
+import { UsherMark } from "../components/usher/UsherMark";
 import type { MediaTitle } from "../domain/catalog";
 import type { UsherMoment } from "../domain/usher";
 
@@ -25,6 +28,7 @@ export function SearchPage({
   onUsherDismiss: (scope: "once" | "kind") => void;
 }) {
   const trimmed = query.trim();
+  const isLookingForHim = /^(the\s+)?usher$/iu.test(trimmed);
   const pendingCount = items.filter((item) => item.pending).length;
   const showSkeleton = isSearching && items.length === 0 && trimmed.length > 1;
 
@@ -46,6 +50,17 @@ export function SearchPage({
                 : "Type a film or show name to search."}
         </p>
       </div>
+
+      {isLookingForHim && (
+        <Link className="search-usher" to="/usher">
+          <UsherMark face="pleased" crop="head" />
+          <span>
+            <strong>The Usher</strong>
+            <small>Thirty years on the door. Not in the catalogue, but he is here.</small>
+          </span>
+          <em aria-hidden="true">→</em>
+        </Link>
+      )}
 
       {items.length > 0 && (
         <div className="results-grid">
