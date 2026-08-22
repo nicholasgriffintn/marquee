@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-label="Marquee — streaming, without the hunt">
+  <rect width="1200" height="630" fill="#11130f"/>
+  <path d="M0 512 1200 392v238H0z" fill="#191c18"/>
+  <circle cx="906" cy="300" r="226" fill="#c9f35d"/>
+  <g transform="translate(652.11 63.52) scale(0.8672)">
+  <g fill="none" stroke="#11130f" stroke-linecap="round" stroke-linejoin="round">
+<g id="usher-body">
+      <g stroke-width="36"><path id="usher-limbs" d="M124 300q-34 12-52 32M394 300q30-6 51 0M219 372l-33 84M293 372l33 84"/></g>
+      <g stroke="#f3f0e7" stroke-width="20"><use href="#usher-limbs"/></g>
+      <g transform="translate(445 300) rotate(-20)">
+        <path d="M72-30 122-70v140L72 30z" fill="#c9f35d" stroke-width="10"/>
+        <path d="M46-27h30v54H46z" fill="#11130f" stroke-width="8"/>
+        <path d="M-4-21h54v42H-4z" fill="#ff6e56" stroke-width="11"/>
+        <circle cx="4" cy="0" r="16" fill="#f3f0e7" stroke-width="10"/>
+      </g>
+      <circle cx="68" cy="336" r="20" fill="#f3f0e7" stroke-width="11"/>
+      <path d="M143 472c8-26 27-37 57-32 17 3 29 14 34 32zM278 472c5-18 17-29 34-32 30-5 49 6 57 32z" fill="#f3f0e7" stroke-width="18"/>
+      <path d="M95 101 184 99l72 101 72-101 89 2-30 267h-76l10-134-65 83-65-83 10 134h-76z" fill="#f3f0e7" stroke-width="22"/>
+      <path d="m213 292 43 25 43-25-8 71-35 27-35-27z" fill="#ff6e56" stroke-width="14"/>
+      <g fill="#c9f35d" stroke-width="7">
+        <circle cx="128" cy="142" r="10"/><circle cx="137" cy="197" r="10"/><circle cx="143" cy="253" r="10"/><circle cx="148" cy="310" r="10"/>
+        <circle cx="384" cy="142" r="10"/><circle cx="375" cy="197" r="10"/><circle cx="369" cy="253" r="10"/><circle cx="364" cy="310" r="10"/>
+        <circle cx="256" cy="338" r="8"/>
+      </g>
+    </g>
+<g id="face-idle">
+      <path d="M176 141q28-7 56 1M280 142q28-8 56-1" stroke-width="8"/>
+      <ellipse cx="204" cy="187" rx="26" ry="21" fill="#f3f0e7" stroke-width="8"/>
+      <ellipse cx="308" cy="187" rx="26" ry="21" fill="#f3f0e7" stroke-width="8"/>
+      <circle cx="207" cy="188" r="10" fill="#11130f" stroke="none"/>
+      <circle cx="311" cy="188" r="10" fill="#11130f" stroke="none"/>
+      <circle cx="203" cy="183" r="3.5" fill="#f3f0e7" stroke="none"/>
+      <circle cx="307" cy="183" r="3.5" fill="#f3f0e7" stroke="none"/>
+      <path d="M240 243q16-2 32-6" stroke-width="10"/>
+    </g>
+  </g>
+  </g>
+  <g fill="#fffef8">
+    <text x="86" y="272" font-family="Avenir Next, Avenir, Helvetica Neue, Arial, sans-serif" font-size="112" font-weight="800" letter-spacing="-7">Marquee</text>
+    <text x="92" y="342" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="25" font-weight="700" letter-spacing="3" fill="#c9f35d">STREAMING, WITHOUT THE HUNT</text>
+  </g>
+  <path d="M92 388h430" stroke="#c9f35d" stroke-width="9" stroke-linecap="round"/>
+  <text x="92" y="452" fill="#8f9389" font-family="Avenir Next, Avenir, Helvetica Neue, Arial, sans-serif" font-size="27">Your mildly opinionated guide to movie night.</text>
+</svg>

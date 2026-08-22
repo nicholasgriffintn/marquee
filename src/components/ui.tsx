@@ -31,8 +31,7 @@ export function GitHubIcon() {
 export function MarqueeLogo() {
   return (
     <span className="brand-mark" aria-hidden="true">
-      <span>M</span>
-      <i />
+      <img src="/logo.svg" alt="" />
     </span>
   );
 }

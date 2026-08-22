@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import type { CatalogSection, MediaTitle } from "../domain/catalog";
 import { blendedRating, ratingSources } from "../domain/ratings";
 import { useAvailability } from "../hooks/useAvailability";
+import { useRecommendations } from "../hooks/useRecommendations";
 import { useTitleInsight } from "../hooks/useTitleInsight";
 import {
   artwork,
@@ -23,6 +24,7 @@ import { TrailerBlock } from "./TrailerBlock";
 import { ArrowIcon, PlusIcon, Poster, ProviderBadge } from "./ui";
 
 const RAIL_PROVIDER_LIMIT = 3;
+const SIMILAR_LIMIT = 12;
 const RAIL_RATING_LIMIT = 3;
 
 function measuredOn(value: string) {
@@ -219,6 +221,7 @@ export function DetailPanel({
   const consensus = blendedRating(item);
   const { providers, nextEpisode } = useAvailability(item, availabilityEnabled);
   const { insight, pairs, isLoading: isInsightLoading } = useTitleInsight(item.id);
+  const similar = useRecommendations(item.id, item.recommendationIds, SIMILAR_LIMIT);
   const watchDestinations = providers.flatMap((provider) => {
     const href = provider.webUrl ?? item.watchLink;
 
@@ -261,17 +264,10 @@ export function DetailPanel({
           <p className="detail-meta">
             {item.mediaType === "movie" ? "Film" : "Television"} · {mediaMeta(item)}
           </p>
-          {item.tagline && <p className="detail-tagline">{item.tagline}</p>}
           {item.originalTitle && item.originalTitle !== item.title && (
             <p className="detail-original">Original title · {item.originalTitle}</p>
           )}
-          {(item.studios?.length || item.collection) && (
-            <p className="detail-original">
-              {[item.collection?.name, item.studios?.slice(0, 2).join(", ")]
-                .filter(Boolean)
-                .join(" · ")}
-            </p>
-          )}
+          {item.tagline && <p className="detail-tagline">{item.tagline}</p>}
           {(insight || isInsightLoading) && (
             <div className="detail-insight">
               <span>
@@ -296,25 +292,6 @@ export function DetailPanel({
               )}
             </div>
           )}
-          {item.buzz && (
-            <div className="detail-buzz">
-              <span>Trending signal</span>
-              <p>
-                <strong>{item.buzz.views.toLocaleString()}</strong> Wikipedia readers in the last 7
-                days, {changeLabel(item.buzz.delta)} on the{" "}
-                {item.buzz.previousViews.toLocaleString()} the week before.
-              </p>
-              <small>
-                Article{" "}
-                <a href={item.buzz.articleUrl} target="_blank" rel="noreferrer">
-                  {item.buzz.article}
-                </a>{" "}
-                · matched by{" "}
-                {item.buzz.match === "wikidata" ? "Wikidata IMDb link" : "title search"} · measured{" "}
-                {measuredOn(item.buzz.measuredAt)}
-              </small>
-            </div>
-          )}
           {nextEpisode && (
             <p className="detail-next">
               <span>Next episode</span>
@@ -332,34 +309,45 @@ export function DetailPanel({
               {nextEpisode.network ? ` · ${nextEpisode.network}` : ""}
             </p>
           )}
+          <div className="watch-actions">
+            <span>Watch Now</span>
+            {watchDestinations.map(({ provider, href }) => (
+              <a
+                href={href}
+                target="_blank"
+                rel="noreferrer"
+                className="watch-button"
+                key={provider.id}
+              >
+                <ProviderBadge provider={provider} compact />
+                <span>
+                  {provider.name}
+                  <small>{provider.offerTypes.join(" · ")}</small>
+                </span>
+                <ArrowIcon />
+              </a>
+            ))}
+            {!watchDestinations.length && (
+              <p className="availability-empty">No streaming options found.</p>
+            )}
+          </div>
+          {canSave && !entry && (
+            <button type="button" className="save-button" onClick={() => onSave(item)}>
+              <PlusIcon /> Save to my shelf
+            </button>
+          )}
+          {canSave && entry && (
+            <ShelfForm
+              entry={entry}
+              title={item.title}
+              onRemove={onRemove}
+              onSave={onSaveEntry}
+              onStatus={onStatus}
+              onUpdateDraft={onUpdateDraft}
+            />
+          )}
           <TrailerBlock item={item} />
           <p className="detail-synopsis">{item.overview || "No synopsis available."}</p>
-          {item.people?.length ? (
-            <div className="detail-chips">
-              {item.people.slice(0, 5).map((person) => (
-                <Link
-                  key={person}
-                  to={`/films?q=${encodeURIComponent(person)}`}
-                  className="detail-chip detail-chip-person"
-                >
-                  {person}
-                </Link>
-              ))}
-            </div>
-          ) : null}
-          {item.keywords?.length ? (
-            <div className="detail-chips">
-              {item.keywords.slice(0, 8).map((keyword) => (
-                <Link
-                  key={keyword}
-                  to={`/films?keywords=${encodeURIComponent(keyword)}`}
-                  className="detail-chip"
-                >
-                  {keyword}
-                </Link>
-              ))}
-            </div>
-          ) : null}
           <div className="score-row">
             {consensus && consensus.sources.length > 1 && (
               <div>
@@ -421,43 +409,58 @@ export function DetailPanel({
             )}
           </div>
           {item.ratings?.awards && <p className="detail-awards">{item.ratings.awards}</p>}
-          {canSave && !entry && (
-            <button type="button" className="save-button" onClick={() => onSave(item)}>
-              <PlusIcon /> Save to my shelf
-            </button>
+          {item.people?.length ? (
+            <div className="detail-chips">
+              {item.people.slice(0, 5).map((person) => (
+                <Link
+                  key={person}
+                  to={`/films?q=${encodeURIComponent(person)}`}
+                  className="detail-chip detail-chip-person"
+                >
+                  {person}
+                </Link>
+              ))}
+            </div>
+          ) : null}
+          {item.keywords?.length ? (
+            <div className="detail-chips">
+              {item.keywords.slice(0, 8).map((keyword) => (
+                <Link
+                  key={keyword}
+                  to={`/films?keywords=${encodeURIComponent(keyword)}`}
+                  className="detail-chip"
+                >
+                  {keyword}
+                </Link>
+              ))}
+            </div>
+          ) : null}
+          {item.buzz && (
+            <div className="detail-buzz">
+              <span>Trending signal</span>
+              <p>
+                <strong>{item.buzz.views.toLocaleString()}</strong> Wikipedia readers in the last 7
+                days, {changeLabel(item.buzz.delta)} on the{" "}
+                {item.buzz.previousViews.toLocaleString()} the week before.
+              </p>
+              <small>
+                Article{" "}
+                <a href={item.buzz.articleUrl} target="_blank" rel="noreferrer">
+                  {item.buzz.article}
+                </a>{" "}
+                · matched by{" "}
+                {item.buzz.match === "wikidata" ? "Wikidata IMDb link" : "title search"} · measured{" "}
+                {measuredOn(item.buzz.measuredAt)}
+              </small>
+            </div>
           )}
-          {canSave && entry && (
-            <ShelfForm
-              entry={entry}
-              title={item.title}
-              onRemove={onRemove}
-              onSave={onSaveEntry}
-              onStatus={onStatus}
-              onUpdateDraft={onUpdateDraft}
-            />
+          {(item.studios?.length || item.collection) && (
+            <p className="detail-original">
+              {[item.collection?.name, item.studios?.slice(0, 2).join(", ")]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
           )}
-          <div className="watch-actions">
-            <span>Watch Now</span>
-            {watchDestinations.map(({ provider, href }) => (
-              <a
-                href={href}
-                target="_blank"
-                rel="noreferrer"
-                className="watch-button"
-                key={provider.id}
-              >
-                <ProviderBadge provider={provider} compact />
-                <span>
-                  {provider.name}
-                  <small>{provider.offerTypes.join(" · ")}</small>
-                </span>
-                <ArrowIcon />
-              </a>
-            ))}
-            {!watchDestinations.length && (
-              <p className="availability-empty">No streaming options found.</p>
-            )}
-          </div>
           {pairs.length > 0 && (
             <div className="detail-pairs">
               <span>
@@ -488,6 +491,35 @@ export function DetailPanel({
                   <ArrowIcon />
                 </button>
               ))}
+            </div>
+          )}
+          {similar.length > 0 && (
+            <div className="detail-similar">
+              <span>More like this</span>
+              <div className="detail-similar-track">
+                {similar.map((title) => (
+                  <button
+                    type="button"
+                    key={title.id}
+                    className="detail-similar-card"
+                    onClick={() => onOpen(title)}
+                  >
+                    {title.posterUrl ? (
+                      <img
+                        src={artwork(title.posterUrl, 160) ?? title.posterUrl}
+                        srcSet={artworkSrcSet(title.posterUrl, 160)}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    ) : (
+                      <ArtPlaceholder seed={title.id} label={title.title} />
+                    )}
+                    <strong>{title.title}</strong>
+                    <small>{mediaMeta(title)}</small>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
           <div className="resource-links">

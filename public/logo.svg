@@ -1,5 +1,4 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Marquee">
-  <rect width="64" height="64" rx="10" fill="#c9f35d"/>
   <path d="M8 11h13l11 15 11-15h13l-5 42H40l2-22-10 13-10-13 2 22H13z" fill="#f3f0e7" stroke="#11130f" stroke-linejoin="round" stroke-width="5"/>
   <path d="M20 24h7M37 24h7" fill="none" stroke="#11130f" stroke-linecap="round" stroke-width="3.5"/>
   <path d="M25 35h13" fill="none" stroke="#11130f" stroke-linecap="round" stroke-width="3"/>

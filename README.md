@@ -1,10 +1,35 @@
 # Marquee
 
-Marquee is a streaming discovery service with live title search, provider-aware discovery, current watch destinations, Cloudflare AI recommendations, and a personal shelf with ratings and notes.
+Marquee is a cinema without a building. Live title search, discovery that knows which services you
+actually pay for, what's on tonight, Cloudflare AI recommendations, and a shelf you keep yourself
+with ratings and notes on it.
 
-Title metadata and images come from TMDB. Streaming, rental, and purchase availability comes from JustWatch, both through TMDB's watch-provider API and directly for per-service deep links. Watchmode supplies the service directory and fills availability gaps on saved titles. User authentication is via GitHub OAuth.
+The Usher works here. He is the letter M off the sign out front, who climbed down one evening and
+never went back up. Bow tie, torch, thirty years on the door. He has seen everything in the
+building and most of it twice, and he will tell you when something is long.
 
-Air dates come from TVmaze, both its broadcast and streaming schedules; anime tags and scores from AniList; awards and box office from OMDb; and the trending rail is ranked by Wikipedia pageview movement. A viewer can link Trakt to import their watch history, ratings and watchlist.
+<img src="https://marquee.pashi.app/usher-unimpressed.svg" width="200" height="200" alt="The Usher" style="float:right;margin:0 0 1em 1em;"/>
+
+> Evening. Seat yourself.
+
+Title metadata and images come from TMDB. Streaming, rental and purchase availability comes from
+JustWatch, both through TMDB's watch-provider API and directly for per-service deep links.
+Watchmode supplies the service directory and fills the gaps on saved titles. Sign-in is GitHub
+OAuth.
+
+Air dates come from TVmaze, broadcast and streaming both; anime tags and scores from AniList;
+awards and box office from OMDb. The trending rail is ranked by how much Wikipedia has been read
+about a title this week, which is a better measure of a fuss than any press release. Link Trakt and
+your watch history, ratings and watchlist come with you.
+
+> Everyone's watching that one. Doesn't mean it's good.
+
+He has five faces — attentive, thinking, pleased, unimpressed, asleep — and gets by on about two of
+them. The artwork is in `public/`, all of it cut from `usher.svg`, in ink, paper, acid and coral and
+nothing else. He is drawn to survive on his own dark background, so anything you add to him wants a
+paper core and an ink keyline or it will disappear into the page.
+
+> If I've nothing worth saying, I say nothing. Try it.
 
 ## How search works
 
