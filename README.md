@@ -170,6 +170,40 @@ promote an account directly:
 pnpm exec wrangler d1 execute DB --remote --command "UPDATE users SET role = 'admin' WHERE github_login = 'your-login'"
 ```
 
+## API protection
+
+Every request to `/api`, `/mcp` and `/media` passes through one guard in
+`worker/security/guard.ts` before it reaches a handler. The guard resolves the caller, applies a bot
+check to anyone who is not signed in, then spends a rate limit token on their behalf.
+
+Two tables in `worker/security/policies.ts` drive it, and they are the only place to change when a
+route needs different treatment. `POLICIES` names a bot stance and one rate limiter per tier, so a
+signed-in caller and an anonymous caller can sit on different budgets with different messages.
+`RULES` maps request paths to a policy, first match wins, ending in a catch-all that puts every
+write on `write` and every read on `read`. New endpoints are covered by that catch-all the moment
+they are mounted; give one its own entry only when it deserves a tighter or looser budget.
+
+Callers are identified by session cookie or `Bearer` API token, and anonymous callers are keyed by
+`cf-connecting-ip`, falling back to the guest cookie when the header is absent. The lookup is
+memoised per request, so the guard costs nothing beyond what the routes already do.
+
+The bot check in `worker/security/bots.ts` reads Cloudflare's `botManagement` verdict when the zone
+provides one and falls back to user agent heuristics when it does not. Three stances:
+
+| Stance     | Allows                         | Used for                                    |
+| ---------- | ------------------------------ | ------------------------------------------- |
+| `strict`   | browsers only                  | search, curator, insights, sign-in, writes  |
+| `crawlers` | browsers and verified crawlers | public reads, posters and Open Graph images |
+| `open`     | everything                     | `/mcp`, which is meant for programmatic use |
+
+Signed-in callers skip the bot check entirely, which is what keeps API tokens and MCP clients
+working. Blocks answer `403`; exhausted budgets answer `429` with `retry-after`. Both are recorded
+to Analytics Engine as `guard_blocked` and `guard_throttled`, with the policy name and the reason in
+the detail blob.
+
+Set the `BOT_PROTECTION` var to `off` to disable the bot check while keeping rate limits, which is
+occasionally useful when debugging a client that trips the heuristics.
+
 ## Connecting an agent
 
 Marquee speaks MCP at `/mcp` over JSON-RPC. Mint a token from the Sources page, then point a client

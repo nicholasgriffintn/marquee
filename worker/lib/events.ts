@@ -17,7 +17,9 @@ export type MarqueeEvent = {
     | "usher_answered"
     | "usher_dismissed"
     | "usher_pick"
-    | "shelf_pinned";
+    | "shelf_pinned"
+    | "guard_blocked"
+    | "guard_throttled";
   viewerId?: string;
   titleId?: string;
   detail?: string;

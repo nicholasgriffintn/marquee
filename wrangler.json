@@ -81,6 +81,46 @@
         "limit": 40,
         "period": 60
       }
+    },
+    {
+      "name": "PUBLIC_RATE_LIMITER",
+      "namespace_id": "764221",
+      "simple": {
+        "limit": 120,
+        "period": 60
+      }
+    },
+    {
+      "name": "MEMBER_RATE_LIMITER",
+      "namespace_id": "764222",
+      "simple": {
+        "limit": 600,
+        "period": 60
+      }
+    },
+    {
+      "name": "WRITE_RATE_LIMITER",
+      "namespace_id": "764223",
+      "simple": {
+        "limit": 30,
+        "period": 60
+      }
+    },
+    {
+      "name": "TELEMETRY_RATE_LIMITER",
+      "namespace_id": "764224",
+      "simple": {
+        "limit": 120,
+        "period": 60
+      }
+    },
+    {
+      "name": "MEDIA_RATE_LIMITER",
+      "namespace_id": "764225",
+      "simple": {
+        "limit": 1200,
+        "period": 60
+      }
     }
   ],
   "vars": {

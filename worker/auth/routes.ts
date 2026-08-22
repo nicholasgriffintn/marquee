@@ -27,13 +27,6 @@ authRoutes.post("/tokens", (context) => createToken(context));
 authRoutes.delete("/tokens/:id", (context) => revokeToken(context));
 
 async function startGitHub(context: AppContext) {
-  const actor = context.req.header("cf-connecting-ip")?.trim().slice(0, 64) || "local";
-  const { success } = await context.env.AUTH_RATE_LIMITER.limit({ key: `github:${actor}` });
-
-  if (!success) {
-    return jsonResponse({ error: "Too many sign-in attempts. Try again shortly." }, 429);
-  }
-
   const url = await authenticationFor(context.env, context.req.raw).startGitHub();
   const state = url.searchParams.get("state");
 

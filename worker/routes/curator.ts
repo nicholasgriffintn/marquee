@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import type { MarqueeUser } from "../auth/model.ts";
 import { attachViewer, guestIdentity, type ViewerVariables } from "../auth/session.ts";
 import { recordEvent } from "../lib/events.ts";
-import { clientRateLimitKey, jsonResponse, readJsonObject } from "../lib/http.ts";
+import { jsonResponse, readJsonObject } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
 import { isKnownTitle, validProviderIds } from "../lib/validation.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
@@ -34,24 +34,6 @@ function askIdentity(env: Bindings, request: Request, user: MarqueeUser | null) 
 
 curatorRoutes.post("/", async (context) => {
   const identity = askIdentity(context.env, context.req.raw, context.get("viewer"));
-  const limiter = identity.isMember
-    ? context.env.CURATOR_RATE_LIMITER
-    : context.env.CURATOR_FREE_RATE_LIMITER;
-  const { success } = await limiter.limit({
-    key: clientRateLimitKey(context.req.raw, identity.sessionKey),
-  });
-
-  if (!success) {
-    return jsonResponse(
-      {
-        error: identity.isMember
-          ? "Too many curator requests. Try again in a minute."
-          : "That is the free limit for now. Sign in for more, or try again in a minute.",
-      },
-      429,
-    );
-  }
-
   const body = await readJsonObject(context.req.raw);
 
   if (!body) {
@@ -170,14 +152,6 @@ curatorRoutes.get("/insight/:titleId", async (context) => {
   }
 
   const user = context.get("viewer");
-  const limiter = user ? context.env.CURATOR_RATE_LIMITER : context.env.INSIGHT_RATE_LIMITER;
-  const { success } = await limiter.limit({
-    key: clientRateLimitKey(context.req.raw, user?.id ?? "anonymous"),
-  });
-
-  if (!success) {
-    return jsonResponse({ error: "Too many requests" }, 429);
-  }
 
   try {
     const insight = await getTitleInsight(context.env, titleId, { generate: Boolean(user) });

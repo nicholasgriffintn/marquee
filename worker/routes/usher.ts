@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { isUsherSurface } from "../../src/domain/usher.ts";
 import { requireAuthentication, type AuthVariables } from "../auth/session.ts";
 import { recordEvent } from "../lib/events.ts";
-import { clientRateLimitKey, jsonResponse, readJsonObject } from "../lib/http.ts";
+import { jsonResponse, readJsonObject } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
 import { isKnownTitle, validProviderIds } from "../lib/validation.ts";
 import {
@@ -210,14 +210,6 @@ usherRoutes.post("/feedback", async (context) => {
 
 usherRoutes.post("/pick", async (context) => {
   const user = context.get("authenticatedUser");
-  const { success } = await context.env.CURATOR_RATE_LIMITER.limit({
-    key: clientRateLimitKey(context.req.raw, user.id),
-  });
-
-  if (!success) {
-    return jsonResponse({ error: "Give me a minute." }, 429);
-  }
-
   const body = await readJsonObject(context.req.raw);
 
   try {
