@@ -179,14 +179,16 @@ It exposes `search_catalogue`, `find_similar`, `get_title`, `get_shelf`, `save_t
 
 ## Posters
 
-Posters are cached in R2. In production, the client requests four fixed widths through the Images
-transformations enabled on `pashi.app`, with `marquee.pashi.app` configured as an allowed source:
+Posters are cached in R2. Images transformations are enabled on the `pashi.app` zone, so the
+production client requests four fixed widths from the app's own `marquee.pashi.app` hostname:
 
 ```text
-https://pashi.app/cdn-cgi/image/width=320,fit=scale-down,format=auto/https://marquee.pashi.app/media/posters/...
+https://marquee.pashi.app/cdn-cgi/image/width=320,fit=scale-down,format=auto/media/posters/...
 ```
 
-Local and preview deployments keep using `/media/posters/...?w=320`, which resizes through the
-Worker's Images binding. Both paths negotiate AVIF or WebP from the request's `Accept` header. Keep
-the four widths in `src/lib/media.ts` and `worker/routes/media.ts` aligned so the number of billable
-unique transformations stays bounded. Transformations are counted per account, not per zone.
+The URL is emitted as a same-origin relative path; no separate image hostname or CSP exception is
+needed. Local and preview deployments keep using `/media/posters/...?w=320`, which resizes through
+the Worker's Images binding. Both paths negotiate AVIF or WebP from the request's `Accept` header.
+Keep the four widths in `src/lib/media.ts` and `worker/routes/media.ts` aligned so the number of
+billable unique transformations stays bounded. Transformations are counted per account, not per
+hostname.
