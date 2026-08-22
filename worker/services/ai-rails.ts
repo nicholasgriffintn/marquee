@@ -176,12 +176,13 @@ function parseRail(content: string | null, shortlist: MediaTitle[]): StoredRail 
         const index = typeof pick === "number" ? Math.trunc(pick) - 1 : -1;
         const title = shortlist[index];
 
-        return title && !seen.has(title.id) ? [title.id] : [];
-      })
-      .filter((titleId) => {
-        seen.add(titleId);
+        if (!title || seen.has(title.id)) {
+          return [];
+        }
 
-        return true;
+        seen.add(title.id);
+
+        return [title.id];
       })
       .slice(0, RAIL_MAX);
 
