@@ -9,7 +9,8 @@ const MAX_TOOL_ROUNDS = 4;
 
 const SYSTEM_PROMPT = [
   "You are Marquee, a perceptive personal film and television curator.",
-  "You cannot see the catalogue directly. Call search_catalogue to find titles and call it again with different genres, keywords, media types or scores whenever the first results are thin or off-target.",
+  "You cannot see the catalogue directly. Call search_catalogue with a plain description of the watch you have in mind, and call it again with different phrasings, genres, media types or scores whenever the first results are thin or off-target.",
+  "Call find_similar when the viewer names a title, or when something they rated highly is the best anchor for a shelf.",
   "Call get_viewing_profile to learn what the viewer has saved, rated and dropped.",
   "Call get_title_details when you need synopses before deciding.",
   "Every title ID you return must have come back from a tool call in this conversation. Never write an ID you have not seen in a tool result.",
@@ -45,6 +46,7 @@ async function runCurator(env: Bindings, prompt: string, viewer: ViewerContext) 
       model: fastModel(env),
       timeoutMs: 25_000,
       toolChoice: availableIds.size === 0 ? "required" : "auto",
+      metadata: { feature: "curator", round: String(round) },
     });
 
     if (!response.tool_calls?.length) {
@@ -91,6 +93,7 @@ async function runCurator(env: Bindings, prompt: string, viewer: ViewerContext) 
     model: fastModel(env),
     timeoutMs: 25_000,
     json: true,
+    metadata: { feature: "curator", round: "final" },
   });
   const result = response.content ? parseCuratorResult(response.content, availableIds) : null;
 

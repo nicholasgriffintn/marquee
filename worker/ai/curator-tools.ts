@@ -1,8 +1,11 @@
+import type { MediaTitle } from "../../src/domain/catalog.ts";
 import type { ToolCall } from "../lib/curator-payload.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { isRecord, parseJson } from "../lib/values.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
-import { type CatalogueSearch, searchCatalogue } from "../repositories/catalog-search.ts";
+import { readRanked, type CatalogueSearch } from "../repositories/catalog-search.ts";
+import { similarTo } from "../services/embeddings.ts";
+import { retrieveTitles } from "../services/retrieval.ts";
 import type { Bindings, ViewerContext } from "../types.ts";
 
 export const SEARCH_TOOL: ChatCompletionTool = {
@@ -10,11 +13,14 @@ export const SEARCH_TOOL: ChatCompletionTool = {
   function: {
     name: "search_catalogue",
     description:
-      "Search Marquee's whole catalogue. Call it repeatedly with different genres, keywords, sort orders and score floors to dig past the obvious hits. Score sorting is vote-weighted, so obscure titles with a handful of votes will not dominate.",
+      "Search Marquee's whole catalogue. The query understands moods and descriptions as well as words in the title, so 'slow burn on a rainy night' works as well as a genre. Call it repeatedly with different phrasings, sort orders and score floors to dig past the obvious hits. Score sorting is vote-weighted, so obscure titles with a handful of votes will not dominate.",
     parameters: {
       type: "object",
       properties: {
-        query: { type: "string", description: "Words expected in the title or synopsis." },
+        query: {
+          type: "string",
+          description: "A description of the watch you want, or words from its title.",
+        },
         genres: { type: "array", items: { type: "string" }, maxItems: 10 },
         mediaType: { type: "string", enum: ["movie", "tv"] },
         minScore: { type: "number", minimum: 0, maximum: 10 },
@@ -48,11 +54,14 @@ export const CURATOR_TOOLS: ChatCompletionTool[] = [
     function: {
       name: "search_catalogue",
       description:
-        "Search Marquee's whole catalogue. Call it repeatedly with different genres, keywords, sort orders and score floors to dig past the obvious hits. Score sorting is vote-weighted, so obscure titles with a handful of votes will not dominate.",
+        "Search Marquee's whole catalogue. The query understands moods and descriptions as well as words in the title, so 'slow burn on a rainy night' works as well as a genre. Call it repeatedly with different phrasings, sort orders and score floors to dig past the obvious hits. Score sorting is vote-weighted, so obscure titles with a handful of votes will not dominate.",
       parameters: {
         type: "object",
         properties: {
-          query: { type: "string", description: "Words expected in the title or synopsis." },
+          query: {
+            type: "string",
+            description: "A description of the watch you want, or words from its title.",
+          },
           genres: { type: "array", items: { type: "string" }, maxItems: 10 },
           mediaType: { type: "string", enum: ["movie", "tv"] },
           minScore: { type: "number", minimum: 0, maximum: 10 },
@@ -80,6 +89,23 @@ export const CURATOR_TOOLS: ChatCompletionTool[] = [
           },
           limit: { type: "integer", minimum: 1, maximum: 30 },
         },
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "find_similar",
+      description:
+        "Find catalogue titles that feel like a specific title the viewer already knows. Use it to build a shelf around something they rated highly.",
+      parameters: {
+        type: "object",
+        properties: {
+          titleId: { type: "string", pattern: "^(movie|tv):[1-9][0-9]*$" },
+          limit: { type: "integer", minimum: 1, maximum: 20 },
+        },
+        required: ["titleId"],
         additionalProperties: false,
       },
     },
@@ -143,27 +169,28 @@ export async function executeCuratorTool(
   }
 
   if (call.function.name === "search_catalogue") {
-    const results = await searchCatalogue(
-      env.DB,
-      buildSearch(argumentsValue, viewer, alwaysExclude),
-    );
+    const search = buildSearch(argumentsValue, viewer, alwaysExclude);
+    const results = await retrieveTitles(env, { ...search, text: search.query });
 
-    for (const item of results) {
-      availableIds.add(item.id);
+    return summarise(results, availableIds);
+  }
+
+  if (call.function.name === "find_similar") {
+    const titleId = isKnownTitle(argumentsValue.titleId) ? argumentsValue.titleId : null;
+
+    if (!titleId) {
+      return { error: "Unknown title id" };
     }
 
-    return {
-      results: results.map((item) => ({
-        id: item.id,
-        title: item.title,
-        year: item.year,
-        mediaType: item.mediaType,
-        genres: item.genres.slice(0, 3),
-        tmdbScore: item.tmdbScore,
-        tmdbVoteCount: item.tmdbVoteCount,
-        overview: item.overview.slice(0, 160),
-      })),
-    };
+    const search = buildSearch(argumentsValue, viewer, [...alwaysExclude, titleId]);
+    const neighbours = await similarTo(env, titleId, 60);
+    const results = neighbours.length
+      ? (await readRanked(env.DB, neighbours))
+          .filter((item) => !search.excludeIds?.includes(item.id))
+          .slice(0, search.limit ?? 12)
+      : [];
+
+    return summarise(results, availableIds);
   }
 
   if (call.function.name === "get_title_details") {
@@ -190,6 +217,26 @@ export async function executeCuratorTool(
   }
 
   return { error: "Unknown tool" };
+}
+
+function summarise(results: MediaTitle[], availableIds: Set<string>) {
+  for (const item of results) {
+    availableIds.add(item.id);
+  }
+
+  return {
+    results: results.map((item) => ({
+      id: item.id,
+      title: item.title,
+      year: item.year,
+      mediaType: item.mediaType,
+      genres: item.genres.slice(0, 3),
+      keywords: (item.keywords ?? []).slice(0, 6),
+      tmdbScore: item.tmdbScore,
+      tmdbVoteCount: item.tmdbVoteCount,
+      overview: item.overview.slice(0, 160),
+    })),
+  };
 }
 
 function buildSearch(

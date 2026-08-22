@@ -206,7 +206,25 @@ export function DetailPanel({
               <span>TMDB votes</span>
             </div>
           </div>
+          {canSave && !entry && (
+            <button type="button" className="save-button" onClick={() => onSave(item)}>
+              <PlusIcon /> Save to my shelf
+            </button>
+          )}
+          {canSave && entry && (
+            <ShelfForm
+              entry={entry}
+              title={item.title}
+              onRemove={onRemove}
+              onSave={onSaveEntry}
+              onStatus={onStatus}
+              onUpdateDraft={onUpdateDraft}
+            />
+          )}
           <div className="watch-actions">
+            <span>
+              Watch Now
+            </span>
             {watchDestinations.map(({ provider, href }) => (
               <a
                 href={href}
@@ -227,21 +245,6 @@ export function DetailPanel({
               <p className="availability-empty">No streaming options found.</p>
             )}
           </div>
-          {canSave && !entry && (
-            <button type="button" className="save-button" onClick={() => onSave(item)}>
-              <PlusIcon /> Save to my shelf
-            </button>
-          )}
-          {canSave && entry && (
-            <ShelfForm
-              entry={entry}
-              title={item.title}
-              onRemove={onRemove}
-              onSave={onSaveEntry}
-              onStatus={onStatus}
-              onUpdateDraft={onUpdateDraft}
-            />
-          )}
           {pairs.length > 0 && (
             <div className="detail-pairs">
               <span>

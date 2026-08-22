@@ -418,6 +418,12 @@ export async function executeIngestionJob(env: Bindings, job: IngestionJob) {
     return;
   }
 
+  if (job.type === "embed-titles") {
+    await embedTitles(env, job.titleIds);
+
+    return;
+  }
+
   if (job.type === "enrich-availability") {
     await enrichTitleAvailability(env, job.titleId);
   }

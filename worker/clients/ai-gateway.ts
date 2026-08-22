@@ -26,6 +26,19 @@ export function fastModel(env: Bindings) {
     : env.AI_MODEL;
 }
 
+const LAST_RESORT_MODEL = "@cf/openai/gpt-oss-120b";
+
+function fallbackChain(env: Bindings, model: string) {
+  return [...new Set([model, fastModel(env), env.AI_MODEL, LAST_RESORT_MODEL])];
+}
+
+function isRetryable(error: unknown) {
+  return (
+    error instanceof AiGatewayError &&
+    (error.status === 429 || error.status === 500 || error.status >= 502)
+  );
+}
+
 export class AiGatewayError extends Error {
   constructor(
     message: string,
@@ -47,11 +60,54 @@ export async function requestAiCompletion(
     maxTokens?: number;
     json?: boolean;
     toolChoice?: "auto" | "required" | "none";
+    metadata?: Record<string, string>;
+    cacheSeconds?: number;
   } = {},
 ) {
   assertConfiguration(env);
 
-  const model = options.model ?? env.AI_MODEL;
+  const chain = fallbackChain(env, options.model ?? env.AI_MODEL);
+  let lastError: unknown = new Error("Cloudflare AI produced no response");
+
+  for (const candidate of chain) {
+    try {
+      // oxlint-disable-next-line no-await-in-loop
+      return await completeOnce(env, messages, tools, allowTools, options, candidate);
+    } catch (error) {
+      lastError = error;
+
+      if (!isRetryable(error)) {
+        throw error;
+      }
+
+      console.log(
+        JSON.stringify({
+          event: "ai_model_fallback",
+          from: candidate,
+          status: error instanceof AiGatewayError ? error.status : null,
+        }),
+      );
+    }
+  }
+
+  throw lastError;
+}
+
+async function completeOnce(
+  env: Bindings,
+  messages: ChatMessage[],
+  tools: ChatCompletionTool[],
+  allowTools: boolean,
+  options: {
+    timeoutMs?: number;
+    maxTokens?: number;
+    json?: boolean;
+    toolChoice?: "auto" | "required" | "none";
+    metadata?: Record<string, string>;
+    cacheSeconds?: number;
+  },
+  model: string,
+) {
   const timeoutMs = options.timeoutMs ?? 16_000;
 
   const response = await fetch(
@@ -65,6 +121,10 @@ export async function requestAiCompletion(
         "cf-aig-gateway-id": env.AI_GATEWAY_ID,
         "cf-aig-request-timeout": String(timeoutMs - 1_000),
         "cf-aig-skip-cache": "false",
+        ...(options.cacheSeconds ? { "cf-aig-cache-ttl": String(options.cacheSeconds) } : {}),
+        ...(options.metadata
+          ? { "cf-aig-metadata": JSON.stringify(options.metadata).slice(0, 1_000) }
+          : {}),
         "content-type": "application/json",
       },
       body: JSON.stringify({

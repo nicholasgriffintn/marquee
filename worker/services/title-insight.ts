@@ -2,8 +2,9 @@ import type { MediaTitle } from "../../src/domain/catalog.ts";
 import { fastModel, requestAiCompletion } from "../clients/ai-gateway.ts";
 import { isRecord } from "../lib/values.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
-import { searchCatalogue } from "../repositories/catalog-search.ts";
+import { readRanked, searchCatalogue } from "../repositories/catalog-search.ts";
 import type { Bindings } from "../types.ts";
+import { similarTo } from "./embeddings.ts";
 
 const MAX_AGE_DAYS = 30;
 const PAIR_CANDIDATES = 8;
@@ -73,6 +74,29 @@ function parseInsight(content: string, candidates: MediaTitle[]): TitleInsight |
   }
 }
 
+async function pairCandidates(env: Bindings, title: MediaTitle) {
+  const neighbours = await similarTo(env, title.id, PAIR_CANDIDATES * 3);
+
+  if (neighbours.length) {
+    const ranked = (await readRanked(env.DB, neighbours))
+      .filter((item) => item.id !== title.id)
+      .slice(0, PAIR_CANDIDATES);
+
+    if (ranked.length >= 2) {
+      return ranked;
+    }
+  }
+
+  return (
+    await searchCatalogue(env.DB, {
+      genres: title.genres.slice(0, 2),
+      mediaType: title.mediaType,
+      excludeIds: [title.id],
+      limit: PAIR_CANDIDATES,
+    })
+  ).filter((item) => item.id !== title.id);
+}
+
 export async function getTitleInsight(env: Bindings, titleId: string) {
   const cached = await env.DB.prepare(
     `SELECT payload, julianday('now') - julianday(created_at) AS ageDays
@@ -91,14 +115,7 @@ export async function getTitleInsight(env: Bindings, titleId: string) {
     return null;
   }
 
-  const candidates = (
-    await searchCatalogue(env.DB, {
-      genres: title.genres.slice(0, 2),
-      mediaType: title.mediaType,
-      excludeIds: [titleId],
-      limit: PAIR_CANDIDATES,
-    })
-  ).filter((item) => item.id !== titleId);
+  const candidates = await pairCandidates(env, title);
   const candidateList = candidates
     .map((item, index) => `${index + 1}. ${item.title}${item.year ? ` (${item.year})` : ""}`)
     .join("\n");
@@ -112,6 +129,7 @@ export async function getTitleInsight(env: Bindings, titleId: string) {
           `Title: ${title.title}${title.year ? ` (${title.year})` : ""}`,
           `Type: ${title.mediaType === "movie" ? "Film" : "Television"}`,
           `Genres: ${title.genres.join(", ") || "unknown"}`,
+          `Tags: ${(title.keywords ?? []).slice(0, 10).join(", ") || "none"}`,
           `Synopsis: ${title.overview || "unavailable"}`,
           `Candidates:\n${candidateList || "none"}`,
         ].join("\n"),
@@ -119,7 +137,14 @@ export async function getTitleInsight(env: Bindings, titleId: string) {
     ],
     [],
     false,
-    { model: fastModel(env), timeoutMs: 30_000, maxTokens: 500, json: true },
+    {
+      model: fastModel(env),
+      timeoutMs: 30_000,
+      maxTokens: 500,
+      json: true,
+      cacheSeconds: 86_400,
+      metadata: { feature: "insight" },
+    },
   );
   const insight = response.content ? parseInsight(response.content, candidates) : null;
 
