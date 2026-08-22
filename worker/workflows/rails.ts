@@ -23,7 +23,7 @@ export class RailsWorkflow extends WorkflowEntrypoint<Bindings, RailsParameters>
     const viewer = await readViewerContext(this.env.DB, viewerId);
     const { signature } = await getPersonalRails(this.env, viewerId);
     const prepared = await step.do("read taste", { retries: RETRIES }, async () =>
-      prepareRails(this.env, viewer),
+      prepareRails(this.env, viewer, viewerId),
     );
     const built = await Promise.all(
       ANGLES.map((angle) =>
@@ -36,6 +36,8 @@ export class RailsWorkflow extends WorkflowEntrypoint<Bindings, RailsParameters>
               angle,
               prepared.exclude,
               viewerId,
+              prepared.affinity,
+              prepared.shelf,
             );
 
             return rail ?? null;

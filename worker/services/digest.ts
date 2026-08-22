@@ -60,7 +60,7 @@ export async function buildDigest(env: Bindings, viewerId: string) {
     return null;
   }
 
-  const { vector, exclude } = await prepareRails(env, viewer);
+  const { vector, exclude } = await prepareRails(env, viewer, viewerId);
   const [fresh, trending, episodes] = await Promise.all([
     freshForViewer(env, vector, [
       ...exclude,
