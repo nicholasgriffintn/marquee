@@ -8,7 +8,7 @@ The Usher works here. He is the letter M off the sign out front, who climbed dow
 never went back up. Bow tie, torch, thirty years on the door. He has seen everything in the
 building and most of it twice, and he will tell you when something is long.
 
-<img src="https://marquee.pashi.app/usher-unimpressed.svg" width="200" height="200" alt="The Usher" style="float:right;margin:0 0 1em 1em;"/>
+<img src="https://marquee.pashi.app/usher-unimpressed.png" width="200" height="200" alt="The Usher" style="float:right;margin:0 0 1em 1em;"/>
 
 > Evening. Seat yourself.
 
