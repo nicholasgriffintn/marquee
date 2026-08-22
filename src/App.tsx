@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, Route, Routes, useLocation, useMatch, useNavigate } from "react-router-dom";
 
 import { DetailPanel } from "./components/catalog";
@@ -83,6 +83,12 @@ export function App() {
     : storedBackground;
   const pageLocation =
     background ?? (titleMatch ? { ...location, pathname: "/", search: "" } : location);
+  const pagePath = pageLocation.pathname;
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [pagePath]);
+
   const openTitle = useCallback(
     (item: MediaTitle) => {
       void navigate(`/title/${encodeURIComponent(item.id)}`, {
@@ -119,7 +125,7 @@ export function App() {
   );
 
   async function saveTitle(item: MediaTitle) {
-    const saved = await profile.saveEntry(
+    await profile.saveEntry(
       profile.entries[item.id] ?? {
         titleId: item.id,
         status: "watchlist",
@@ -127,10 +133,6 @@ export function App() {
         thoughts: "",
       },
     );
-
-    if (saved) {
-      void navigate("/shelf");
-    }
   }
 
   async function askCurator(prompt: string) {
