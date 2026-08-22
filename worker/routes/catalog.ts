@@ -12,6 +12,7 @@ import {
   getCatalogue,
   getGenres,
   getKeywords,
+  getPipelineHealth,
   getTonight,
   getTrending,
   searchCatalogue,
@@ -123,6 +124,16 @@ catalogRoutes.get("/trending", edgeCache(1_800), async (context) => {
     logError("trending_read_failed", error, { area: "buzz" });
 
     return context.json({ items: [], source: "Wikipedia pageview trend", fetchedAt: "" });
+  }
+});
+
+catalogRoutes.get("/pipeline", edgeCache(120), async (context) => {
+  try {
+    return context.json(await getPipelineHealth(context.env));
+  } catch (error) {
+    logError("pipeline_read_failed", error, { area: "pipeline" });
+
+    return context.json({ failures: [], lastRuns: [], budgets: [], fetchedAt: "" });
   }
 });
 

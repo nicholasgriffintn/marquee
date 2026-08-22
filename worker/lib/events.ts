@@ -9,7 +9,9 @@ export type MarqueeEvent = {
     | "shelf_remove"
     | "curator_ask"
     | "rails_served"
-    | "rails_built";
+    | "rails_built"
+    | "rail_impression"
+    | "rail_click";
   viewerId?: string;
   titleId?: string;
   detail?: string;

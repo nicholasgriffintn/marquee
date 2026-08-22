@@ -4,6 +4,7 @@ import { ProviderBadge } from "../components/ui";
 import type { Provider, ProvidersResponse } from "../domain/catalog";
 import type { ProviderCategory } from "../domain/providers";
 import { useLinks } from "../hooks/useLinks";
+import { usePipeline } from "../hooks/usePipeline";
 
 const TMDB_LOGO =
   "https://www.themoviedb.org/assets/v4/logos/v2/blue_short-8e7b30f73a4020692ccca9c88bafe5dcb6f8a62a4c6bc55cd9ba82bb2cd95f6c.svg";
@@ -41,6 +42,7 @@ export function SourcesPage({
   onSelectProviders: (ids: string[]) => void;
 }) {
   const connections = useLinks(isSignedIn);
+  const pipeline = usePipeline();
   const [tokenLabel, setTokenLabel] = useState("");
   const trakt = connections.links.find((link) => link.provider === "trakt");
 
@@ -226,6 +228,48 @@ export function SourcesPage({
             </ul>
           )}
           {connections.error && <p className="provider-error">{connections.error}</p>}
+        </section>
+      )}
+
+      {pipeline && (pipeline.failures.length > 0 || pipeline.budgets.length > 0) && (
+        <section className="connections" aria-labelledby="pipeline-title">
+          <h2 id="pipeline-title">Pipeline</h2>
+          {pipeline.budgets.length > 0 && (
+            <div className="budget-grid">
+              {pipeline.budgets.map((budget) => (
+                <div key={budget.source} className="budget-cell">
+                  <strong>{budget.source}</strong>
+                  <span>
+                    {budget.used.toLocaleString()} / {budget.callLimit.toLocaleString()}
+                  </span>
+                  <small>per {budget.windowKind}</small>
+                  <div className="budget-bar" aria-hidden="true">
+                    <i
+                      style={{
+                        width: `${Math.min(100, (budget.used / Math.max(1, budget.callLimit)) * 100)}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {pipeline.failures.length > 0 ? (
+            <ul className="token-list">
+              {pipeline.failures.map((failure) => (
+                <li key={`${failure.jobType}-${failure.startedAt}-${failure.subjectId ?? ""}`}>
+                  <strong>{failure.jobType}</strong>
+                  <small>{failure.subjectId ?? "—"}</small>
+                  <small>{failure.error ?? "failed"}</small>
+                  <small>{new Date(failure.startedAt).toLocaleString()}</small>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="connection-row">
+              <small>No ingestion failures recorded.</small>
+            </p>
+          )}
         </section>
       )}
 

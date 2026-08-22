@@ -8,6 +8,7 @@ import { canonicalOrigin } from "./lib/security.ts";
 import { withShareCard } from "./lib/share.ts";
 import { catalogRoutes } from "./routes/catalog.ts";
 import { curatorRoutes } from "./routes/curator.ts";
+import { eventRoutes } from "./routes/events.ts";
 import { linkRoutes } from "./routes/links.ts";
 import { mcpRoutes } from "./routes/mcp.ts";
 import { mediaRoutes } from "./routes/media.ts";
@@ -49,6 +50,8 @@ app.route("/api/profile", profileRoutes);
 app.route("/api/curator", curatorRoutes);
 
 app.route("/api/links", linkRoutes);
+
+app.route("/api/events", eventRoutes);
 
 app.route("/mcp", mcpRoutes);
 

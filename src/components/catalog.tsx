@@ -4,6 +4,7 @@ import type { CatalogSection, MediaTitle } from "../domain/catalog";
 import { useAvailability } from "../hooks/useAvailability";
 import { useTitleInsight } from "../hooks/useTitleInsight";
 import { artwork, artworkSrcSet, mediaMeta, scoreLabel, voteLabel } from "../lib/media";
+import { track } from "../lib/telemetry";
 import type { EntryStatus, ViewingEntry } from "../types";
 import { ArtPlaceholder } from "./ArtPlaceholder";
 import { ShelfForm } from "./ShelfForm";
@@ -78,9 +79,34 @@ export function ContentRail({
   onOpen: (title: MediaTitle) => void;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
+  const railRef = useRef<HTMLElement>(null);
+  const seenRef = useRef(false);
+
+  useEffect(() => {
+    const rail = railRef.current;
+
+    if (!rail || seenRef.current || section.items.length === 0) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting) && !seenRef.current) {
+          seenRef.current = true;
+          track("rail_impression", section.id);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.4 },
+    );
+
+    observer.observe(rail);
+
+    return () => observer.disconnect();
+  }, [section.id, section.items.length]);
 
   return (
-    <section className="content-rail">
+    <section className="content-rail" ref={railRef}>
       <div className="rail-heading">
         <div>
           <span>{section.description}</span>
@@ -97,7 +123,14 @@ export function ContentRail({
       <div className="rail-track" ref={trackRef}>
         {section.items.length ? (
           section.items.map((item) => (
-            <TitleCard key={`${section.id}-${item.id}`} item={item} onOpen={onOpen} />
+            <TitleCard
+              key={`${section.id}-${item.id}`}
+              item={item}
+              onOpen={(title) => {
+                track("rail_click", section.id, title.id);
+                onOpen(title);
+              }}
+            />
           ))
         ) : (
           <p className="rail-empty">No titles found.</p>

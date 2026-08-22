@@ -2459,3 +2459,50 @@ h2 em {
   opacity: 0.6;
   font-size: 0.78rem;
 }
+
+.budget-grid {
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+}
+
+.budget-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.12));
+  border-radius: 6px;
+}
+
+.budget-cell strong {
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+.budget-cell span {
+  font-variant-numeric: tabular-nums;
+  font-size: 1.05rem;
+}
+
+.budget-cell small {
+  opacity: 0.55;
+  font-size: 0.72rem;
+}
+
+.budget-bar {
+  margin-top: 0.35rem;
+  height: 3px;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 15%, transparent);
+  overflow: hidden;
+}
+
+.budget-bar i {
+  display: block;
+  height: 100%;
+  background: currentColor;
+  opacity: 0.6;
+}

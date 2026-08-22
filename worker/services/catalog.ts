@@ -1,5 +1,6 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
 import { logError } from "../lib/logging.ts";
+import { readBudgets } from "../repositories/budgets.ts";
 import { readAvailability, readCatalog, readItems } from "../repositories/catalog-reader.ts";
 import {
   readGenres,
@@ -152,6 +153,34 @@ export async function getTrending(env: Bindings) {
   return {
     items: await readRanked(env.DB, titleIds),
     source: "Wikipedia pageview trend",
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
+export async function getPipelineHealth(env: Bindings) {
+  const [failures, lastRuns, budgets] = await Promise.all([
+    env.DB.prepare(
+      `SELECT job_type AS jobType, subject_id AS subjectId, error, started_at AS startedAt
+       FROM ingestion_runs
+       WHERE status = 'failed'
+       ORDER BY started_at DESC
+       LIMIT 12`,
+    ).all<{ jobType: string; subjectId: string | null; error: string | null; startedAt: string }>(),
+    env.DB.prepare(
+      `SELECT job_type AS jobType, max(started_at) AS lastRunAt, count(*) AS runs
+       FROM ingestion_runs
+       WHERE status = 'completed'
+       GROUP BY job_type
+       ORDER BY lastRunAt DESC
+       LIMIT 12`,
+    ).all<{ jobType: string; lastRunAt: string; runs: number }>(),
+    readBudgets(env),
+  ]);
+
+  return {
+    failures: failures.results,
+    lastRuns: lastRuns.results,
+    budgets,
     fetchedAt: new Date().toISOString(),
   };
 }
