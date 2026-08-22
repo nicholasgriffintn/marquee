@@ -5,6 +5,7 @@ import { ContentRail } from "../components/catalog";
 import { ArrowIcon, ProviderBadge } from "../components/ui";
 import type { CatalogSection, MediaTitle, Provider } from "../domain/catalog";
 import type { CuratorState } from "../hooks/useCurator";
+import type { ScheduledEpisode } from "../hooks/useTonight";
 import { artwork, artworkSrcSet, mediaMeta, scoreLabel } from "../lib/media";
 
 const SEED_PROMPTS = [
@@ -15,6 +16,19 @@ const SEED_PROMPTS = [
 ];
 
 const REFINEMENTS = ["Shorter", "Lighter", "Older", "Weirder", "More acclaimed"];
+
+function formatAirTime(value: string) {
+  const airsAt = new Date(value);
+
+  if (Number.isNaN(airsAt.getTime())) {
+    return "";
+  }
+
+  const isToday = airsAt.toDateString() === new Date().toDateString();
+  const time = airsAt.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+
+  return isToday ? time : `${airsAt.toLocaleDateString(undefined, { weekday: "short" })} ${time}`;
+}
 
 export function TonightPage({
   curator,
@@ -27,6 +41,7 @@ export function TonightPage({
   providerError,
   isSignedIn,
   sections,
+  episodes,
   providers,
   selectedProviderIds,
   onAsk,
@@ -45,6 +60,7 @@ export function TonightPage({
   providerError: string;
   isSignedIn: boolean;
   sections: CatalogSection[];
+  episodes: ScheduledEpisode[];
   providers: Provider[];
   selectedProviderIds: string[];
   onAsk: (prompt: string, refineOf?: string[]) => Promise<void>;
@@ -241,6 +257,36 @@ export function TonightPage({
                     : "Loading providers…")}
               </p>
             )}
+          </div>
+        </section>
+      )}
+
+      {episodes.length > 0 && (
+        <section className="schedule-strip">
+          <div className="schedule-heading">
+            <strong>On tonight</strong>
+            <small>Air times from TVmaze</small>
+          </div>
+          <div className="schedule-list">
+            {episodes.slice(0, 8).map((episode) => (
+              <button
+                type="button"
+                key={`${episode.showName}-${episode.airsAt}-${episode.episode ?? 0}`}
+                className="schedule-item"
+                disabled={!episode.item}
+                onClick={() => episode.item && onOpen(episode.item)}
+              >
+                <time dateTime={episode.airsAt}>{formatAirTime(episode.airsAt)}</time>
+                <strong>{episode.showName}</strong>
+                <small>
+                  {episode.season && episode.episode
+                    ? `S${episode.season}E${episode.episode}`
+                    : "New episode"}
+                  {episode.episodeName ? ` · ${episode.episodeName}` : ""}
+                  {episode.network ? ` · ${episode.network}` : ""}
+                </small>
+              </button>
+            ))}
           </div>
         </section>
       )}

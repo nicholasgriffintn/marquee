@@ -9,6 +9,7 @@ import { isKnownTitle } from "../lib/validation.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
 import { getPersonalRails } from "../services/ai-rails.ts";
 import { curateStream } from "../services/curator.ts";
+import { readDigest } from "../services/digest.ts";
 import { getTitleInsight } from "../services/title-insight.ts";
 import type { Bindings } from "../types.ts";
 
@@ -100,6 +101,20 @@ curatorRoutes.get("/rails", async (context) => {
     logError("ai_rails_failed", error);
 
     return jsonResponse({ sections: [], status: "error" });
+  }
+});
+
+curatorRoutes.get("/digest", async (context) => {
+  const user = context.get("authenticatedUser");
+
+  try {
+    context.header("cache-control", "no-store");
+
+    return jsonResponse({ digest: await readDigest(context.env, user.id) });
+  } catch (error) {
+    logError("digest_read_failed", error);
+
+    return jsonResponse({ digest: null });
   }
 });
 

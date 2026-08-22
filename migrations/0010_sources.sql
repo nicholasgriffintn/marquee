@@ -58,3 +58,9 @@ CREATE TABLE IF NOT EXISTS api_tokens (
 );
 
 CREATE INDEX IF NOT EXISTS api_tokens_user_idx ON api_tokens (user_id);
+
+CREATE TABLE IF NOT EXISTS viewer_digests (
+  viewer_id TEXT PRIMARY KEY,
+  payload TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

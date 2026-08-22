@@ -93,7 +93,8 @@
   },
   "triggers": {
     "crons": [
-      "17 */6 * * *"
+      "17 */6 * * *",
+      "0 9 * * 1"
     ]
   },
   "queues": {
@@ -218,6 +219,11 @@
       "name": "marquee-rails",
       "binding": "RAILS_WORKFLOW",
       "class_name": "RailsWorkflow"
+    },
+    {
+      "name": "marquee-digest",
+      "binding": "DIGEST_WORKFLOW",
+      "class_name": "DigestWorkflow"
     }
   ]
 }

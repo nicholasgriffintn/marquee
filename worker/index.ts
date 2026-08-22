@@ -14,6 +14,7 @@ import { mediaRoutes } from "./routes/media.ts";
 import { profileRoutes } from "./routes/profile.ts";
 import type { Bindings, IngestionJob } from "./types.ts";
 import { CatalogSweep } from "./workflows/catalog-sweep.ts";
+import { DigestWorkflow } from "./workflows/digest.ts";
 import { RailsWorkflow } from "./workflows/rails.ts";
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -83,12 +84,12 @@ app.onError((error, context) => {
   return context.json({ error: "Unexpected server error" }, 500);
 });
 
-export { CatalogSweep, RailsWorkflow };
+export { CatalogSweep, DigestWorkflow, RailsWorkflow };
 
 export default {
   fetch: app.fetch,
-  scheduled(_controller, env, context) {
-    context.waitUntil(scheduleIngestion(env));
+  scheduled(controller, env, context) {
+    context.waitUntil(scheduleIngestion(env, controller.cron));
   },
   queue(batch, env, context) {
     context.waitUntil(

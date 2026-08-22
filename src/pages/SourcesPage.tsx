@@ -1,6 +1,9 @@
+import { useState } from "react";
+
 import { ProviderBadge } from "../components/ui";
 import type { Provider, ProvidersResponse } from "../domain/catalog";
 import type { ProviderCategory } from "../domain/providers";
+import { useLinks } from "../hooks/useLinks";
 
 const TMDB_LOGO =
   "https://www.themoviedb.org/assets/v4/logos/v2/blue_short-8e7b30f73a4020692ccca9c88bafe5dcb6f8a62a4c6bc55cd9ba82bb2cd95f6c.svg";
@@ -37,6 +40,10 @@ export function SourcesPage({
   selectedProviderIds: string[];
   onSelectProviders: (ids: string[]) => void;
 }) {
+  const connections = useLinks(isSignedIn);
+  const [tokenLabel, setTokenLabel] = useState("");
+  const trakt = connections.links.find((link) => link.provider === "trakt");
+
   function toggleProvider(id: string) {
     onSelectProviders(
       selectedProviderIds.includes(id)
@@ -140,6 +147,88 @@ export function SourcesPage({
           );
         })}
       </div>
+      {isSignedIn && (
+        <section className="connections" aria-labelledby="connections-title">
+          <h2 id="connections-title">Connected accounts</h2>
+          <div className="connection-row">
+            <strong>Trakt</strong>
+            {trakt?.available === false ? (
+              <small>Not configured on this deployment.</small>
+            ) : trakt?.connected ? (
+              <>
+                <small>
+                  {trakt.account ? `Linked as ${trakt.account}` : "Linked"}
+                  {trakt.syncedAt
+                    ? ` · last synced ${new Date(trakt.syncedAt).toLocaleDateString()}`
+                    : ""}
+                </small>
+                <button type="button" onClick={() => void connections.syncTrakt()}>
+                  Sync now
+                </button>
+                <button type="button" onClick={() => void connections.unlinkTrakt()}>
+                  Unlink
+                </button>
+              </>
+            ) : (
+              <>
+                <small>Import your watch history, ratings and watchlist.</small>
+                <a href="/api/links/trakt/start?returnTo=/sources">Connect Trakt</a>
+              </>
+            )}
+          </div>
+
+          <div className="connection-row">
+            <strong>API tokens</strong>
+            <small>For connecting Marquee to an agent over MCP at /mcp.</small>
+          </div>
+          <div className="connection-row">
+            <input
+              value={tokenLabel}
+              maxLength={60}
+              placeholder="Token name, e.g. Claude"
+              aria-label="Token name"
+              onChange={(event) => setTokenLabel(event.target.value)}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                void connections.createToken(tokenLabel);
+                setTokenLabel("");
+              }}
+            >
+              Create token
+            </button>
+          </div>
+          {connections.freshToken && (
+            <div className="connection-row">
+              <code className="token-value">{connections.freshToken}</code>
+              <small>Copy it now. It is not shown again.</small>
+              <button type="button" onClick={connections.dismissToken}>
+                Done
+              </button>
+            </div>
+          )}
+          {connections.tokens.length > 0 && (
+            <ul className="token-list">
+              {connections.tokens.map((token) => (
+                <li key={token.id}>
+                  <strong>{token.label}</strong>
+                  <small>
+                    {token.lastUsedAt
+                      ? `used ${new Date(token.lastUsedAt).toLocaleDateString()}`
+                      : "never used"}
+                  </small>
+                  <button type="button" onClick={() => void connections.revokeToken(token.id)}>
+                    Revoke
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {connections.error && <p className="provider-error">{connections.error}</p>}
+        </section>
+      )}
+
       <section className="source-attribution" aria-labelledby="source-attribution-title">
         <h2 id="source-attribution-title">Where this comes from</h2>
         <div className="source-credits">
@@ -154,6 +243,22 @@ export function SourcesPage({
           <a href="https://www.justwatch.com" target="_blank" rel="noreferrer">
             <strong>JustWatch</strong>
             <span>Availability via TMDB</span>
+          </a>
+          <a href="https://www.tvmaze.com" target="_blank" rel="noreferrer">
+            <strong>TVmaze</strong>
+            <span>Air dates and episode schedules</span>
+          </a>
+          <a href="https://anilist.co" target="_blank" rel="noreferrer">
+            <strong>AniList</strong>
+            <span>Anime tags and airing episodes</span>
+          </a>
+          <a href="https://wikimediafoundation.org" target="_blank" rel="noreferrer">
+            <strong>Wikimedia</strong>
+            <span>Pageview trends behind Trending</span>
+          </a>
+          <a href="https://trakt.tv" target="_blank" rel="noreferrer">
+            <strong>Trakt</strong>
+            <span>Your imported watch history</span>
           </a>
         </div>
         <p>

@@ -12,6 +12,7 @@ import { useProfile } from "./hooks/useProfile";
 import { useSearch } from "./hooks/useSearch";
 import { useSession } from "./hooks/useSession";
 import { useTitle } from "./hooks/useTitle";
+import { useTonight } from "./hooks/useTonight";
 import { BrowsePage, type BrowsePreset } from "./pages/BrowsePage";
 import { LibraryPage } from "./pages/LibraryPage";
 import { SearchPage } from "./pages/SearchPage";
@@ -74,6 +75,7 @@ export function App() {
   const search = useSearch(query, profile.selectedProviderIds);
   const curator = useCurator();
   const aiRails = useAiRails(isSignedIn && isViewerReady && isHome, profile.savedIds.join(","));
+  const episodes = useTonight(isViewerReady);
   const titleMatch = useMatch("/title/:titleId");
   const storedBackground = (location.state as { background?: typeof location } | null)?.background;
   const background = storedBackground?.pathname.startsWith("/title/")
@@ -231,6 +233,7 @@ export function App() {
               providerError={catalog.providerError}
               isSignedIn={isSignedIn}
               sections={sections}
+              episodes={episodes}
               providers={catalog.providers}
               selectedProviderIds={profile.selectedProviderIds}
               onAsk={askCurator}
