@@ -30,6 +30,7 @@ export type Bindings = {
   CATALOG_SWEEP: Workflow;
   RAILS_WORKFLOW: Workflow<{ viewerId: string }>;
   DIGEST_WORKFLOW: Workflow;
+  CURATOR_SESSION: DurableObjectNamespace;
   MEDIA: R2Bucket;
   TRAKT_CLIENT_ID?: string;
   TRAKT_CLIENT_SECRET?: string;

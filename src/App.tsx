@@ -139,8 +139,8 @@ export function App() {
     );
   }
 
-  async function askCurator(prompt: string) {
-    await curator.ask(prompt);
+  async function askCurator(prompt: string, isRefinement = false) {
+    await curator.ask(prompt, isRefinement);
   }
 
   return (

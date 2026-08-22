@@ -2,6 +2,16 @@ import { isIngestionJob } from "../lib/validation.ts";
 import type { Bindings, IngestionJob } from "../types.ts";
 import { jobSubject, recordIngestionRun } from "./ingestion-runs.ts";
 
+function errorStatus(error: unknown) {
+  if (error instanceof Error && "status" in error) {
+    const status = (error as { status?: unknown }).status;
+
+    return typeof status === "number" ? status : null;
+  }
+
+  return null;
+}
+
 export async function consumeIngestion(batch: MessageBatch<unknown>, env: Bindings) {
   for (const message of batch.messages) {
     if (!isIngestionJob(message.body)) {
@@ -15,6 +25,9 @@ export async function consumeIngestion(batch: MessageBatch<unknown>, env: Bindin
       await recordIngestionRun(env, message.body);
       message.ack();
     } catch (error) {
+      const status = errorStatus(error);
+      const permanent = status !== null && status >= 400 && status < 500 && status !== 429;
+
       console.error(
         JSON.stringify({
           event: "ingestion_job_failed",
@@ -22,8 +35,18 @@ export async function consumeIngestion(batch: MessageBatch<unknown>, env: Bindin
           subjectId: jobSubject(message.body),
           attempt: message.attempts,
           kind: error instanceof Error ? error.name : "UnknownError",
+          status,
+          permanent,
+          detail:
+            error instanceof Error ? error.message.slice(0, 300) : String(error).slice(0, 300),
         }),
       );
+
+      if (permanent) {
+        message.ack();
+        continue;
+      }
+
       message.retry({ delaySeconds: Math.min(300, 30 * message.attempts) });
     }
   }

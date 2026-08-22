@@ -65,7 +65,7 @@ export function TonightPage({
   trending: MediaTitle[];
   providers: Provider[];
   selectedProviderIds: string[];
-  onAsk: (prompt: string, refineOf?: string[]) => Promise<void>;
+  onAsk: (prompt: string, isRefinement?: boolean) => Promise<void>;
   onClearCurator: () => void;
   onOpen: (item: MediaTitle) => void;
   onSelectProviders: (ids: string[]) => void;
@@ -206,12 +206,7 @@ export function TonightPage({
                   key={refinement}
                   type="button"
                   disabled={isAsking}
-                  onClick={() =>
-                    void onAsk(
-                      refinement,
-                      curator.items.map((item) => item.id),
-                    )
-                  }
+                  onClick={() => void onAsk(refinement, true)}
                 >
                   {refinement}
                 </button>

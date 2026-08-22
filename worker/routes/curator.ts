@@ -1,14 +1,12 @@
 import { Hono } from "hono";
 
 import { requireAuthentication, type AuthVariables } from "../auth/session.ts";
-import { AiGatewayError } from "../clients/ai-gateway.ts";
 import { recordEvent } from "../lib/events.ts";
 import { clientRateLimitKey, jsonResponse, readJsonObject } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
 import { getPersonalRails } from "../services/ai-rails.ts";
-import { curateStream } from "../services/curator.ts";
 import { readDigest } from "../services/digest.ts";
 import { getTitleInsight } from "../services/title-insight.ts";
 import type { Bindings } from "../types.ts";
@@ -34,9 +32,6 @@ curatorRoutes.post("/", async (context) => {
   }
 
   const prompt = typeof body.prompt === "string" ? body.prompt.trim().slice(0, 1_000) : "";
-  const refineOf = Array.isArray(body.refineOf)
-    ? body.refineOf.filter((id): id is string => isKnownTitle(id)).slice(0, 8)
-    : [];
 
   if (!prompt) {
     return jsonResponse({ error: "Describe what kind of watch you want" }, 400);
@@ -44,34 +39,22 @@ curatorRoutes.post("/", async (context) => {
 
   recordEvent(context.env, { name: "curator_ask", viewerId: user.id, detail: prompt });
 
-  const { readable, writable } = new TransformStream();
-  const writer = writable.getWriter();
-  const encoder = new TextEncoder();
-  const send = (payload: unknown) =>
-    writer.write(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
+  const session = context.env.CURATOR_SESSION.get(context.env.CURATOR_SESSION.idFromName(user.id));
 
-  context.executionCtx.waitUntil(
-    (async () => {
-      try {
-        for await (const event of curateStream(context.env, prompt, user.id, refineOf)) {
-          await send(event);
-        }
-      } catch (error) {
-        logError("curator_request_failed", error);
-        await send({ type: "error", message: curatorErrorMessage(error) });
-      } finally {
-        await writer.close();
-      }
-    })(),
-  );
-
-  return new Response(readable, {
-    headers: {
-      "cache-control": "no-store",
-      "content-type": "text/event-stream",
-      "x-content-type-options": "nosniff",
-    },
+  return session.fetch("https://curator/ask", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ prompt, viewerId: user.id }),
   });
+});
+
+curatorRoutes.delete("/", async (context) => {
+  const user = context.get("authenticatedUser");
+  const session = context.env.CURATOR_SESSION.get(context.env.CURATOR_SESSION.idFromName(user.id));
+
+  await session.fetch("https://curator/reset", { method: "POST" });
+
+  return jsonResponse({ cleared: true });
 });
 
 curatorRoutes.get("/rails", async (context) => {
@@ -160,15 +143,3 @@ curatorRoutes.get("/insight/:titleId", async (context) => {
     return jsonResponse({ insight: null, pairs: [] });
   }
 });
-
-function curatorErrorMessage(error: unknown) {
-  if (error instanceof AiGatewayError && error.status === 402) {
-    return "The AI curator has used up its Cloudflare AI allowance.";
-  }
-
-  if (error instanceof AiGatewayError && error.status === 429) {
-    return "The AI curator is rate limited. Try again shortly.";
-  }
-
-  return "Cloudflare AI curator is unavailable";
-}

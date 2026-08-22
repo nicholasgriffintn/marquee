@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 
 import { authRoutes } from "./auth/routes.ts";
+import { CuratorSession } from "./durable/curator-session.ts";
 import { consumeDeadLetters, consumeIngestion } from "./jobs/ingestion-consumer.ts";
 import { scheduleIngestion } from "./jobs/ingestion-scheduler.ts";
 import { hasTrustedOrigin } from "./lib/http.ts";
@@ -87,7 +88,7 @@ app.onError((error, context) => {
   return context.json({ error: "Unexpected server error" }, 500);
 });
 
-export { CatalogSweep, DigestWorkflow, RailsWorkflow };
+export { CatalogSweep, CuratorSession, DigestWorkflow, RailsWorkflow };
 
 export default {
   fetch: app.fetch,

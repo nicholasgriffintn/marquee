@@ -9,6 +9,7 @@ const MAX_TOOL_ROUNDS = 4;
 
 const SYSTEM_PROMPT = [
   "You are Marquee, a perceptive personal film and television curator.",
+  "Earlier turns in this conversation are the selections you already gave this viewer. A follow-up refines them rather than starting over.",
   "You cannot see the catalogue directly. Call search_catalogue with a plain description of the watch you have in mind, and call it again with different phrasings, genres, media types or scores whenever the first results are thin or off-target.",
   "Call find_similar when the viewer names a title, or when something they rated highly is the best anchor for a shelf.",
   "Call get_viewing_profile to learn what the viewer has saved, rated and dropped.",
@@ -27,15 +28,36 @@ const NARRATION_PROMPT = [
   "Never invent titles beyond the ones listed. No lists, no JSON, no headings.",
 ].join(" ");
 
+export type CuratorTurn = { prompt: string; titleIds: string[]; summary: string };
+
 export type CuratorEvent =
   | { type: "status"; label: string }
   | { type: "result"; titleIds: string[]; items: Awaited<ReturnType<typeof readItems>> }
   | { type: "delta"; text: string }
-  | { type: "done"; summary: string; reasons: Record<string, string> };
+  | { type: "done"; summary: string; reasons: Record<string, string> }
+  | { type: "turn"; turn: CuratorTurn };
 
-async function runCurator(env: Bindings, prompt: string, viewer: ViewerContext) {
+const HISTORY_TURNS = 4;
+
+function historyMessages(turns: CuratorTurn[]): ChatMessage[] {
+  return turns.slice(-HISTORY_TURNS).flatMap((turn): ChatMessage[] => [
+    { role: "user", content: turn.prompt },
+    {
+      role: "assistant",
+      content: JSON.stringify({ titleIds: turn.titleIds, summary: turn.summary }),
+    },
+  ]);
+}
+
+async function runCurator(
+  env: Bindings,
+  prompt: string,
+  viewer: ViewerContext,
+  turns: CuratorTurn[],
+) {
   const messages: ChatMessage[] = [
     { role: "system", content: SYSTEM_PROMPT },
+    ...historyMessages(turns),
     { role: "user", content: prompt },
   ];
   const availableIds = new Set<string>();
@@ -108,20 +130,24 @@ export async function* curateStream(
   env: Bindings,
   prompt: string,
   viewerId: string,
-  refineOf: string[] = [],
+  turns: CuratorTurn[] = [],
 ): AsyncGenerator<CuratorEvent> {
   yield { type: "status", label: "Reading your shelf" };
 
   const viewer = await readViewerContext(env.DB, viewerId);
 
-  yield { type: "status", label: "Searching your catalogue" };
+  yield {
+    type: "status",
+    label: turns.length ? "Refining your selection" : "Searching your catalogue",
+  };
 
   const result = await runCurator(
     env,
-    refineOf.length
-      ? `${prompt}\n\nRefine the previous selection (${refineOf.join(", ")}). Keep what still fits and replace what does not.`
+    turns.length
+      ? `${prompt}\n\nRefine the selection you just gave me. Keep what still fits and replace what does not.`
       : prompt,
     viewer,
+    turns,
   );
   const items = await readItems(env.DB, result.titleIds);
 
@@ -145,9 +171,15 @@ export async function* curateStream(
     summary = "";
   }
 
+  const finalSummary = summary.trim() || result.summary;
+
+  yield {
+    type: "turn",
+    turn: { prompt, titleIds: result.titleIds, summary: finalSummary },
+  };
   yield {
     type: "done",
-    summary: summary.trim() || result.summary,
+    summary: finalSummary,
     reasons: result.reasons,
   };
 }

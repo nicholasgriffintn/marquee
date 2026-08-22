@@ -3,9 +3,7 @@
   "name": "marquee",
   "main": "./worker/index.ts",
   "compatibility_date": "2026-08-21",
-  "compatibility_flags": [
-    "nodejs_compat"
-  ],
+  "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
   "preview_urls": false,
   "routes": [
@@ -92,10 +90,7 @@
     "enabled": true
   },
   "triggers": {
-    "crons": [
-      "17 */6 * * *",
-      "0 9 * * 1"
-    ]
+    "crons": ["17 */6 * * *", "0 9 * * 1"]
   },
   "queues": {
     "producers": [
@@ -224,6 +219,20 @@
       "name": "marquee-digest",
       "binding": "DIGEST_WORKFLOW",
       "class_name": "DigestWorkflow"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CURATOR_SESSION",
+        "class_name": "CuratorSession"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["CuratorSession"]
     }
   ]
 }
