@@ -62,11 +62,146 @@ export function SourcesPage({
             Services, and <em>where the data comes from.</em>
           </h1>
         </div>
+
         <p>
           Watchmode provides availability and deep links. TMDB and JustWatch cover the rest.
           Services without a feed still link out, so you can see what’s missing.
         </p>
       </div>
+      {isSignedIn && (
+        <section className="panel-block" aria-labelledby="connections-title">
+          <h2 id="connections-title">Connected accounts</h2>
+          <div className="connection-row">
+            <strong>Trakt</strong>
+            {trakt?.available === false ? (
+              <small>Not configured on this deployment.</small>
+            ) : trakt?.connected ? (
+              <>
+                <small>
+                  {trakt.account ? `Linked as ${trakt.account}` : "Linked"}
+                  {trakt.syncedAt
+                    ? ` · synced ${new Date(trakt.syncedAt).toLocaleDateString()}`
+                    : ""}
+                </small>
+                <span className="spacer" />
+                <button type="button" onClick={() => void connections.syncTrakt()}>
+                  Sync now
+                </button>
+                <button type="button" onClick={() => void connections.unlinkTrakt()}>
+                  Unlink
+                </button>
+              </>
+            ) : (
+              <>
+                <small>Import your watch history, ratings and watchlist.</small>
+                <span className="spacer" />
+                <a
+                  className="link-button link-button-primary"
+                  href="/api/links/trakt/start?returnTo=/sources"
+                >
+                  Connect Trakt
+                </a>
+              </>
+            )}
+          </div>
+
+          <div className="connection-row">
+            <strong>API tokens</strong>
+            <small>Connect Marquee to an agent over MCP at /mcp.</small>
+            <span className="spacer" />
+            <input
+              className="token-field"
+              value={tokenLabel}
+              maxLength={60}
+              placeholder="Token name, e.g. Claude"
+              aria-label="Token name"
+              onChange={(event) => setTokenLabel(event.target.value)}
+            />
+            <button
+              type="button"
+              className="link-button-primary"
+              onClick={() => {
+                void connections.createToken(tokenLabel);
+                setTokenLabel("");
+              }}
+            >
+              Create
+            </button>
+          </div>
+          {connections.freshToken && (
+            <div className="connection-row">
+              <strong>Copy it now</strong>
+              <code className="token-value">{connections.freshToken}</code>
+              <span className="spacer" />
+              <button type="button" onClick={connections.dismissToken}>
+                Done
+              </button>
+            </div>
+          )}
+          {connections.tokens.length > 0 && (
+            <ul className="token-list">
+              {connections.tokens.map((token) => (
+                <li key={token.id}>
+                  <strong>{token.label}</strong>
+                  <small>
+                    {token.lastUsedAt
+                      ? `used ${new Date(token.lastUsedAt).toLocaleDateString()}`
+                      : "never used"}
+                  </small>
+                  <span className="spacer" />
+                  <button type="button" onClick={() => void connections.revokeToken(token.id)}>
+                    Revoke
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {connections.error && (
+            <div className="connection-row">
+              <p>{connections.error}</p>
+            </div>
+          )}
+        </section>
+      )}
+      {pipeline && pipeline.budgets.length > 0 && (
+        <section className="panel-block" aria-labelledby="pipeline-title">
+          <h2 id="pipeline-title">Pipeline</h2>
+          <div className="budget-grid">
+            {pipeline.budgets.map((budget) => (
+              <div key={budget.source} className="budget-cell">
+                <strong>{budget.source}</strong>
+                <span>
+                  {budget.used.toLocaleString()} / {budget.callLimit.toLocaleString()}
+                </span>
+                <div className="budget-bar" aria-hidden="true">
+                  <i
+                    style={{
+                      width: `${Math.min(100, (budget.used / Math.max(1, budget.callLimit)) * 100)}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+          {pipeline.failures.length > 0 && (
+            <ul className="failure-list">
+              {pipeline.failures.map((failure) => (
+                <li key={`${failure.jobType}-${failure.startedAt}-${failure.subjectId ?? ""}`}>
+                  <strong>{failure.jobType}</strong>
+                  <small>
+                    {failure.subjectId ? `${failure.subjectId} · ` : ""}
+                    {failure.error ?? "failed"}
+                  </small>
+                  <time dateTime={failure.startedAt}>
+                    {new Date(`${failure.startedAt.replace(" ", "T")}Z`).toLocaleString()}
+                  </time>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
       <div className="source-summary">
         <div>
           <strong>{stats.configured}</strong>
@@ -149,129 +284,6 @@ export function SourcesPage({
           );
         })}
       </div>
-      {isSignedIn && (
-        <section className="connections" aria-labelledby="connections-title">
-          <h2 id="connections-title">Connected accounts</h2>
-          <div className="connection-row">
-            <strong>Trakt</strong>
-            {trakt?.available === false ? (
-              <small>Not configured on this deployment.</small>
-            ) : trakt?.connected ? (
-              <>
-                <small>
-                  {trakt.account ? `Linked as ${trakt.account}` : "Linked"}
-                  {trakt.syncedAt
-                    ? ` · last synced ${new Date(trakt.syncedAt).toLocaleDateString()}`
-                    : ""}
-                </small>
-                <button type="button" onClick={() => void connections.syncTrakt()}>
-                  Sync now
-                </button>
-                <button type="button" onClick={() => void connections.unlinkTrakt()}>
-                  Unlink
-                </button>
-              </>
-            ) : (
-              <>
-                <small>Import your watch history, ratings and watchlist.</small>
-                <a href="/api/links/trakt/start?returnTo=/sources">Connect Trakt</a>
-              </>
-            )}
-          </div>
-
-          <div className="connection-row">
-            <strong>API tokens</strong>
-            <small>For connecting Marquee to an agent over MCP at /mcp.</small>
-          </div>
-          <div className="connection-row">
-            <input
-              value={tokenLabel}
-              maxLength={60}
-              placeholder="Token name, e.g. Claude"
-              aria-label="Token name"
-              onChange={(event) => setTokenLabel(event.target.value)}
-            />
-            <button
-              type="button"
-              onClick={() => {
-                void connections.createToken(tokenLabel);
-                setTokenLabel("");
-              }}
-            >
-              Create token
-            </button>
-          </div>
-          {connections.freshToken && (
-            <div className="connection-row">
-              <code className="token-value">{connections.freshToken}</code>
-              <small>Copy it now. It is not shown again.</small>
-              <button type="button" onClick={connections.dismissToken}>
-                Done
-              </button>
-            </div>
-          )}
-          {connections.tokens.length > 0 && (
-            <ul className="token-list">
-              {connections.tokens.map((token) => (
-                <li key={token.id}>
-                  <strong>{token.label}</strong>
-                  <small>
-                    {token.lastUsedAt
-                      ? `used ${new Date(token.lastUsedAt).toLocaleDateString()}`
-                      : "never used"}
-                  </small>
-                  <button type="button" onClick={() => void connections.revokeToken(token.id)}>
-                    Revoke
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-          {connections.error && <p className="provider-error">{connections.error}</p>}
-        </section>
-      )}
-
-      {pipeline && (pipeline.failures.length > 0 || pipeline.budgets.length > 0) && (
-        <section className="connections" aria-labelledby="pipeline-title">
-          <h2 id="pipeline-title">Pipeline</h2>
-          {pipeline.budgets.length > 0 && (
-            <div className="budget-grid">
-              {pipeline.budgets.map((budget) => (
-                <div key={budget.source} className="budget-cell">
-                  <strong>{budget.source}</strong>
-                  <span>
-                    {budget.used.toLocaleString()} / {budget.callLimit.toLocaleString()}
-                  </span>
-                  <small>per {budget.windowKind}</small>
-                  <div className="budget-bar" aria-hidden="true">
-                    <i
-                      style={{
-                        width: `${Math.min(100, (budget.used / Math.max(1, budget.callLimit)) * 100)}%`,
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-          {pipeline.failures.length > 0 ? (
-            <ul className="token-list">
-              {pipeline.failures.map((failure) => (
-                <li key={`${failure.jobType}-${failure.startedAt}-${failure.subjectId ?? ""}`}>
-                  <strong>{failure.jobType}</strong>
-                  <small>{failure.subjectId ?? "—"}</small>
-                  <small>{failure.error ?? "failed"}</small>
-                  <small>{new Date(failure.startedAt).toLocaleString()}</small>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="connection-row">
-              <small>No ingestion failures recorded.</small>
-            </p>
-          )}
-        </section>
-      )}
 
       <section className="source-attribution" aria-labelledby="source-attribution-title">
         <h2 id="source-attribution-title">Where this comes from</h2>

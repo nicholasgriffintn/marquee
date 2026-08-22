@@ -105,7 +105,7 @@ against whatever is unembedded or has been updated since it was last embedded, s
 re-embedded without reason.
 
 A second cron on Monday mornings runs the digest workflow, which writes a per-viewer digest of
-fresh releases near their taste, what is trending, and the week's episodes.
+fresh releases near their taste, what is trending, and the week's episodes, readable at `/this-week`.
 
 ## Connecting an agent
 

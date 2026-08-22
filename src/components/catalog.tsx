@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { Link } from "react-router-dom";
 
 import type { CatalogSection, MediaTitle } from "../domain/catalog";
 import { useAvailability } from "../hooks/useAvailability";
@@ -235,6 +236,28 @@ export function DetailPanel({
             </div>
           )}
           <p className="detail-synopsis">{item.overview || "No synopsis available."}</p>
+          {(item.people?.length || item.keywords?.length) && (
+            <div className="detail-chips">
+              {(item.people ?? []).slice(0, 5).map((person) => (
+                <Link
+                  key={person}
+                  to={`/films?q=${encodeURIComponent(person)}`}
+                  className="detail-chip detail-chip-person"
+                >
+                  {person}
+                </Link>
+              ))}
+              {(item.keywords ?? []).slice(0, 6).map((keyword) => (
+                <Link
+                  key={keyword}
+                  to={`/films?keywords=${encodeURIComponent(keyword)}`}
+                  className="detail-chip"
+                >
+                  {keyword}
+                </Link>
+              ))}
+            </div>
+          )}
           <div className="score-row">
             <div>
               <strong>{scoreLabel(item)}</strong>
