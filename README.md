@@ -8,7 +8,7 @@ The Usher works here. He is the letter M off the sign out front, who climbed dow
 never went back up. Bow tie, torch, thirty years on the door. He has seen everything in the
 building and most of it twice, and he will tell you when something is long.
 
-<img src="https://marquee.pashi.app/usher-idle.png" width="200" height="200" alt="The Usher" style="float:right;margin:0 0 1em 1em;"/>
+<img src="https://marquee.pashi.app/usher-idle.png" width="200" height="200" alt="The Usher Welcomes You" style="float:right;margin:0 0 1em 1em;"/>
 
 > Evening. Seat yourself.
 
@@ -22,9 +22,7 @@ awards and box office from OMDb. The trending rail is ranked by how much Wikiped
 about a title this week, which is a better measure of a fuss than any press release. Link Trakt and
 your watch history, ratings and watchlist come with you.
 
-<img src="https://marquee.pashi.app/usher-thinking.png" width="200" height="200" alt="The Usher" style="float:right;margin:0 0 1em 1em;"/>
-
-<img src="https://marquee.pashi.app/usher-unimpressed.png" width="200" height="200" alt="The Usher" style="float:right;margin:0 0 1em 1em;"/>
+<img src="https://marquee.pashi.app/usher-unimpressed.png" width="200" height="200" alt="The Usher is Unimpressed"/>
 
 > Everyone's watching that one. Doesn't mean it's good.
 
@@ -32,6 +30,8 @@ He has five faces — attentive, thinking, pleased, unimpressed, asleep — and 
 them. The artwork is in `public/`, all of it cut from `usher.svg`, in ink, paper, acid and coral and
 nothing else. He is drawn to survive on his own dark background, so anything you add to him wants a
 paper core and an ink keyline or it will disappear into the page.
+
+<img src="https://marquee.pashi.app/usher-thinking.png" width="200" height="200" alt="The Usher Has Some Advice" />
 
 > If I've nothing worth saying, I say nothing. Try it.
 
