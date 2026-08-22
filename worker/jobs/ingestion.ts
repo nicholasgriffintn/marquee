@@ -1,3 +1,4 @@
+import { getAnilistDetails } from "../clients/anilist.ts";
 import { getOmdbPoster, getOmdbRatings } from "../clients/omdb.ts";
 import { getSimklIds } from "../clients/simkl.ts";
 import {
@@ -13,7 +14,12 @@ import { enrichAvailability } from "../repositories/availability.ts";
 import { claimBudget } from "../repositories/budgets.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
 import { storeCatalog, storeItems } from "../repositories/catalog-writer.ts";
-import { selectUnenriched, storeEnrichment, storePoster } from "../repositories/enrichment.ts";
+import {
+  selectAnilistCandidates,
+  selectUnenriched,
+  storeEnrichment,
+  storePoster,
+} from "../repositories/enrichment.ts";
 import { storeProviders } from "../repositories/providers.ts";
 import { syncBuzz } from "../services/buzz.ts";
 import { embedTitles, selectUnembedded } from "../services/embeddings.ts";
@@ -34,6 +40,7 @@ const ENRICHERS = [
   { source: "omdb", job: "enrich-ratings", maxAgeDays: 30, perRun: 900 },
   { source: "simkl", job: "enrich-simkl", maxAgeDays: 90, perRun: 2_000 },
   { source: "poster", job: "cache-poster", maxAgeDays: 365, perRun: 2_000 },
+  { source: "anilist", job: "enrich-anilist", maxAgeDays: 14, perRun: 400 },
 ] as const satisfies readonly {
   source: EnrichmentSource;
   job: IngestionJob["type"];
@@ -53,9 +60,24 @@ function enrichmentQueue(env: Bindings, source: EnrichmentSource) {
   return env.SIMKL_QUEUE;
 }
 
+function sourceCandidates(
+  env: Bindings,
+  source: EnrichmentSource,
+  maxAgeDays: number,
+  perRun: number,
+) {
+  return source === "anilist"
+    ? selectAnilistCandidates(env, maxAgeDays, perRun)
+    : selectUnenriched(env, source, maxAgeDays, perRun);
+}
+
 function sourceConfigured(env: Bindings, source: EnrichmentSource) {
   if (source === "omdb" || source === "poster") {
     return Boolean(env.OMDB_API_KEY);
+  }
+
+  if (source === "anilist") {
+    return true;
   }
 
   return Boolean(env.SIMKL_CLIENT_ID);
@@ -149,7 +171,7 @@ export async function queueEnrichment(env: Bindings) {
     }
 
     // oxlint-disable-next-line no-await-in-loop
-    const titleIds = await selectUnenriched(
+    const titleIds = await sourceCandidates(
       env,
       enricher.source,
       enricher.maxAgeDays,
@@ -353,6 +375,58 @@ async function cachePoster(env: Bindings, titleId: string) {
   }
 }
 
+async function enrichAnilist(env: Bindings, titleId: string) {
+  const [title] = await readItems(env.DB, [titleId]);
+  const anilistId = title?.externalIds?.anilistId ?? null;
+
+  if (!anilistId) {
+    return;
+  }
+
+  if (!(await claimBudget(env, "anilist"))) {
+    console.log(JSON.stringify({ event: "budget_exhausted", source: "anilist", titleId }));
+
+    return;
+  }
+
+  const details = await getAnilistDetails(anilistId);
+
+  if (!details) {
+    return;
+  }
+
+  const keywords = [
+    ...new Set([
+      ...(title?.keywords ?? []),
+      ...details.tags,
+      ...details.studios.map((studio) => studio.toLowerCase()),
+    ]),
+  ].slice(0, 40);
+
+  await storeEnrichment(env, titleId, "anilist", { keywords });
+
+  if (details.nextEpisode && title) {
+    await env.DB.prepare(
+      `INSERT INTO title_schedule
+         (id, title_id, imdb_id, show_name, season, episode, episode_name, airs_at, network, source)
+       VALUES (?, ?, ?, ?, NULL, ?, NULL, ?, NULL, 'anilist')
+       ON CONFLICT(id) DO UPDATE SET
+         episode = excluded.episode,
+         airs_at = excluded.airs_at,
+         fetched_at = CURRENT_TIMESTAMP`,
+    )
+      .bind(
+        `anilist:${anilistId}`,
+        titleId,
+        title.imdbUrl ? (/\/(tt\d+)/u.exec(title.imdbUrl)?.[1] ?? null) : null,
+        title.title,
+        details.nextEpisode.episode,
+        details.nextEpisode.airsAt,
+      )
+      .run();
+  }
+}
+
 async function enrichSimkl(env: Bindings, titleId: string) {
   const parts = env.SIMKL_CLIENT_ID ? titleParts(titleId) : null;
 
@@ -402,6 +476,12 @@ export async function executeIngestionJob(env: Bindings, job: IngestionJob) {
 
   if (job.type === "enrich-simkl") {
     await enrichSimkl(env, job.titleId);
+
+    return;
+  }
+
+  if (job.type === "enrich-anilist") {
+    await enrichAnilist(env, job.titleId);
 
     return;
   }

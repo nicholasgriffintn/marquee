@@ -4,9 +4,12 @@ import { authRoutes } from "./auth/routes.ts";
 import { consumeDeadLetters, consumeIngestion } from "./jobs/ingestion-consumer.ts";
 import { scheduleIngestion } from "./jobs/ingestion-scheduler.ts";
 import { hasTrustedOrigin } from "./lib/http.ts";
+import { canonicalOrigin } from "./lib/security.ts";
+import { withShareCard } from "./lib/share.ts";
 import { catalogRoutes } from "./routes/catalog.ts";
 import { curatorRoutes } from "./routes/curator.ts";
 import { linkRoutes } from "./routes/links.ts";
+import { mcpRoutes } from "./routes/mcp.ts";
 import { mediaRoutes } from "./routes/media.ts";
 import { profileRoutes } from "./routes/profile.ts";
 import type { Bindings, IngestionJob } from "./types.ts";
@@ -46,13 +49,21 @@ app.route("/api/curator", curatorRoutes);
 
 app.route("/api/links", linkRoutes);
 
+app.route("/mcp", mcpRoutes);
+
 app.notFound(async (context) => {
   if (context.req.path.startsWith("/api/")) {
     return context.json({ error: "Not found" }, 404);
   }
 
   const asset = await context.env.ASSETS.fetch(context.req.raw);
-  const response = new Response(asset.body, asset);
+  const decorated = await withShareCard(
+    context.env,
+    asset,
+    context.req.path,
+    canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN),
+  );
+  const response = new Response(decorated.body, decorated);
   const scriptSource = import.meta.env.DEV ? "'self' 'unsafe-inline'" : "'self'";
 
   response.headers.set(

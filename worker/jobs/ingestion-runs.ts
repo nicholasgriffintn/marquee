@@ -6,6 +6,7 @@ export function jobSubject(job: IngestionJob) {
     job.type === "enrich-availability" ||
     job.type === "enrich-ratings" ||
     job.type === "enrich-simkl" ||
+    job.type === "enrich-anilist" ||
     job.type === "cache-poster"
   ) {
     return job.titleId;

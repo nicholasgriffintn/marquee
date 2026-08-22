@@ -34,7 +34,7 @@ export type Bindings = {
   TRAKT_CLIENT_SECRET?: string;
 };
 
-export type EnrichmentSource = "watchmode" | "omdb" | "poster" | "simkl";
+export type EnrichmentSource = "watchmode" | "omdb" | "poster" | "simkl" | "anilist";
 
 export type TitleRatings = {
   imdbScore: number | null;
@@ -58,6 +58,7 @@ export type IngestionJob =
   | { type: "enrich-availability"; titleId: string }
   | { type: "enrich-ratings"; titleId: string }
   | { type: "enrich-simkl"; titleId: string }
+  | { type: "enrich-anilist"; titleId: string }
   | { type: "cache-poster"; titleId: string }
   | { type: "import-imdb-title"; imdbId: string }
   | { type: "embed-titles"; titleIds: string[] }

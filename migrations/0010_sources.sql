@@ -48,3 +48,13 @@ CREATE TABLE IF NOT EXISTS title_buzz (
 );
 
 CREATE INDEX IF NOT EXISTS title_buzz_delta_idx ON title_buzz (delta DESC);
+
+CREATE TABLE IF NOT EXISTS api_tokens (
+  token_hash TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  label TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  last_used_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS api_tokens_user_idx ON api_tokens (user_id);

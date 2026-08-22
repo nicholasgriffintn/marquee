@@ -4,7 +4,9 @@ import { readItems } from "./catalog-reader.ts";
 
 type FieldsFor<S extends EnrichmentSource> = S extends "omdb"
   ? Pick<MediaTitle, "ratings">
-  : Pick<MediaTitle, "externalIds">;
+  : S extends "anilist"
+    ? Pick<MediaTitle, "keywords">
+    : Pick<MediaTitle, "externalIds">;
 
 export async function storeEnrichment<S extends Exclude<EnrichmentSource, "watchmode">>(
   env: Bindings,
@@ -36,6 +38,22 @@ export async function storeEnrichment<S extends Exclude<EnrichmentSource, "watch
   ]);
 
   return true;
+}
+
+export async function selectAnilistCandidates(env: Bindings, maxAgeDays: number, limit: number) {
+  const rows = await env.DB.prepare(
+    `SELECT t.id AS titleId
+     FROM catalog_titles AS t
+     LEFT JOIN title_enrichment AS e ON e.title_id = t.id AND e.source = 'anilist'
+     WHERE json_extract(t.payload, '$.externalIds.anilistId') IS NOT NULL
+       AND (e.title_id IS NULL OR e.fetched_at < datetime('now', ?))
+     ORDER BY t.popularity DESC
+     LIMIT ?`,
+  )
+    .bind(`-${maxAgeDays} days`, limit)
+    .all<{ titleId: string }>();
+
+  return rows.results.map((row) => row.titleId);
 }
 
 export async function selectUnenriched(

@@ -2,10 +2,11 @@ import { parseCookies, serializeCookie, serializeExpiredCookie } from "@ngriffin
 import { AuthError } from "@ngriffin_uk/auth-core";
 import { Hono } from "hono";
 
-import { jsonResponse } from "../lib/http.ts";
+import { jsonResponse, readJsonObject } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
 import { canonicalOrigin, safeReturnPath } from "../lib/security.ts";
 import type { Bindings } from "../types.ts";
+import { listApiTokens, mintToken, revokeApiToken, storeApiToken } from "./api-tokens.ts";
 import {
   authenticationFor,
   RETURN_COOKIE,
@@ -21,6 +22,9 @@ authRoutes.get("/github", (context) => startGitHub(context));
 authRoutes.get("/github/callback", (context) => completeGitHub(context));
 authRoutes.get("/session", (context) => getSession(context));
 authRoutes.post("/logout", (context) => logout(context));
+authRoutes.get("/tokens", (context) => listTokens(context));
+authRoutes.post("/tokens", (context) => createToken(context));
+authRoutes.delete("/tokens/:id", (context) => revokeToken(context));
 
 async function startGitHub(context: AppContext) {
   const actor = context.req.header("cf-connecting-ip")?.trim().slice(0, 64) || "local";
@@ -117,6 +121,45 @@ async function logout(context: AppContext) {
   context.header("set-cookie", expiredCookie(context, SESSION_COOKIE));
 
   return jsonResponse({ ok: true });
+}
+
+async function listTokens(context: AppContext) {
+  const principal = await sessionPrincipal(context.env, context.req.raw);
+
+  if (!principal) {
+    return jsonResponse({ error: "Sign in required" }, 401);
+  }
+
+  return jsonResponse({ tokens: await listApiTokens(context.env, principal.user.id) });
+}
+
+async function createToken(context: AppContext) {
+  const principal = await sessionPrincipal(context.env, context.req.raw);
+
+  if (!principal) {
+    return jsonResponse({ error: "Sign in required" }, 401);
+  }
+
+  const body = await readJsonObject(context.req.raw);
+  const label = typeof body?.label === "string" ? body.label.trim().slice(0, 60) : "";
+  const token = mintToken();
+
+  await storeApiToken(context.env, principal.user.id, token, label || "MCP client");
+
+  return jsonResponse({ token, label: label || "MCP client" });
+}
+
+async function revokeToken(context: AppContext) {
+  const principal = await sessionPrincipal(context.env, context.req.raw);
+
+  if (!principal) {
+    return jsonResponse({ error: "Sign in required" }, 401);
+  }
+
+  const id = context.req.param("id");
+  const removed = await revokeApiToken(context.env, principal.user.id, id ?? "");
+
+  return removed ? jsonResponse({ removed: true }) : jsonResponse({ error: "Unknown token" }, 404);
 }
 
 function failedCallback(context: AppContext, error: string) {

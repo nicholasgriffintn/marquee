@@ -15,6 +15,7 @@ export const SOURCE_BUDGETS: Record<
   omdb: { windowKind: "day", callLimit: 500_000 },
   poster: { windowKind: "day", callLimit: 500_000 },
   simkl: { windowKind: "day", callLimit: 50_000 },
+  anilist: { windowKind: "day", callLimit: 2_000 },
 };
 
 function windowExpression(windowKind: "day" | "month") {

@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 
 import { logError } from "../lib/logging.ts";
+import { isKnownTitle } from "../lib/validation.ts";
+import { readItems } from "../repositories/catalog-reader.ts";
 import type { Bindings } from "../types.ts";
 
 export const mediaRoutes = new Hono<{ Bindings: Bindings }>();
@@ -68,5 +70,49 @@ mediaRoutes.get("/posters/:file", async (context) => {
     const original = await context.env.MEDIA.get(key);
 
     return original ? rawResponse(original) : context.json({ error: "Not found" }, 404);
+  }
+});
+
+const OG_WIDTH = 1_200;
+const OG_HEIGHT = 630;
+
+mediaRoutes.get("/og/:titleId", async (context) => {
+  const titleId = decodeURIComponent(context.req.param("titleId")).replace(/\.png$/u, "");
+
+  if (!isKnownTitle(titleId) || !context.env.IMAGES) {
+    return context.json({ error: "Not found" }, 404);
+  }
+
+  const [title] = await readItems(context.env.DB, [titleId]);
+  const source = title?.backdropUrl ?? title?.posterUrl;
+
+  if (!source) {
+    return context.json({ error: "Not found" }, 404);
+  }
+
+  try {
+    const upstream = source.startsWith("/media/")
+      ? await context.env.MEDIA.get(source.replace("/media/", ""))
+      : await fetch(source, { cf: { cacheEverything: true, cacheTtl: 86_400 } });
+    const body = upstream instanceof Response ? upstream.body : (upstream?.body ?? null);
+
+    if (!body) {
+      return context.json({ error: "Not found" }, 404);
+    }
+
+    const result = await context.env.IMAGES.input(body)
+      .transform({ width: OG_WIDTH, height: OG_HEIGHT, fit: "cover" })
+      .output({ format: "image/png" });
+
+    return result.response({
+      headers: {
+        "cache-control": "public, max-age=86400",
+        "x-content-type-options": "nosniff",
+      },
+    });
+  } catch (error) {
+    logError("og_image_failed", error, { area: "media", titleId });
+
+    return context.json({ error: "Not found" }, 404);
   }
 });

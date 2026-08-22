@@ -79,6 +79,7 @@ export function isIngestionJob(value: unknown): value is IngestionJob {
     value.type === "enrich-availability" ||
     value.type === "enrich-ratings" ||
     value.type === "enrich-simkl" ||
+    value.type === "enrich-anilist" ||
     value.type === "cache-poster"
   ) {
     return isKnownTitle(value.titleId);
