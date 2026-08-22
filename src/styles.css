@@ -1364,6 +1364,7 @@ h2 em {
 .rail-heading {
   align-items: end;
   display: flex;
+  gap: 28px;
   justify-content: space-between;
   padding: 0 var(--gutter) 17px;
 }
@@ -1391,14 +1392,11 @@ h2 em {
 .rail-pages i {
   background: var(--line);
   height: 2px;
-  transition:
-    background 0.18s,
-    width 0.18s;
-  width: 13px;
+  transition: background 0.18s;
+  width: 22px;
 }
 .rail-pages i.is-current {
   background: var(--acid);
-  width: 24px;
 }
 .rail-pager button {
   align-items: center;
@@ -4563,4 +4561,120 @@ h2 em {
 }
 .lost-aside:hover {
   color: var(--acid);
+}
+
+/* The manager's office */
+
+.managers-office {
+  min-height: calc(100vh - 78px);
+}
+.office-inner {
+  align-items: center;
+  display: grid;
+  gap: clamp(28px, 6vw, 76px);
+  grid-template-columns: minmax(0, 260px) minmax(0, 1fr);
+  margin: 0 auto;
+  max-width: 900px;
+}
+.office-door {
+  aspect-ratio: 5 / 9;
+  background: linear-gradient(160deg, #23281f, #191c18);
+  border: 3px solid var(--ink);
+  box-shadow:
+    inset 0 0 0 10px #1f231c,
+    12px 12px 0 rgba(0, 0, 0, 0.45);
+  padding: 22px;
+  position: relative;
+}
+.door-glass {
+  align-items: center;
+  background:
+    repeating-linear-gradient(-18deg, rgba(243, 240, 231, 0.09) 0 3px, transparent 3px 7px),
+    rgba(243, 240, 231, 0.14);
+  border: 2px solid var(--ink);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  height: 54%;
+  justify-content: center;
+  text-align: center;
+}
+.door-name {
+  color: var(--acid);
+  font: 500 clamp(21px, 2.4vw, 30px) / 1 var(--serif);
+  letter-spacing: 0.06em;
+  margin: 0;
+  text-transform: uppercase;
+}
+.door-sub {
+  color: rgba(243, 240, 231, 0.72);
+  font: 700 8px/1 var(--mono);
+  letter-spacing: 2.4px;
+  margin: 0;
+  text-transform: uppercase;
+}
+.door-note {
+  background: var(--paper);
+  color: var(--ink);
+  font: 700 10px/1.35 var(--mono);
+  left: 50%;
+  letter-spacing: 1px;
+  margin: 0;
+  padding: 9px 12px;
+  position: absolute;
+  text-align: center;
+  text-transform: uppercase;
+  top: 63%;
+  transform: translateX(-50%) rotate(-3deg);
+}
+.door-handle {
+  background: var(--paper-deep);
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  bottom: 27%;
+  display: block;
+  height: 16px;
+  left: 20px;
+  position: absolute;
+  width: 16px;
+}
+.office-copy h1 {
+  font-size: clamp(38px, 5vw, 62px);
+  letter-spacing: -0.05em;
+  margin: 0 0 14px;
+}
+.office-copy > p {
+  color: var(--muted);
+  margin: 0 0 26px;
+  max-width: 42ch;
+}
+.office-aside {
+  align-items: center;
+  border-left: 3px solid var(--acid);
+  display: flex;
+  gap: 14px;
+  margin-bottom: 28px;
+  padding-left: 14px;
+}
+.office-aside .usher-mark {
+  flex: 0 0 auto;
+  height: 40px;
+  width: 56px;
+}
+.office-aside p {
+  color: var(--white);
+  font: italic 400 18px/1.35 var(--serif);
+  margin: 0;
+}
+
+@media (max-width: 700px) {
+  .office-inner {
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 420px;
+  }
+  .office-door {
+    margin: 0 auto;
+    max-width: 220px;
+    width: 100%;
+  }
 }

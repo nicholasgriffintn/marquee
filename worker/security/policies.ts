@@ -9,44 +9,50 @@ export type Tier = { limiter: LimiterKey; message: string };
 
 export type Policy = { anonymous: Tier; member: Tier; bots: BotStance };
 
-const TOO_MANY = "Too many requests. Try again in a minute.";
+const STEADY_ON = "Steady on. One at a time.";
 
 export const POLICIES = {
   read: {
-    anonymous: { limiter: "PUBLIC_RATE_LIMITER", message: TOO_MANY },
-    member: { limiter: "MEMBER_RATE_LIMITER", message: TOO_MANY },
+    anonymous: { limiter: "PUBLIC_RATE_LIMITER", message: STEADY_ON },
+    member: { limiter: "MEMBER_RATE_LIMITER", message: STEADY_ON },
     bots: "crawlers",
   },
   write: {
-    anonymous: { limiter: "WRITE_RATE_LIMITER", message: TOO_MANY },
-    member: { limiter: "MEMBER_RATE_LIMITER", message: TOO_MANY },
+    anonymous: {
+      limiter: "WRITE_RATE_LIMITER",
+      message: "One at a time. I have only the two hands.",
+    },
+    member: {
+      limiter: "MEMBER_RATE_LIMITER",
+      message: "One at a time. I have only the two hands.",
+    },
     bots: "strict",
   },
   search: {
     anonymous: {
       limiter: "SEARCH_RATE_LIMITER",
-      message: "Too many searches. Try again in a minute.",
+      message: "You have searched enough for one minute.",
     },
     member: {
       limiter: "SEARCH_MEMBER_RATE_LIMITER",
-      message: "Too many searches. Try again in a minute.",
+      message: "You have searched enough for one minute.",
     },
     bots: "strict",
   },
   curator: {
     anonymous: {
       limiter: "CURATOR_FREE_RATE_LIMITER",
-      message: "That is the free limit for now. Sign in for more, or try again in a minute.",
+      message: "That is your lot for now. Sign in and I will look the other way.",
     },
     member: {
       limiter: "CURATOR_RATE_LIMITER",
-      message: "Too many curator requests. Try again in a minute.",
+      message: "One at a time. I am still on the last one.",
     },
     bots: "strict",
   },
   insight: {
-    anonymous: { limiter: "INSIGHT_RATE_LIMITER", message: TOO_MANY },
-    member: { limiter: "CURATOR_RATE_LIMITER", message: TOO_MANY },
+    anonymous: { limiter: "INSIGHT_RATE_LIMITER", message: "Steady on. I am still reading." },
+    member: { limiter: "CURATOR_RATE_LIMITER", message: "Steady on. I am still reading." },
     bots: "strict",
   },
   usher: {
@@ -57,27 +63,27 @@ export const POLICIES = {
   auth: {
     anonymous: {
       limiter: "AUTH_RATE_LIMITER",
-      message: "Too many sign-in attempts. Try again shortly.",
+      message: "That is a lot of attempts at one door. Wait a minute.",
     },
     member: {
       limiter: "AUTH_RATE_LIMITER",
-      message: "Too many sign-in attempts. Try again shortly.",
+      message: "That is a lot of attempts at one door. Wait a minute.",
     },
     bots: "strict",
   },
   telemetry: {
-    anonymous: { limiter: "TELEMETRY_RATE_LIMITER", message: TOO_MANY },
-    member: { limiter: "MEMBER_RATE_LIMITER", message: TOO_MANY },
+    anonymous: { limiter: "TELEMETRY_RATE_LIMITER", message: STEADY_ON },
+    member: { limiter: "MEMBER_RATE_LIMITER", message: STEADY_ON },
     bots: "strict",
   },
   media: {
-    anonymous: { limiter: "MEDIA_RATE_LIMITER", message: TOO_MANY },
-    member: { limiter: "MEDIA_RATE_LIMITER", message: TOO_MANY },
+    anonymous: { limiter: "MEDIA_RATE_LIMITER", message: STEADY_ON },
+    member: { limiter: "MEDIA_RATE_LIMITER", message: STEADY_ON },
     bots: "crawlers",
   },
   machine: {
-    anonymous: { limiter: "WRITE_RATE_LIMITER", message: TOO_MANY },
-    member: { limiter: "MEMBER_RATE_LIMITER", message: TOO_MANY },
+    anonymous: { limiter: "WRITE_RATE_LIMITER", message: STEADY_ON },
+    member: { limiter: "MEMBER_RATE_LIMITER", message: STEADY_ON },
     bots: "open",
   },
 } as const satisfies Record<string, Policy>;

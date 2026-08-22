@@ -106,7 +106,7 @@ export const requireAdmin: MiddlewareHandler<{
   }
 
   if (principal.user.role !== "admin") {
-    return jsonResponse({ error: "Administrator access required" }, 403);
+    return jsonResponse({ error: "The manager is not in. He is never in." }, 403);
   }
 
   context.set("authenticatedUser", principal.user);

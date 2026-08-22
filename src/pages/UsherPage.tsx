@@ -56,6 +56,16 @@ const SCENES: Scene[] = [
     line: "You see everything twice in this trade. Once on the screen. Once on their faces.",
   },
   {
+    id: "door",
+    slug: "Int. The Corridor — Any Given Night",
+    face: "unimpressed",
+    action: [
+      "Most of the job is letting people in. The rest of it is not. Sales reps. Two lads with one ticket between them. A man with a clipboard who says he is from head office and cannot say which one.",
+      "At the far end of the corridor there is a door with frosted glass and a name painted on it. In thirty years he has knocked twice, and waited both times.",
+    ],
+    line: "I have seen a lot of faces come through that door. I remember the ones that were lying.",
+  },
+  {
     id: "closing",
     slug: "Ext. The Marquee — Night — Closing",
     face: "unimpressed",
@@ -182,7 +192,7 @@ export function UsherPage() {
         <div className="reel-beam" aria-hidden="true" />
         <div className="reel-inner">
           <h2 className="reel-slug" id="now-slug">
-            <i>06</i>
+            <i>{String(SCENES.length + 1).padStart(2, "0")}</i>
             Int. Here — Now
           </h2>
           <div className="reel-action reel-action-wide">
@@ -215,6 +225,10 @@ export function UsherPage() {
               <dd>Himself</dd>
             </div>
             <div>
+              <dt>The Manager</dt>
+              <dd>Never seen</dd>
+            </div>
+            <div>
               <dt>Titles and artwork</dt>
               <dd>TMDB</dd>
             </div>
@@ -245,6 +259,10 @@ export function UsherPage() {
             <div>
               <dt>Bulbs</dt>
               <dd>One hundred and forty, one short</dd>
+            </div>
+            <div>
+              <dt>Knocks on the office door</dt>
+              <dd>Two, in thirty years</dd>
             </div>
           </dl>
           <p className="reel-fine">

@@ -27,7 +27,12 @@ export const apiGuard: MiddlewareHandler<{ Bindings: Bindings }> = async (contex
         detail: `${matched.name}:${verdict.reason}`,
       });
 
-      return jsonResponse({ error: "Automated traffic is not allowed here." }, 403);
+      return jsonResponse(
+        {
+          error: "I have seen a lot of faces come through that door. Not one of them was yours.",
+        },
+        403,
+      );
     }
   }
 

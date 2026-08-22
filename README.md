@@ -32,6 +32,13 @@ per session, and he takes a hint after three. He turns up where he is relevant: 
 shelf to ask whether it landed, on a title that has sat unwatched since spring, on a search that
 found nothing. And if you cannot decide, he will simply pick something and tell you why.
 
+He is also on the door. Most of the job is letting people in; the rest of it is not, and the API's
+rate limits and bot checks speak in his voice rather than a status code's. Ask too fast and you get
+_"Steady on. One at a time."_ Arrive as something that is not a person and you get told that he has
+seen a lot of faces and not one of them was yours. Try a door that is not yours and you meet the
+manager's office instead: frosted glass, a name painted on it, a note that has said _back in ten
+minutes_ since 1974. The manager is canon and has never been drawn. He is not in. He is never in.
+
 He has five faces — attentive, thinking, pleased, unimpressed, asleep — and gets by on about two of
 them. The artwork is in `public/`, all of it cut from `usher.svg`, in ink, paper, acid and coral and
 nothing else. He is drawn to survive on his own dark background, so anything you add to him wants a

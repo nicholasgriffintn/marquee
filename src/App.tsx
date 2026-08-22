@@ -4,6 +4,7 @@ import { Link, Route, Routes, useLocation, useMatch, useNavigate } from "react-r
 import { DetailPanel } from "./components/catalog";
 import { SearchBox } from "./components/SearchBox";
 import { GitHubIcon, MarqueeLogo } from "./components/ui";
+import { ManagersDoor } from "./components/usher/ManagersDoor";
 import { UsherCard } from "./components/usher/UsherCard";
 import { UsherMark } from "./components/usher/UsherMark";
 import type { CatalogSection, MediaTitle } from "./domain/catalog";
@@ -454,7 +455,7 @@ export function App() {
         <Route
           path="/admin"
           element={
-            session.user?.role === "admin" ? <AdminPage user={session.user} /> : <NotFoundPage />
+            session.user?.role === "admin" ? <AdminPage user={session.user} /> : <ManagersDoor />
           }
         />
 
