@@ -7,6 +7,7 @@ import {
   readKeywords,
   readRanked,
   searchCatalogue as queryCatalogue,
+  searchTitlesFirst,
 } from "../repositories/catalog-search.ts";
 import { readProviders } from "../repositories/providers.ts";
 import type { Bindings } from "../types.ts";
@@ -76,17 +77,20 @@ const PAGE_SIZE = 24;
 const BROWSE_MIN_VOTES = 20;
 
 export async function browseCatalogue(env: Bindings, browse: BrowseQuery) {
-  const items = await queryCatalogue(env.DB, {
+  const search = {
     mediaType: browse.mediaType,
     genres: browse.genres,
     keywords: browse.keywords,
     providerIds: browse.providerIds,
     query: browse.query,
-    sort: browse.sort,
+    sort: browse.query && browse.sort === "popularity" ? undefined : browse.sort,
     minVotes: browse.sort === "recent" ? 0 : BROWSE_MIN_VOTES,
     limit: PAGE_SIZE + 1,
     offset: browse.page * PAGE_SIZE,
-  });
+  };
+  const items = browse.query
+    ? await searchTitlesFirst(env.DB, search)
+    : await queryCatalogue(env.DB, search);
 
   return {
     items: items.slice(0, PAGE_SIZE),

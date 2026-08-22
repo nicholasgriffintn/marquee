@@ -1,7 +1,7 @@
 import type { CatalogResponse, CatalogSection, MediaTitle } from "../../src/domain/catalog.ts";
 import { parseStoredTitle, parseStoredTitleIds } from "../lib/catalog-payload.ts";
 import { isKnownTitle } from "../lib/validation.ts";
-import { searchCatalogue } from "./catalog-search.ts";
+import { searchTitlesFirst } from "./catalog-search.ts";
 
 type PayloadRow = { payload: string; posterKey?: string | null };
 
@@ -110,7 +110,7 @@ export async function readAvailability(db: D1Database, titleId: string) {
 }
 
 async function readSearchResults(db: D1Database, query: string, providerIds: string[]) {
-  const items = (await searchCatalogue(db, { query, limit: 30 })).filter((title) =>
+  const items = (await searchTitlesFirst(db, { query, limit: 30 })).filter((title) =>
     includesProvider(title, providerIds),
   );
 

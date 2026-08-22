@@ -6,6 +6,8 @@ type PayloadRow = { payload: string; posterKey?: string | null };
 
 export type CatalogueSort = "popularity" | "score" | "recent" | "relevance";
 
+export type SearchScope = "title" | "everything";
+
 const VOTE_PRIOR = 250;
 const MEAN_SCORE = 6.5;
 const SCORE_SORT_MIN_VOTES = 50;
@@ -30,9 +32,12 @@ export type CatalogueSearch = {
   excludeIds?: string[];
   includeIds?: string[];
   sort?: CatalogueSort;
+  scope?: SearchScope;
   limit?: number;
   offset?: number;
 };
+
+const TITLE_EXACTNESS = `(CASE WHEN lower(t.title) = ? OR lower(t.original_title) = ? THEN 0 ELSE 1 END)`;
 
 const ORDER_BY: Record<CatalogueSort, string> = {
   popularity: "t.popularity DESC",
@@ -41,7 +46,7 @@ const ORDER_BY: Record<CatalogueSort, string> = {
   relevance: `${RELEVANCE}, t.popularity DESC`,
 };
 
-export function ftsMatchQuery(raw: string) {
+export function ftsMatchQuery(raw: string, scope: SearchScope = "everything") {
   const tokens = raw
     .toLowerCase()
     .replaceAll(/[^\p{L}\p{N}\s]+/gu, " ")
@@ -49,7 +54,13 @@ export function ftsMatchQuery(raw: string) {
     .filter(Boolean)
     .slice(0, MAX_QUERY_TOKENS);
 
-  return tokens.length ? tokens.map((token) => `"${token}"*`).join(" AND ") : null;
+  if (tokens.length === 0) {
+    return null;
+  }
+
+  const expression = tokens.map((token) => `"${token}"*`).join(" AND ");
+
+  return scope === "title" ? `{title original_title} : (${expression})` : expression;
 }
 
 function hydrate(rows: PayloadRow[]): MediaTitle[] {
@@ -65,7 +76,9 @@ function hydrate(rows: PayloadRow[]): MediaTitle[] {
 export async function searchCatalogue(db: D1Database, search: CatalogueSearch) {
   const conditions: string[] = [];
   const bindings: unknown[] = [];
-  const match = search.query?.trim() ? ftsMatchQuery(search.query.trim().slice(0, 120)) : null;
+  const match = search.query?.trim()
+    ? ftsMatchQuery(search.query.trim().slice(0, 120), search.scope)
+    : null;
   const genres = (search.genres ?? [])
     .map((genre) => genre.trim().toLowerCase())
     .filter(Boolean)
@@ -75,7 +88,15 @@ export async function searchCatalogue(db: D1Database, search: CatalogueSearch) {
   const limit = Math.max(1, Math.min(60, Math.floor(search.limit ?? 12)));
   const offset = Math.max(0, Math.min(2_000, Math.floor(search.offset ?? 0)));
   const sort = search.sort ?? (match ? "relevance" : "popularity");
-  const orderBy = ORDER_BY[match ? sort : sort === "relevance" ? "popularity" : sort];
+  const orderBindings: unknown[] = [];
+  let orderBy = ORDER_BY[match ? sort : sort === "relevance" ? "popularity" : sort];
+
+  if (match && search.scope === "title" && sort === "relevance") {
+    const needle = (search.query ?? "").trim().toLowerCase().slice(0, 120);
+
+    orderBy = `${TITLE_EXACTNESS}, t.popularity DESC`;
+    orderBindings.push(needle, needle);
+  }
 
   if (match) {
     conditions.push("catalog_search MATCH ?");
@@ -170,10 +191,34 @@ export async function searchCatalogue(db: D1Database, search: CatalogueSearch) {
        ORDER BY ${orderBy}
        LIMIT ? OFFSET ?`,
     )
-    .bind(...bindings, limit, offset)
+    .bind(...bindings, ...orderBindings, limit, offset)
     .all<PayloadRow>();
 
   return hydrate(rows.results);
+}
+
+export async function searchTitlesFirst(db: D1Database, search: CatalogueSearch) {
+  const limit = Math.max(1, Math.min(60, Math.floor(search.limit ?? 12)));
+
+  if (!search.query?.trim()) {
+    return searchCatalogue(db, search);
+  }
+
+  const byTitle = await searchCatalogue(db, { ...search, scope: "title", limit });
+
+  if (byTitle.length >= limit) {
+    return byTitle;
+  }
+
+  const found = new Set(byTitle.map((title) => title.id));
+  const rest = await searchCatalogue(db, {
+    ...search,
+    scope: "everything",
+    limit,
+    excludeIds: [...(search.excludeIds ?? []), ...found],
+  });
+
+  return [...byTitle, ...rest.filter((title) => !found.has(title.id))].slice(0, limit);
 }
 
 export async function readRanked(db: D1Database, ids: string[]) {
