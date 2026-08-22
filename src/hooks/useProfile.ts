@@ -5,7 +5,6 @@ import type { EntryStatus, ViewingEntry } from "../types";
 
 type ProfileResponse = {
   entries: ViewingEntry[];
-  selectedProviderIds: string[] | null;
 };
 
 const SUCCESS_HOLD_MS = 3_500;
@@ -22,7 +21,6 @@ const emptyEntry = (titleId: string): ViewingEntry => ({
 
 export function useProfile(isSignedIn: boolean) {
   const [entries, setEntries] = useState<Record<string, ViewingEntry>>({});
-  const [selectedProviderIds, setSelectedProviderIds] = useState<string[]>([]);
   const [message, setMessage] = useState("");
   const [isLoaded, setIsLoaded] = useState(false);
   const messageTimer = useRef(0);
@@ -52,10 +50,6 @@ export function useProfile(isSignedIn: boolean) {
         });
 
         setEntries(Object.fromEntries(profile.entries.map((entry) => [entry.titleId, entry])));
-        if (profile.selectedProviderIds !== null) {
-          setSelectedProviderIds(profile.selectedProviderIds);
-        }
-
         announce("");
       } catch (error) {
         if (!(error instanceof DOMException && error.name === "AbortError")) {
@@ -70,20 +64,6 @@ export function useProfile(isSignedIn: boolean) {
 
     return () => controller.abort();
   }, [isSignedIn]);
-
-  async function savePreferences(nextIds: string[]) {
-    const previous = selectedProviderIds;
-
-    setSelectedProviderIds(nextIds);
-    announce("Saving services…", 0);
-    try {
-      await requestJson("/api/profile", jsonRequest("POST", { selectedProviderIds: nextIds }));
-      announce("Services saved");
-    } catch {
-      setSelectedProviderIds(previous);
-      announce("Services could not be saved. Try again.", ERROR_HOLD_MS);
-    }
-  }
 
   async function saveEntry(entry: ViewingEntry) {
     const previous = entries[entry.titleId];
@@ -160,12 +140,10 @@ export function useProfile(isSignedIn: boolean) {
   return {
     entries: isSignedIn ? entries : NO_ENTRIES,
     savedIds: isSignedIn ? savedIds : NO_IDS,
-    selectedProviderIds: isSignedIn ? selectedProviderIds : NO_IDS,
     message: isSignedIn ? message : "",
     isLoaded: isSignedIn ? isLoaded : true,
     removeEntry,
     saveEntry,
-    savePreferences,
     setStatus,
     updateDraft,
   };

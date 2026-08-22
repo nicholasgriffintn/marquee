@@ -9,11 +9,13 @@ import { useAiRails } from "./hooks/useAiRails";
 import { useCatalog } from "./hooks/useCatalog";
 import { useCurator } from "./hooks/useCurator";
 import { useProfile } from "./hooks/useProfile";
+import { useProviderPreferences } from "./hooks/useProviderPreferences";
 import { useSearch } from "./hooks/useSearch";
 import { useSession } from "./hooks/useSession";
 import { useTitle } from "./hooks/useTitle";
 import { useTonight } from "./hooks/useTonight";
 import { useTrending } from "./hooks/useTrending";
+import { AdminPage } from "./pages/AdminPage";
 import { BrowsePage, type BrowsePreset } from "./pages/BrowsePage";
 import { DigestPage } from "./pages/DigestPage";
 import { LibraryPage } from "./pages/LibraryPage";
@@ -22,7 +24,7 @@ import { SourcesPage } from "./pages/SourcesPage";
 import { TonightPage } from "./pages/TonightPage";
 import type { EntryStatus, ViewingEntry } from "./types";
 
-const NAV: { to: string; label: string; private: boolean }[] = [
+const NAV: { to: string; label: string; private: boolean; admin?: boolean }[] = [
   { to: "/", label: "Tonight", private: false },
   { to: "/films", label: "Films", private: false },
   { to: "/series", label: "Series", private: false },
@@ -31,6 +33,7 @@ const NAV: { to: string; label: string; private: boolean }[] = [
   { to: "/shelf", label: "My shelf", private: true },
   { to: "/this-week", label: "This week", private: true },
   { to: "/sources", label: "Sources", private: false },
+  { to: "/admin", label: "Admin", private: true, admin: true },
 ];
 
 const BROWSE_PRESETS: Record<string, BrowsePreset> = {
@@ -67,15 +70,16 @@ export function App() {
   const session = useSession();
   const isSignedIn = Boolean(session.user);
   const profile = useProfile(isSignedIn);
+  const { selectedProviderIds, selectProviders } = useProviderPreferences();
   const isViewerReady = !session.isLoading && profile.isLoaded;
   const isHome = location.pathname === "/";
   const catalog = useCatalog(
-    profile.selectedProviderIds,
+    selectedProviderIds,
     profile.savedIds,
     isViewerReady && isHome,
     isViewerReady && (isHome || location.pathname === "/shelf"),
   );
-  const search = useSearch(query, profile.selectedProviderIds);
+  const search = useSearch(query, selectedProviderIds);
   const curator = useCurator();
   const aiRails = useAiRails(isSignedIn && isViewerReady && isHome, profile.savedIds.join(","));
   const episodes = useTonight(isViewerReady);
@@ -140,7 +144,7 @@ export function App() {
   }
 
   async function askCurator(prompt: string, isRefinement = false) {
-    await curator.ask(prompt, isRefinement);
+    await curator.ask(prompt, isRefinement, selectedProviderIds);
   }
 
   return (
@@ -151,7 +155,10 @@ export function App() {
           <span>Marquee</span>
         </Link>
         <nav aria-label="Primary navigation">
-          {NAV.filter((item) => !item.private || isSignedIn).map((item) => (
+          {NAV.filter(
+            (item) =>
+              (!item.private || isSignedIn) && (!item.admin || session.user?.role === "admin"),
+          ).map((item) => (
             <Link
               key={item.to}
               to={item.to}
@@ -237,16 +244,15 @@ export function App() {
               isSessionLoading={!isViewerReady}
               error={catalog.error}
               providerError={catalog.providerError}
-              isSignedIn={isSignedIn}
               sections={sections}
               episodes={episodes}
               trending={trending}
               providers={catalog.providers}
-              selectedProviderIds={profile.selectedProviderIds}
+              selectedProviderIds={selectedProviderIds}
               onAsk={askCurator}
               onClearCurator={curator.clear}
               onOpen={openTitle}
-              onSelectProviders={(ids) => void profile.savePreferences(ids)}
+              onSelectProviders={selectProviders}
               onShowSources={() => void navigate("/sources")}
             />
           }
@@ -299,9 +305,16 @@ export function App() {
               providerError={catalog.providerError}
               stats={catalog.providerStats}
               isSignedIn={isSignedIn}
-              selectedProviderIds={profile.selectedProviderIds}
-              onSelectProviders={(ids) => void profile.savePreferences(ids)}
+              selectedProviderIds={selectedProviderIds}
+              onSelectProviders={selectProviders}
             />
+          }
+        />
+
+        <Route
+          path="/admin"
+          element={
+            session.user?.role === "admin" ? <AdminPage user={session.user} /> : <NotFoundPage />
           }
         />
 

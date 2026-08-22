@@ -53,7 +53,7 @@ async function requestWatchmode(
       response.status === 401
         ? "Watchmode credentials were rejected"
         : `Watchmode request failed (${response.status})`,
-      response.status === 401 ? 503 : 502,
+      response.status === 401 ? 503 : response.status === 429 ? 429 : 502,
     );
   }
 

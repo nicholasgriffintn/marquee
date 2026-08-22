@@ -1,11 +1,11 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
 import type { Bindings, EnrichmentSource } from "../types.ts";
-import { readItems } from "./catalog-reader.ts";
+import { readRawItems } from "./catalog-reader.ts";
 
 type FieldsFor<S extends EnrichmentSource> = S extends "omdb"
   ? Pick<MediaTitle, "ratings">
   : S extends "anilist"
-    ? Pick<MediaTitle, "keywords">
+    ? Pick<MediaTitle, "keywords" | "ratings">
     : Pick<MediaTitle, "externalIds">;
 
 export async function storeEnrichment<S extends Exclude<EnrichmentSource, "watchmode">>(
@@ -14,7 +14,7 @@ export async function storeEnrichment<S extends Exclude<EnrichmentSource, "watch
   source: S,
   fields: FieldsFor<S>,
 ) {
-  const [title] = await readItems(env.DB, [titleId]);
+  const title = (await readRawItems(env.DB, [titleId])).get(titleId);
 
   if (!title) {
     return false;

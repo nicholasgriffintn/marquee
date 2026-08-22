@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import type { CatalogSection, MediaTitle } from "../domain/catalog";
 import { useAvailability } from "../hooks/useAvailability";
 import { useTitleInsight } from "../hooks/useTitleInsight";
-import { artwork, artworkSrcSet, mediaMeta, scoreLabel, voteLabel } from "../lib/media";
+import { artwork, artworkSrcSet, mediaMeta, moneyLabel, scoreLabel, voteLabel } from "../lib/media";
 import { track } from "../lib/telemetry";
 import type { EntryStatus, ViewingEntry } from "../types";
 import { ArtPlaceholder } from "./ArtPlaceholder";
@@ -169,7 +169,7 @@ export function DetailPanel({
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const { providers, nextEpisode } = useAvailability(item, availabilityEnabled);
-  const { insight, pairs, isLoading: isInsightLoading } = useTitleInsight(item.id, canSave);
+  const { insight, pairs, isLoading: isInsightLoading } = useTitleInsight(item.id);
   const watchDestinations = providers.flatMap((provider) => {
     const href = provider.webUrl ?? item.watchLink;
 
@@ -212,8 +212,16 @@ export function DetailPanel({
           <p className="detail-meta">
             {item.mediaType === "movie" ? "Film" : "Television"} · {mediaMeta(item)}
           </p>
+          {item.tagline && <p className="detail-tagline">{item.tagline}</p>}
           {item.originalTitle && item.originalTitle !== item.title && (
             <p className="detail-original">Original title · {item.originalTitle}</p>
+          )}
+          {(item.studios?.length || item.collection) && (
+            <p className="detail-original">
+              {[item.collection?.name, item.studios?.slice(0, 2).join(", ")]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
           )}
           {(insight || isInsightLoading) && (
             <div className="detail-insight">
@@ -316,7 +324,26 @@ export function DetailPanel({
                 <span>Metascore</span>
               </div>
             )}
+            {item.ratings?.anilistScore != null && (
+              <div>
+                <strong>{item.ratings.anilistScore}%</strong>
+                <span>AniList</span>
+              </div>
+            )}
+            {item.ratings?.boxOffice != null && (
+              <div>
+                <strong>{moneyLabel(item.ratings.boxOffice)}</strong>
+                <span>Box office</span>
+              </div>
+            )}
+            {item.revenue != null && item.ratings?.boxOffice == null && (
+              <div>
+                <strong>{moneyLabel(item.revenue)}</strong>
+                <span>Worldwide gross</span>
+              </div>
+            )}
           </div>
+          {item.ratings?.awards && <p className="detail-awards">{item.ratings.awards}</p>}
           {canSave && !entry && (
             <button type="button" className="save-button" onClick={() => onSave(item)}>
               <PlusIcon /> Save to my shelf

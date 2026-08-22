@@ -4,7 +4,6 @@ import { ProviderBadge } from "../components/ui";
 import type { Provider, ProvidersResponse } from "../domain/catalog";
 import type { ProviderCategory } from "../domain/providers";
 import { useLinks } from "../hooks/useLinks";
-import { usePipeline } from "../hooks/usePipeline";
 
 const TMDB_LOGO =
   "https://www.themoviedb.org/assets/v4/logos/v2/blue_short-8e7b30f73a4020692ccca9c88bafe5dcb6f8a62a4c6bc55cd9ba82bb2cd95f6c.svg";
@@ -42,7 +41,6 @@ export function SourcesPage({
   onSelectProviders: (ids: string[]) => void;
 }) {
   const connections = useLinks(isSignedIn);
-  const pipeline = usePipeline();
   const [tokenLabel, setTokenLabel] = useState("");
   const trakt = connections.links.find((link) => link.provider === "trakt");
 
@@ -164,45 +162,6 @@ export function SourcesPage({
           )}
         </section>
       )}
-      {pipeline && pipeline.budgets.length > 0 && (
-        <section className="panel-block" aria-labelledby="pipeline-title">
-          <h2 id="pipeline-title">Pipeline</h2>
-          <div className="budget-grid">
-            {pipeline.budgets.map((budget) => (
-              <div key={budget.source} className="budget-cell">
-                <strong>{budget.source}</strong>
-                <span>
-                  {budget.used.toLocaleString()} / {budget.callLimit.toLocaleString()}
-                </span>
-                <div className="budget-bar" aria-hidden="true">
-                  <i
-                    style={{
-                      width: `${Math.min(100, (budget.used / Math.max(1, budget.callLimit)) * 100)}%`,
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-          {pipeline.failures.length > 0 && (
-            <ul className="failure-list">
-              {pipeline.failures.map((failure) => (
-                <li key={`${failure.jobType}-${failure.startedAt}-${failure.subjectId ?? ""}`}>
-                  <strong>{failure.jobType}</strong>
-                  <small>
-                    {failure.subjectId ? `${failure.subjectId} · ` : ""}
-                    {failure.error ?? "failed"}
-                  </small>
-                  <time dateTime={failure.startedAt}>
-                    {new Date(`${failure.startedAt.replace(" ", "T")}Z`).toLocaleString()}
-                  </time>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      )}
-
       <div className="source-summary">
         <div>
           <strong>{stats.configured}</strong>
@@ -226,10 +185,7 @@ export function SourcesPage({
           {providerError}
         </p>
       )}
-      <div
-        className={`source-list${isSignedIn ? "" : " source-list-public"}`}
-        aria-label="Streaming providers"
-      >
+      <div className="source-list" aria-label="Streaming providers">
         {CATEGORIES.map((category) => {
           const categoryProviders = providers.filter(
             (provider) => provider.category === category.name,
@@ -260,7 +216,7 @@ export function SourcesPage({
                     <span className={`source-status source-status-${provider.status}`}>
                       {provider.status === "marker" ? "TBD" : provider.status.toUpperCase()}
                     </span>
-                    {isSignedIn && provider.status === "feed" && (
+                    {provider.status === "feed" && (
                       <button
                         type="button"
                         disabled={!isLive}

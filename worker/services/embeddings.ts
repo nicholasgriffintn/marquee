@@ -18,11 +18,21 @@ function embeddingText(title: MediaTitle) {
     title.genres.join(", "),
     (title.keywords ?? []).join(", "),
     (title.people ?? []).join(", "),
+    (title.studios ?? []).join(", "),
     title.overview,
   ]
     .filter(Boolean)
     .join(" · ")
     .slice(0, MAX_TEXT_LENGTH);
+}
+
+async function contentHash(text: string) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+
+  return [...new Uint8Array(digest)]
+    .slice(0, 16)
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 function parseVectors(result: unknown) {
@@ -54,6 +64,29 @@ export async function embedQuery(env: Bindings, text: string) {
   return vector ?? null;
 }
 
+function markEmbedded(env: Bindings, titleId: string, hash: string) {
+  return env.DB.prepare(
+    `INSERT INTO title_embeddings (title_id, model, content_hash, embedded_at)
+     VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+     ON CONFLICT(title_id) DO UPDATE SET
+       model = excluded.model,
+       content_hash = excluded.content_hash,
+       embedded_at = CURRENT_TIMESTAMP`,
+  ).bind(titleId, EMBEDDING_MODEL, hash);
+}
+
+async function storedHashes(env: Bindings, titleIds: string[]) {
+  const rows = await env.DB.prepare(
+    `SELECT title_id AS titleId, content_hash AS contentHash
+     FROM title_embeddings
+     WHERE model = ? AND title_id IN (${titleIds.map(() => "?").join(", ")})`,
+  )
+    .bind(EMBEDDING_MODEL, ...titleIds)
+    .all<{ titleId: string; contentHash: string | null }>();
+
+  return new Map(rows.results.map((row) => [row.titleId, row.contentHash]));
+}
+
 export async function embedTitles(env: Bindings, titleIds: string[]) {
   const titles = await readItems(env.DB, titleIds, titleIds.length);
 
@@ -61,10 +94,18 @@ export async function embedTitles(env: Bindings, titleIds: string[]) {
     return 0;
   }
 
+  const hashes = await Promise.all(titles.map((title) => contentHash(embeddingText(title))));
+  const known = await storedHashes(
+    env,
+    titles.map((title) => title.id),
+  );
+  const pending = titles.filter((title, index) => known.get(title.id) !== hashes[index]);
+  const unchanged = titles.filter((title, index) => known.get(title.id) === hashes[index]);
+  const hashById = new Map(titles.map((title, index) => [title.id, hashes[index]]));
   let stored = 0;
 
-  for (let index = 0; index < titles.length; index += EMBED_BATCH) {
-    const wave = titles.slice(index, index + EMBED_BATCH);
+  for (let index = 0; index < pending.length; index += EMBED_BATCH) {
+    const wave = pending.slice(index, index + EMBED_BATCH);
     // oxlint-disable-next-line no-await-in-loop
     const vectors = await embedTexts(env, wave.map(embeddingText));
 
@@ -89,22 +130,23 @@ export async function embedTitles(env: Bindings, titleIds: string[]) {
       })),
     );
 
+    // oxlint-disable-next-line no-await-in-loop
+    await env.DB.batch(
+      wave.map((title) => markEmbedded(env, title.id, hashById.get(title.id) as string)),
+    );
+
     stored += wave.length;
   }
 
-  await env.DB.batch(
-    titles.map((title) =>
-      env.DB.prepare(
-        `INSERT INTO title_embeddings (title_id, model, embedded_at)
-         VALUES (?, ?, CURRENT_TIMESTAMP)
-         ON CONFLICT(title_id) DO UPDATE SET
-           model = excluded.model,
-           embedded_at = CURRENT_TIMESTAMP`,
-      ).bind(title.id, EMBEDDING_MODEL),
-    ),
-  );
+  if (unchanged.length) {
+    await env.DB.batch(
+      unchanged.map((title) => markEmbedded(env, title.id, hashById.get(title.id) as string)),
+    );
+  }
 
-  console.log(JSON.stringify({ event: "titles_embedded", count: stored }));
+  console.log(
+    JSON.stringify({ event: "titles_embedded", count: stored, skipped: unchanged.length }),
+  );
 
   return stored;
 }
@@ -114,8 +156,10 @@ export async function selectUnembedded(env: Bindings, limit: number) {
     `SELECT t.id AS titleId
      FROM catalog_titles AS t
      LEFT JOIN title_embeddings AS e ON e.title_id = t.id AND e.model = ?
-     WHERE e.title_id IS NULL OR e.embedded_at < t.updated_at
-     ORDER BY t.popularity DESC
+     WHERE e.title_id IS NULL
+        OR e.content_hash IS NULL
+        OR e.embedded_at < t.updated_at
+     ORDER BY (e.title_id IS NOT NULL), t.popularity DESC
      LIMIT ?`,
   )
     .bind(EMBEDDING_MODEL, Math.max(1, Math.min(5_000, limit)))

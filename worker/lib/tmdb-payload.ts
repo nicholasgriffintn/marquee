@@ -222,6 +222,39 @@ function cleanDate(value: string | null) {
   return value && /^\d{4}-\d{2}-\d{2}$/u.test(value) ? value : null;
 }
 
+const STUDIO_LIMIT = 4;
+const RECOMMENDATION_LIMIT = 12;
+
+function parseStudios(mediaType: MediaType, details: Record<string, unknown>) {
+  return names(
+    mediaType === "movie" ? details.production_companies : details.networks,
+    STUDIO_LIMIT,
+  );
+}
+
+function parseCollection(details: Record<string, unknown>) {
+  const collection = recordAt(details, "belongs_to_collection");
+  const id = collection ? numberAt(collection, "id") : null;
+  const name = collection ? stringAt(collection, "name") : null;
+
+  return id && name ? { id, name: name.replace(/\s+Collection$/u, "") } : null;
+}
+
+function parseRecommendations(details: Record<string, unknown>) {
+  return records(recordAt(details, "recommendations")?.results)
+    .flatMap((item): string[] => {
+      const id = numberAt(item, "id");
+      const type = stringAt(item, "media_type");
+
+      return id && (type === "movie" || type === "tv") ? [`${type}:${id}`] : [];
+    })
+    .slice(0, RECOMMENDATION_LIMIT);
+}
+
+function positive(value: number | null) {
+  return value !== null && value > 0 ? value : null;
+}
+
 export function parseTmdbTitle(mediaType: MediaType, value: unknown): MediaTitle | null {
   if (!isRecord(value)) {
     return null;
@@ -276,6 +309,20 @@ export function parseTmdbTitle(mediaType: MediaType, value: unknown): MediaTitle
     people: parsePeople(mediaType, value),
     trailerKey: parseTrailer(value),
     videos: parseVideos(value),
+    originalLanguage: stringAt(value, "original_language"),
+    tagline: stringAt(value, "tagline")?.trim().slice(0, 200) || null,
+    status: stringAt(value, "status"),
+    collection: mediaType === "movie" ? parseCollection(value) : null,
+    studios: parseStudios(mediaType, value),
+    revenue: mediaType === "movie" ? positive(numberAt(value, "revenue")) : null,
+    budget: mediaType === "movie" ? positive(numberAt(value, "budget")) : null,
+    episodeCount: mediaType === "tv" ? positive(numberAt(value, "number_of_episodes")) : null,
+    lastAirDate: mediaType === "tv" ? cleanDate(stringAt(value, "last_air_date")) : null,
+    nextAirDate:
+      mediaType === "tv"
+        ? cleanDate(stringAt(recordAt(value, "next_episode_to_air") ?? {}, "air_date"))
+        : null,
+    recommendationIds: parseRecommendations(value),
   };
 }
 

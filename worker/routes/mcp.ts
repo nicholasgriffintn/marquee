@@ -35,10 +35,6 @@ const TOOLS = [
         genres: { type: "array", items: { type: "string" } },
         minScore: { type: "number", minimum: 0, maximum: 10 },
         releasedAfter: { type: "integer", minimum: 1900, maximum: 2100 },
-        onMyServices: {
-          type: "boolean",
-          description: "Restrict to the streaming services on the viewer's profile.",
-        },
         limit: { type: "integer", minimum: 1, maximum: 25 },
       },
       required: ["query"],
@@ -129,7 +125,6 @@ async function callTool(
   origin: string,
 ) {
   if (name === "search_catalogue") {
-    const viewer = await readViewerContext(env.DB, user.id);
     const results = await retrieveTitles(env, {
       text: typeof input.query === "string" ? input.query.slice(0, 300) : "",
       mediaType:
@@ -139,7 +134,7 @@ async function callTool(
         : undefined,
       minScore: typeof input.minScore === "number" ? input.minScore : undefined,
       releasedAfter: typeof input.releasedAfter === "number" ? input.releasedAfter : undefined,
-      providerIds: input.onMyServices === true ? viewer.selectedProviderIds : [],
+      providerIds: [],
       limit: typeof input.limit === "number" ? Math.min(25, input.limit) : 10,
     });
 
@@ -190,7 +185,6 @@ async function callTool(
     const byId = new Map(titles.map((title) => [title.id, title]));
 
     return textResult({
-      selectedServices: viewer.selectedProviderIds,
       entries: viewer.entries.map((entry) => ({
         id: entry.titleId,
         title: byId.get(entry.titleId)?.title ?? entry.titleId,

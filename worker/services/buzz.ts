@@ -3,9 +3,12 @@ import { findArticle, getPageviews } from "../clients/wikimedia.ts";
 import { logError } from "../lib/logging.ts";
 import type { Bindings } from "../types.ts";
 
-const SAMPLE_SIZE = 120;
+const SAMPLE_SIZE = 250;
 const CONCURRENCY = 6;
 const MAX_BOOST = 1.5;
+const REFRESH_DAYS = 2;
+const RETRY_DAYS = 21;
+const MIN_TRENDING_VIEWS = 500;
 
 type BuzzCandidate = {
   titleId: string;
@@ -21,11 +24,13 @@ async function candidates(env: Bindings) {
     `SELECT t.id AS titleId, t.title, t.year, t.media_type AS mediaType, t.imdb_id AS imdbId
      FROM catalog_titles AS t
      LEFT JOIN title_buzz AS b ON b.title_id = t.id
-     WHERE b.title_id IS NULL OR b.measured_at < datetime('now', '-2 days')
+     WHERE b.title_id IS NULL
+        OR (b.article <> '' AND b.measured_at < datetime('now', ?))
+        OR (b.article = '' AND b.measured_at < datetime('now', ?))
      ORDER BY t.popularity DESC
      LIMIT ?`,
   )
-    .bind(SAMPLE_SIZE)
+    .bind(`-${REFRESH_DAYS} days`, `-${RETRY_DAYS} days`, SAMPLE_SIZE)
     .all<{
       titleId: string;
       title: string;
@@ -47,23 +52,23 @@ async function measure(
   env: Bindings,
   candidate: BuzzCandidate,
   byImdb: Map<string, string>,
-): Promise<BuzzRow | null> {
+): Promise<BuzzRow> {
   const existing = await env.DB.prepare(`SELECT article FROM title_buzz WHERE title_id = ?`)
     .bind(candidate.titleId)
     .first<{ article: string }>();
   const article =
-    existing?.article ??
+    (existing?.article || null) ??
     (candidate.imdbId ? byImdb.get(candidate.imdbId) : null) ??
     (await findArticle(candidate.title, candidate.year, candidate.isFilm));
 
   if (!article) {
-    return null;
+    return { titleId: candidate.titleId, article: "", views: 0, previousViews: 0 };
   }
 
   const views = await getPageviews(article, 14);
 
   if (views.length < 8) {
-    return null;
+    return { titleId: candidate.titleId, article: "", views: 0, previousViews: 0 };
   }
 
   const recent = views.slice(-7).reduce((total, value) => total + value, 0);
@@ -133,9 +138,18 @@ export async function syncBuzz(env: Bindings) {
     );
   }
 
-  console.log(JSON.stringify({ event: "buzz_synced", titles: measured.length }));
+  const resolved = measured.filter((row) => row.article !== "").length;
 
-  return measured.length;
+  console.log(
+    JSON.stringify({
+      event: "buzz_synced",
+      titles: measured.length,
+      resolved,
+      unresolved: measured.length - resolved,
+    }),
+  );
+
+  return resolved;
 }
 
 export async function buzzBoosts(env: Bindings, titleIds: string[]) {
@@ -163,7 +177,7 @@ export async function readTrending(env: Bindings, limit = 20) {
     `SELECT b.title_id AS titleId
      FROM title_buzz AS b
      JOIN catalog_titles AS t ON t.id = b.title_id
-     WHERE b.views >= 500
+     WHERE b.views >= ${MIN_TRENDING_VIEWS}
      ORDER BY b.delta DESC
      LIMIT ?`,
   )

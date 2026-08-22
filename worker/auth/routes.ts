@@ -107,6 +107,7 @@ async function getSession(context: AppContext) {
       name: principal.user.displayName,
       login: principal.user.githubLogin,
       avatarUrl: principal.user.avatarUrl ?? null,
+      role: principal.user.role,
     },
   });
 }

@@ -26,6 +26,30 @@ function includesProvider(title: MediaTitle, providerIds: string[]) {
 
 const READ_CHUNK = 80;
 
+export async function readRawItems(db: D1Database, ids: string[]) {
+  const uniqueIds = [...new Set(ids.filter(isKnownTitle))];
+  const titles = new Map<string, MediaTitle>();
+
+  for (let index = 0; index < uniqueIds.length; index += READ_CHUNK) {
+    const wave = uniqueIds.slice(index, index + READ_CHUNK);
+    // oxlint-disable-next-line no-await-in-loop
+    const rows = await db
+      .prepare(`SELECT payload FROM catalog_titles WHERE id IN (${wave.map(() => "?").join(",")})`)
+      .bind(...wave)
+      .all<PayloadRow>();
+
+    for (const row of rows.results) {
+      const title = parseStoredTitle(row.payload);
+
+      if (title) {
+        titles.set(title.id, title);
+      }
+    }
+  }
+
+  return titles;
+}
+
 export async function readItems(db: D1Database, ids: string[], limit = 30) {
   const uniqueIds = [...new Set(ids.filter(isKnownTitle))].slice(0, Math.min(limit, 400));
 

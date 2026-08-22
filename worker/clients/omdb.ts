@@ -35,6 +35,22 @@ function numeric(value: unknown) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function money(value: unknown) {
+  return typeof value === "string" ? numeric(value.replace(/^[^\d]*/u, "")) : null;
+}
+
+function awardWins(value: unknown) {
+  if (typeof value !== "string" || value === "N/A") {
+    return { awards: null, awardWins: null };
+  }
+
+  const wins = /(\d+)\s+wins?/iu.exec(value);
+  const won = /won\s+(\d+)/iu.exec(value);
+  const total = Number(wins?.[1] ?? won?.[1] ?? 0);
+
+  return { awards: value.slice(0, 200), awardWins: Number.isFinite(total) ? total : null };
+}
+
 export async function getOmdbRatings(env: Bindings, imdbId: string): Promise<TitleRatings> {
   if (!env.OMDB_API_KEY) {
     throw new OmdbError("OMDb is not configured", 503);
@@ -79,6 +95,8 @@ export async function getOmdbRatings(env: Bindings, imdbId: string): Promise<Tit
     imdbVotes: numeric(payload.imdbVotes),
     rottenTomatoes: ratingValue(payload, "Rotten Tomatoes"),
     metascore: numeric(payload.Metascore),
+    boxOffice: money(payload.BoxOffice),
+    ...awardWins(payload.Awards),
   };
 }
 

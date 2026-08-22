@@ -1,8 +1,11 @@
+export type UserRole = "viewer" | "admin";
+
 export type User = {
   id: string;
   name: string;
   login: string;
   avatarUrl: string | null;
+  role: UserRole;
 };
 
 export type EntryStatus = "watchlist" | "watching" | "watched" | "dropped";

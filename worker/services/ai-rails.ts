@@ -21,7 +21,7 @@ const SEED_POOL = 30;
 const RAIL_MIN = 2;
 const RAIL_MAX = 6;
 const TASTE_SAMPLE = 16;
-const NEIGHBOUR_TOP_K = 150;
+const NEIGHBOUR_TOP_K = 100;
 
 const SYSTEM_PROMPT = [
   "You are Marquee, building ONE themed shelf of films or television for a single viewer.",
@@ -143,7 +143,7 @@ async function neighbourIds(env: Bindings, vector: number[], slice: Angle["slice
   });
   const ids = matches.matches.map((match) => match.id);
 
-  return slice === "near" ? ids.slice(0, 80) : ids.slice(60);
+  return slice === "near" ? ids.slice(0, 60) : ids.slice(40);
 }
 
 async function seedCandidates(

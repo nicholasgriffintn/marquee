@@ -69,7 +69,7 @@ async function runCurator(
       model: fastModel(env),
       timeoutMs: 25_000,
       toolChoice: availableIds.size === 0 ? "required" : "auto",
-      metadata: { feature: "curator", round: String(round), viewer: viewerId },
+      metadata: { feature: "curator", round: String(round), viewer: viewerId || "guest" },
     });
 
     if (!response.tool_calls?.length) {
@@ -116,7 +116,7 @@ async function runCurator(
     model: fastModel(env),
     timeoutMs: 25_000,
     json: true,
-    metadata: { feature: "curator", round: "final", viewer: viewerId },
+    metadata: { feature: "curator", round: "final", viewer: viewerId || "guest" },
   });
   const result = response.content ? parseCuratorResult(response.content, availableIds) : null;
 
@@ -132,10 +132,11 @@ export async function* curateStream(
   prompt: string,
   viewerId: string,
   turns: CuratorTurn[] = [],
+  options: { providerIds?: string[] } = {},
 ): AsyncGenerator<CuratorEvent> {
-  yield { type: "status", label: "Reading your shelf" };
+  yield { type: "status", label: viewerId ? "Reading your shelf" : "Reading your services" };
 
-  const viewer = await readViewerContext(env.DB, viewerId);
+  const viewer = await readViewerContext(env.DB, viewerId, options.providerIds ?? []);
 
   yield {
     type: "status",

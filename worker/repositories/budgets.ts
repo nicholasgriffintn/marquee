@@ -5,6 +5,7 @@ type BudgetRow = {
   callLimit: number;
   used: number;
   windowStartedAt: string;
+  pausedUntil: string | null;
 };
 
 export const SOURCE_BUDGETS: Record<
@@ -15,7 +16,7 @@ export const SOURCE_BUDGETS: Record<
   watchmode: { windowKind: "month", callLimit: 1_000 },
   omdb: { windowKind: "day", callLimit: 500_000 },
   poster: { windowKind: "day", callLimit: 500_000 },
-  simkl: { windowKind: "day", callLimit: 50_000 },
+  simkl: { windowKind: "day", callLimit: 5_000 },
   anilist: { windowKind: "day", callLimit: 2_000 },
 };
 
@@ -35,9 +36,11 @@ export async function claimBudget(env: Bindings, source: EnrichmentSource) {
     .run();
 
   const row = await env.DB.prepare(
-    `SELECT window_kind AS windowKind, call_limit AS callLimit, used, window_started_at AS windowStartedAt
+    `SELECT window_kind AS windowKind, call_limit AS callLimit, used,
+            window_started_at AS windowStartedAt, paused_until AS pausedUntil
      FROM source_budgets
-     WHERE source = ?`,
+     WHERE source = ?
+       AND (paused_until IS NULL OR paused_until <= CURRENT_TIMESTAMP)`,
   )
     .bind(source)
     .first<BudgetRow>();
@@ -70,10 +73,38 @@ export async function claimBudget(env: Bindings, source: EnrichmentSource) {
   return claimed.meta.changes > 0;
 }
 
+export async function pauseSource(env: Bindings, source: EnrichmentSource, minutes: number) {
+  await env.DB.prepare(
+    `UPDATE source_budgets
+     SET paused_until = datetime('now', ?), updated_at = CURRENT_TIMESTAMP
+     WHERE source = ?`,
+  )
+    .bind(`+${Math.max(1, Math.trunc(minutes))} minutes`, source)
+    .run();
+
+  console.log(JSON.stringify({ event: "source_paused", source, minutes }));
+}
+
+export async function resumeSource(env: Bindings, source: EnrichmentSource) {
+  await env.DB.prepare(
+    `UPDATE source_budgets
+     SET paused_until = NULL, updated_at = CURRENT_TIMESTAMP
+     WHERE source = ?`,
+  )
+    .bind(source)
+    .run();
+}
+
+export function isRateLimited(error: unknown) {
+  return (
+    error instanceof Error && "status" in error && (error as { status?: unknown }).status === 429
+  );
+}
+
 export async function readBudgets(env: Bindings) {
   const rows = await env.DB.prepare(
     `SELECT source, window_kind AS windowKind, call_limit AS callLimit, used,
-            window_started_at AS windowStartedAt
+            window_started_at AS windowStartedAt, paused_until AS pausedUntil
      FROM source_budgets
      ORDER BY source`,
   ).all<BudgetRow & { source: string }>();

@@ -1,4 +1,4 @@
-import { parseCookies } from "@ngriffin_uk/auth-cookie";
+import { parseCookies, serializeCookie } from "@ngriffin_uk/auth-cookie";
 import type { Context, MiddlewareHandler } from "hono";
 
 import { jsonResponse } from "../lib/http.ts";
@@ -8,6 +8,7 @@ import { createAuthentication } from "./authentication.ts";
 import type { MarqueeUser } from "./model.ts";
 
 export const SESSION_COOKIE = "marquee_session";
+export const GUEST_COOKIE = "marquee_guest";
 export const STATE_COOKIE = "marquee_oauth_state";
 export const RETURN_COOKIE = "marquee_return_to";
 
@@ -16,7 +17,14 @@ export type AuthVariables = {
   sessionToken: string;
 };
 
+export type ViewerVariables = {
+  viewer: MarqueeUser | null;
+};
+
 export type AppContext = Context<{ Bindings: Bindings }>;
+
+const GUEST_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
+const GUEST_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 
 export function authenticationFor(env: Bindings, request: Request) {
   const origin = canonicalOrigin(request, env.SITE_ORIGIN);
@@ -35,6 +43,60 @@ export async function sessionPrincipal(env: Bindings, request: Request) {
 
   return user ? { token, user } : null;
 }
+
+export function guestIdentity(env: Bindings, request: Request) {
+  const existing = parseCookies(request.headers.get("cookie") ?? "").get(GUEST_COOKIE);
+
+  if (existing && GUEST_ID_PATTERN.test(existing)) {
+    return { guestId: existing, cookie: null };
+  }
+
+  const guestId = crypto.randomUUID();
+
+  return {
+    guestId,
+    cookie: serializeCookie(GUEST_COOKIE, guestId, {
+      path: "/",
+      httpOnly: true,
+      sameSite: "lax",
+      secure: canonicalOrigin(request, env.SITE_ORIGIN).startsWith("https://"),
+      maxAge: GUEST_MAX_AGE_SECONDS,
+    }),
+  };
+}
+
+export const attachViewer: MiddlewareHandler<{
+  Bindings: Bindings;
+  Variables: ViewerVariables;
+}> = async (context, next) => {
+  const principal = await sessionPrincipal(context.env, context.req.raw);
+
+  context.set("viewer", principal?.user ?? null);
+  await next();
+
+  return context.res;
+};
+
+export const requireAdmin: MiddlewareHandler<{
+  Bindings: Bindings;
+  Variables: AuthVariables;
+}> = async (context, next) => {
+  const principal = await sessionPrincipal(context.env, context.req.raw);
+
+  if (!principal) {
+    return jsonResponse({ error: "Sign in required" }, 401);
+  }
+
+  if (principal.user.role !== "admin") {
+    return jsonResponse({ error: "Administrator access required" }, 403);
+  }
+
+  context.set("authenticatedUser", principal.user);
+  context.set("sessionToken", principal.token);
+  await next();
+
+  return context.res;
+};
 
 export const requireAuthentication: MiddlewareHandler<{
   Bindings: Bindings;

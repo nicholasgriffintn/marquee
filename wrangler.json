@@ -65,6 +65,22 @@
         "limit": 120,
         "period": 60
       }
+    },
+    {
+      "name": "CURATOR_FREE_RATE_LIMITER",
+      "namespace_id": "764219",
+      "simple": {
+        "limit": 4,
+        "period": 60
+      }
+    },
+    {
+      "name": "INSIGHT_RATE_LIMITER",
+      "namespace_id": "764220",
+      "simple": {
+        "limit": 40,
+        "period": 60
+      }
     }
   ],
   "vars": {
@@ -90,7 +106,7 @@
     "enabled": true
   },
   "triggers": {
-    "crons": ["17 */6 * * *", "0 9 * * 1"]
+    "crons": ["17 */3 * * *", "41 4 * * *", "0 9 * * 1"]
   },
   "queues": {
     "producers": [

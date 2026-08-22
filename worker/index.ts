@@ -7,6 +7,7 @@ import { scheduleIngestion } from "./jobs/ingestion-scheduler.ts";
 import { hasTrustedOrigin } from "./lib/http.ts";
 import { canonicalOrigin } from "./lib/security.ts";
 import { withShareCard } from "./lib/share.ts";
+import { adminRoutes } from "./routes/admin.ts";
 import { catalogRoutes } from "./routes/catalog.ts";
 import { curatorRoutes } from "./routes/curator.ts";
 import { eventRoutes } from "./routes/events.ts";
@@ -41,6 +42,8 @@ app.use("/api/*", async (context, next) => {
 app.get("/health", (context) => context.json({ ok: true, service: "marquee" }));
 
 app.route("/media", mediaRoutes);
+
+app.route("/api/admin", adminRoutes);
 
 app.route("/api/catalog", catalogRoutes);
 

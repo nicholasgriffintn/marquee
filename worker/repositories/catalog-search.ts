@@ -166,8 +166,8 @@ export async function searchCatalogue(db: D1Database, search: CatalogueSearch) {
   }
 
   if (excludedIds.length) {
-    conditions.push(`t.id NOT IN (${excludedIds.map(() => "?").join(", ")})`);
-    bindings.push(...excludedIds);
+    conditions.push(`t.id NOT IN (SELECT value FROM json_each(?))`);
+    bindings.push(JSON.stringify(excludedIds));
   }
 
   if (search.includeIds) {
@@ -177,8 +177,8 @@ export async function searchCatalogue(db: D1Database, search: CatalogueSearch) {
       return [];
     }
 
-    conditions.push(`t.id IN (${includedIds.map(() => "?").join(", ")})`);
-    bindings.push(...includedIds);
+    conditions.push(`t.id IN (SELECT value FROM json_each(?))`);
+    bindings.push(JSON.stringify(includedIds));
   }
 
   const from = match
@@ -233,9 +233,9 @@ export async function readRanked(db: D1Database, ids: string[]) {
     .prepare(
       `SELECT id, payload, poster_key AS posterKey
        FROM catalog_titles
-       WHERE id IN (${uniqueIds.map(() => "?").join(", ")})`,
+       WHERE id IN (SELECT value FROM json_each(?))`,
     )
-    .bind(...uniqueIds)
+    .bind(JSON.stringify(uniqueIds))
     .all<PayloadRow & { id: string }>();
   const byId = new Map(hydrate(rows.results).map((title) => [title.id, title]));
 

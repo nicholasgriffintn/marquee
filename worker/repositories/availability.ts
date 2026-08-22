@@ -1,18 +1,22 @@
 import type { MediaTitle, ProviderAvailability } from "../../src/domain/catalog.ts";
-import { readItems } from "./catalog-reader.ts";
+import { readRawItems } from "./catalog-reader.ts";
 
 export async function enrichAvailability(
   db: D1Database,
   titleId: string,
   availability: ProviderAvailability[],
 ) {
-  const [title] = await readItems(db, [titleId]);
+  const title = (await readRawItems(db, [titleId])).get(titleId);
 
   if (!title) {
     return false;
   }
 
-  const mergedProviders = new Map(title.providers.map((provider) => [provider.id, provider]));
+  const mergedProviders = new Map(
+    title.providers
+      .filter((provider) => provider.source === "TMDB / JustWatch")
+      .map((provider) => [provider.id, provider]),
+  );
 
   for (const provider of availability) {
     const existing = mergedProviders.get(provider.id);

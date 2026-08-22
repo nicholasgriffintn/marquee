@@ -4,7 +4,7 @@ Marquee is a streaming discovery service with live title search, provider-aware 
 
 Title metadata and images come from TMDB. Streaming, rental, and purchase availability comes from JustWatch, both through TMDB's watch-provider API and directly for per-service deep links. Watchmode supplies the service directory and fills availability gaps on saved titles. User authentication is via GitHub OAuth.
 
-Air dates come from TVmaze, anime tags from AniList, and the trending rail is ranked by Wikipedia pageview movement. A viewer can link Trakt to import their watch history, ratings and watchlist.
+Air dates come from TVmaze, both its broadcast and streaming schedules; anime tags and scores from AniList; awards and box office from OMDb; and the trending rail is ranked by Wikipedia pageview movement. A viewer can link Trakt to import their watch history, ratings and watchlist.
 
 ## How search works
 
@@ -95,17 +95,39 @@ pnpm deploy
 
 ## Backfills
 
-The catalogue sweep is a Workflow on a six-hourly cron. It syncs providers and the homepage
-sections, fans the discover pages out over the ingestion queue, refreshes the TVmaze schedule and
-the Wikipedia buzz sample, then queues enrichment and embeddings.
+The catalogue sweep is a Workflow on two crons. A light sweep every three hours refreshes the
+homepage head, the TVmaze schedule and the Wikipedia buzz sample, and queues availability,
+enrichment, embeddings and the homepage sections. A deep sweep once a night additionally syncs the
+provider ledger and fans all of TMDB's discover pages out over the ingestion queue.
 
 Keywords, credits and embeddings arrive as titles are re-hydrated from TMDB, so a fresh deployment
-fills in over the first few sweeps rather than all at once. Embeddings are queued 2,000 at a time
-against whatever is unembedded or has been updated since it was last embedded, so nothing is
-re-embedded without reason.
+fills in over the first few sweeps rather than all at once. A sweep merges rather than replaces:
+ratings, external ids and fetched availability survive a re-hydration, and a title whose TMDB
+record has not moved is not rewritten at all. Embeddings are queued 2,000 at a time and keyed on a
+hash of the text they are built from, so a title is only re-embedded when that text changes.
+
+Availability is refreshed on a rolling seven-day window, 400 titles a sweep, oldest first. A source
+that answers 429 is stood down for a while rather than retried, and the pause shows on the Sources
+page next to its call budget.
 
 A second cron on Monday mornings runs the digest workflow, which writes a per-viewer digest of
 fresh releases near their taste, what is trending, and the week's episodes, readable at `/this-week`.
+
+## Admin
+
+Accounts carry a role, `viewer` or `admin`. The first account to sign in on a fresh deployment
+becomes the administrator; everyone after that is a viewer. Admins get an `/admin` page in the
+navigation with the pipeline's call budgets, enrichment coverage, recent jobs, failures and the
+homepage rails, plus buttons to start a sweep, rebuild the digests, queue a backfill, or resume a
+source that has been stood down after a rate limit. Roles are granted and revoked from the same
+page, and the last remaining administrator cannot be demoted.
+
+Everything under `/api/admin` requires an administrator session. If you ever lock yourself out,
+promote an account directly:
+
+```bash
+pnpm exec wrangler d1 execute DB --remote --command "UPDATE users SET role = 'admin' WHERE github_login = 'your-login'"
+```
 
 ## Connecting an agent
 

@@ -97,7 +97,12 @@ async function pairCandidates(env: Bindings, title: MediaTitle) {
   ).filter((item) => item.id !== title.id);
 }
 
-export async function getTitleInsight(env: Bindings, titleId: string) {
+export async function getTitleInsight(
+  env: Bindings,
+  titleId: string,
+  options: { generate?: boolean } = {},
+) {
+  const generate = options.generate ?? true;
   const cached = await env.DB.prepare(
     `SELECT payload, julianday('now') - julianday(created_at) AS ageDays
      FROM title_insights WHERE title_id = ?`,
@@ -105,8 +110,12 @@ export async function getTitleInsight(env: Bindings, titleId: string) {
     .bind(titleId)
     .first<InsightRow>();
 
-  if (cached && cached.ageDays < MAX_AGE_DAYS) {
+  if (cached && (!generate || cached.ageDays < MAX_AGE_DAYS)) {
     return JSON.parse(cached.payload) as TitleInsight;
+  }
+
+  if (!generate) {
+    return null;
   }
 
   const [title] = await readItems(env.DB, [titleId]);

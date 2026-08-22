@@ -48,7 +48,11 @@ export function isIngestionJob(value: unknown): value is IngestionJob {
     );
   }
 
-  if (value.type === "sync-schedule" || value.type === "sync-buzz") {
+  if (
+    value.type === "sync-schedule" ||
+    value.type === "sync-buzz" ||
+    value.type === "build-sections"
+  ) {
     return true;
   }
 

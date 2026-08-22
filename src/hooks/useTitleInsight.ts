@@ -10,13 +10,13 @@ export type TitleInsight = {
 
 export type InsightPair = { item: MediaTitle; reason: string };
 
-export function useTitleInsight(titleId: string | null, enabled: boolean) {
+export function useTitleInsight(titleId: string | null) {
   const [insight, setInsight] = useState<TitleInsight | null>(null);
   const [pairs, setPairs] = useState<InsightPair[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (!titleId || !enabled) {
+    if (!titleId) {
       return;
     }
 
@@ -54,7 +54,7 @@ export function useTitleInsight(titleId: string | null, enabled: boolean) {
       active = false;
       controller.abort();
     };
-  }, [enabled, titleId]);
+  }, [titleId]);
 
   return { insight, pairs, isLoading };
 }

@@ -3,6 +3,8 @@ export type Bindings = {
   DB: D1Database;
   AUTH_RATE_LIMITER: RateLimit;
   CURATOR_RATE_LIMITER: RateLimit;
+  CURATOR_FREE_RATE_LIMITER: RateLimit;
+  INSIGHT_RATE_LIMITER: RateLimit;
   SEARCH_RATE_LIMITER: RateLimit;
   SEARCH_MEMBER_RATE_LIMITER: RateLimit;
   CLOUDFLARE_ACCOUNT_ID: string;
@@ -27,7 +29,7 @@ export type Bindings = {
   SIMKL_QUEUE: Queue<IngestionJob>;
   POSTER_QUEUE: Queue<IngestionJob>;
   EMBEDDING_QUEUE: Queue<IngestionJob>;
-  CATALOG_SWEEP: Workflow;
+  CATALOG_SWEEP: Workflow<CatalogSweepParameters>;
   RAILS_WORKFLOW: Workflow<{ viewerId: string }>;
   DIGEST_WORKFLOW: Workflow;
   CURATOR_SESSION: DurableObjectNamespace;
@@ -36,6 +38,8 @@ export type Bindings = {
   TRAKT_CLIENT_SECRET?: string;
 };
 
+export type CatalogSweepParameters = { deep?: boolean };
+
 export type EnrichmentSource = "justwatch" | "watchmode" | "omdb" | "poster" | "simkl" | "anilist";
 
 export type TitleRatings = {
@@ -43,6 +47,10 @@ export type TitleRatings = {
   imdbVotes: number | null;
   rottenTomatoes: string | null;
   metascore: number | null;
+  awards?: string | null;
+  awardWins?: number | null;
+  boxOffice?: number | null;
+  anilistScore?: number | null;
 };
 
 export type ExternalIds = {
@@ -66,7 +74,8 @@ export type IngestionJob =
   | { type: "embed-titles"; titleIds: string[] }
   | { type: "import-trakt-history"; viewerId: string; origin: string }
   | { type: "sync-schedule" }
-  | { type: "sync-buzz" };
+  | { type: "sync-buzz" }
+  | { type: "build-sections" };
 
 export type EntryStatus = "watchlist" | "watching" | "watched" | "dropped";
 

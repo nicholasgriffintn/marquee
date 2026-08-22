@@ -1,28 +1,54 @@
 import { Hono } from "hono";
 
-import { requireAuthentication, type AuthVariables } from "../auth/session.ts";
+import type { MarqueeUser } from "../auth/model.ts";
+import { attachViewer, guestIdentity, type ViewerVariables } from "../auth/session.ts";
 import { recordEvent } from "../lib/events.ts";
 import { clientRateLimitKey, jsonResponse, readJsonObject } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
-import { isKnownTitle } from "../lib/validation.ts";
+import { isKnownTitle, validProviderIds } from "../lib/validation.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
 import { getPersonalRails } from "../services/ai-rails.ts";
 import { readDigest } from "../services/digest.ts";
 import { getTitleInsight } from "../services/title-insight.ts";
 import type { Bindings } from "../types.ts";
 
-export const curatorRoutes = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
+export const curatorRoutes = new Hono<{ Bindings: Bindings; Variables: ViewerVariables }>();
 
-curatorRoutes.use("*", requireAuthentication);
+curatorRoutes.use("*", attachViewer);
+
+function askIdentity(env: Bindings, request: Request, user: MarqueeUser | null) {
+  if (user) {
+    return { sessionKey: user.id, viewerId: user.id, isMember: true, cookie: null };
+  }
+
+  const guest = guestIdentity(env, request);
+
+  return {
+    sessionKey: `guest:${guest.guestId}`,
+    viewerId: "",
+    isMember: false,
+    cookie: guest.cookie,
+  };
+}
 
 curatorRoutes.post("/", async (context) => {
-  const user = context.get("authenticatedUser");
-  const { success } = await context.env.CURATOR_RATE_LIMITER.limit({
-    key: clientRateLimitKey(context.req.raw, user.id),
+  const identity = askIdentity(context.env, context.req.raw, context.get("viewer"));
+  const limiter = identity.isMember
+    ? context.env.CURATOR_RATE_LIMITER
+    : context.env.CURATOR_FREE_RATE_LIMITER;
+  const { success } = await limiter.limit({
+    key: clientRateLimitKey(context.req.raw, identity.sessionKey),
   });
 
   if (!success) {
-    return jsonResponse({ error: "Too many curator requests. Try again in a minute." }, 429);
+    return jsonResponse(
+      {
+        error: identity.isMember
+          ? "Too many curator requests. Try again in a minute."
+          : "That is the free limit for now. Sign in for more, or try again in a minute.",
+      },
+      429,
+    );
   }
 
   const body = await readJsonObject(context.req.raw);
@@ -37,20 +63,46 @@ curatorRoutes.post("/", async (context) => {
     return jsonResponse({ error: "Describe what kind of watch you want" }, 400);
   }
 
-  recordEvent(context.env, { name: "curator_ask", viewerId: user.id, detail: prompt });
+  const providerIds = validProviderIds(
+    Array.isArray(body.providerIds) ? body.providerIds : [],
+  ).slice(0, 24);
 
-  const session = context.env.CURATOR_SESSION.get(context.env.CURATOR_SESSION.idFromName(user.id));
+  recordEvent(context.env, {
+    name: "curator_ask",
+    viewerId: identity.viewerId || undefined,
+    detail: prompt,
+  });
 
-  return session.fetch("https://curator/ask", {
+  const session = context.env.CURATOR_SESSION.get(
+    context.env.CURATOR_SESSION.idFromName(identity.sessionKey),
+  );
+  const streamed = await session.fetch("https://curator/ask", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ prompt, viewerId: user.id }),
+    body: JSON.stringify({ prompt, viewerId: identity.viewerId, providerIds }),
   });
+
+  if (!identity.cookie) {
+    return streamed;
+  }
+
+  const response = new Response(streamed.body, streamed);
+
+  response.headers.append("set-cookie", identity.cookie);
+
+  return response;
 });
 
 curatorRoutes.delete("/", async (context) => {
-  const user = context.get("authenticatedUser");
-  const session = context.env.CURATOR_SESSION.get(context.env.CURATOR_SESSION.idFromName(user.id));
+  const identity = askIdentity(context.env, context.req.raw, context.get("viewer"));
+
+  if (identity.cookie) {
+    return jsonResponse({ cleared: true });
+  }
+
+  const session = context.env.CURATOR_SESSION.get(
+    context.env.CURATOR_SESSION.idFromName(identity.sessionKey),
+  );
 
   await session.fetch("https://curator/reset", { method: "POST" });
 
@@ -58,7 +110,11 @@ curatorRoutes.delete("/", async (context) => {
 });
 
 curatorRoutes.get("/rails", async (context) => {
-  const user = context.get("authenticatedUser");
+  const user = context.get("viewer");
+
+  if (!user) {
+    return jsonResponse({ error: "Sign in required" }, 401);
+  }
 
   try {
     context.header("cache-control", "no-store");
@@ -88,7 +144,11 @@ curatorRoutes.get("/rails", async (context) => {
 });
 
 curatorRoutes.get("/digest", async (context) => {
-  const user = context.get("authenticatedUser");
+  const user = context.get("viewer");
+
+  if (!user) {
+    return jsonResponse({ error: "Sign in required" }, 401);
+  }
 
   try {
     context.header("cache-control", "no-store");
@@ -108,8 +168,10 @@ curatorRoutes.get("/insight/:titleId", async (context) => {
     return jsonResponse({ error: "Unknown title" }, 400);
   }
 
-  const { success } = await context.env.CURATOR_RATE_LIMITER.limit({
-    key: clientRateLimitKey(context.req.raw, context.get("authenticatedUser").id),
+  const user = context.get("viewer");
+  const limiter = user ? context.env.CURATOR_RATE_LIMITER : context.env.INSIGHT_RATE_LIMITER;
+  const { success } = await limiter.limit({
+    key: clientRateLimitKey(context.req.raw, user?.id ?? "anonymous"),
   });
 
   if (!success) {
@@ -117,7 +179,7 @@ curatorRoutes.get("/insight/:titleId", async (context) => {
   }
 
   try {
-    const insight = await getTitleInsight(context.env, titleId);
+    const insight = await getTitleInsight(context.env, titleId, { generate: Boolean(user) });
 
     if (!insight) {
       return jsonResponse({ insight: null, pairs: [] });

@@ -36,15 +36,23 @@ function airstamp(episode: Record<string, unknown>) {
 }
 
 function networkName(show: Record<string, unknown>) {
-  const network = recordAt(show, "network") ?? recordAt(show, "webChannel");
+  const network = recordAt(show, "webChannel") ?? recordAt(show, "network");
 
   return network ? stringAt(network, "name") : null;
 }
 
-export async function getTvmazeSchedule(countryCode: string, date: string) {
-  const url = new URL(`${API_BASE}/schedule`);
+function scheduleUrl(countryCode: string | null, date: string) {
+  const url = new URL(`${API_BASE}/schedule${countryCode ? "" : "/web"}`);
 
-  url.search = new URLSearchParams({ country: countryCode, date }).toString();
+  url.search = new URLSearchParams(
+    countryCode ? { country: countryCode, date } : { date },
+  ).toString();
+
+  return url;
+}
+
+export async function getTvmazeSchedule(countryCode: string | null, date: string) {
+  const url = scheduleUrl(countryCode, date);
 
   const response = await fetch(url, {
     headers: { accept: "application/json" },
@@ -59,7 +67,7 @@ export async function getTvmazeSchedule(countryCode: string, date: string) {
   const payload = await response.json();
 
   return records(payload).flatMap((episode): ScheduledEpisode[] => {
-    const show = recordAt(episode, "show");
+    const show = recordAt(episode, "show") ?? recordAt(recordAt(episode, "_embedded"), "show");
     const showName = show ? stringAt(show, "name") : null;
     const airsAt = airstamp(episode);
     const id = numberAt(episode, "id");

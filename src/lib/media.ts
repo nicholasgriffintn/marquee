@@ -50,6 +50,14 @@ export function mediaMeta(item: MediaTitle) {
   return values.filter(Boolean).join(" · ");
 }
 
+export function moneyLabel(value: number) {
+  if (value >= 1_000_000_000) {
+    return `$${(value / 1_000_000_000).toFixed(1)}bn`;
+  }
+
+  return value >= 1_000_000 ? `$${Math.round(value / 1_000_000)}m` : `$${value.toLocaleString()}`;
+}
+
 export function scoreLabel(item: MediaTitle) {
   return item.tmdbScore === null ? "Not yet rated" : `${item.tmdbScore.toFixed(1)} / 10`;
 }

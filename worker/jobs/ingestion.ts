@@ -13,7 +13,7 @@ import {
 import { getWatchmodeAvailability } from "../clients/watchmode.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { enrichAvailability } from "../repositories/availability.ts";
-import { claimBudget } from "../repositories/budgets.ts";
+import { claimBudget, isRateLimited, pauseSource } from "../repositories/budgets.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
 import { storeCatalog, storeItems } from "../repositories/catalog-writer.ts";
 import {
@@ -26,6 +26,7 @@ import { storeProviders } from "../repositories/providers.ts";
 import { syncBuzz } from "../services/buzz.ts";
 import { embedTitles, selectUnembedded } from "../services/embeddings.ts";
 import { syncSchedule } from "../services/schedule.ts";
+import { buildSections } from "../services/sections.ts";
 import { importTraktHistory } from "../services/trakt.ts";
 import type { Bindings, EnrichmentSource, IngestionJob } from "../types.ts";
 import { getProviderLedger } from "./provider-ledger.ts";
@@ -33,14 +34,21 @@ import { getProviderLedger } from "./provider-ledger.ts";
 type SavedTitleRow = { titleId: string };
 
 const AVAILABILITY_MAX_AGE_DAYS = 7;
+const AVAILABILITY_PER_RUN = 400;
 const QUEUE_BATCH = 100;
 const EMBED_JOB_SIZE = 25;
 const EMBED_PER_RUN = 2_000;
 const MIN_POSTER_BYTES = 40_000;
 
+const RATE_LIMIT_PAUSE_MINUTES: Partial<Record<EnrichmentSource, number>> = {
+  simkl: 60,
+  anilist: 60,
+  watchmode: 24 * 60,
+};
+
 const ENRICHERS = [
   { source: "omdb", job: "enrich-ratings", maxAgeDays: 30, perRun: 900 },
-  { source: "simkl", job: "enrich-simkl", maxAgeDays: 90, perRun: 150 },
+  { source: "simkl", job: "enrich-simkl", maxAgeDays: 90, perRun: 120 },
   { source: "poster", job: "cache-poster", maxAgeDays: 365, perRun: 2_000 },
   { source: "anilist", job: "enrich-anilist", maxAgeDays: 14, perRun: 400 },
 ] as const satisfies readonly {
@@ -83,6 +91,24 @@ function sourceConfigured(env: Bindings, source: EnrichmentSource) {
   }
 
   return Boolean(env.SIMKL_CLIENT_ID);
+}
+
+async function withRateLimitPause<T>(
+  env: Bindings,
+  source: EnrichmentSource,
+  run: () => Promise<T>,
+) {
+  try {
+    return await run();
+  } catch (error) {
+    if (!isRateLimited(error)) {
+      throw error;
+    }
+
+    await pauseSource(env, source, RATE_LIMIT_PAUSE_MINUTES[source] ?? 30);
+
+    return null;
+  }
 }
 
 function titleParts(titleId: string) {
@@ -164,6 +190,28 @@ export async function queueEmbeddings(env: Bindings) {
   console.log(JSON.stringify({ event: "embeddings_queued", titles: titleIds.length }));
 
   await enqueue(env.EMBEDDING_QUEUE, jobs);
+}
+
+export async function queueStaleAvailability(env: Bindings) {
+  const rows = await env.DB.prepare(
+    `SELECT id AS titleId
+     FROM catalog_titles
+     WHERE enriched_at IS NULL OR enriched_at < datetime('now', ?)
+     ORDER BY (enriched_at IS NOT NULL), popularity DESC
+     LIMIT ?`,
+  )
+    .bind(`-${AVAILABILITY_MAX_AGE_DAYS} days`, AVAILABILITY_PER_RUN)
+    .all<SavedTitleRow>();
+  const titleIds = rows.results.map((row) => row.titleId).filter(isKnownTitle);
+
+  console.log(JSON.stringify({ event: "availability_backfill_queued", count: titleIds.length }));
+
+  await enqueue(
+    env.AVAILABILITY_QUEUE,
+    titleIds.map((titleId): IngestionJob => ({ type: "enrich-availability", titleId })),
+  );
+
+  return titleIds.length;
 }
 
 export async function queueEnrichment(env: Bindings) {
@@ -279,7 +327,11 @@ async function watchmodeAvailability(
     return [];
   }
 
-  return getWatchmodeAvailability(env, mediaType, tmdbId);
+  return (
+    (await withRateLimitPause(env, "watchmode", () =>
+      getWatchmodeAvailability(env, mediaType, tmdbId),
+    )) ?? []
+  );
 }
 
 async function enrichTitleAvailability(env: Bindings, titleId: string) {
@@ -333,7 +385,17 @@ async function enrichRatings(env: Bindings, titleId: string) {
     return;
   }
 
-  await storeEnrichment(env, titleId, "omdb", { ratings: await getOmdbRatings(env, imdbId) });
+  const ratings = await withRateLimitPause(env, "omdb", () => getOmdbRatings(env, imdbId));
+
+  if (!ratings) {
+    return;
+  }
+
+  const [title] = await readItems(env.DB, [titleId]);
+
+  await storeEnrichment(env, titleId, "omdb", {
+    ratings: { ...ratings, anilistScore: title?.ratings?.anilistScore ?? null },
+  });
 }
 
 async function importImdbTitle(env: Bindings, imdbId: string) {
@@ -425,7 +487,7 @@ async function enrichAnilist(env: Bindings, titleId: string) {
     return;
   }
 
-  const details = await getAnilistDetails(anilistId);
+  const details = await withRateLimitPause(env, "anilist", () => getAnilistDetails(anilistId));
 
   if (!details) {
     return;
@@ -439,7 +501,19 @@ async function enrichAnilist(env: Bindings, titleId: string) {
     ]),
   ].slice(0, 40);
 
-  await storeEnrichment(env, titleId, "anilist", { keywords });
+  await storeEnrichment(env, titleId, "anilist", {
+    keywords,
+    ratings: {
+      imdbScore: title?.ratings?.imdbScore ?? null,
+      imdbVotes: title?.ratings?.imdbVotes ?? null,
+      rottenTomatoes: title?.ratings?.rottenTomatoes ?? null,
+      metascore: title?.ratings?.metascore ?? null,
+      awards: title?.ratings?.awards ?? null,
+      awardWins: title?.ratings?.awardWins ?? null,
+      boxOffice: title?.ratings?.boxOffice ?? null,
+      anilistScore: details.score,
+    },
+  });
 
   if (details.nextEpisode && title) {
     await env.DB.prepare(
@@ -476,7 +550,9 @@ async function enrichSimkl(env: Bindings, titleId: string) {
     return;
   }
 
-  const externalIds = await getSimklIds(env, parts.mediaType, parts.tmdbId);
+  const externalIds = await withRateLimitPause(env, "simkl", () =>
+    getSimklIds(env, parts.mediaType, parts.tmdbId),
+  );
 
   if (externalIds) {
     await storeEnrichment(env, titleId, "simkl", { externalIds });
@@ -542,6 +618,12 @@ export async function executeIngestionJob(env: Bindings, job: IngestionJob) {
 
   if (job.type === "sync-buzz") {
     await syncBuzz(env);
+
+    return;
+  }
+
+  if (job.type === "build-sections") {
+    await buildSections(env);
 
     return;
   }

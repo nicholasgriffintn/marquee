@@ -51,11 +51,26 @@ export type MediaTitle = {
   trailerKey?: string | null;
   videos?: { key: string; name: string; type: string }[];
   pending?: boolean;
+  originalLanguage?: string | null;
+  tagline?: string | null;
+  status?: string | null;
+  collection?: { id: number; name: string } | null;
+  studios?: string[];
+  revenue?: number | null;
+  budget?: number | null;
+  episodeCount?: number | null;
+  lastAirDate?: string | null;
+  nextAirDate?: string | null;
+  recommendationIds?: string[];
   ratings?: {
     imdbScore: number | null;
     imdbVotes: number | null;
     rottenTomatoes: string | null;
     metascore: number | null;
+    awards?: string | null;
+    awardWins?: number | null;
+    boxOffice?: number | null;
+    anilistScore?: number | null;
   };
 
   externalIds?: {

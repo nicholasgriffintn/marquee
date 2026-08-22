@@ -32,6 +32,7 @@ function candidateText(title: MediaTitle) {
     title.mediaType === "movie" ? "Film" : "Television",
     title.genres.join(", "),
     (title.keywords ?? []).slice(0, 12).join(", "),
+    (title.studios ?? []).join(", "),
     title.overview,
   ]
     .filter(Boolean)

@@ -15,6 +15,8 @@ const SEED_PROMPTS = [
   "Watch with my kids",
 ];
 
+const SCHEDULE_LIMIT = 8;
+
 const REFINEMENTS = ["Shorter", "Lighter", "Older", "Weirder", "More acclaimed"];
 
 function formatAirTime(value: string) {
@@ -39,7 +41,6 @@ export function TonightPage({
   isSessionLoading,
   error,
   providerError,
-  isSignedIn,
   sections,
   episodes,
   trending,
@@ -59,7 +60,6 @@ export function TonightPage({
   isSessionLoading: boolean;
   error: string;
   providerError: string;
-  isSignedIn: boolean;
   sections: CatalogSection[];
   episodes: ScheduledEpisode[];
   trending: MediaTitle[];
@@ -138,54 +138,52 @@ export function TonightPage({
             </div>
           )}
         </div>
-        {isSignedIn && (
-          <div className="curator-console">
-            <form
-              className="curator-dock"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void onAsk(prompt);
-              }}
+        <div className="curator-console">
+          <form
+            className="curator-dock"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void onAsk(prompt);
+            }}
+          >
+            <span>
+              <i>AI</i> Ask Marquee
+            </span>
+            <input
+              maxLength={1_000}
+              value={prompt}
+              onChange={(event) => setPrompt(event.target.value)}
+              placeholder="90 mins, clever but not bleak…"
+              aria-label="Ask Marquee for recommendations"
+            />
+            <button
+              type="submit"
+              disabled={isAsking || !prompt.trim() || !featured}
+              aria-label="Ask Marquee"
             >
-              <span>
-                <i>AI</i> Ask Marquee
-              </span>
-              <input
-                maxLength={1_000}
-                value={prompt}
-                onChange={(event) => setPrompt(event.target.value)}
-                placeholder="90 mins, clever but not bleak…"
-                aria-label="Ask Marquee for recommendations"
-              />
-              <button
-                type="submit"
-                disabled={isAsking || !prompt.trim() || !featured}
-                aria-label="Ask Marquee"
-              >
-                {isAsking ? "…" : <ArrowIcon />}
-              </button>
-            </form>
-            {!curator.prompt && (
-              <div className="curator-seeds">
-                {SEED_PROMPTS.map((seed) => (
-                  <button
-                    key={seed}
-                    type="button"
-                    onClick={() => {
-                      setPrompt(seed);
-                      void onAsk(seed);
-                    }}
-                  >
-                    {seed}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+              {isAsking ? "…" : <ArrowIcon />}
+            </button>
+          </form>
+          {!curator.prompt && (
+            <div className="curator-seeds">
+              {SEED_PROMPTS.map((seed) => (
+                <button
+                  key={seed}
+                  type="button"
+                  onClick={() => {
+                    setPrompt(seed);
+                    void onAsk(seed);
+                  }}
+                >
+                  {seed}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </section>
 
-      {isSignedIn && (curator.prompt || curatorError) && (
+      {(curator.prompt || curatorError) && (
         <div
           className={`curator-response${curatorError ? " curator-error" : ""}`}
           aria-live="polite"
@@ -219,7 +217,7 @@ export function TonightPage({
         </div>
       )}
 
-      {isSignedIn && !isSessionLoading && (
+      {!isSessionLoading && (
         <section className="provider-strip">
           <div className="provider-strip-heading">
             <div>
@@ -281,6 +279,9 @@ export function TonightPage({
               onOpen={onOpen}
             />
           )}
+          {sections.map((section) => (
+            <ContentRail key={section.id} section={section} onOpen={onOpen} />
+          ))}
           {episodes.length > 0 && (
             <section className="schedule-strip">
               <div className="schedule-heading">
@@ -288,7 +289,7 @@ export function TonightPage({
                 <small>Air times from TVmaze</small>
               </div>
               <div className="schedule-list">
-                {episodes.map((episode) => (
+                {episodes.slice(0, SCHEDULE_LIMIT).map((episode) => (
                   <button
                     type="button"
                     key={`${episode.showName}-${episode.airsAt}-${episode.episode ?? 0}`}
@@ -310,9 +311,6 @@ export function TonightPage({
               </div>
             </section>
           )}
-          {sections.map((section) => (
-            <ContentRail key={section.id} section={section} onOpen={onOpen} />
-          ))}
         </div>
       ) : (
         isLoading && (

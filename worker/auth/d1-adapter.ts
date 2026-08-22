@@ -142,11 +142,14 @@ async function resolveIdentity(db: D1Database, identity: ExternalIdentity) {
   }
 
   const userId = crypto.randomUUID();
+  const firstUser = !(await db.prepare("SELECT 1 AS present FROM users LIMIT 1").first());
 
   await db.batch([
     db
-      .prepare("INSERT INTO users (id, name, github_login, avatar_url) VALUES (?1, ?2, ?3, ?4)")
-      .bind(userId, name, login, avatarUrl),
+      .prepare(
+        "INSERT INTO users (id, name, github_login, avatar_url, role) VALUES (?1, ?2, ?3, ?4, ?5)",
+      )
+      .bind(userId, name, login, avatarUrl, firstUser ? "admin" : "viewer"),
     db
       .prepare(
         `INSERT INTO identities (provider, provider_subject, user_id, claims_json)

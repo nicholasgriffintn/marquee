@@ -60,3 +60,23 @@ export async function recordIngestionRun(env: Bindings, job: IngestionJob) {
     throw error;
   }
 }
+
+const RUN_RETENTION_DAYS = 7;
+const RUN_PRUNE_LIMIT = 20_000;
+
+export async function pruneIngestionRuns(env: Bindings) {
+  const result = await env.DB.prepare(
+    `DELETE FROM ingestion_runs
+     WHERE id IN (
+       SELECT id FROM ingestion_runs
+       WHERE started_at < datetime('now', ?)
+       LIMIT ?
+     )`,
+  )
+    .bind(`-${RUN_RETENTION_DAYS} days`, RUN_PRUNE_LIMIT)
+    .run();
+
+  console.log(JSON.stringify({ event: "ingestion_runs_pruned", removed: result.meta.changes }));
+
+  return result.meta.changes;
+}

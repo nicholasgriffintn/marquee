@@ -1,10 +1,5 @@
-import { isEntryStatus, isKnownTitle, validProviderIds } from "../lib/validation.ts";
-import {
-  deleteViewingEntry,
-  readProfile,
-  saveProviderPreferences,
-  saveViewingEntry,
-} from "../repositories/profile.ts";
+import { isEntryStatus, isKnownTitle } from "../lib/validation.ts";
+import { deleteViewingEntry, readProfile, saveViewingEntry } from "../repositories/profile.ts";
 
 const MAX_THOUGHTS_LENGTH = 2_000;
 
@@ -19,14 +14,6 @@ export async function updateProfile(
   viewerId: string,
   input: Record<string, unknown>,
 ): Promise<ProfileUpdateResult> {
-  if (Array.isArray(input.selectedProviderIds)) {
-    const selectedProviderIds = validProviderIds(input.selectedProviderIds);
-
-    await saveProviderPreferences(db, viewerId, selectedProviderIds);
-
-    return { ok: true, payload: { preference: { selectedProviderIds } } };
-  }
-
   if (!isKnownTitle(input.titleId)) {
     return { ok: false, error: "Unknown title" };
   }

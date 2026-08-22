@@ -5,9 +5,11 @@ import type { Bindings } from "../types.ts";
 const SECTION_SIZE = 14;
 const OVERFETCH = 60;
 const MIN_SECTION = 6;
-const MAX_SECTIONS = 14;
+const MAX_SECTIONS = 20;
 const ROTATING_GENRES = 3;
-const ROTATING_MOODS = 3;
+const ROTATING_MOODS = 2;
+const ROTATING_STUDIOS = 2;
+const ROTATING_SERVICES = 2;
 
 const JUNK_KEYWORDS = ["duringcreditsstinger", "aftercreditsstinger", "woman director"];
 
@@ -18,6 +20,10 @@ const VOTES = `COALESCE(json_extract(payload, '$.tmdbVoteCount'), 0)`;
 const RUNTIME = `json_extract(payload, '$.runtimeMinutes')`;
 const SEASONS = `json_extract(payload, '$.numberOfSeasons')`;
 const CERT = `COALESCE(json_extract(payload, '$.certification'), '')`;
+const STATUS = `COALESCE(json_extract(payload, '$.status'), '')`;
+const LANGUAGE = `COALESCE(json_extract(payload, '$.originalLanguage'), '')`;
+const REVENUE = `COALESCE(json_extract(payload, '$.revenue'), 0)`;
+const AWARD_WINS = `COALESCE(json_extract(payload, '$.ratings.awardWins'), 0)`;
 
 function titleCase(value: string) {
   return value.replaceAll(/\b\w/gu, (character) => character.toUpperCase());
@@ -32,7 +38,10 @@ function rotate<T>(values: T[], count: number, offset: number) {
     return values;
   }
 
-  return Array.from({ length: count }, (_, index) => values[(offset + index) % values.length]);
+  return Array.from(
+    { length: count },
+    (_, index) => values[(offset + index) % values.length],
+  ).filter((value): value is T => value !== undefined);
 }
 
 async function pick(
@@ -85,6 +94,42 @@ async function topValues(env: Bindings, path: string, minimum: number, limit: nu
   return rows.results
     .map((row) => row.value)
     .filter((value) => typeof value === "string" && value.length > 1);
+}
+
+async function topStudios(env: Bindings, limit: number): Promise<string[]> {
+  const rows = await env.DB.prepare(
+    `SELECT json_each.value AS value, count(*) AS uses
+     FROM catalog_titles, json_each(payload, '$.studios')
+     WHERE ${SCORE} >= 6.5
+     GROUP BY json_each.value
+     HAVING uses BETWEEN 8 AND 400
+     ORDER BY uses DESC
+     LIMIT ?`,
+  )
+    .bind(limit)
+    .all<{ value: string }>();
+
+  return rows.results.map((row) => String(row.value)).filter((value) => value.length > 1);
+}
+
+async function topServices(env: Bindings, limit: number) {
+  const rows = await env.DB.prepare(
+    `SELECT json_extract(offer.value, '$.id') AS providerId,
+            json_extract(offer.value, '$.name') AS providerName,
+            count(*) AS uses
+     FROM catalog_titles, json_each(payload, '$.providers') AS offer
+     WHERE offer.value LIKE '%Subscription%'
+     GROUP BY providerId
+     HAVING uses >= 40
+     ORDER BY uses DESC
+     LIMIT ?`,
+  )
+    .bind(limit)
+    .all<{ providerId: string; providerName: string }>();
+
+  return rows.results
+    .filter((row) => Boolean(row.providerId) && Boolean(row.providerName))
+    .map((row) => ({ id: String(row.providerId), name: String(row.providerName) }));
 }
 
 export async function buildSections(env: Bindings) {
@@ -179,6 +224,92 @@ export async function buildSections(env: Bindings) {
       "popularity DESC",
     ),
   });
+
+  add({
+    id: "ended",
+    title: "Finished, all of it",
+    description: "Series that have ended, so there is nothing left to wait for",
+    titleIds: await pick(
+      env,
+      used,
+      `media_type = 'tv' AND ${STATUS} = 'Ended' AND ${SEASONS} >= 2
+       AND ${SCORE} >= 7.4 AND ${VOTES} >= 150`,
+      `${SCORE} DESC`,
+    ),
+  });
+
+  add({
+    id: "subtitles",
+    title: "Worth the subtitles",
+    description: "The best of what was not made in English",
+    titleIds: await pick(
+      env,
+      used,
+      `${LANGUAGE} NOT IN ('', 'en') AND ${SCORE} >= 7.2 AND ${VOTES} >= 250`,
+      `${SCORE} DESC`,
+    ),
+  });
+
+  add({
+    id: "awarded",
+    title: "The trophy cabinet",
+    description: "Films and series the awards season could not ignore",
+    titleIds: await pick(env, used, `${AWARD_WINS} >= 8 AND ${VOTES} >= 150`, `${AWARD_WINS} DESC`),
+  });
+
+  add({
+    id: "boxoffice",
+    title: "Everyone went to see it",
+    description: "The films that filled cinemas, by what they took",
+    titleIds: await pick(
+      env,
+      used,
+      `media_type = 'movie' AND ${REVENUE} >= 250000000 AND ${SCORE} >= 6.5`,
+      `${REVENUE} DESC`,
+    ),
+  });
+
+  for (const service of await topServices(env, 8).then((services) =>
+    rotate(services, ROTATING_SERVICES, seed * 3),
+  )) {
+    // oxlint-disable-next-line no-await-in-loop
+    const titleIds = await pick(
+      env,
+      used,
+      `${SCORE} >= 6.8 AND ${VOTES} >= 120
+       AND EXISTS (SELECT 1 FROM json_each(provider_ids) WHERE json_each.value = ?)`,
+      "popularity DESC",
+      [service.id],
+    );
+
+    add({
+      id: `service-${service.id.replaceAll(/\W+/gu, "-")}`,
+      title: `Sitting on ${service.name}`,
+      description: `Well reviewed titles you can already stream on ${service.name}`,
+      titleIds,
+    });
+  }
+
+  for (const studio of await topStudios(env, 24).then((studios) =>
+    rotate(studios, ROTATING_STUDIOS, seed * 11),
+  )) {
+    // oxlint-disable-next-line no-await-in-loop
+    const titleIds = await pick(
+      env,
+      used,
+      `${SCORE} >= 6.8 AND ${VOTES} >= 100
+       AND EXISTS (SELECT 1 FROM json_each(payload, '$.studios') WHERE json_each.value = ?)`,
+      `${SCORE} DESC`,
+      [studio],
+    );
+
+    add({
+      id: `studio-${studio.toLowerCase().replaceAll(/\W+/gu, "-")}`,
+      title: `Made by ${studio}`,
+      description: `The strongest of what ${studio} has put out`,
+      titleIds,
+    });
+  }
 
   const genres = await topValues(env, "$.genres", 200, 16);
 

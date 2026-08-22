@@ -3,7 +3,7 @@ import { logError } from "../lib/logging.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
 import type { Bindings } from "../types.ts";
 
-const COUNTRIES = ["GB", "US"];
+const COUNTRIES: (string | null)[] = ["GB", "US", null];
 const DAYS_AHEAD = 8;
 const RETENTION_DAYS = 3;
 

@@ -1,4 +1,79 @@
-import type { CatalogResponse, MediaTitle } from "../../src/domain/catalog.ts";
+import type {
+  CatalogResponse,
+  MediaTitle,
+  ProviderAvailability,
+} from "../../src/domain/catalog.ts";
+import { readRawItems } from "./catalog-reader.ts";
+
+const READ_CHUNK = 80;
+const KEYWORD_LIMIT = 40;
+
+const EXTERNAL_PROVIDER_SOURCES = new Set<ProviderAvailability["source"]>([
+  "JustWatch",
+  "Watchmode",
+]);
+
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map((entry) => canonical(entry)).join(",")}]`;
+  }
+
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+
+    return `{${Object.keys(record)
+      .filter((key) => record[key] !== undefined)
+      // oxlint-disable-next-line unicorn/no-array-sort
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${canonical(record[key])}`)
+      .join(",")}}`;
+  }
+
+  return JSON.stringify(value) ?? "null";
+}
+
+function mergeProviders(fresh: MediaTitle, stored: MediaTitle) {
+  const providers = new Map(fresh.providers.map((provider) => [provider.id, provider]));
+
+  for (const provider of stored.providers) {
+    if (!EXTERNAL_PROVIDER_SOURCES.has(provider.source)) {
+      continue;
+    }
+
+    const existing = providers.get(provider.id);
+
+    providers.set(
+      provider.id,
+      existing
+        ? {
+            ...provider,
+            offerTypes: [...new Set([...existing.offerTypes, ...provider.offerTypes])],
+            webUrl: provider.webUrl ?? existing.webUrl,
+          }
+        : provider,
+    );
+  }
+
+  return [...providers.values()];
+}
+
+function mergeWithStored(fresh: MediaTitle, stored: MediaTitle | null): MediaTitle {
+  if (!stored) {
+    return fresh;
+  }
+
+  return {
+    ...fresh,
+    providers: mergeProviders(fresh, stored),
+    watchLink: fresh.watchLink ?? stored.watchLink,
+    keywords: [...new Set([...(fresh.keywords ?? []), ...(stored.keywords ?? [])])].slice(
+      0,
+      KEYWORD_LIMIT,
+    ),
+    ratings: stored.ratings ?? fresh.ratings,
+    externalIds: stored.externalIds ?? fresh.externalIds,
+  };
+}
 
 export async function storeCatalog(db: D1Database, catalogue: CatalogResponse) {
   const titles = [
@@ -7,7 +82,7 @@ export async function storeCatalog(db: D1Database, catalogue: CatalogResponse) {
     ).values(),
   ];
 
-  await db.batch(titles.map((title) => upsertTitle(db, title, catalogue.fetchedAt)));
+  await storeItems(db, titles, catalogue.fetchedAt);
 
   return titles;
 }
@@ -17,7 +92,30 @@ export async function storeItems(db: D1Database, items: MediaTitle[], sourceUpda
     return;
   }
 
-  await db.batch(items.map((title) => upsertTitle(db, title, sourceUpdatedAt)));
+  const unique = [...new Map(items.map((title) => [title.id, title])).values()];
+  const stored = await readRawItems(
+    db,
+    unique.map((title) => title.id),
+  );
+  const changed = unique.flatMap((title) => {
+    const previous = stored.get(title.id) ?? null;
+    const merged = mergeWithStored(title, previous);
+
+    return previous && canonical(merged) === canonical(previous) ? [] : [merged];
+  });
+
+  if (changed.length === 0) {
+    return;
+  }
+
+  for (let index = 0; index < changed.length; index += READ_CHUNK) {
+    // oxlint-disable-next-line no-await-in-loop
+    await db.batch(
+      changed
+        .slice(index, index + READ_CHUNK)
+        .map((title) => upsertTitle(db, title, sourceUpdatedAt)),
+    );
+  }
 }
 
 function upsertTitle(db: D1Database, title: MediaTitle, sourceUpdatedAt: string) {

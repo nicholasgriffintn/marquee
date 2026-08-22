@@ -42,83 +42,102 @@ export function useCurator() {
     void fetch("/api/curator", { method: "DELETE" }).catch(() => undefined);
   }, []);
 
-  const ask = useCallback(async (prompt: string, isRefinement = false) => {
-    const trimmed = prompt.trim();
+  const ask = useCallback(
+    async (prompt: string, isRefinement = false, providerIds: string[] = []) => {
+      const trimmed = prompt.trim();
 
-    if (!trimmed) {
-      return;
-    }
-
-    abortRef.current?.abort();
-
-    const controller = new AbortController();
-
-    abortRef.current = controller;
-    setError("");
-    setIsAsking(true);
-    setState((current) => ({
-      ...EMPTY,
-      prompt: trimmed,
-      items: isRefinement ? current.items : [],
-      status: "Thinking",
-      isStreaming: true,
-    }));
-
-    try {
-      const response = await fetch("/api/curator", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ prompt: trimmed }),
-        signal: controller.signal,
-      });
-
-      if (!response.ok || !response.body) {
-        throw new Error("The AI curator is unavailable");
+      if (!trimmed) {
+        return;
       }
 
-      const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
-      let buffer = "";
+      abortRef.current?.abort();
 
-      for (;;) {
-        const { done, value } = await reader.read();
+      const controller = new AbortController();
 
-        if (done) {
-          break;
+      abortRef.current = controller;
+      setError("");
+      setIsAsking(true);
+      setState((current) => ({
+        ...EMPTY,
+        prompt: trimmed,
+        items: isRefinement ? current.items : [],
+        status: "Thinking",
+        isStreaming: true,
+      }));
+
+      try {
+        const response = await fetch("/api/curator", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ prompt: trimmed, providerIds }),
+          signal: controller.signal,
+        });
+
+        if (!response.ok || !response.body) {
+          throw new Error(await failureMessage(response));
         }
 
-        buffer += value;
+        const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+        let buffer = "";
 
-        const chunks = buffer.split("\n\n");
+        for (;;) {
+          const { done, value } = await reader.read();
 
-        buffer = chunks.pop() ?? "";
-
-        for (const chunk of chunks) {
-          const line = chunk.split("\n").find((part) => part.startsWith("data:"));
-
-          if (!line) {
-            continue;
+          if (done) {
+            break;
           }
 
-          const event = JSON.parse(line.slice(5).trim()) as CuratorEvent;
+          buffer += value;
 
-          setState((current) => applyEvent(current, event));
+          const chunks = buffer.split("\n\n");
 
-          if (event.type === "error") {
-            setError(event.message);
+          buffer = chunks.pop() ?? "";
+
+          for (const chunk of chunks) {
+            const line = chunk.split("\n").find((part) => part.startsWith("data:"));
+
+            if (!line) {
+              continue;
+            }
+
+            const event = JSON.parse(line.slice(5).trim()) as CuratorEvent;
+
+            setState((current) => applyEvent(current, event));
+
+            if (event.type === "error") {
+              setError(event.message);
+            }
           }
         }
+      } catch (caught) {
+        if (!(caught instanceof DOMException && caught.name === "AbortError")) {
+          setError(caught instanceof Error ? caught.message : "The AI curator is unavailable");
+          setState((current) => ({ ...current, isStreaming: false, status: "" }));
+        }
+      } finally {
+        setIsAsking(false);
       }
-    } catch (caught) {
-      if (!(caught instanceof DOMException && caught.name === "AbortError")) {
-        setError(caught instanceof Error ? caught.message : "The AI curator is unavailable");
-        setState((current) => ({ ...current, isStreaming: false, status: "" }));
-      }
-    } finally {
-      setIsAsking(false);
-    }
-  }, []);
+    },
+    [],
+  );
 
   return { state, error, clear, isAsking, ask };
+}
+
+async function failureMessage(response: Response) {
+  const fallback = "The AI curator is unavailable";
+
+  try {
+    const payload: unknown = await response.json();
+
+    if (payload && typeof payload === "object" && "error" in payload) {
+      return typeof payload.error === "string" && payload.error ? payload.error : fallback;
+    }
+  } catch {
+    return fallback;
+  }
+
+  return fallback;
 }
 
 function applyEvent(current: CuratorState, event: CuratorEvent): CuratorState {
