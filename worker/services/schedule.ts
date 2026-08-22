@@ -165,3 +165,21 @@ export async function readTonight(env: Bindings, viewerId: string | null, hours 
     item: row.titleId ? (byId.get(row.titleId) ?? null) : null,
   }));
 }
+
+export async function readNextEpisode(env: Bindings, titleId: string) {
+  return env.DB.prepare(
+    `SELECT season, episode, episode_name AS episodeName, airs_at AS airsAt, network
+     FROM title_schedule
+     WHERE title_id = ? AND airs_at >= datetime('now', '-3 hours')
+     ORDER BY airs_at
+     LIMIT 1`,
+  )
+    .bind(titleId)
+    .first<{
+      season: number | null;
+      episode: number | null;
+      episodeName: string | null;
+      airsAt: string;
+      network: string | null;
+    }>();
+}

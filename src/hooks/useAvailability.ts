@@ -3,14 +3,24 @@ import { useEffect, useState } from "react";
 import type { MediaTitle, ProviderAvailability } from "../domain/catalog";
 import { requestJson } from "../lib/api";
 
+export type NextEpisode = {
+  season: number | null;
+  episode: number | null;
+  episodeName: string | null;
+  airsAt: string;
+  network: string | null;
+};
+
 type AvailabilityResponse = {
   providers: ProviderAvailability[];
+  nextEpisode?: NextEpisode | null;
 };
 
 export function useAvailability(item: MediaTitle, enabled: boolean) {
   const [loaded, setLoaded] = useState<{
     titleId: string;
     providers: ProviderAvailability[];
+    nextEpisode: NextEpisode | null;
   } | null>(null);
 
   useEffect(() => {
@@ -27,7 +37,7 @@ export function useAvailability(item: MediaTitle, enabled: boolean) {
           { signal: controller.signal },
         );
 
-        if (!response.providers.length) {
+        if (!response.providers.length && !response.nextEpisode) {
           return;
         }
 
@@ -35,6 +45,7 @@ export function useAvailability(item: MediaTitle, enabled: boolean) {
 
         setLoaded({
           titleId: item.id,
+          nextEpisode: response.nextEpisode ?? null,
           providers: response.providers.map((provider) => {
             const fallback = fallbackById.get(provider.id);
 
@@ -55,5 +66,10 @@ export function useAvailability(item: MediaTitle, enabled: boolean) {
     return () => controller.abort();
   }, [enabled, item]);
 
-  return enabled && loaded?.titleId === item.id ? loaded.providers : item.providers;
+  const live = enabled && loaded?.titleId === item.id ? loaded : null;
+
+  return {
+    providers: live && live.providers.length ? live.providers : item.providers,
+    nextEpisode: live?.nextEpisode ?? null,
+  };
 }

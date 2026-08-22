@@ -2467,7 +2467,7 @@ h2 em {
 }
 .schedule-strip {
   border-top: 1px solid var(--line);
-  margin-top: 50px;
+  margin-bottom: 54px;
 }
 .schedule-heading {
   align-items: baseline;
@@ -2557,10 +2557,17 @@ h2 em {
   display: flex;
   flex-wrap: wrap;
   gap: 9px 10px;
-  margin-top: 18px;
+  margin: 18px 0 0;
 }
 .detail-chips + .detail-chips {
   margin-top: 10px;
+}
+.detail-chips:last-of-type,
+.detail-chips + .score-row {
+  margin-bottom: 0;
+}
+.detail-chips + *:not(.detail-chips) {
+  margin-top: 26px;
 }
 .detail-chip {
   border: 1px solid var(--paper-line);
@@ -2577,4 +2584,102 @@ h2 em {
 }
 .detail-chip-person {
   border-style: dashed;
+}
+
+.detail-original {
+  color: var(--muted);
+  font: 10px var(--mono);
+  letter-spacing: 0.1em;
+  margin: 6px 0 0;
+  text-transform: uppercase;
+}
+.detail-next {
+  border-left: 2px solid var(--blue);
+  color: var(--ink);
+  font-size: 13px;
+  margin: 20px 0 0;
+  padding-left: 12px;
+}
+.detail-next span {
+  color: var(--blue);
+  font: 700 10px var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.detail-media {
+  margin: 22px 0 4px;
+}
+.detail-media-frame {
+  aspect-ratio: 16 / 9;
+  background: var(--ink);
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+.detail-media-frame iframe {
+  border: 0;
+  height: 100%;
+  left: 0;
+  position: absolute;
+  top: 0;
+  width: 100%;
+}
+.detail-media-play {
+  background: var(--ink);
+  border: 0;
+  cursor: pointer;
+  display: block;
+  height: 100%;
+  padding: 0;
+  position: relative;
+  width: 100%;
+}
+.detail-media-play img {
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.72;
+  transition: opacity 0.2s ease;
+  width: 100%;
+}
+.detail-media-play:hover img {
+  opacity: 0.92;
+}
+.detail-media-badge {
+  align-items: center;
+  background: var(--acid);
+  bottom: 14px;
+  color: var(--ink);
+  display: inline-flex;
+  font: 700 11px var(--mono);
+  gap: 8px;
+  left: 14px;
+  letter-spacing: 0.08em;
+  padding: 9px 14px;
+  position: absolute;
+  text-transform: uppercase;
+}
+.detail-media-badge i {
+  font-size: 10px;
+  font-style: normal;
+}
+.detail-media-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.detail-media-picks button {
+  background: none;
+  border: 1px solid var(--paper-line);
+  color: var(--ink);
+  cursor: pointer;
+  font: 700 10px var(--mono);
+  letter-spacing: 0.06em;
+  padding: 6px 10px;
+  text-transform: uppercase;
+}
+.detail-media-picks button.selected,
+.detail-media-picks button:hover {
+  border-color: var(--blue);
+  color: var(--blue);
 }

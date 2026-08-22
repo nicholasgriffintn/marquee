@@ -138,6 +138,37 @@ function names(value: unknown, limit: number) {
     .slice(0, limit);
 }
 
+const VIDEO_TYPES = ["Trailer", "Teaser", "Clip", "Featurette"];
+const VIDEO_LIMIT = 5;
+
+function parseVideos(details: Record<string, unknown>) {
+  const videos = records(recordAt(details, "videos")?.results).filter((video) => {
+    const type = stringAt(video, "type");
+
+    return (
+      stringAt(video, "site") === "YouTube" &&
+      stringAt(video, "key") &&
+      type &&
+      VIDEO_TYPES.includes(type)
+    );
+  });
+
+  // oxlint-disable-next-line unicorn/no-array-sort
+  const ordered = [...videos].sort((left, right) => {
+    const rank = (video: Record<string, unknown>) =>
+      VIDEO_TYPES.indexOf(stringAt(video, "type") ?? "") + (video.official === true ? 0 : 0.5);
+
+    return rank(left) - rank(right);
+  });
+
+  return ordered.slice(0, VIDEO_LIMIT).flatMap((video) => {
+    const key = stringAt(video, "key");
+    const type = stringAt(video, "type");
+
+    return key && type ? [{ key, name: (stringAt(video, "name") ?? type).slice(0, 80), type }] : [];
+  });
+}
+
 function parseTrailer(details: Record<string, unknown>) {
   const videos = records(recordAt(details, "videos")?.results).filter(
     (video) => stringAt(video, "site") === "YouTube" && stringAt(video, "key"),
@@ -244,6 +275,7 @@ export function parseTmdbTitle(mediaType: MediaType, value: unknown): MediaTitle
     keywords: parseKeywords(value),
     people: parsePeople(mediaType, value),
     trailerKey: parseTrailer(value),
+    videos: parseVideos(value),
   };
 }
 

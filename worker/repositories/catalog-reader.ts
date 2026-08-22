@@ -24,27 +24,37 @@ function includesProvider(title: MediaTitle, providerIds: string[]) {
   );
 }
 
+const READ_CHUNK = 80;
+
 export async function readItems(db: D1Database, ids: string[], limit = 30) {
-  const uniqueIds = [...new Set(ids.filter(isKnownTitle))].slice(0, Math.min(limit, 200));
+  const uniqueIds = [...new Set(ids.filter(isKnownTitle))].slice(0, Math.min(limit, 400));
 
   if (uniqueIds.length === 0) {
     return [];
   }
 
-  const placeholders = uniqueIds.map(() => "?").join(",");
-  const rows = await db
-    .prepare(
-      `SELECT payload, poster_key AS posterKey FROM catalog_titles WHERE id IN (${placeholders})`,
-    )
-    .bind(...uniqueIds)
-    .all<PayloadRow>();
-  const titlesById = new Map(
-    rows.results.flatMap((row): Array<[string, MediaTitle]> => {
+  const titlesById = new Map<string, MediaTitle>();
+
+  for (let index = 0; index < uniqueIds.length; index += READ_CHUNK) {
+    const wave = uniqueIds.slice(index, index + READ_CHUNK);
+    // oxlint-disable-next-line no-await-in-loop
+    const rows = await db
+      .prepare(
+        `SELECT payload, poster_key AS posterKey FROM catalog_titles WHERE id IN (${wave
+          .map(() => "?")
+          .join(",")})`,
+      )
+      .bind(...wave)
+      .all<PayloadRow>();
+
+    for (const row of rows.results) {
       const title = parseStoredTitle(row.payload);
 
-      return title ? [[title.id, withStoredPoster(title, row.posterKey)]] : [];
-    }),
-  );
+      if (title) {
+        titlesById.set(title.id, withStoredPoster(title, row.posterKey));
+      }
+    }
+  }
 
   return uniqueIds.flatMap((id) => {
     const title = titlesById.get(id);
@@ -76,7 +86,7 @@ export async function readCatalog(db: D1Database, query: string, providerIds: st
   }
 
   const titleIds = rows.results.flatMap((section) => parseStoredTitleIds(section.titleIds));
-  const titles = await readItems(db, titleIds);
+  const titles = await readItems(db, titleIds, titleIds.length);
   const titlesById = new Map(titles.map((title) => [title.id, title]));
   const sections: CatalogSection[] = rows.results.map((section) => ({
     id: section.id,

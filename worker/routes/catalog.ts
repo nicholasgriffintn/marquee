@@ -223,7 +223,7 @@ catalogRoutes.get("/:mediaType/:tmdbId/availability", edgeCache(900), async (con
   }
 
   try {
-    const availability = await getTitleAvailability(context.env.DB, `${mediaType}:${tmdbId}`);
+    const availability = await getTitleAvailability(context.env, `${mediaType}:${tmdbId}`);
 
     if (!availability) {
       return context.json({ error: "Unknown title" }, 404);

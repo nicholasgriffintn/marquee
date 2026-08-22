@@ -6,28 +6,8 @@ export async function storeCatalog(db: D1Database, catalogue: CatalogResponse) {
       catalogue.sections.flatMap((section) => section.items).map((title) => [title.id, title]),
     ).values(),
   ];
-  const titleStatements = titles.map((title) => upsertTitle(db, title, catalogue.fetchedAt));
-  const sectionStatements = catalogue.sections.map((section) =>
-    db
-      .prepare(
-        `INSERT INTO catalog_sections
-           (id, title, description, title_ids, source_updated_at)
-         VALUES (?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        section.id,
-        section.title,
-        section.description,
-        JSON.stringify(section.items.map((title) => title.id)),
-        catalogue.fetchedAt,
-      ),
-  );
 
-  await db.batch([
-    ...titleStatements,
-    db.prepare(`DELETE FROM catalog_sections`),
-    ...sectionStatements,
-  ]);
+  await db.batch(titles.map((title) => upsertTitle(db, title, catalogue.fetchedAt)));
 
   return titles;
 }

@@ -258,36 +258,6 @@ export function TonightPage({
         </section>
       )}
 
-      {episodes.length > 0 && (
-        <section className="schedule-strip">
-          <div className="schedule-heading">
-            <strong>On tonight</strong>
-            <small>Air times from TVmaze</small>
-          </div>
-          <div className="schedule-list">
-            {episodes.slice(0, 8).map((episode) => (
-              <button
-                type="button"
-                key={`${episode.showName}-${episode.airsAt}-${episode.episode ?? 0}`}
-                className="schedule-item"
-                disabled={!episode.item}
-                onClick={() => episode.item && onOpen(episode.item)}
-              >
-                <time dateTime={episode.airsAt}>{formatAirTime(episode.airsAt)}</time>
-                <strong>{episode.showName}</strong>
-                <small>
-                  {episode.season && episode.episode
-                    ? `S${episode.season}E${episode.episode}`
-                    : "New episode"}
-                  {episode.episodeName ? ` · ${episode.episodeName}` : ""}
-                  {episode.network ? ` · ${episode.network}` : ""}
-                </small>
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
-
       {error && featured && (
         <p className="catalogue-error" role="alert">
           {error}
@@ -310,6 +280,35 @@ export function TonightPage({
               }}
               onOpen={onOpen}
             />
+          )}
+          {episodes.length > 0 && (
+            <section className="schedule-strip">
+              <div className="schedule-heading">
+                <strong>On tonight</strong>
+                <small>Air times from TVmaze</small>
+              </div>
+              <div className="schedule-list">
+                {episodes.map((episode) => (
+                  <button
+                    type="button"
+                    key={`${episode.showName}-${episode.airsAt}-${episode.episode ?? 0}`}
+                    className="schedule-item"
+                    disabled={!episode.item}
+                    onClick={() => episode.item && onOpen(episode.item)}
+                  >
+                    <time dateTime={episode.airsAt}>{formatAirTime(episode.airsAt)}</time>
+                    <strong>{episode.showName}</strong>
+                    <small>
+                      {episode.season && episode.episode
+                        ? `S${episode.season}E${episode.episode}`
+                        : "New episode"}
+                      {episode.episodeName ? ` · ${episode.episodeName}` : ""}
+                      {episode.network ? ` · ${episode.network}` : ""}
+                    </small>
+                  </button>
+                ))}
+              </div>
+            </section>
           )}
           {sections.map((section) => (
             <ContentRail key={section.id} section={section} onOpen={onOpen} />

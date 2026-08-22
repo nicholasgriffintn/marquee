@@ -13,7 +13,7 @@ import { readProviders } from "../repositories/providers.ts";
 import type { Bindings } from "../types.ts";
 import { readTrending } from "./buzz.ts";
 import { findPendingTitles } from "./discovery.ts";
-import { readTonight } from "./schedule.ts";
+import { readNextEpisode, readTonight } from "./schedule.ts";
 import { traktUpcoming } from "./trakt.ts";
 
 export async function getCatalogue(env: Bindings, providerIds: string[]) {
@@ -51,16 +51,23 @@ export async function getProviderCatalogue(db: D1Database) {
   return readProviders(db);
 }
 
-export async function getTitleAvailability(db: D1Database, titleId: string) {
-  const providers = await readAvailability(db, titleId);
+export async function getTitleAvailability(env: Bindings, titleId: string) {
+  const providers = await readAvailability(env.DB, titleId);
 
-  return providers
-    ? {
-        providers,
-        source: "Marquee catalogue",
-        fetchedAt: new Date().toISOString(),
-      }
+  if (!providers) {
+    return null;
+  }
+
+  const nextEpisode = titleId.startsWith("tv:")
+    ? await readNextEpisode(env, titleId).catch(() => null)
     : null;
+
+  return {
+    providers,
+    nextEpisode,
+    source: "Marquee catalogue",
+    fetchedAt: new Date().toISOString(),
+  };
 }
 
 export type BrowseQuery = {

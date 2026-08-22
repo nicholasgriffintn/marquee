@@ -9,6 +9,7 @@ import { track } from "../lib/telemetry";
 import type { EntryStatus, ViewingEntry } from "../types";
 import { ArtPlaceholder } from "./ArtPlaceholder";
 import { ShelfForm } from "./ShelfForm";
+import { TrailerBlock } from "./TrailerBlock";
 import { ArrowIcon, PlusIcon, Poster, ProviderBadge } from "./ui";
 
 const RAIL_PROVIDER_LIMIT = 3;
@@ -167,7 +168,7 @@ export function DetailPanel({
   onSaveEntry: (entry: ViewingEntry) => void;
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
-  const providers = useAvailability(item, availabilityEnabled);
+  const { providers, nextEpisode } = useAvailability(item, availabilityEnabled);
   const { insight, pairs, isLoading: isInsightLoading } = useTitleInsight(item.id, canSave);
   const watchDestinations = providers.flatMap((provider) => {
     const href = provider.webUrl ?? item.watchLink;
@@ -211,6 +212,9 @@ export function DetailPanel({
           <p className="detail-meta">
             {item.mediaType === "movie" ? "Film" : "Television"} · {mediaMeta(item)}
           </p>
+          {item.originalTitle && item.originalTitle !== item.title && (
+            <p className="detail-original">Original title · {item.originalTitle}</p>
+          )}
           {(insight || isInsightLoading) && (
             <div className="detail-insight">
               <span>
@@ -235,6 +239,24 @@ export function DetailPanel({
               )}
             </div>
           )}
+          {nextEpisode && (
+            <p className="detail-next">
+              <span>Next episode</span>
+              {nextEpisode.season && nextEpisode.episode
+                ? ` S${nextEpisode.season}E${nextEpisode.episode}`
+                : ""}
+              {nextEpisode.episodeName ? ` · ${nextEpisode.episodeName}` : ""} ·{" "}
+              {new Date(nextEpisode.airsAt).toLocaleString(undefined, {
+                weekday: "short",
+                day: "numeric",
+                month: "short",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+              {nextEpisode.network ? ` · ${nextEpisode.network}` : ""}
+            </p>
+          )}
+          <TrailerBlock item={item} />
           <p className="detail-synopsis">{item.overview || "No synopsis available."}</p>
           {item.people?.length ? (
             <div className="detail-chips">
@@ -271,6 +293,29 @@ export function DetailPanel({
               <strong>{item.tmdbVoteCount.toLocaleString()}</strong>
               <span>TMDB votes</span>
             </div>
+            {item.ratings?.imdbScore != null && (
+              <div>
+                <strong>{item.ratings.imdbScore.toFixed(1)}</strong>
+                <span>
+                  IMDb
+                  {item.ratings.imdbVotes
+                    ? ` · ${voteLabel({ ...item, tmdbScore: 1, tmdbVoteCount: item.ratings.imdbVotes })}`
+                    : ""}
+                </span>
+              </div>
+            )}
+            {item.ratings?.rottenTomatoes && (
+              <div>
+                <strong>{item.ratings.rottenTomatoes}</strong>
+                <span>Rotten Tomatoes</span>
+              </div>
+            )}
+            {item.ratings?.metascore != null && (
+              <div>
+                <strong>{item.ratings.metascore}</strong>
+                <span>Metascore</span>
+              </div>
+            )}
           </div>
           {canSave && !entry && (
             <button type="button" className="save-button" onClick={() => onSave(item)}>
