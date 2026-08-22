@@ -60,7 +60,7 @@ async function vectorCandidates(env: Bindings, query: RetrievalQuery, text: stri
 
   const matches = await env.VECTORS.query(vector, {
     topK: VECTOR_TOP_K,
-    returnMetadata: false,
+    returnMetadata: "none",
   });
   const ids = matches.matches.map((match) => match.id);
 

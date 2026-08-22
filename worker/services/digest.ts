@@ -30,7 +30,7 @@ async function freshForViewer(env: Bindings, vector: number[] | null, exclude: s
 
   const matches = await env.VECTORS.query(vector, {
     topK: NEIGHBOUR_TOP_K,
-    returnMetadata: false,
+    returnMetadata: "none",
   });
   const excluded = new Set(exclude);
   const ids = matches.matches.map((match) => match.id).filter((id) => !excluded.has(id));

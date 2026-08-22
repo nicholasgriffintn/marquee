@@ -127,7 +127,7 @@ export async function selectUnembedded(env: Bindings, limit: number) {
 
 export async function similarTo(env: Bindings, titleId: string, topK = 24) {
   try {
-    const matches = await env.VECTORS.queryById(titleId, { topK, returnMetadata: false });
+    const matches = await env.VECTORS.queryById(titleId, { topK, returnMetadata: "none" });
 
     return matches.matches.filter((match) => match.id !== titleId).map((match) => match.id);
   } catch (error) {

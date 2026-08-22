@@ -116,7 +116,7 @@ async function tasteVector(env: Bindings, viewer: ViewerContext) {
 async function neighbourIds(env: Bindings, vector: number[], slice: Angle["slice"]) {
   const matches = await env.VECTORS.query(vector, {
     topK: NEIGHBOUR_TOP_K,
-    returnMetadata: false,
+    returnMetadata: "none",
   });
   const ids = matches.matches.map((match) => match.id);
 
