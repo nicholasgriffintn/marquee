@@ -8,7 +8,7 @@ The Usher works here. He is the letter M off the sign out front, who climbed dow
 never went back up. Bow tie, torch, thirty years on the door. He has seen everything in the
 building and most of it twice, and he will tell you when something is long.
 
-<img src="https://marquee.pashi.app/usher-unimpressed.png" width="200" height="200" alt="The Usher" style="float:right;margin:0 0 1em 1em;"/>
+<img src="https://marquee.pashi.app/usher-idle.png" width="200" height="200" alt="The Usher" style="float:right;margin:0 0 1em 1em;"/>
 
 > Evening. Seat yourself.
 
@@ -21,6 +21,10 @@ Air dates come from TVmaze, broadcast and streaming both; anime tags and scores 
 awards and box office from OMDb. The trending rail is ranked by how much Wikipedia has been read
 about a title this week, which is a better measure of a fuss than any press release. Link Trakt and
 your watch history, ratings and watchlist come with you.
+
+<img src="https://marquee.pashi.app/usher-thinking.png" width="200" height="200" alt="The Usher" style="float:right;margin:0 0 1em 1em;"/>
+
+<img src="https://marquee.pashi.app/usher-unimpressed.png" width="200" height="200" alt="The Usher" style="float:right;margin:0 0 1em 1em;"/>
 
 > Everyone's watching that one. Doesn't mean it's good.
 
@@ -175,11 +179,14 @@ It exposes `search_catalogue`, `find_similar`, `get_title`, `get_shelf`, `save_t
 
 ## Posters
 
-Posters are cached in R2 and resized on the way out through the Images binding, which negotiates
-AVIF or WebP from the request's `Accept` header. The route only honours four widths so the number
-of billable unique transformations stays small.
+Posters are cached in R2. In production, the client requests four fixed widths through the Images
+transformations enabled on `pashi.app`, with `marquee.pashi.app` configured as an allowed source:
 
-Transformations can also be served from another zone that already has them enabled, by adding
-`marquee.pashi.app` under Images → Transformations → Sources there and pointing at
-`/cdn-cgi/image/width=320,format=auto/https://marquee.pashi.app/media/posters/...`. There is no
-billing advantage: transformations are counted per account, not per zone.
+```text
+https://pashi.app/cdn-cgi/image/width=320,fit=scale-down,format=auto/https://marquee.pashi.app/media/posters/...
+```
+
+Local and preview deployments keep using `/media/posters/...?w=320`, which resizes through the
+Worker's Images binding. Both paths negotiate AVIF or WebP from the request's `Accept` header. Keep
+the four widths in `src/lib/media.ts` and `worker/routes/media.ts` aligned so the number of billable
+unique transformations stays bounded. Transformations are counted per account, not per zone.

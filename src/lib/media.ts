@@ -3,9 +3,23 @@ import type { MediaTitle } from "../domain/catalog";
 const POSTER_WIDTHS = [160, 320, 500, 780];
 const TMDB_POSTER_SIZES = [92, 154, 185, 342, 500, 780];
 const TMDB_BACKDROP_SIZES = [300, 780, 1280];
+const PRODUCTION_HOST = "marquee.pashi.app";
+const TRANSFORM_ORIGIN = "https://pashi.app";
 
 function nearest(sizes: number[], width: number) {
   return sizes.find((size) => size >= width) ?? sizes[sizes.length - 1];
+}
+
+function cachedArtwork(url: string, width: number) {
+  const resolvedWidth = nearest(POSTER_WIDTHS, width);
+
+  if (window.location.hostname !== PRODUCTION_HOST) {
+    return `${url}?w=${resolvedWidth}`;
+  }
+
+  const source = new URL(url, window.location.origin).href;
+
+  return `${TRANSFORM_ORIGIN}/cdn-cgi/image/width=${resolvedWidth},fit=scale-down,format=auto/${source}`;
 }
 
 export function artwork(url: string | null, width: number, kind: "poster" | "backdrop" = "poster") {
@@ -14,7 +28,7 @@ export function artwork(url: string | null, width: number, kind: "poster" | "bac
   }
 
   if (url.startsWith("/media/")) {
-    return `${url}?w=${nearest(POSTER_WIDTHS, width)}`;
+    return cachedArtwork(url, width);
   }
 
   const sizes = kind === "poster" ? TMDB_POSTER_SIZES : TMDB_BACKDROP_SIZES;
