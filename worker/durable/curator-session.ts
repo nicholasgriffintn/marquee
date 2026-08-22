@@ -7,7 +7,13 @@ import type { Bindings } from "../types.ts";
 const MAX_TURNS = 8;
 const IDLE_MINUTES = 60;
 
-type AskRequest = { prompt: string; viewerId: string; providerIds?: string[] };
+type AskRequest = {
+  prompt: string;
+  viewerId: string;
+  providerIds?: string[];
+  hour?: number;
+  isWeekend?: boolean;
+};
 
 export class CuratorSession extends DurableObject<Bindings> {
   async fetch(request: Request) {
@@ -30,6 +36,8 @@ export class CuratorSession extends DurableObject<Bindings> {
         try {
           for await (const event of curateStream(this.env, body.prompt, body.viewerId, turns, {
             providerIds: body.providerIds ?? [],
+            hour: body.hour,
+            isWeekend: body.isWeekend,
           })) {
             if (event.type === "turn") {
               await this.ctx.storage.put("turns", [...turns, event.turn].slice(-MAX_TURNS));

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 import type { MediaTitle } from "../../domain/catalog";
 import type { UsherFace } from "../../domain/usher";
@@ -16,6 +17,7 @@ export function UsherHero({
   isAsking,
   isPinned,
   pick,
+  aside,
   onAsk,
   onClear,
   onOpen,
@@ -27,6 +29,7 @@ export function UsherHero({
   isAsking: boolean;
   isPinned: boolean;
   pick: UsherPickState;
+  aside: string;
   onAsk: (prompt: string, isRefinement?: boolean) => void;
   onClear: () => void;
   onOpen: (item: MediaTitle) => void;
@@ -34,6 +37,36 @@ export function UsherHero({
   onReject: () => void;
 }) {
   const [selection, setSelection] = useState({ prompt: "", id: "" });
+
+  if (aside) {
+    return (
+      <section className="hero-section usher-hero usher-hero-aside hero-empty">
+        <div className="hero-gradient" />
+        <button type="button" className="usher-exit" onClick={onClear}>
+          ← Back to tonight
+        </button>
+        <div className="usher-hero-figure" aria-hidden="true">
+          <UsherMark face="idle" className="usher-figure" />
+        </div>
+        <div className="hero-copy">
+          <div className="usher-hero-head">
+            <UsherMark face="idle" crop="head" />
+            <p>
+              <span>The Usher</span>
+              <em>since you asked</em>
+            </p>
+          </div>
+          <p className="usher-aside-line">{aside}</p>
+          <div className="hero-actions">
+            <Link className="button-link" to="/usher">
+              There is a film about it
+            </Link>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   const isPick = Boolean(pick.item || pick.isPicking || pick.error);
   const activeId = selection.prompt === curator.prompt ? selection.id : "";
   const active = isPick

@@ -229,6 +229,10 @@ export function UsherPage() {
               <dd>Never seen</dd>
             </div>
             <div>
+              <dt>The Projectionist</dt>
+              <dd>Also never seen</dd>
+            </div>
+            <div>
               <dt>Titles and artwork</dt>
               <dd>TMDB</dd>
             </div>

@@ -69,7 +69,12 @@ export function useCurator() {
         const response = await fetch("/api/curator", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ prompt: trimmed, providerIds }),
+          body: JSON.stringify({
+            prompt: trimmed,
+            providerIds,
+            hour: new Date().getHours(),
+            isWeekend: [0, 6].includes(new Date().getDay()),
+          }),
           signal: controller.signal,
         });
 

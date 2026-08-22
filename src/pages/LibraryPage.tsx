@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 
 import { ArrowIcon, Poster } from "../components/ui";
 import { UsherCard } from "../components/usher/UsherCard";
+import { UsherMark } from "../components/usher/UsherMark";
 import type { MediaTitle } from "../domain/catalog";
 import type { UsherMoment } from "../domain/usher";
 import type { EntryStatus, ViewingEntry } from "../types";
@@ -25,6 +26,22 @@ const STATUS_LABELS: Record<EntryStatus, string> = {
 };
 
 const STATUS_ORDER: EntryStatus[] = ["watching", "watchlist", "watched", "dropped"];
+
+const LOST_AFTER_DAYS = 180;
+
+function staleFor(entry: ViewingEntry) {
+  const updated = entry.updatedAt ? Date.parse(entry.updatedAt) : Number.NaN;
+
+  return Number.isFinite(updated) ? (Date.now() - updated) / 86_400_000 : 0;
+}
+
+function sinceLabel(entry: ViewingEntry) {
+  const updated = entry.updatedAt ? new Date(entry.updatedAt) : null;
+
+  return updated && !Number.isNaN(updated.getTime())
+    ? updated.toLocaleDateString(undefined, { month: "long" })
+    : "a while back";
+}
 
 function groupFor(sort: ShelfSort, item: MediaTitle, entry: ViewingEntry) {
   if (sort === "year") {
@@ -79,6 +96,8 @@ export function LibraryPage({
   titles,
   catalogueError,
   usherMoment,
+  onClaim,
+  onDiscard,
   onOpen,
   onShowTonight,
   onUsherRequest,
@@ -89,6 +108,8 @@ export function LibraryPage({
   titles: MediaTitle[];
   catalogueError: string;
   usherMoment: UsherMoment | null;
+  onClaim: (entry: ViewingEntry) => void;
+  onDiscard: (titleId: string) => void;
   onOpen: (item: MediaTitle) => void;
   onShowTonight: () => void;
   onUsherRequest: () => void;
@@ -97,6 +118,16 @@ export function LibraryPage({
 }) {
   const [params, setParams] = useSearchParams();
   const savedCount = Object.keys(entries).length;
+  const lost = titles
+    .flatMap((item) => {
+      const entry = entries[item.id];
+
+      return entry && entry.status === "watchlist" && staleFor(entry) >= LOST_AFTER_DAYS
+        ? [{ item, entry }]
+        : [];
+    })
+    .sort((left, right) => staleFor(right.entry) - staleFor(left.entry))
+    .slice(0, 8);
 
   useEffect(() => {
     if (savedCount >= 5) {
@@ -172,6 +203,39 @@ export function LibraryPage({
 
       {usherMoment && (
         <UsherCard moment={usherMoment} onAction={onUsherAction} onDismiss={onUsherDismiss} />
+      )}
+
+      {lost.length > 0 && (
+        <section className="lost-property">
+          <div className="lost-head">
+            <UsherMark face="unimpressed" crop="head" />
+            <div>
+              <span>Lost property</span>
+              <p>
+                {lost.length === 1 ? "This has" : `These ${lost.length} have`} been in the box since{" "}
+                {sinceLabel(lost[lost.length - 1].entry)}. Claim them or I am throwing them out.
+              </p>
+            </div>
+          </div>
+          <ul className="lost-items">
+            {lost.map(({ item, entry }) => (
+              <li key={item.id}>
+                <button type="button" className="lost-poster" onClick={() => onOpen(item)}>
+                  <Poster item={item} />
+                </button>
+                <strong>{item.title}</strong>
+                <div className="lost-buttons">
+                  <button type="button" onClick={() => onClaim(entry)}>
+                    Claim it
+                  </button>
+                  <button type="button" onClick={() => onDiscard(item.id)}>
+                    Bin it
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       {catalogueError && savedCount > 0 && !titles.length && (

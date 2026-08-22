@@ -9,6 +9,7 @@ import { isKnownTitle, validProviderIds } from "../lib/validation.ts";
 import {
   readAnswers,
   readUsherRecord,
+  writeUsherRecord,
   popularPeople,
   recordRailFeedback,
   searchPeople,
@@ -28,6 +29,12 @@ export const usherRoutes = new Hono<{ Bindings: Bindings; Variables: AuthVariabl
 
 usherRoutes.use("*", requireAuthentication);
 
+export function viewerHour(value: unknown) {
+  const hour = Number(value);
+
+  return Number.isInteger(hour) && hour >= 0 && hour <= 23 ? hour : undefined;
+}
+
 function numberParam(value: string | undefined) {
   const parsed = Number.parseInt(value ?? "", 10);
 
@@ -44,12 +51,21 @@ usherRoutes.get("/state", async (context) => {
       readUsherRecord(context.env.DB, user.id),
       readAnswers(context.env.DB, user.id),
     ]);
+    const awayDays = record.lastSeenAt
+      ? Math.floor((Date.now() - Date.parse(record.lastSeenAt)) / 86_400_000)
+      : 0;
 
-    return jsonResponse({ status: record.status, answered: [...answers.keys()] });
+    await writeUsherRecord(context.env.DB, user.id, { lastSeenAt: new Date().toISOString() });
+
+    return jsonResponse({
+      status: record.status,
+      answered: [...answers.keys()],
+      awayDays: Number.isFinite(awayDays) && awayDays > 0 ? awayDays : 0,
+    });
   } catch (error) {
     logError("usher_state_failed", error);
 
-    return jsonResponse({ status: "dismissed", answered: [] });
+    return jsonResponse({ status: "dismissed", answered: [], awayDays: 0 });
   }
 });
 
@@ -73,6 +89,7 @@ usherRoutes.get("/moment", async (context) => {
       query: context.req.query("query")?.slice(0, 120),
       savedCount: numberParam(context.req.query("savedCount")),
       unratedCount: numberParam(context.req.query("unratedCount")),
+      awayDays: numberParam(context.req.query("awayDays")),
     });
 
     if (moment) {
@@ -216,6 +233,8 @@ usherRoutes.post("/pick", async (context) => {
     const pick = await pickOne(context.env, user.id, {
       providerIds: validProviderIds(body?.providerIds),
       rejected: Array.isArray(body?.rejected) ? body.rejected.filter(isKnownTitle) : [],
+      hour: viewerHour(body?.hour),
+      isWeekend: body?.isWeekend === true,
     });
 
     if (!pick) {

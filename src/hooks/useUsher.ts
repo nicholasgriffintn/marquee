@@ -4,7 +4,7 @@ import type { MediaTitle } from "../domain/catalog";
 import type { UsherMoment, UsherSurface } from "../domain/usher";
 import { jsonRequest, requestJson } from "../lib/api";
 
-type StateResponse = { status: string; answered: string[] };
+type StateResponse = { status: string; answered: string[]; awayDays?: number };
 
 type MomentResponse = { moment: UsherMoment | null };
 
@@ -26,9 +26,11 @@ export function useUsher(isSignedIn: boolean) {
   const [moment, setMoment] = useState<UsherMoment | null>(null);
   const [isOnboarding, setIsOnboarding] = useState(false);
   const [pick, setPick] = useState<UsherPickState>(NO_PICK);
+  const [aside, setAside] = useState("");
   const uninvited = useRef(0);
   const rejected = useRef<string[]>([]);
   const inFlight = useRef(false);
+  const awayDays = useRef(0);
   const momentRef = useRef<UsherMoment | null>(null);
 
   useEffect(() => {
@@ -48,6 +50,10 @@ export function useUsher(isSignedIn: boolean) {
       inFlight.current = true;
 
       const parameters = new URLSearchParams({ surface });
+
+      if (surface === "home" && awayDays.current > 0) {
+        parameters.set("awayDays", String(awayDays.current));
+      }
 
       for (const [key, value] of Object.entries(context)) {
         if (value !== undefined && value !== "") {
@@ -88,6 +94,7 @@ export function useUsher(isSignedIn: boolean) {
         });
         const pending = state.status === "new" || state.status === "in-progress";
 
+        awayDays.current = state.awayDays ?? 0;
         setIsOnboarding(pending);
 
         if (pending) {
@@ -188,7 +195,12 @@ export function useUsher(isSignedIn: boolean) {
       try {
         const response = await requestJson<PickResponse>(
           "/api/usher/pick",
-          jsonRequest("POST", { providerIds, rejected: rejected.current }),
+          jsonRequest("POST", {
+            providerIds,
+            rejected: rejected.current,
+            hour: new Date().getHours(),
+            isWeekend: [0, 6].includes(new Date().getDay()),
+          }),
         );
 
         setPick({
@@ -220,12 +232,22 @@ export function useUsher(isSignedIn: boolean) {
     [askForPick, pick.item],
   );
 
-  const clearPick = useCallback(() => setPick(NO_PICK), []);
+  const clearPick = useCallback(() => {
+    setPick(NO_PICK);
+    setAside("");
+  }, []);
+
+  const say = useCallback((line: string) => {
+    setPick(NO_PICK);
+    setAside(line);
+  }, []);
 
   return {
     moment: isSignedIn ? moment : null,
     isOnboarding: isSignedIn && isOnboarding,
     pick,
+    aside: isSignedIn ? aside : "",
+    say,
     request,
     answer,
     skip,

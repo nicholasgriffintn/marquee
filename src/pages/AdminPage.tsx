@@ -1,3 +1,4 @@
+import { UsherMark } from "../components/usher/UsherMark";
 import { useAdmin, type AdminAction } from "../hooks/useAdmin";
 import type { User } from "../types";
 
@@ -112,6 +113,14 @@ export function AdminPage({ user }: { user: User }) {
           spend the API budgets shown below.
         </p>
       </div>
+
+      <aside className="projection-note">
+        <UsherMark face="thinking" crop="head" />
+        <p>
+          <strong>The projection box.</strong> He does the reels, the sweeps and the long nights of
+          re-hydrating forty thousand records. I do the door. We have not spoken since 1988.
+        </p>
+      </aside>
 
       {admin.error && (
         <p className="catalogue-error" role="alert">

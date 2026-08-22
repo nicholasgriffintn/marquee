@@ -8,7 +8,7 @@ import { ManagersDoor } from "./components/usher/ManagersDoor";
 import { UsherCard } from "./components/usher/UsherCard";
 import { UsherMark } from "./components/usher/UsherMark";
 import type { CatalogSection, MediaTitle } from "./domain/catalog";
-import type { UsherMoment } from "./domain/usher";
+import { asideFor, type UsherMoment } from "./domain/usher";
 import { useAiRails } from "./hooks/useAiRails";
 import { useCatalog } from "./hooks/useCatalog";
 import { useCurator } from "./hooks/useCurator";
@@ -175,6 +175,15 @@ export function App() {
 
   const askCurator = useCallback(
     async (prompt: string, isRefinement = false) => {
+      const aside = isRefinement ? null : asideFor(prompt);
+
+      if (aside) {
+        curator.clear();
+        usher.say(aside);
+
+        return;
+      }
+
       usher.clearPick();
       await curator.ask(prompt, isRefinement, selectedProviderIds);
     },
@@ -373,6 +382,7 @@ export function App() {
               isPinned={isPinned}
               usherMoment={usher.moment}
               pick={usher.pick}
+              aside={usher.aside}
               onAsk={askCurator}
               onClearCurator={clearAll}
               onOpen={openTitle}
@@ -426,6 +436,8 @@ export function App() {
                 titles={catalog.savedTitles}
                 catalogueError={catalog.error}
                 usherMoment={usher.moment?.surface === "shelf" ? usher.moment : null}
+                onClaim={(entry) => void profile.saveEntry(entry)}
+                onDiscard={(titleId) => void profile.removeEntry(titleId)}
                 onUsherRequest={onShelfMoment}
                 onUsherAction={onUsherAction}
                 onUsherDismiss={(scope) => void usher.dismiss(scope)}

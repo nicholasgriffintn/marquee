@@ -29,6 +29,7 @@ export type CatalogueSearch = {
   providerIds?: string[];
   minScore?: number;
   releasedAfter?: number;
+  maxRuntime?: number;
   excludeIds?: string[];
   includeIds?: string[];
   sort?: CatalogueSort;
@@ -159,6 +160,14 @@ export async function searchCatalogue(db: D1Database, search: CatalogueSearch) {
   if (minVotes > 0) {
     conditions.push("COALESCE(json_extract(t.payload, '$.tmdbVoteCount'), 0) >= ?");
     bindings.push(minVotes);
+  }
+
+  if (Number.isFinite(search.maxRuntime)) {
+    conditions.push(
+      `(json_extract(t.payload, '$.runtimeMinutes') IS NULL
+        OR json_extract(t.payload, '$.runtimeMinutes') <= ?)`,
+    );
+    bindings.push(Math.max(30, Math.min(600, Math.trunc(search.maxRuntime ?? 600))));
   }
 
   if (Number.isFinite(search.releasedAfter)) {

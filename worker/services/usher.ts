@@ -47,6 +47,19 @@ const DRIP_COOLDOWN_DAYS = 3;
 const IGNORE_LIMIT = 3;
 const QUIET_DAYS = 14;
 const STALE_WATCHLIST_DAYS = 60;
+const AWAY_DAYS = 21;
+
+function awayPhrase(days: number) {
+  if (days >= 330) {
+    return "It has been the best part of a year.";
+  }
+
+  if (days >= 60) {
+    return `Not seen you in ${Math.round(days / 30)} months.`;
+  }
+
+  return `Not seen you in ${Math.round(days / 7)} weeks.`;
+}
 
 function days(count: number) {
   return new Date(Date.now() + count * 86_400_000).toISOString();
@@ -179,6 +192,7 @@ export type MomentContext = {
   query?: string;
   savedCount?: number;
   unratedCount?: number;
+  awayDays?: number;
   idle?: boolean;
 };
 
@@ -334,6 +348,17 @@ export async function nextMoment(
       face: "idle",
       line: "You have saved a fair bit and rated none of it. Ratings sharpen the shelves.",
       actions: [{ id: "dismiss", label: "Noted" }],
+    };
+  }
+
+  if (surface === "home" && (context.awayDays ?? 0) >= AWAY_DAYS && !muted("welcome-back")) {
+    return {
+      id: "welcome-back",
+      kind: "welcome-back",
+      surface,
+      face: "pleased",
+      line: `${awayPhrase(context.awayDays ?? 0)} The seats are the same.`,
+      actions: [{ id: "dismiss", label: "Good to be back" }],
     };
   }
 

@@ -49,6 +49,7 @@ export function TonightPage({
   isPinned,
   usherMoment,
   pick,
+  aside,
   onAsk,
   onClearCurator,
   onOpen,
@@ -81,6 +82,7 @@ export function TonightPage({
   isPinned: boolean;
   usherMoment: UsherMoment | null;
   pick: UsherPickState;
+  aside: string;
   onAsk: (prompt: string, isRefinement?: boolean) => Promise<void>;
   onClearCurator: () => void;
   onOpen: (item: MediaTitle) => void;
@@ -97,7 +99,7 @@ export function TonightPage({
 }) {
   const [isIdle, setIsIdle] = useState(false);
   const isUsherMode = Boolean(
-    curator.prompt || curatorError || pick.item || pick.isPicking || pick.error,
+    curator.prompt || curatorError || pick.item || pick.isPicking || pick.error || aside,
   );
   const onboardingMoment = usherMoment?.surface === "first-run" ? usherMoment : null;
   const dripMoment = usherMoment?.surface === "home" ? usherMoment : null;
@@ -146,6 +148,7 @@ export function TonightPage({
                 isAsking={isAsking}
                 isPinned={isPinned}
                 pick={pick}
+                aside={aside}
                 onAsk={onAsk}
                 onClear={onClearCurator}
                 onOpen={onOpen}

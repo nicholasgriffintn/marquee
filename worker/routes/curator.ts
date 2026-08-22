@@ -12,6 +12,7 @@ import { getPersonalRails } from "../services/ai-rails.ts";
 import { readDigest } from "../services/digest.ts";
 import { getTitleInsight } from "../services/title-insight.ts";
 import type { Bindings } from "../types.ts";
+import { viewerHour } from "./usher.ts";
 
 export const curatorRoutes = new Hono<{ Bindings: Bindings; Variables: ViewerVariables }>();
 
@@ -62,7 +63,13 @@ curatorRoutes.post("/", async (context) => {
   const streamed = await session.fetch("https://curator/ask", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ prompt, viewerId: identity.viewerId, providerIds }),
+    body: JSON.stringify({
+      prompt,
+      viewerId: identity.viewerId,
+      providerIds,
+      hour: viewerHour(body.hour),
+      isWeekend: body.isWeekend === true,
+    }),
   });
 
   if (!identity.cookie) {

@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { showingNow } from "../../domain/usher";
 import { ArrowIcon } from "../ui";
 import { UsherMark } from "./UsherMark";
 
@@ -26,10 +27,11 @@ export function UsherConsole({
 }) {
   const [prompt, setPrompt] = useState("");
   const isBusy = isAsking || isPicking;
+  const showing = showingNow();
 
   return (
     <div className="usher-console">
-      {isIdle && !hasAsked && !isBusy && <p className="usher-nudge">Still deciding? I'll pick.</p>}
+      {isIdle && !hasAsked && !isBusy && <p className="usher-nudge">{showing.nudge}</p>}
 
       <form
         className="usher-ask"

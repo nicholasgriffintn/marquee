@@ -5,6 +5,8 @@ import type { UsherMoment } from "../../domain/usher";
 import { UsherAnswer } from "./UsherAnswer";
 import { UsherMark } from "./UsherMark";
 
+const SIGN = [".", "T", ".", "O", ".", "N", ".", "I", ".", "G", ".", "H", ".", "T", "."];
+
 export function UsherOnboarding({
   moment,
   providers,
@@ -32,9 +34,15 @@ export function UsherOnboarding({
   return (
     <section className="hero-section usher-onboarding">
       <div className="usher-bulbs" aria-hidden="true">
-        {Array.from({ length: 14 }, (_, index) => (
-          <i key={index} />
-        ))}
+        {SIGN.map((glyph, index) =>
+          glyph === "." ? (
+            <i key={index} />
+          ) : (
+            <span key={index} className={`letter${index === 9 ? " dim" : ""}`}>
+              {glyph}
+            </span>
+          ),
+        )}
       </div>
 
       <div className="usher-onboarding-inner">

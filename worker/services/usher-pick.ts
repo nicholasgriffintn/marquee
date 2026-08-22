@@ -1,4 +1,5 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
+import { showingFor, type Showing } from "../../src/domain/usher.ts";
 import { USHER_VOICE } from "../ai/usher-voice.ts";
 import { fastModel, requestAiCompletion } from "../clients/ai-gateway.ts";
 import type { ChatMessage } from "../lib/curator-payload.ts";
@@ -22,7 +23,11 @@ const PICK_PROMPT = [
   'Reply with JSON only: {"titleId":"","line":""}.',
 ].join(" ");
 
-function fallbackLine(title: MediaTitle) {
+function fallbackLine(title: MediaTitle, showing: Showing) {
+  if (showing.slot === "late" || showing.slot === "small-hours") {
+    return "It's late. This one won't keep you up.";
+  }
+
   if (title.runtimeMinutes && title.runtimeMinutes > 150) {
     return "It's long. Clear the evening.";
   }
@@ -39,6 +44,7 @@ async function candidates(
   viewerId: string,
   providerIds: string[],
   rejected: string[],
+  showing: Showing,
 ) {
   const preferences = await readViewerPreferences(env.DB, viewerId);
   const services = [...new Set([...providerIds, ...preferences.providerIds])];
@@ -54,6 +60,7 @@ async function candidates(
     excludeIds: exclude,
     limit: SHORTLIST,
     minVotes: 200,
+    ...(showing.maxRuntime ? { maxRuntime: showing.maxRuntime } : {}),
   };
   const vector = await tasteVector(env, viewer, preferences);
 
@@ -101,11 +108,12 @@ async function candidates(
 export async function pickOne(
   env: Bindings,
   viewerId: string,
-  options: { providerIds?: string[]; rejected?: string[] } = {},
+  options: { providerIds?: string[]; rejected?: string[]; hour?: number; isWeekend?: boolean } = {},
 ) {
   const providerIds = options.providerIds ?? [];
   const rejected = (options.rejected ?? []).filter(isKnownTitle).slice(0, 40);
-  const { titles, preferences } = await candidates(env, viewerId, providerIds, rejected);
+  const showing = showingFor(options.hour ?? 20, options.isWeekend ?? false);
+  const { titles, preferences } = await candidates(env, viewerId, providerIds, rejected, showing);
 
   if (titles.length === 0) {
     return null;
@@ -127,6 +135,8 @@ export async function pickOne(
     {
       role: "user",
       content: [
+        showing.brief,
+        "",
         summary ? `What I know about them: ${summary}` : "I know very little about them yet.",
         "",
         `Tonight's options:\n${listing}`,
@@ -151,7 +161,7 @@ export async function pickOne(
       if (chosen) {
         const line = typeof parsed.line === "string" ? parsed.line.trim().slice(0, 160) : "";
 
-        return { item: chosen, line: line || fallbackLine(chosen) };
+        return { item: chosen, line: line || fallbackLine(chosen, showing) };
       }
     }
   } catch (error) {
@@ -160,5 +170,5 @@ export async function pickOne(
 
   const [chosen] = titles;
 
-  return { item: chosen, line: fallbackLine(chosen) };
+  return { item: chosen, line: fallbackLine(chosen, showing) };
 }

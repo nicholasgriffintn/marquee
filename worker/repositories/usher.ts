@@ -7,6 +7,7 @@ export type UsherRecord = {
   ignored: number;
   snoozedUntil: string | null;
   lastPromptedAt: string | null;
+  lastSeenAt: string | null;
 };
 
 type UsherRow = {
@@ -16,6 +17,7 @@ type UsherRow = {
   ignored: number;
   snoozedUntil: string | null;
   lastPromptedAt: string | null;
+  lastSeenAt: string | null;
 };
 
 const EMPTY: UsherRecord = {
@@ -25,6 +27,7 @@ const EMPTY: UsherRecord = {
   ignored: 0,
   snoozedUntil: null,
   lastPromptedAt: null,
+  lastSeenAt: null,
 };
 
 function strings(value: unknown) {
@@ -50,7 +53,8 @@ export async function readUsherRecord(db: D1Database, viewerId: string): Promise
     .prepare(
       `SELECT status, asked, muted, ignored,
               snoozed_until AS snoozedUntil,
-              last_prompted_at AS lastPromptedAt
+              last_prompted_at AS lastPromptedAt,
+              last_seen_at AS lastSeenAt
        FROM viewer_usher WHERE viewer_id = ?`,
     )
     .bind(viewerId)
@@ -70,6 +74,7 @@ export async function readUsherRecord(db: D1Database, viewerId: string): Promise
     ignored: Number.isFinite(row.ignored) ? row.ignored : 0,
     snoozedUntil: row.snoozedUntil,
     lastPromptedAt: row.lastPromptedAt,
+    lastSeenAt: row.lastSeenAt,
   };
 }
 
@@ -84,8 +89,8 @@ export async function writeUsherRecord(
   await db
     .prepare(
       `INSERT INTO viewer_usher
-         (viewer_id, status, asked, muted, ignored, snoozed_until, last_prompted_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
+         (viewer_id, status, asked, muted, ignored, snoozed_until, last_prompted_at, last_seen_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(viewer_id) DO UPDATE SET
          status = excluded.status,
          asked = excluded.asked,
@@ -93,6 +98,7 @@ export async function writeUsherRecord(
          ignored = excluded.ignored,
          snoozed_until = excluded.snoozed_until,
          last_prompted_at = excluded.last_prompted_at,
+         last_seen_at = excluded.last_seen_at,
          updated_at = CURRENT_TIMESTAMP`,
     )
     .bind(
@@ -103,6 +109,7 @@ export async function writeUsherRecord(
       next.ignored,
       next.snoozedUntil,
       next.lastPromptedAt,
+      next.lastSeenAt,
     )
     .run();
 

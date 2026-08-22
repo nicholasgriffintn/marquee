@@ -1,3 +1,4 @@
+import { showingFor } from "../../src/domain/usher.ts";
 import { CURATOR_TOOLS, executeCuratorTool } from "../ai/curator-tools.ts";
 import { USHER_VOICE } from "../ai/usher-voice.ts";
 import { fastModel, requestAiCompletion, streamAiCompletion } from "../clients/ai-gateway.ts";
@@ -59,6 +60,7 @@ async function runCurator(
   turns: CuratorTurn[],
   viewerId: string,
   summary = "",
+  showingBrief = "",
 ) {
   const messages: ChatMessage[] = [
     { role: "system", content: SYSTEM_PROMPT },
@@ -70,6 +72,7 @@ async function runCurator(
           },
         ]
       : []),
+    ...(showingBrief ? [{ role: "system" as const, content: showingBrief }] : []),
     ...historyMessages(turns),
     { role: "user", content: prompt },
   ];
@@ -144,7 +147,7 @@ export async function* curateStream(
   prompt: string,
   viewerId: string,
   turns: CuratorTurn[] = [],
-  options: { providerIds?: string[] } = {},
+  options: { providerIds?: string[]; hour?: number; isWeekend?: boolean } = {},
 ): AsyncGenerator<CuratorEvent> {
   yield { type: "status", label: viewerId ? "Reading your shelf" : "Reading your services" };
 
@@ -153,6 +156,7 @@ export async function* curateStream(
     ...new Set([...(options.providerIds ?? []), ...preferences.providerIds]),
   ]);
   const tasteLine = preferenceSummary(preferences);
+  const showing = showingFor(options.hour ?? 20, options.isWeekend ?? false);
 
   yield {
     type: "status",
@@ -168,6 +172,7 @@ export async function* curateStream(
     turns,
     viewerId,
     tasteLine,
+    showing.brief,
   );
   const items = await readItems(env.DB, result.titleIds);
 

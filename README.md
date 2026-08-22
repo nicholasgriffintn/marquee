@@ -37,7 +37,10 @@ rate limits and bot checks speak in his voice rather than a status code's. Ask t
 _"Steady on. One at a time."_ Arrive as something that is not a person and you get told that he has
 seen a lot of faces and not one of them was yours. Try a door that is not yours and you meet the
 manager's office instead: frosted glass, a name painted on it, a note that has said _back in ten
-minutes_ since 1974. The manager is canon and has never been drawn. He is not in. He is never in.
+minutes_ since 1974. The manager is canon and has never been drawn. He is not in. He is never in. Nor is the
+projectionist, who runs the sweeps and the re-hydration and the long nights of ingestion, and who
+gets a note of his own on the admin page. Two colleagues, both unseen, is the correct number: it
+makes the building feel staffed without giving the Usher anyone to compete with.
 
 He has five faces — attentive, thinking, pleased, unimpressed, asleep — and gets by on about two of
 them. The artwork is in `public/`, all of it cut from `usher.svg`, in ink, paper, acid and coral and
