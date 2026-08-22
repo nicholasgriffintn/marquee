@@ -1,6 +1,7 @@
 import type { MediaTitle, Provider, ProviderAvailability } from "../domain/catalog";
 import { providerLogo } from "../domain/provider-logos";
 import { providerMark } from "../domain/providers";
+import { ArtPlaceholder } from "./ArtPlaceholder";
 
 export function ArrowIcon() {
   return (
@@ -70,7 +71,7 @@ export function Poster({ item, wide = false }: { item: MediaTitle; wide?: boolea
           loading={wide ? "eager" : "lazy"}
         />
       )}
-      {!image && <strong>{item.title}</strong>}
+      {!image && <ArtPlaceholder seed={item.id} label={item.title} wide={wide} />}
     </div>
   );
 }

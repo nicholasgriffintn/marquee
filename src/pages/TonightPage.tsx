@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { ArtPlaceholder } from "../components/ArtPlaceholder";
 import { ContentRail } from "../components/catalog";
 import { ArrowIcon, ProviderBadge } from "../components/ui";
 import type { CatalogSection, MediaTitle, Provider } from "../domain/catalog";
@@ -75,9 +76,13 @@ export function TonightPage({
           !featured && isLoading ? " hero-loading" : ""
         }`}
       >
-        {featured?.backdropUrl && (
+        {featured && (
           <div className="hero-art" aria-hidden="true">
-            <img src={featured.backdropUrl} alt="" />
+            {featured.backdropUrl ? (
+              <img src={featured.backdropUrl} alt="" />
+            ) : (
+              <ArtPlaceholder seed={featured.id} label={featured.title} wide />
+            )}
           </div>
         )}
         <div className="hero-gradient" />
@@ -111,46 +116,48 @@ export function TonightPage({
           )}
         </div>
         {isSignedIn && (
-          <form
-            className="curator-dock"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void onAsk(prompt);
-            }}
-          >
-            <span>
-              <i>AI</i> Ask Marquee
-            </span>
-            <input
-              maxLength={1_000}
-              value={prompt}
-              onChange={(event) => setPrompt(event.target.value)}
-              placeholder="90 mins, clever but not bleak…"
-              aria-label="Ask Marquee for recommendations"
-            />
-            <button
-              type="submit"
-              disabled={isAsking || !prompt.trim() || !featured}
-              aria-label="Ask Marquee"
+          <div className="curator-console">
+            <form
+              className="curator-dock"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void onAsk(prompt);
+              }}
             >
-              {isAsking ? "…" : <ArrowIcon />}
-            </button>
-          </form>
-        )}
-        {isSignedIn && !curator.prompt && (
-          <div className="curator-seeds">
-            {SEED_PROMPTS.map((seed) => (
+              <span>
+                <i>AI</i> Ask Marquee
+              </span>
+              <input
+                maxLength={1_000}
+                value={prompt}
+                onChange={(event) => setPrompt(event.target.value)}
+                placeholder="90 mins, clever but not bleak…"
+                aria-label="Ask Marquee for recommendations"
+              />
               <button
-                key={seed}
-                type="button"
-                onClick={() => {
-                  setPrompt(seed);
-                  void onAsk(seed);
-                }}
+                type="submit"
+                disabled={isAsking || !prompt.trim() || !featured}
+                aria-label="Ask Marquee"
               >
-                {seed}
+                {isAsking ? "…" : <ArrowIcon />}
               </button>
-            ))}
+            </form>
+            {!curator.prompt && (
+              <div className="curator-seeds">
+                {SEED_PROMPTS.map((seed) => (
+                  <button
+                    key={seed}
+                    type="button"
+                    onClick={() => {
+                      setPrompt(seed);
+                      void onAsk(seed);
+                    }}
+                  >
+                    {seed}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </section>
@@ -239,29 +246,9 @@ export function TonightPage({
         </p>
       )}
       {isBuildingRails && (
-        <div className="rails-section rails-section-pending" aria-live="polite">
-          <p className="rails-building">
-            <i>AI</i> Building your shelves…
-          </p>
-          {[0, 1].map((rail) => (
-            <div className="content-rail" key={rail} aria-hidden="true">
-              <div className="rail-heading">
-                <div>
-                  <span className="skeleton skeleton-eyebrow" />
-                  <span className="skeleton skeleton-heading" />
-                </div>
-              </div>
-              <div className="rail-track">
-                {[0, 1, 2, 3, 4].map((card) => (
-                  <div className="rail-card" key={card}>
-                    <span className="skeleton skeleton-art" />
-                    <span className="skeleton skeleton-meta" />
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
+        <p className="rails-building" aria-live="polite">
+          <i>AI</i> Building your shelves…
+        </p>
       )}
       {sections.length > 0 ? (
         <div className="rails-section">

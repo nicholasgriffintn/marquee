@@ -22,7 +22,12 @@ function message(error: unknown) {
   return error instanceof ApiError ? error.message : "Live catalogue is unavailable";
 }
 
-export function useCatalog(providerIds: string[], savedIds: string[], isReady: boolean) {
+export function useCatalog(
+  providerIds: string[],
+  savedIds: string[],
+  isReady: boolean,
+  wantsSavedTitles: boolean,
+) {
   const [catalogue, setCatalogue] = useState<CatalogResponse>(emptyCatalogue);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [providerSources, setProviderSources] = useState<string[]>([]);
@@ -111,7 +116,7 @@ export function useCatalog(providerIds: string[], savedIds: string[], isReady: b
   useEffect(() => {
     const controller = new AbortController();
 
-    if (!savedKey) {
+    if (!savedKey || !wantsSavedTitles) {
       return () => controller.abort();
     }
 
@@ -133,7 +138,7 @@ export function useCatalog(providerIds: string[], savedIds: string[], isReady: b
     void loadSavedTitles();
 
     return () => controller.abort();
-  }, [savedKey]);
+  }, [savedKey, wantsSavedTitles]);
 
   const currentSavedTitles = useMemo(
     () => savedTitles.filter((item) => savedKey.split(",").includes(item.id)),

@@ -10,7 +10,7 @@ export const SEARCH_TOOL: ChatCompletionTool = {
   function: {
     name: "search_catalogue",
     description:
-      "Search Marquee's whole catalogue. Call it repeatedly with different genres, keywords, sort orders and score floors to dig past the obvious hits.",
+      "Search Marquee's whole catalogue. Call it repeatedly with different genres, keywords, sort orders and score floors to dig past the obvious hits. Score sorting is vote-weighted, so obscure titles with a handful of votes will not dominate.",
     parameters: {
       type: "object",
       properties: {
@@ -18,6 +18,12 @@ export const SEARCH_TOOL: ChatCompletionTool = {
         genres: { type: "array", items: { type: "string" }, maxItems: 10 },
         mediaType: { type: "string", enum: ["movie", "tv"] },
         minScore: { type: "number", minimum: 0, maximum: 10 },
+        minVotes: {
+          type: "integer",
+          minimum: 0,
+          description:
+            "Minimum TMDB vote count. Defaults to 50 when sorting by score, so a 10/10 from three votes cannot win.",
+        },
         releasedAfter: { type: "integer", minimum: 1900, maximum: 2100 },
         sort: { type: "string", enum: ["popularity", "score", "recent"] },
         limit: { type: "integer", minimum: 1, maximum: 30 },
@@ -42,7 +48,7 @@ export const CURATOR_TOOLS: ChatCompletionTool[] = [
     function: {
       name: "search_catalogue",
       description:
-        "Search Marquee's whole catalogue. Call it repeatedly with different genres, keywords, sort orders and score floors to dig past the obvious hits.",
+        "Search Marquee's whole catalogue. Call it repeatedly with different genres, keywords, sort orders and score floors to dig past the obvious hits. Score sorting is vote-weighted, so obscure titles with a handful of votes will not dominate.",
       parameters: {
         type: "object",
         properties: {
@@ -50,6 +56,12 @@ export const CURATOR_TOOLS: ChatCompletionTool[] = [
           genres: { type: "array", items: { type: "string" }, maxItems: 10 },
           mediaType: { type: "string", enum: ["movie", "tv"] },
           minScore: { type: "number", minimum: 0, maximum: 10 },
+          minVotes: {
+            type: "integer",
+            minimum: 0,
+            description:
+              "Minimum TMDB vote count. Defaults to 50 when sorting by score, so a 10/10 from three votes cannot win.",
+          },
           availableOnSelectedServices: {
             type: "boolean",
             description: "Default true. Restrict results to providers selected by the viewer.",
@@ -206,6 +218,7 @@ function buildSearch(
     providerIds:
       argumentsValue.availableOnSelectedServices === false ? [] : viewer.selectedProviderIds,
     minScore: typeof argumentsValue.minScore === "number" ? argumentsValue.minScore : undefined,
+    minVotes: typeof argumentsValue.minVotes === "number" ? argumentsValue.minVotes : undefined,
     releasedAfter:
       typeof argumentsValue.releasedAfter === "number" ? argumentsValue.releasedAfter : undefined,
     sort:

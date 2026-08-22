@@ -5,7 +5,9 @@ import { clientRateLimitKey } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
 import { validProviderIds } from "../lib/validation.ts";
 import {
+  browseCatalogue,
   getCatalogue,
+  getGenres,
   searchCatalogue,
   getCatalogueItems,
   getProviderCatalogue,
@@ -64,6 +66,48 @@ catalogRoutes.get("/search", async (context) => {
     logError("catalogue_search_failed", error, { area: "search" });
 
     return context.json({ error: "Search is unavailable" }, 500);
+  }
+});
+
+catalogRoutes.get("/genres", async (context) => {
+  try {
+    context.header("cache-control", "public, max-age=3600");
+
+    return context.json({ genres: await getGenres(context.env) });
+  } catch (error) {
+    logError("genres_read_failed", error, { area: "browse" });
+
+    return context.json({ genres: [] });
+  }
+});
+
+catalogRoutes.get("/browse", async (context) => {
+  const mediaTypeParam = context.req.query("mediaType");
+  const sortParam = context.req.query("sort");
+  const page = Number.parseInt(context.req.query("page") ?? "0", 10);
+
+  try {
+    context.header("cache-control", "public, max-age=120");
+
+    return context.json(
+      await browseCatalogue(context.env, {
+        mediaType:
+          mediaTypeParam === "movie" || mediaTypeParam === "tv" ? mediaTypeParam : undefined,
+        genres: (context.req.query("genres") ?? "")
+          .split(",")
+          .map((genre) => genre.trim())
+          .filter(Boolean)
+          .slice(0, 6),
+        providerIds: validProviderIds((context.req.query("providers") ?? "").split(",")),
+        query: (context.req.query("query") ?? "").trim().slice(0, 120),
+        sort: sortParam === "score" || sortParam === "recent" ? sortParam : "popularity",
+        page: Number.isInteger(page) && page > 0 ? Math.min(page, 80) : 0,
+      }),
+    );
+  } catch (error) {
+    logError("browse_failed", error, { area: "browse" });
+
+    return context.json({ error: "Browsing is unavailable" }, 500);
   }
 });
 

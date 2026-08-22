@@ -24,6 +24,7 @@ type SavedTitleRow = { titleId: string };
 
 const AVAILABILITY_MAX_AGE_DAYS = 7;
 const QUEUE_BATCH = 100;
+const MIN_POSTER_BYTES = 40_000;
 
 const ENRICHERS = [
   { source: "omdb", job: "enrich-ratings", maxAgeDays: 30, perRun: 900 },
@@ -254,23 +255,58 @@ async function importImdbTitle(env: Bindings, imdbId: string) {
   await queueAvailability(env, [titleId]);
 }
 
+async function originPosterUrl(env: Bindings, titleId: string) {
+  const row = await env.DB.prepare(
+    `SELECT json_extract(payload, '$.posterUrl') AS posterUrl FROM catalog_titles WHERE id = ?`,
+  )
+    .bind(titleId)
+    .first<{ posterUrl: string | null }>();
+  const url = row?.posterUrl ?? null;
+
+  return url?.startsWith("https://image.tmdb.org/")
+    ? url.replace(/\/t\/p\/w\d+\//u, "/t/p/w780/")
+    : null;
+}
+
+async function fetchImage(url: string) {
+  const response = await fetch(url, {
+    signal: AbortSignal.timeout(20_000),
+    cf: { cacheEverything: true, cacheTtl: 86_400 },
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const contentType = response.headers.get("content-type") ?? "";
+
+  if (!contentType.startsWith("image/")) {
+    return null;
+  }
+
+  const body = await response.arrayBuffer();
+
+  return body.byteLength > 0 ? { body, contentType } : null;
+}
+
 async function cachePoster(env: Bindings, titleId: string) {
   const imdbId = await imdbIdFor(env, titleId);
 
-  if (!imdbId) {
-    return;
+  if (imdbId && (await claimBudget(env, "poster"))) {
+    const poster = await getOmdbPoster(env, imdbId);
+
+    if (poster && poster.body.byteLength >= MIN_POSTER_BYTES) {
+      await storePoster(env, titleId, poster.body, poster.contentType);
+
+      return;
+    }
   }
 
-  if (!(await claimBudget(env, "poster"))) {
-    console.log(JSON.stringify({ event: "budget_exhausted", source: "poster", titleId }));
+  const tmdbPoster = await originPosterUrl(env, titleId);
+  const fallback = tmdbPoster ? await fetchImage(tmdbPoster) : null;
 
-    return;
-  }
-
-  const poster = await getOmdbPoster(env, imdbId);
-
-  if (poster) {
-    await storePoster(env, titleId, poster.body, poster.contentType);
+  if (fallback) {
+    await storePoster(env, titleId, fallback.body, fallback.contentType);
   }
 }
 

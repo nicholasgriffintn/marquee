@@ -12,6 +12,7 @@ import { useProfile } from "./hooks/useProfile";
 import { useSearch } from "./hooks/useSearch";
 import { useSession } from "./hooks/useSession";
 import { useTitle } from "./hooks/useTitle";
+import { BrowsePage, type BrowsePreset } from "./pages/BrowsePage";
 import { LibraryPage } from "./pages/LibraryPage";
 import { SearchPage } from "./pages/SearchPage";
 import { SourcesPage } from "./pages/SourcesPage";
@@ -19,9 +20,38 @@ import { TonightPage } from "./pages/TonightPage";
 
 const NAV: { to: string; label: string; private: boolean }[] = [
   { to: "/", label: "Tonight", private: false },
+  { to: "/films", label: "Films", private: false },
+  { to: "/series", label: "Series", private: false },
+  { to: "/new", label: "New", private: false },
+  { to: "/popular", label: "Popular", private: false },
   { to: "/shelf", label: "My shelf", private: true },
   { to: "/sources", label: "Sources", private: false },
 ];
+
+const BROWSE_PRESETS: Record<string, BrowsePreset> = {
+  "/films": {
+    title: "Films",
+    description: "Every film in the Marquee catalogue.",
+    mediaType: "movie",
+    sort: "popularity",
+  },
+  "/series": {
+    title: "Series",
+    description: "Every series in the Marquee catalogue.",
+    mediaType: "tv",
+    sort: "popularity",
+  },
+  "/new": {
+    title: "New",
+    description: "The most recent additions, newest first.",
+    sort: "recent",
+  },
+  "/popular": {
+    title: "Popular",
+    description: "What people are watching right now.",
+    sort: "popularity",
+  },
+};
 
 export function App() {
   const navigate = useNavigate();
@@ -33,10 +63,16 @@ export function App() {
   const isSignedIn = Boolean(session.user);
   const profile = useProfile(isSignedIn);
   const isViewerReady = !session.isLoading && profile.isLoaded;
-  const catalog = useCatalog(profile.selectedProviderIds, profile.savedIds, isViewerReady);
+  const isHome = location.pathname === "/";
+  const catalog = useCatalog(
+    profile.selectedProviderIds,
+    profile.savedIds,
+    isViewerReady && isHome,
+    isViewerReady && (isHome || location.pathname === "/shelf"),
+  );
   const search = useSearch(query, profile.selectedProviderIds);
   const curator = useCurator();
-  const aiRails = useAiRails(isSignedIn && isViewerReady, profile.savedIds.join(","));
+  const aiRails = useAiRails(isSignedIn && isViewerReady && isHome, profile.savedIds.join(","));
   const titleMatch = useMatch("/title/:titleId");
   const storedBackground = (location.state as { background?: typeof location } | null)?.background;
   const background = storedBackground?.pathname.startsWith("/title/")
@@ -256,6 +292,16 @@ export function App() {
             />
           }
         />
+
+        {Object.entries(BROWSE_PRESETS).map(([path, preset]) => (
+          <Route
+            key={path}
+            path={path}
+            element={
+              <BrowsePage preset={preset} providers={catalog.providers} onOpen={openTitle} />
+            }
+          />
+        ))}
 
         <Route path="*" element={<NotFoundPage />} />
       </Routes>

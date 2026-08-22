@@ -3,7 +3,8 @@ import { useEffect, useRef } from "react";
 import type { CatalogSection, MediaTitle } from "../domain/catalog";
 import { useAvailability } from "../hooks/useAvailability";
 import { useTitleInsight } from "../hooks/useTitleInsight";
-import { mediaMeta, scoreLabel } from "../lib/media";
+import { mediaMeta, scoreLabel, voteLabel } from "../lib/media";
+import { ArtPlaceholder } from "./ArtPlaceholder";
 import { ArrowIcon, PlusIcon, Poster, ProviderBadge } from "./ui";
 
 const RAIL_PROVIDER_LIMIT = 3;
@@ -11,9 +12,11 @@ const RAIL_PROVIDER_LIMIT = 3;
 export function TitleCard({
   item,
   onOpen,
+  rank,
 }: {
   item: MediaTitle;
   onOpen: (title: MediaTitle) => void;
+  rank?: number;
 }) {
   return (
     <article className={`rail-card${item.pending ? " rail-card-pending" : ""}`}>
@@ -24,10 +27,17 @@ export function TitleCard({
         aria-label={`Open ${item.title}`}
       >
         <div className={`rail-art${item.backdropUrl ? "" : " rail-art-missing"}`}>
-          {item.backdropUrl && <img src={item.backdropUrl} alt="" loading="lazy" />}
-          <span className="rail-number">
-            {item.pending ? "FETCHING" : item.mediaType === "movie" ? "FILM" : "TV"}
-          </span>
+          {item.backdropUrl ? (
+            <img src={item.backdropUrl} alt="" loading="lazy" />
+          ) : (
+            <ArtPlaceholder seed={item.id} label={item.title} wide />
+          )}
+          <div className="rail-tags">
+            {rank !== undefined && <span className="rail-rank">#{rank}</span>}
+            <span className="rail-number">
+              {item.pending ? "FETCHING" : item.mediaType === "movie" ? "FILM" : "TV"}
+            </span>
+          </div>
           <strong>{item.title}</strong>
           <div className="rail-provider-row">
             {item.providers.slice(0, RAIL_PROVIDER_LIMIT).map((provider) => (
@@ -42,7 +52,10 @@ export function TitleCard({
         </div>
       </button>
       <div className="rail-meta">
-        <span className="source-label">TMDB {scoreLabel(item)}</span>
+        <span className="source-label">
+          TMDB {scoreLabel(item)}
+          {voteLabel(item) && <em>{voteLabel(item)}</em>}
+        </span>
         <span>{mediaMeta(item)}</span>
       </div>
     </article>
@@ -229,7 +242,7 @@ export function DetailPanel({
                   {pair.item.posterUrl ? (
                     <img src={pair.item.posterUrl} alt="" loading="lazy" />
                   ) : (
-                    <i aria-hidden="true" />
+                    <ArtPlaceholder seed={pair.item.id} label={pair.item.title} />
                   )}
                   <span>
                     <strong>{pair.item.title}</strong>

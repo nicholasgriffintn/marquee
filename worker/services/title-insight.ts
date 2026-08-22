@@ -1,4 +1,4 @@
-import type { CuratorCandidate } from "../../src/domain/catalog.ts";
+import type { MediaTitle } from "../../src/domain/catalog.ts";
 import { fastModel, requestAiCompletion } from "../clients/ai-gateway.ts";
 import { isRecord } from "../lib/values.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
@@ -25,7 +25,7 @@ export type TitleInsight = {
 
 type InsightRow = { payload: string; ageDays: number };
 
-function parseInsight(content: string, candidates: CuratorCandidate[]): TitleInsight | null {
+function parseInsight(content: string, candidates: MediaTitle[]): TitleInsight | null {
   const json = content.match(/\{[\s\S]*\}/u)?.[0];
 
   if (!json) {

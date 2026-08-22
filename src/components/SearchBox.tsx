@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { MediaTitle } from "../domain/catalog";
+import { ArtPlaceholder } from "./ArtPlaceholder";
 import { ArrowIcon } from "./ui";
 
 export function SearchBox({
@@ -123,7 +124,7 @@ export function SearchBox({
               {item.posterUrl ? (
                 <img src={item.posterUrl} alt="" loading="lazy" />
               ) : (
-                <i aria-hidden="true" />
+                <ArtPlaceholder seed={item.id} label={item.title} />
               )}
               <span>
                 <strong>{item.title}</strong>

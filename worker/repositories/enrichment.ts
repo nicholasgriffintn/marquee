@@ -69,24 +69,16 @@ export async function storePoster(
   body: ArrayBuffer,
   contentType: string,
 ) {
-  const [title] = await readItems(env.DB, [titleId]);
-
-  if (!title) {
-    return false;
-  }
-
   const key = posterKey(titleId);
 
   await env.MEDIA.put(key, body, { httpMetadata: { contentType } });
 
-  const enrichedTitle = { ...title, posterUrl: `/media/${key}` } satisfies MediaTitle;
-
   await env.DB.batch([
     env.DB.prepare(
       `UPDATE catalog_titles
-       SET payload = ?, updated_at = CURRENT_TIMESTAMP
+       SET poster_key = ?, updated_at = CURRENT_TIMESTAMP
        WHERE id = ?`,
-    ).bind(JSON.stringify(enrichedTitle), titleId),
+    ).bind(key, titleId),
     env.DB.prepare(
       `INSERT INTO title_enrichment (title_id, source, payload)
        VALUES (?, 'poster', ?)

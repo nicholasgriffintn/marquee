@@ -4,6 +4,7 @@ import type { Bindings, TitleRatings } from "../types.ts";
 
 const API_BASE = "https://www.omdbapi.com/";
 const POSTER_BASE = "https://img.omdbapi.com/";
+const POSTER_HEIGHT = 1_000;
 
 export class OmdbError extends Error {
   constructor(
@@ -81,14 +82,18 @@ export async function getOmdbRatings(env: Bindings, imdbId: string): Promise<Tit
   };
 }
 
-export async function getOmdbPoster(env: Bindings, imdbId: string) {
+export async function getOmdbPoster(env: Bindings, imdbId: string, height = POSTER_HEIGHT) {
   if (!env.OMDB_API_KEY) {
     throw new OmdbError("OMDb is not configured", 503);
   }
 
   const url = new URL(POSTER_BASE);
 
-  url.search = new URLSearchParams({ apikey: env.OMDB_API_KEY, i: imdbId }).toString();
+  url.search = new URLSearchParams({
+    apikey: env.OMDB_API_KEY,
+    i: imdbId,
+    h: String(height),
+  }).toString();
 
   const response = await fetch(url, {
     signal: AbortSignal.timeout(20_000),

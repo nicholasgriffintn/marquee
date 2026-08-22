@@ -26,7 +26,7 @@ const SYSTEM_PROMPT = [
 
 const ANGLES = [
   "Build the shelf around a genre or subgenre this viewer clearly gravitates towards, based on what they save and rate highly.",
-  "Build the shelf from highly rated titles this viewer is unlikely to have come across. Use sort score and a score floor around 7.5.",
+  "Build the shelf from genuinely well regarded titles this viewer is unlikely to have come across. Use sort score with a score floor around 7.5 and minVotes of at least 500, so a perfect score from a handful of votes never qualifies.",
   "Build the shelf around a different mood, era or format from their usual habits, to widen what they watch.",
 ];
 

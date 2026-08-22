@@ -2,7 +2,11 @@ import type { CatalogResponse, CatalogSection, MediaTitle } from "../../src/doma
 import { parseStoredTitle, parseStoredTitleIds } from "../lib/catalog-payload.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 
-type PayloadRow = { payload: string };
+type PayloadRow = { payload: string; posterKey?: string | null };
+
+function withStoredPoster(title: MediaTitle, posterKey?: string | null) {
+  return posterKey ? { ...title, posterUrl: `/media/${posterKey}` } : title;
+}
 
 type SectionRow = {
   id: string;
@@ -28,14 +32,16 @@ export async function readItems(db: D1Database, ids: string[]) {
 
   const placeholders = uniqueIds.map(() => "?").join(",");
   const rows = await db
-    .prepare(`SELECT payload FROM catalog_titles WHERE id IN (${placeholders})`)
+    .prepare(
+      `SELECT payload, poster_key AS posterKey FROM catalog_titles WHERE id IN (${placeholders})`,
+    )
     .bind(...uniqueIds)
     .all<PayloadRow>();
   const titlesById = new Map(
     rows.results.flatMap((row): Array<[string, MediaTitle]> => {
       const title = parseStoredTitle(row.payload);
 
-      return title ? [[title.id, title]] : [];
+      return title ? [[title.id, withStoredPoster(title, row.posterKey)]] : [];
     }),
   );
 
@@ -105,7 +111,7 @@ export async function readAvailability(db: D1Database, titleId: string) {
 async function readSearchResults(db: D1Database, query: string, providerIds: string[]) {
   const rows = await db
     .prepare(
-      `SELECT payload
+      `SELECT payload, poster_key AS posterKey
        FROM catalog_titles
        WHERE instr(lower(title), lower(?)) > 0
           OR instr(lower(original_title), lower(?)) > 0
@@ -118,7 +124,7 @@ async function readSearchResults(db: D1Database, query: string, providerIds: str
     .flatMap((row) => {
       const title = parseStoredTitle(row.payload);
 
-      return title ? [title] : [];
+      return title ? [withStoredPoster(title, row.posterKey)] : [];
     })
     .filter((title) => includesProvider(title, providerIds));
 

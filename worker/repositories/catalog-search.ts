@@ -1,12 +1,22 @@
 import { parseStoredTitle } from "../lib/catalog-payload.ts";
-import { curatorCandidates, isKnownTitle, validProviderIds } from "../lib/validation.ts";
+import { isKnownTitle, validProviderIds } from "../lib/validation.ts";
 
-type PayloadRow = { payload: string };
+type PayloadRow = { payload: string; posterKey?: string | null };
 
 export type CatalogueSort = "popularity" | "score" | "recent";
 
+const VOTE_PRIOR = 250;
+const MEAN_SCORE = 6.5;
+const SCORE_SORT_MIN_VOTES = 50;
+
+const WEIGHTED_RATING = `(
+  (COALESCE(json_extract(payload, '$.tmdbVoteCount'), 0) * COALESCE(json_extract(payload, '$.tmdbScore'), 0))
+  + (${VOTE_PRIOR} * ${MEAN_SCORE})
+) / (COALESCE(json_extract(payload, '$.tmdbVoteCount'), 0) + ${VOTE_PRIOR})`;
+
 export type CatalogueSearch = {
   query?: string;
+  minVotes?: number;
   genres?: string[];
   mediaType?: "movie" | "tv";
   providerIds?: string[];
@@ -15,11 +25,12 @@ export type CatalogueSearch = {
   excludeIds?: string[];
   sort?: CatalogueSort;
   limit?: number;
+  offset?: number;
 };
 
 const ORDER_BY: Record<CatalogueSort, string> = {
   popularity: "popularity DESC",
-  score: "COALESCE(json_extract(payload, '$.tmdbScore'), 0) DESC, popularity DESC",
+  score: `${WEIGHTED_RATING} DESC, popularity DESC`,
   recent: "COALESCE(year, 0) DESC, popularity DESC",
 };
 
@@ -33,7 +44,8 @@ export async function searchCatalogue(db: D1Database, search: CatalogueSearch) {
     .slice(0, 10);
   const providerIds = validProviderIds(search.providerIds);
   const excludedIds = [...new Set((search.excludeIds ?? []).filter(isKnownTitle))].slice(0, 300);
-  const limit = Math.max(1, Math.min(30, Math.floor(search.limit ?? 12)));
+  const limit = Math.max(1, Math.min(60, Math.floor(search.limit ?? 12)));
+  const offset = Math.max(0, Math.min(2_000, Math.floor(search.offset ?? 0)));
 
   if (search.mediaType === "movie" || search.mediaType === "tv") {
     conditions.push("media_type = ?");
@@ -74,6 +86,17 @@ export async function searchCatalogue(db: D1Database, search: CatalogueSearch) {
     bindings.push(Math.max(0, Math.min(10, search.minScore ?? 0)));
   }
 
+  const minVotes = Number.isFinite(search.minVotes)
+    ? Math.max(0, Math.trunc(search.minVotes ?? 0))
+    : search.sort === "score" || Number.isFinite(search.minScore)
+      ? SCORE_SORT_MIN_VOTES
+      : 0;
+
+  if (minVotes > 0) {
+    conditions.push("COALESCE(json_extract(payload, '$.tmdbVoteCount'), 0) >= ?");
+    bindings.push(minVotes);
+  }
+
   if (Number.isFinite(search.releasedAfter)) {
     conditions.push("COALESCE(year, 0) >= ?");
     bindings.push(Math.max(1900, Math.min(2100, Math.trunc(search.releasedAfter ?? 0))));
@@ -86,19 +109,37 @@ export async function searchCatalogue(db: D1Database, search: CatalogueSearch) {
 
   const rows = await db
     .prepare(
-      `SELECT payload
+      `SELECT payload, poster_key AS posterKey
        FROM catalog_titles
        ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
        ORDER BY ${ORDER_BY[search.sort ?? "popularity"]}
-       LIMIT ?`,
+       LIMIT ? OFFSET ?`,
     )
-    .bind(...bindings, limit)
+    .bind(...bindings, limit, offset)
     .all<PayloadRow>();
   const matches = rows.results.flatMap((row) => {
     const title = parseStoredTitle(row.payload);
 
-    return title ? [title] : [];
+    return title
+      ? [row.posterKey ? { ...title, posterUrl: `/media/${row.posterKey}` } : title]
+      : [];
   });
 
-  return curatorCandidates(matches);
+  return matches;
+}
+
+export async function readGenres(db: D1Database) {
+  const rows = await db
+    .prepare(
+      `SELECT json_each.value AS genre, count(*) AS titles
+       FROM catalog_titles, json_each(payload, '$.genres')
+       GROUP BY json_each.value
+       HAVING titles >= 5
+       ORDER BY titles DESC`,
+    )
+    .all<{ genre: string; titles: number }>();
+
+  return rows.results
+    .filter((row) => typeof row.genre === "string" && row.genre.length > 0)
+    .map((row) => row.genre);
 }
