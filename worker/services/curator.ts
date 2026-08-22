@@ -1,9 +1,12 @@
 import { CURATOR_TOOLS, executeCuratorTool } from "../ai/curator-tools.ts";
+import { USHER_VOICE } from "../ai/usher-voice.ts";
 import { fastModel, requestAiCompletion, streamAiCompletion } from "../clients/ai-gateway.ts";
 import { parseCuratorResult, type ChatMessage } from "../lib/curator-payload.ts";
+import { logError } from "../lib/logging.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
 import { readViewerContext } from "../repositories/viewer-context.ts";
 import type { Bindings, ViewerContext } from "../types.ts";
+import { preferenceSummary, readViewerPreferences } from "./usher.ts";
 
 const MAX_TOOL_ROUNDS = 4;
 
@@ -22,9 +25,9 @@ const SYSTEM_PROMPT = [
 ].join(" ");
 
 const NARRATION_PROMPT = [
-  "You are Marquee, a film and television curator talking directly to one viewer.",
-  "Explain the given selection in at most 90 words of warm, specific prose.",
-  "Reference the titles by name and say why they fit the request.",
+  USHER_VOICE,
+  "Introduce the selection you have just made, in at most 60 words.",
+  "Name the titles you mean and say what each is for. One concrete detail beats three adjectives.",
   "Never invent titles beyond the ones listed. No lists, no JSON, no headings.",
 ].join(" ");
 
@@ -55,9 +58,18 @@ async function runCurator(
   viewer: ViewerContext,
   turns: CuratorTurn[],
   viewerId: string,
+  summary = "",
 ) {
   const messages: ChatMessage[] = [
     { role: "system", content: SYSTEM_PROMPT },
+    ...(summary
+      ? [
+          {
+            role: "system" as const,
+            content: `What this viewer has told us about themselves: ${summary}`,
+          },
+        ]
+      : []),
     ...historyMessages(turns),
     { role: "user", content: prompt },
   ];
@@ -136,7 +148,11 @@ export async function* curateStream(
 ): AsyncGenerator<CuratorEvent> {
   yield { type: "status", label: viewerId ? "Reading your shelf" : "Reading your services" };
 
-  const viewer = await readViewerContext(env.DB, viewerId, options.providerIds ?? []);
+  const preferences = await readViewerPreferences(env.DB, viewerId);
+  const viewer = await readViewerContext(env.DB, viewerId, [
+    ...new Set([...(options.providerIds ?? []), ...preferences.providerIds]),
+  ]);
+  const tasteLine = preferenceSummary(preferences);
 
   yield {
     type: "status",
@@ -151,6 +167,7 @@ export async function* curateStream(
     viewer,
     turns,
     viewerId,
+    tasteLine,
   );
   const items = await readItems(env.DB, result.titleIds);
 
@@ -170,7 +187,8 @@ export async function* curateStream(
       summary += delta;
       yield { type: "delta", text: delta };
     }
-  } catch {
+  } catch (error) {
+    logError("curator_narration_failed", error, { viewerId: viewerId || "guest" });
     summary = "";
   }
 

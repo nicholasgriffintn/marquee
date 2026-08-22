@@ -15,6 +15,7 @@ import { linkRoutes } from "./routes/links.ts";
 import { mcpRoutes } from "./routes/mcp.ts";
 import { mediaRoutes } from "./routes/media.ts";
 import { profileRoutes } from "./routes/profile.ts";
+import { usherRoutes } from "./routes/usher.ts";
 import { apiGuard } from "./security/guard.ts";
 import type { Bindings, IngestionJob } from "./types.ts";
 import { CatalogSweep } from "./workflows/catalog-sweep.ts";
@@ -55,6 +56,8 @@ app.route("/api/auth", authRoutes);
 app.route("/api/profile", profileRoutes);
 
 app.route("/api/curator", curatorRoutes);
+
+app.route("/api/usher", usherRoutes);
 
 app.route("/api/links", linkRoutes);
 

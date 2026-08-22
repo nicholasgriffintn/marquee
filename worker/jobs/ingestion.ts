@@ -3,27 +3,26 @@ import { getAnilistDetails } from "../clients/anilist.ts";
 import { getJustwatchAvailability } from "../clients/justwatch.ts";
 import { getOmdbPoster, getOmdbRatings } from "../clients/omdb.ts";
 import { getSimklIds } from "../clients/simkl.ts";
-import {
-  findByImdbId,
-  getCatalog,
-  getDiscoverPage,
-  getDiscoverPageCount,
-  getItems,
-} from "../clients/tmdb.ts";
+import { findByImdbId, getCatalog, getDiscoverPage, getItems } from "../clients/tmdb.ts";
 import { getWatchmodeAvailability } from "../clients/watchmode.ts";
+import { enqueue } from "../lib/queue.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { enrichAvailability } from "../repositories/availability.ts";
 import { claimBudget, isRateLimited, pauseSource } from "../repositories/budgets.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
 import { storeCatalog, storeItems } from "../repositories/catalog-writer.ts";
+import { readPartition, recordPageDrained } from "../repositories/discover.ts";
 import {
   selectAnilistCandidates,
   selectUnenriched,
   storeEnrichment,
+  storeEnrichmentMiss,
   storePoster,
 } from "../repositories/enrichment.ts";
 import { storeProviders } from "../repositories/providers.ts";
+import { selectStaleWorkingSet } from "../repositories/working-set.ts";
 import { syncBuzz } from "../services/buzz.ts";
+import { advanceDiscoverFrontier, measureDiscoverPartition } from "../services/discover.ts";
 import { embedTitles, selectUnembedded } from "../services/embeddings.ts";
 import { syncSchedule } from "../services/schedule.ts";
 import { buildSections } from "../services/sections.ts";
@@ -33,9 +32,8 @@ import { getProviderLedger } from "./provider-ledger.ts";
 
 type SavedTitleRow = { titleId: string };
 
-const AVAILABILITY_MAX_AGE_DAYS = 7;
-const AVAILABILITY_PER_RUN = 400;
-const QUEUE_BATCH = 100;
+export const AVAILABILITY_MAX_AGE_DAYS = 7;
+const AVAILABILITY_PER_RUN = 600;
 const EMBED_JOB_SIZE = 25;
 const EMBED_PER_RUN = 2_000;
 const MIN_POSTER_BYTES = 40_000;
@@ -93,13 +91,15 @@ function sourceConfigured(env: Bindings, source: EnrichmentSource) {
   return Boolean(env.SIMKL_CLIENT_ID);
 }
 
+type SourceAttempt<T> = { limited: true } | { limited: false; value: T };
+
 async function withRateLimitPause<T>(
   env: Bindings,
   source: EnrichmentSource,
   run: () => Promise<T>,
-) {
+): Promise<SourceAttempt<T>> {
   try {
-    return await run();
+    return { limited: false, value: await run() };
   } catch (error) {
     if (!isRateLimited(error)) {
       throw error;
@@ -107,7 +107,7 @@ async function withRateLimitPause<T>(
 
     await pauseSource(env, source, RATE_LIMIT_PAUSE_MINUTES[source] ?? 30);
 
-    return null;
+    return { limited: true };
   }
 }
 
@@ -145,35 +145,10 @@ export async function syncCatalogHead(env: Bindings) {
   ];
 }
 
-export async function queueDiscoverPages(env: Bindings) {
-  const [moviePages, televisionPages] = await Promise.all([
-    getDiscoverPageCount(env, "movie"),
-    getDiscoverPageCount(env, "tv"),
-  ]);
-  const pageJobs: IngestionJob[] = [
-    ...Array.from({ length: moviePages }, (_, index): IngestionJob => ({
-      type: "sync-discover-page",
-      mediaType: "movie",
-      page: index + 1,
-    })),
-    ...Array.from({ length: televisionPages }, (_, index): IngestionJob => ({
-      type: "sync-discover-page",
-      mediaType: "tv",
-      page: index + 1,
-    })),
-  ];
-
-  console.log(JSON.stringify({ event: "discover_sweep_queued", moviePages, televisionPages }));
-
-  await enqueue(env.INGESTION_QUEUE, pageJobs);
-
-  return { moviePages, televisionPages };
-}
-
 async function syncCatalog(env: Bindings) {
   const titleIds = await syncCatalogHead(env);
 
-  await queueDiscoverPages(env);
+  await advanceDiscoverFrontier(env);
   await queueAvailability(env, titleIds);
   await queueEnrichment(env);
   await queueEmbeddings(env);
@@ -193,16 +168,9 @@ export async function queueEmbeddings(env: Bindings) {
 }
 
 export async function queueStaleAvailability(env: Bindings) {
-  const rows = await env.DB.prepare(
-    `SELECT id AS titleId
-     FROM catalog_titles
-     WHERE enriched_at IS NULL OR enriched_at < datetime('now', ?)
-     ORDER BY (enriched_at IS NOT NULL), popularity DESC
-     LIMIT ?`,
-  )
-    .bind(`-${AVAILABILITY_MAX_AGE_DAYS} days`, AVAILABILITY_PER_RUN)
-    .all<SavedTitleRow>();
-  const titleIds = rows.results.map((row) => row.titleId).filter(isKnownTitle);
+  const titleIds = (
+    await selectStaleWorkingSet(env.DB, AVAILABILITY_MAX_AGE_DAYS, AVAILABILITY_PER_RUN)
+  ).filter(isKnownTitle);
 
   console.log(JSON.stringify({ event: "availability_backfill_queued", count: titleIds.length }));
 
@@ -244,10 +212,38 @@ export async function queueEnrichment(env: Bindings) {
   }
 }
 
-async function syncDiscoverPage(env: Bindings, mediaType: "movie" | "tv", page: number) {
-  const titles = await getDiscoverPage(env, mediaType, page);
+async function syncDiscoverPage(
+  env: Bindings,
+  mediaType: "movie" | "tv",
+  page: number,
+  id: string | null,
+) {
+  const partition = id ? await readPartition(env.DB, id) : null;
 
-  await storeItems(env.DB, titles, new Date().toISOString());
+  if (id && !partition) {
+    return;
+  }
+
+  if (!(await claimBudget(env, "tmdb"))) {
+    console.log(JSON.stringify({ event: "budget_exhausted", source: "tmdb", partition: id }));
+
+    return;
+  }
+
+  const window = partition ? { startDate: partition.startDate, endDate: partition.endDate } : null;
+  const titles = await withRateLimitPause(env, "tmdb", () =>
+    getDiscoverPage(env, mediaType, page, window),
+  );
+
+  if (titles.limited) {
+    return;
+  }
+
+  await storeItems(env.DB, titles.value, new Date().toISOString());
+
+  if (partition) {
+    await recordPageDrained(env.DB, partition.id);
+  }
 }
 
 async function queueTitleEmbeddings(env: Bindings, titleIds: string[]) {
@@ -291,15 +287,6 @@ export async function queueAvailability(env: Bindings, titleIds: string[]) {
   );
 }
 
-async function enqueue(queue: Queue<IngestionJob>, jobs: IngestionJob[]) {
-  for (let index = 0; index < jobs.length; index += QUEUE_BATCH) {
-    // oxlint-disable-next-line no-await-in-loop
-    await queue.sendBatch(
-      jobs.slice(index, index + QUEUE_BATCH).map((body) => ({ body, contentType: "json" })),
-    );
-  }
-}
-
 async function isSavedTitle(env: Bindings, titleId: string) {
   const row = await env.DB.prepare(
     `SELECT 1 AS saved FROM viewing_entries WHERE title_id = ? LIMIT 1`,
@@ -326,11 +313,11 @@ async function watchmodeAvailability(
     return [];
   }
 
-  return (
-    (await withRateLimitPause(env, "watchmode", () =>
-      getWatchmodeAvailability(env, mediaType, tmdbId),
-    )) ?? []
+  const attempt = await withRateLimitPause(env, "watchmode", () =>
+    getWatchmodeAvailability(env, mediaType, tmdbId),
   );
+
+  return attempt.limited ? [] : (attempt.value ?? []);
 }
 
 async function enrichTitleAvailability(env: Bindings, titleId: string) {
@@ -375,6 +362,10 @@ async function enrichRatings(env: Bindings, titleId: string) {
   const imdbId = await imdbIdFor(env, titleId);
 
   if (!imdbId) {
+    if (env.OMDB_API_KEY) {
+      await storeEnrichmentMiss(env, titleId, "omdb", "no-imdb-id");
+    }
+
     return;
   }
 
@@ -384,16 +375,22 @@ async function enrichRatings(env: Bindings, titleId: string) {
     return;
   }
 
-  const ratings = await withRateLimitPause(env, "omdb", () => getOmdbRatings(env, imdbId));
+  const attempt = await withRateLimitPause(env, "omdb", () => getOmdbRatings(env, imdbId));
 
-  if (!ratings) {
+  if (attempt.limited) {
+    return;
+  }
+
+  if (!attempt.value) {
+    await storeEnrichmentMiss(env, titleId, "omdb", "no-omdb-record");
+
     return;
   }
 
   const [title] = await readItems(env.DB, [titleId]);
 
   await storeEnrichment(env, titleId, "omdb", {
-    ratings: { ...ratings, anilistScore: title?.ratings?.anilistScore ?? null },
+    ratings: { ...attempt.value, anilistScore: title?.ratings?.anilistScore ?? null },
   });
 }
 
@@ -465,11 +462,22 @@ async function cachePoster(env: Bindings, titleId: string) {
   }
 
   const tmdbPoster = await originPosterUrl(env, titleId);
-  const fallback = tmdbPoster ? await fetchImage(tmdbPoster) : null;
 
-  if (fallback) {
-    await storePoster(env, titleId, fallback.body, fallback.contentType);
+  if (!tmdbPoster) {
+    await storeEnrichmentMiss(env, titleId, "poster", "no-poster-source");
+
+    return;
   }
+
+  const fallback = await fetchImage(tmdbPoster);
+
+  if (!fallback) {
+    await storeEnrichmentMiss(env, titleId, "poster", "poster-fetch-failed");
+
+    return;
+  }
+
+  await storePoster(env, titleId, fallback.body, fallback.contentType);
 }
 
 async function enrichAnilist(env: Bindings, titleId: string) {
@@ -477,6 +485,8 @@ async function enrichAnilist(env: Bindings, titleId: string) {
   const anilistId = title?.externalIds?.anilistId ?? null;
 
   if (!anilistId) {
+    await storeEnrichmentMiss(env, titleId, "anilist", "no-anilist-id");
+
     return;
   }
 
@@ -486,9 +496,17 @@ async function enrichAnilist(env: Bindings, titleId: string) {
     return;
   }
 
-  const details = await withRateLimitPause(env, "anilist", () => getAnilistDetails(anilistId));
+  const attempt = await withRateLimitPause(env, "anilist", () => getAnilistDetails(anilistId));
+
+  if (attempt.limited) {
+    return;
+  }
+
+  const details = attempt.value;
 
   if (!details) {
+    await storeEnrichmentMiss(env, titleId, "anilist", "no-anilist-record");
+
     return;
   }
 
@@ -549,13 +567,21 @@ async function enrichSimkl(env: Bindings, titleId: string) {
     return;
   }
 
-  const externalIds = await withRateLimitPause(env, "simkl", () =>
+  const attempt = await withRateLimitPause(env, "simkl", () =>
     getSimklIds(env, parts.mediaType, parts.tmdbId),
   );
 
-  if (externalIds) {
-    await storeEnrichment(env, titleId, "simkl", { externalIds });
+  if (attempt.limited) {
+    return;
   }
+
+  if (!attempt.value) {
+    await storeEnrichmentMiss(env, titleId, "simkl", "no-simkl-match");
+
+    return;
+  }
+
+  await storeEnrichment(env, titleId, "simkl", { externalIds: attempt.value });
 }
 
 export async function executeIngestionJob(env: Bindings, job: IngestionJob) {
@@ -574,7 +600,13 @@ export async function executeIngestionJob(env: Bindings, job: IngestionJob) {
   }
 
   if (job.type === "sync-discover-page") {
-    await syncDiscoverPage(env, job.mediaType, job.page);
+    await syncDiscoverPage(env, job.mediaType, job.page, job.partitionId ?? null);
+
+    return;
+  }
+
+  if (job.type === "measure-discover-partition") {
+    await measureDiscoverPartition(env, job.partitionId);
 
     return;
   }

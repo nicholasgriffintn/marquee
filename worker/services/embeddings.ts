@@ -159,7 +159,7 @@ export async function selectUnembedded(env: Bindings, limit: number) {
      WHERE e.title_id IS NULL
         OR e.content_hash IS NULL
         OR e.embedded_at < t.updated_at
-     ORDER BY (e.title_id IS NOT NULL), t.popularity DESC
+     ORDER BY t.popularity DESC
      LIMIT ?`,
   )
     .bind(EMBEDDING_MODEL, Math.max(1, Math.min(5_000, limit)))

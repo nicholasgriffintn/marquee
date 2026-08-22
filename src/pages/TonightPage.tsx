@@ -1,21 +1,21 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { ArtPlaceholder } from "../components/ArtPlaceholder";
 import { ContentRail } from "../components/catalog";
 import { ArrowIcon, ProviderBadge } from "../components/ui";
+import { UsherBanner } from "../components/usher/UsherBanner";
+import { UsherCard } from "../components/usher/UsherCard";
+import { UsherConsole } from "../components/usher/UsherConsole";
+import { UsherHero } from "../components/usher/UsherHero";
+import { UsherOnboarding } from "../components/usher/UsherOnboarding";
 import type { CatalogSection, MediaTitle, Provider } from "../domain/catalog";
+import type { UsherMoment } from "../domain/usher";
 import type { CuratorState } from "../hooks/useCurator";
 import type { ScheduledEpisode } from "../hooks/useTonight";
-import { artwork, artworkSrcSet, mediaMeta, scoreLabel } from "../lib/media";
+import type { UsherPickState } from "../hooks/useUsher";
+import { artwork, artworkSrcSet, heroTitleClass, mediaMeta, scoreLabel } from "../lib/media";
 
-const SEED_PROMPTS = [
-  "Something short and funny",
-  "A slow burn for a rainy night",
-  "Smart sci-fi I have not seen",
-  "Watch with my kids",
-];
-
-const REFINEMENTS = ["Shorter", "Lighter", "Older", "Weirder", "More acclaimed"];
+const IDLE_NUDGE_MS = 40_000;
 
 function formatAirTime(value: string) {
   const airsAt = new Date(value);
@@ -40,15 +40,28 @@ export function TonightPage({
   error,
   providerError,
   sections,
+  heroSections,
+  isHeroReady,
   episodes,
   trending,
   providers,
   selectedProviderIds,
+  isPinned,
+  usherMoment,
+  pick,
   onAsk,
   onClearCurator,
   onOpen,
+  onPin,
+  onPick,
+  onRejectPick,
   onSelectProviders,
   onShowSources,
+  onUsherAction,
+  onUsherAnswer,
+  onUsherDismiss,
+  onUsherSkip,
+  onRailSeen,
 }: {
   curator: CuratorState;
   curatorError: string;
@@ -59,18 +72,46 @@ export function TonightPage({
   error: string;
   providerError: string;
   sections: CatalogSection[];
+  heroSections: CatalogSection[];
+  isHeroReady: boolean;
   episodes: ScheduledEpisode[];
   trending: MediaTitle[];
   providers: Provider[];
   selectedProviderIds: string[];
+  isPinned: boolean;
+  usherMoment: UsherMoment | null;
+  pick: UsherPickState;
   onAsk: (prompt: string, isRefinement?: boolean) => Promise<void>;
   onClearCurator: () => void;
   onOpen: (item: MediaTitle) => void;
+  onPin: () => void;
+  onPick: () => void;
+  onRejectPick: () => void;
   onSelectProviders: (ids: string[]) => void;
   onShowSources: () => void;
+  onUsherAction: (moment: UsherMoment, actionId: string) => void;
+  onUsherAnswer: (questionId: string, value: unknown) => Promise<unknown>;
+  onUsherDismiss: (scope: "once" | "kind" | "all") => void;
+  onUsherSkip: (questionId: string) => void;
+  onRailSeen: (section: CatalogSection) => void;
 }) {
-  const [prompt, setPrompt] = useState("");
-  const featured = sections.flatMap((section) => section.items)[0];
+  const [isIdle, setIsIdle] = useState(false);
+  const isUsherMode = Boolean(
+    curator.prompt || curatorError || pick.item || pick.isPicking || pick.error,
+  );
+  const onboardingMoment = usherMoment?.surface === "first-run" ? usherMoment : null;
+  const dripMoment = usherMoment?.surface === "home" ? usherMoment : null;
+
+  useEffect(() => {
+    if (isUsherMode) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => setIsIdle(true), IDLE_NUDGE_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [isUsherMode]);
+  const featured = isHeroReady ? heroSections.flatMap((section) => section.items)[0] : undefined;
   const filterableProviders = providers.filter(
     (provider) =>
       provider.status === "feed" &&
@@ -87,145 +128,138 @@ export function TonightPage({
 
   return (
     <>
-      <section
-        className={`hero-section${featured?.backdropUrl ? "" : " hero-empty"}${
-          !featured && isLoading ? " hero-loading" : ""
-        }`}
-      >
-        {featured && (
-          <div className="hero-art" aria-hidden="true">
-            {featured.backdropUrl ? (
-              <img
-                src={artwork(featured.backdropUrl, 1280, "backdrop") ?? featured.backdropUrl}
-                srcSet={artworkSrcSet(featured.backdropUrl, 1280, "backdrop")}
-                alt=""
-                decoding="async"
+      <div className="hero-shell">
+        {onboardingMoment ? (
+          <UsherOnboarding
+            moment={onboardingMoment}
+            providers={filterableProviders}
+            onAnswer={onUsherAnswer}
+            onSkip={onUsherSkip}
+            onDismiss={() => onUsherDismiss("all")}
+          />
+        ) : (
+          <>
+            {isUsherMode ? (
+              <UsherHero
+                curator={curator}
+                error={curatorError}
+                isAsking={isAsking}
+                isPinned={isPinned}
+                pick={pick}
+                onAsk={onAsk}
+                onClear={onClearCurator}
+                onOpen={onOpen}
+                onPin={onPin}
+                onReject={onRejectPick}
               />
             ) : (
-              <ArtPlaceholder seed={featured.id} label={featured.title} wide />
+              <section
+                className={`hero-section${featured?.backdropUrl ? "" : " hero-empty"}${
+                  featured ? "" : " hero-loading"
+                }`}
+              >
+                {featured && (
+                  <div className="hero-art" aria-hidden="true">
+                    {featured.backdropUrl ? (
+                      <img
+                        src={
+                          artwork(featured.backdropUrl, 1280, "backdrop") ?? featured.backdropUrl
+                        }
+                        srcSet={artworkSrcSet(featured.backdropUrl, 1280, "backdrop")}
+                        alt=""
+                        decoding="async"
+                      />
+                    ) : (
+                      <ArtPlaceholder seed={featured.id} label={featured.title} wide />
+                    )}
+                  </div>
+                )}
+                <div className="hero-gradient" />
+                <div className="hero-copy">
+                  {featured ? (
+                    <>
+                      <h1 className={heroTitleClass(featured.title)}>{featured.title}</h1>
+                      <p className="hero-meta">
+                        {mediaMeta(featured)} · {scoreLabel(featured)}
+                      </p>
+                      <p className="hero-lede">{featured.overview || "No synopsis available."}</p>
+                      <div className="hero-actions">
+                        <button
+                          type="button"
+                          className="hero-play"
+                          onClick={() => onOpen(featured)}
+                        >
+                          <span className="play-icon">↗</span> See where to watch
+                        </button>
+                      </div>
+                    </>
+                  ) : !isHeroReady ? (
+                    <div className="hero-skeleton" aria-hidden="true">
+                      <span className="skeleton skeleton-title" />
+                      <span className="skeleton skeleton-meta" />
+                      <span className="skeleton skeleton-line" />
+                      <span className="skeleton skeleton-line short" />
+                      <span className="skeleton skeleton-button" />
+                    </div>
+                  ) : (
+                    <div className="honest-empty" aria-live="polite">
+                      <h1>Nothing matched.</h1>
+                      <p>{error || "Try another search or change your services."}</p>
+                    </div>
+                  )}
+                </div>
+              </section>
             )}
-          </div>
+          </>
         )}
-        <div className="hero-gradient" />
-        <div className="hero-copy">
-          {featured ? (
-            <>
-              <h1>{featured.title}</h1>
-              <p className="hero-meta">
-                {mediaMeta(featured)} · {scoreLabel(featured)}
-              </p>
-              <p className="hero-lede">{featured.overview || "No synopsis available."}</p>
-              <div className="hero-actions">
-                <button type="button" className="hero-play" onClick={() => onOpen(featured)}>
-                  <span className="play-icon">↗</span> See where to watch
-                </button>
-              </div>
-            </>
-          ) : isLoading ? (
-            <div className="hero-skeleton" aria-hidden="true">
-              <span className="skeleton skeleton-title" />
-              <span className="skeleton skeleton-meta" />
-              <span className="skeleton skeleton-line" />
-              <span className="skeleton skeleton-line short" />
-              <span className="skeleton skeleton-button" />
-            </div>
-          ) : (
-            <div className="honest-empty" aria-live="polite">
-              <h1>Nothing matched.</h1>
-              <p>{error || "Try another search or change your services."}</p>
-            </div>
-          )}
-        </div>
-        <div className="curator-console">
-          <form
-            className="curator-dock"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void onAsk(prompt);
-            }}
-          >
-            <span>
-              <i>AI</i> Ask Marquee
-            </span>
-            <input
-              maxLength={1_000}
-              value={prompt}
-              onChange={(event) => setPrompt(event.target.value)}
-              placeholder="90 mins, clever but not bleak…"
-              aria-label="Ask Marquee for recommendations"
-            />
-            <button
-              type="submit"
-              disabled={isAsking || !prompt.trim() || !featured}
-              aria-label="Ask Marquee"
-            >
-              {isAsking ? "…" : <ArrowIcon />}
-            </button>
-          </form>
-          {!curator.prompt && (
-            <div className="curator-seeds">
-              {SEED_PROMPTS.map((seed) => (
-                <button
-                  key={seed}
-                  type="button"
-                  onClick={() => {
-                    setPrompt(seed);
-                    void onAsk(seed);
-                  }}
-                >
-                  {seed}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
+        {!onboardingMoment && !isUsherMode && (
+          <UsherConsole
+            isAsking={isAsking}
+            isPicking={pick.isPicking}
+            isIdle={isIdle}
+            hasAsked={isUsherMode}
+            onAsk={(value) => void onAsk(value)}
+            onPick={onPick}
+          />
+        )}
+      </div>
 
-      {(curator.prompt || curatorError) && (
-        <div
-          className={`curator-response${curatorError ? " curator-error" : ""}`}
-          aria-live="polite"
-        >
-          <span>
-            {curatorError ? "COULDN’T MAKE A SELECTION" : "MARQUEE CURATOR"}
-            {curator.status && <em className="curator-status">{curator.status}…</em>}
-          </span>
-          <p>
-            {curatorError || curator.summary}
-            {curator.isStreaming && !curatorError && <i className="curator-caret" />}
-          </p>
-          {curator.items.length > 0 && !curator.isStreaming && (
-            <div className="curator-refine">
-              <span>Refine</span>
-              {REFINEMENTS.map((refinement) => (
-                <button
-                  key={refinement}
-                  type="button"
-                  disabled={isAsking}
-                  onClick={() => void onAsk(refinement, true)}
-                >
-                  {refinement}
-                </button>
-              ))}
-            </div>
-          )}
-          <button type="button" className="curator-clear" onClick={onClearCurator}>
-            Clear
-          </button>
-        </div>
+      {dripMoment && (
+        <UsherBanner
+          moment={dripMoment}
+          providers={filterableProviders}
+          onAnswer={onUsherAnswer}
+          onSkip={onUsherSkip}
+          onAction={onUsherAction}
+          onDismiss={onUsherDismiss}
+        />
       )}
 
       {!isSessionLoading && (
         <section className="provider-strip">
           <div className="provider-strip-heading">
             <div>
-              <strong>Your services · {selectedProviderIds.length || "all"} active</strong>
+              <strong>
+                {selectedProviderIds.length
+                  ? `Showing ${selectedProviderIds.length} service${
+                      selectedProviderIds.length === 1 ? "" : "s"
+                    }`
+                  : "Showing everything"}
+              </strong>
             </div>
             <button type="button" onClick={onShowSources}>
-              Manage all {providers.length} <ArrowIcon />
+              Manage services <ArrowIcon />
             </button>
           </div>
-          <div className="provider-picker">
+          <div className={`provider-picker${selectedProviderIds.length ? " filtering" : ""}`}>
+            <button
+              type="button"
+              className={`provider-filter-all${selectedProviderIds.length ? "" : " active"}`}
+              aria-pressed={selectedProviderIds.length === 0}
+              onClick={() => onSelectProviders([])}
+            >
+              All
+            </button>
             {filterableProviders.map((provider) => {
               const isSelected = selectedProviderIds.includes(provider.id);
 
@@ -236,9 +270,10 @@ export function TonightPage({
                   className={isSelected ? "selected" : ""}
                   onClick={() => toggleProvider(provider.id)}
                   aria-pressed={isSelected}
+                  title={provider.name}
                 >
                   <ProviderBadge provider={provider} />
-                  <small>{isSelected ? "ON" : "OFF"}</small>
+                  {selectedProviderIds.length > 0 && <small>{isSelected ? "ON" : ""}</small>}
                 </button>
               );
             })}
@@ -308,7 +343,22 @@ export function TonightPage({
             </section>
           )}
           {sections.map((section) => (
-            <ContentRail key={section.id} section={section} onOpen={onOpen} />
+            <ContentRail
+              key={section.id}
+              section={section}
+              byUsher={section.id.startsWith("ai-") || section.id.startsWith("pinned-")}
+              onOpen={onOpen}
+              onSeen={section.id.startsWith("ai-") ? onRailSeen : undefined}
+              trailing={
+                usherMoment?.id === `rail-feedback:${section.id}` ? (
+                  <UsherCard
+                    moment={usherMoment}
+                    onAction={onUsherAction}
+                    onDismiss={onUsherDismiss}
+                  />
+                ) : undefined
+              }
+            />
           ))}
         </div>
       ) : (

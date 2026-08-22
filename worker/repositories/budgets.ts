@@ -12,6 +12,7 @@ export const SOURCE_BUDGETS: Record<
   EnrichmentSource,
   { windowKind: "day" | "month"; callLimit: number }
 > = {
+  tmdb: { windowKind: "day", callLimit: 12_000 },
   justwatch: { windowKind: "day", callLimit: 20_000 },
   watchmode: { windowKind: "month", callLimit: 1_000 },
   omdb: { windowKind: "day", callLimit: 500_000 },

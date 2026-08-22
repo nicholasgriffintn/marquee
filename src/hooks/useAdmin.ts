@@ -14,11 +14,20 @@ export type AdminAction =
   | "schedule"
   | "buzz"
   | "providers"
-  | "sections";
+  | "sections"
+  | "working-set";
 
 export type AdminOverview = {
   catalogue: Record<string, number>;
-  enrichment: { source: string; titles: number; newest: string }[];
+  enrichment: { source: string; titles: number; misses: number; newest: string }[];
+  backfill: {
+    mediaType: string;
+    status: string;
+    partitions: number;
+    titles: number;
+    pagesDone: number;
+    totalPages: number;
+  }[];
   failures: {
     jobType: string;
     subjectId: string | null;

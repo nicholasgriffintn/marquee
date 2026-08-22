@@ -1,9 +1,8 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
 import { logError } from "../lib/logging.ts";
 import { readRanked } from "../repositories/catalog-search.ts";
-import { readViewerContext } from "../repositories/viewer-context.ts";
 import type { Bindings } from "../types.ts";
-import { prepareRails } from "./ai-rails.ts";
+import { prepareRails, readRailViewer } from "./ai-rails.ts";
 import { readTrending } from "./buzz.ts";
 import { readTonight } from "./schedule.ts";
 
@@ -55,13 +54,13 @@ async function freshForViewer(env: Bindings, vector: number[] | null, exclude: s
 }
 
 export async function buildDigest(env: Bindings, viewerId: string) {
-  const viewer = await readViewerContext(env.DB, viewerId);
+  const { viewer, preferences } = await readRailViewer(env, viewerId);
 
   if (viewer.entries.length === 0) {
     return null;
   }
 
-  const { vector, exclude } = await prepareRails(env, viewer, viewerId);
+  const { vector, exclude } = await prepareRails(env, viewer, viewerId, preferences);
   const [fresh, trending, episodes] = await Promise.all([
     freshForViewer(env, vector, [
       ...exclude,

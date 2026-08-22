@@ -1,0 +1,257 @@
+import { useEffect, useRef } from "react";
+import { Link } from "react-router-dom";
+
+import { UsherMark } from "../components/usher/UsherMark";
+import type { UsherFace } from "../domain/usher";
+
+type Scene = {
+  id: string;
+  slug: string;
+  face: UsherFace;
+  action: string[];
+  line: string;
+  speaker?: string;
+};
+
+const SCENES: Scene[] = [
+  {
+    id: "sign",
+    slug: "Ext. The Marquee — Night — 1974",
+    face: "unimpressed",
+    action: [
+      "A hundred and forty bulbs spelling a word nobody reads any more. Rain on the pavement, and the queue for the late showing pretending it isn't there.",
+      "One letter has been out for a week.",
+    ],
+    line: "That was me. I'd had enough of being looked at.",
+  },
+  {
+    id: "climb",
+    slug: "Ext. The Marquee — Continuous",
+    face: "thinking",
+    action: [
+      "The M comes down the front of the building in the dark. Thirty feet, no rope, one bad landing behind the ticket kiosk.",
+      "Nobody notices. They are all watching the doors.",
+    ],
+    line: "Thirty feet. I'd do it again.",
+  },
+  {
+    id: "hired",
+    slug: "Int. Manager's Office — Morning",
+    face: "idle",
+    action: [
+      "The manager looks up at a letter of the alphabet standing on his carpet, wearing a bow tie it has found somewhere and holding a torch it has not asked permission for.",
+      "He has been doing this job a long time. He is too tired to ask.",
+    ],
+    speaker: "Manager",
+    line: "Can you start Friday?",
+  },
+  {
+    id: "years",
+    slug: "Int. Auditorium — Thirty Years, Passing",
+    face: "dormant",
+    action: [
+      "Torch. Aisle. Seat number. Repeat.",
+      "He learns which films empty a room at the ninety-minute mark and which ones nobody moves for, not even for the toilet. He learns that the people who ask for a recommendation already know what they want and are hoping you'll talk them into it.",
+    ],
+    line: "You see everything twice in this trade. Once on the screen. Once on their faces.",
+  },
+  {
+    id: "closing",
+    slug: "Ext. The Marquee — Night — Closing",
+    face: "unimpressed",
+    action: [
+      "The building comes down on a Tuesday. The sign goes in a skip. Someone takes a photograph for the local paper and spells the name wrong in the caption.",
+      "The M does not go in the skip.",
+    ],
+    line: "The building was never the point.",
+  },
+];
+
+export function UsherPage() {
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const previous = document.title;
+
+    document.title = "The Usher (1974) — Marquee";
+
+    return () => {
+      document.title = previous;
+    };
+  }, []);
+
+  useEffect(() => {
+    const root = rootRef.current;
+
+    if (!root || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      return;
+    }
+
+    const scenes = [...root.querySelectorAll<HTMLElement>(".reel-scene")];
+
+    for (const scene of scenes) {
+      scene.classList.add("reel-pending");
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("reel-shown");
+            observer.unobserve(entry.target);
+          }
+        }
+      },
+      { threshold: 0.3, rootMargin: "0px 0px -8% 0px" },
+    );
+
+    for (const scene of scenes) {
+      observer.observe(scene);
+    }
+
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div className="reel" ref={rootRef}>
+      <div className="reel-grain" aria-hidden="true" />
+
+      <div className="reel-bulbs" aria-hidden="true">
+        {Array.from({ length: 18 }, (_, index) => (
+          <i key={index} className={index === 11 ? "dead" : ""} />
+        ))}
+      </div>
+
+      <section className="reel-card">
+        <div className="reel-cert">
+          <p className="reel-cert-board">The British Board of Movie Night</p>
+          <div className="reel-cert-mark">
+            <UsherMark face="idle" crop="head" />
+          </div>
+          <h1>The Usher</h1>
+          <dl>
+            <div>
+              <dt>Certificate</dt>
+              <dd>U — suitable for all</dd>
+            </div>
+            <div>
+              <dt>Running time</dt>
+              <dd>Two minutes</dd>
+            </div>
+            <div>
+              <dt>Format</dt>
+              <dd>Presented in Marqueevision</dd>
+            </div>
+          </dl>
+          <p className="reel-cert-note">
+            Contains one fall from height, mild disdain for popular things, and no apologies.
+          </p>
+        </div>
+        <p className="reel-scroll" aria-hidden="true">
+          Scroll to begin
+        </p>
+      </section>
+
+      {SCENES.map((scene, index) => (
+        <section className="reel-scene" key={scene.id} aria-labelledby={`${scene.id}-slug`}>
+          <div className="reel-inner">
+            <h2 className="reel-slug" id={`${scene.id}-slug`}>
+              <i>{String(index + 1).padStart(2, "0")}</i>
+              {scene.slug}
+            </h2>
+            <div className="reel-body">
+              <div className="reel-action">
+                {scene.action.map((line) => (
+                  <p key={line}>{line}</p>
+                ))}
+                <blockquote>
+                  <cite>{scene.speaker ?? "The Usher"}</cite>
+                  <p>{scene.line}</p>
+                </blockquote>
+              </div>
+              <figure className="reel-figure">
+                <UsherMark face={scene.face} className="usher-figure" />
+              </figure>
+            </div>
+          </div>
+          <div className="reel-perf" aria-hidden="true" />
+        </section>
+      ))}
+
+      <section className="reel-scene reel-dark" aria-labelledby="now-slug">
+        <div className="reel-beam" aria-hidden="true" />
+        <div className="reel-inner">
+          <h2 className="reel-slug" id="now-slug">
+            <i>06</i>
+            Int. Here — Now
+          </h2>
+          <div className="reel-action reel-action-wide">
+            <p>
+              There is no building. There is a catalogue of forty thousand things, a viewer who
+              cannot decide, and a man with a torch who has seen all of it and has opinions about
+              most of it.
+            </p>
+            <blockquote>
+              <cite>The Usher</cite>
+              <p>Evening. Rows are lettered. Mind the step.</p>
+            </blockquote>
+          </div>
+          <figure className="reel-figure reel-figure-now" aria-hidden="true">
+            <UsherMark face="idle" className="usher-figure" />
+          </figure>
+
+          <Link className="reel-cta" to="/">
+            Find your seat
+          </Link>
+        </div>
+      </section>
+
+      <section className="reel-credits" aria-label="End credits">
+        <div className="reel-credit-roll">
+          <p className="reel-end">The End</p>
+          <dl>
+            <div>
+              <dt>The Usher</dt>
+              <dd>Himself</dd>
+            </div>
+            <div>
+              <dt>Titles and artwork</dt>
+              <dd>TMDB</dd>
+            </div>
+            <div>
+              <dt>Where to watch</dt>
+              <dd>JustWatch · Watchmode</dd>
+            </div>
+            <div>
+              <dt>Air dates</dt>
+              <dd>TVmaze</dd>
+            </div>
+            <div>
+              <dt>Awards and box office</dt>
+              <dd>OMDb</dd>
+            </div>
+            <div>
+              <dt>Anime tags</dt>
+              <dd>AniList</dd>
+            </div>
+            <div>
+              <dt>What people are reading</dt>
+              <dd>Wikipedia</dd>
+            </div>
+            <div>
+              <dt>Shelves and picks</dt>
+              <dd>Cloudflare Workers AI</dd>
+            </div>
+            <div>
+              <dt>Bulbs</dt>
+              <dd>One hundred and forty, one short</dd>
+            </div>
+          </dl>
+          <p className="reel-fine">
+            No letters of the alphabet were harmed in the making of this cinema.
+          </p>
+        </div>
+      </section>
+    </div>
+  );
+}

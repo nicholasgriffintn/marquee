@@ -3,7 +3,6 @@ import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from "cloud
 import { pruneIngestionRuns } from "../jobs/ingestion-runs.ts";
 import {
   queueAvailability,
-  queueDiscoverPages,
   queueEmbeddings,
   queueEnrichment,
   queueStaleAvailability,
@@ -11,7 +10,10 @@ import {
 } from "../jobs/ingestion.ts";
 import { getProviderLedger } from "../jobs/provider-ledger.ts";
 import { storeProviders } from "../repositories/providers.ts";
+import { rebuildPeopleIndex } from "../repositories/usher.ts";
+import { rebuildWorkingSet } from "../repositories/working-set.ts";
 import { syncBuzz } from "../services/buzz.ts";
+import { advanceDiscoverFrontier } from "../services/discover.ts";
 import { syncSchedule } from "../services/schedule.ts";
 import { buildSections } from "../services/sections.ts";
 import type { Bindings, CatalogSweepParameters } from "../types.ts";
@@ -36,21 +38,15 @@ export class CatalogSweep extends WorkflowEntrypoint<Bindings, CatalogSweepParam
       syncCatalogHead(this.env),
     );
 
-    if (deep) {
-      await step.do("queue discover pages", { retries: RETRIES }, async () =>
-        queueDiscoverPages(this.env),
-      );
-    }
+    await step.do("advance discover frontier", { retries: RETRIES }, async () =>
+      advanceDiscoverFrontier(this.env),
+    );
 
     await step.do("queue availability", { retries: RETRIES }, async () => {
       await queueAvailability(this.env, titleIds);
 
       return titleIds.length;
     });
-
-    await step.do("queue stale availability", { retries: RETRIES }, async () =>
-      queueStaleAvailability(this.env),
-    );
 
     await step.do("queue enrichment", { retries: RETRIES }, async () => {
       await queueEnrichment(this.env);
@@ -62,10 +58,6 @@ export class CatalogSweep extends WorkflowEntrypoint<Bindings, CatalogSweepParam
 
     await step.do("sync buzz", { retries: RETRIES }, async () => syncBuzz(this.env));
 
-    if (deep) {
-      await step.sleep("let discover pages land", "20 minutes");
-    }
-
     await step.do("queue embeddings", { retries: RETRIES }, async () => {
       await queueEmbeddings(this.env);
 
@@ -73,6 +65,18 @@ export class CatalogSweep extends WorkflowEntrypoint<Bindings, CatalogSweepParam
     });
 
     await step.do("build sections", { retries: RETRIES }, async () => buildSections(this.env));
+
+    await step.do("rebuild working set", { retries: RETRIES }, async () =>
+      rebuildWorkingSet(this.env.DB),
+    );
+
+    await step.do("queue stale availability", { retries: RETRIES }, async () =>
+      queueStaleAvailability(this.env),
+    );
+
+    await step.do("index people", { retries: RETRIES }, async () =>
+      rebuildPeopleIndex(this.env.DB),
+    );
 
     await step.do("prune run log", { retries: RETRIES }, async () => pruneIngestionRuns(this.env));
 

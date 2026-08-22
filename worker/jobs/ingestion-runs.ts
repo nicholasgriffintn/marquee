@@ -21,7 +21,11 @@ export function jobSubject(job: IngestionJob) {
   }
 
   if (job.type === "sync-discover-page") {
-    return `${job.mediaType}#${job.page}`;
+    return `${job.partitionId ?? job.mediaType}#${job.page}`;
+  }
+
+  if (job.type === "measure-discover-partition") {
+    return job.partitionId;
   }
 
   return null;

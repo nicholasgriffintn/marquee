@@ -13,10 +13,6 @@ export function jsonResponse(payload: unknown, status = 200, extra?: Record<stri
   return new Response(JSON.stringify(payload), { headers, status });
 }
 
-export function clientRateLimitKey(request: Request, fallback: string) {
-  return request.headers.get("cf-connecting-ip")?.trim().slice(0, 64) || fallback;
-}
-
 export async function readJsonObject(request: Request) {
   const contentLength = Number(request.headers.get("content-length") ?? "0");
 

@@ -1,5 +1,6 @@
 import type { CuratorCandidate, ProviderAvailability } from "../../src/domain/catalog.ts";
 import { providerRegistryIds } from "../../src/domain/providers.ts";
+import { isPartitionId } from "../repositories/discover.ts";
 import type { EntryStatus, IngestionJob, ViewingContext } from "../types.ts";
 import { isRecord } from "./values.ts";
 
@@ -44,8 +45,13 @@ export function isIngestionJob(value: unknown): value is IngestionJob {
       typeof value.page === "number" &&
       Number.isInteger(value.page) &&
       value.page >= 1 &&
-      value.page <= 500
+      value.page <= 500 &&
+      (value.partitionId === undefined || isPartitionId(value.partitionId))
     );
+  }
+
+  if (value.type === "measure-discover-partition") {
+    return isPartitionId(value.partitionId);
   }
 
   if (

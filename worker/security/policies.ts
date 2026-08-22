@@ -49,6 +49,11 @@ export const POLICIES = {
     member: { limiter: "CURATOR_RATE_LIMITER", message: TOO_MANY },
     bots: "strict",
   },
+  usher: {
+    anonymous: { limiter: "CURATOR_FREE_RATE_LIMITER", message: "Give me a minute." },
+    member: { limiter: "CURATOR_RATE_LIMITER", message: "Give me a minute." },
+    bots: "strict",
+  },
   auth: {
     anonymous: {
       limiter: "AUTH_RATE_LIMITER",
@@ -92,6 +97,7 @@ export const RULES: readonly Rule[] = [
   { path: "/api/curator", methods: ["POST"], policy: "curator" },
   { path: "/api/curator/insight/*", policy: "insight" },
   { path: "/api/events", policy: "telemetry" },
+  { path: "/api/usher/pick", methods: ["POST"], policy: "usher" },
   { path: "/api/links/trakt/start", policy: "auth" },
   { path: "/api/links/trakt/callback", policy: "auth" },
   { path: "/mcp", policy: "machine" },

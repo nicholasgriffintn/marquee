@@ -46,7 +46,14 @@ export type Bindings = {
 
 export type CatalogSweepParameters = { deep?: boolean };
 
-export type EnrichmentSource = "justwatch" | "watchmode" | "omdb" | "poster" | "simkl" | "anilist";
+export type EnrichmentSource =
+  | "tmdb"
+  | "justwatch"
+  | "watchmode"
+  | "omdb"
+  | "poster"
+  | "simkl"
+  | "anilist";
 
 export type TitleRatings = {
   imdbScore: number | null;
@@ -70,7 +77,8 @@ export type ExternalIds = {
 export type IngestionJob =
   | { type: "sync-catalog" }
   | { type: "sync-providers" }
-  | { type: "sync-discover-page"; mediaType: "movie" | "tv"; page: number }
+  | { type: "sync-discover-page"; mediaType: "movie" | "tv"; page: number; partitionId?: string }
+  | { type: "measure-discover-partition"; partitionId: string }
   | { type: "enrich-availability"; titleId: string }
   | { type: "enrich-ratings"; titleId: string }
   | { type: "enrich-simkl"; titleId: string }

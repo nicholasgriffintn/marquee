@@ -7,6 +7,7 @@ import { jsonResponse, readJsonObject } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
 import { isKnownTitle, validProviderIds } from "../lib/validation.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
+import { pinShelf, readPinnedShelves, unpinShelf } from "../repositories/shelves.ts";
 import { getPersonalRails } from "../services/ai-rails.ts";
 import { readDigest } from "../services/digest.ts";
 import { getTitleInsight } from "../services/title-insight.ts";
@@ -177,5 +178,104 @@ curatorRoutes.get("/insight/:titleId", async (context) => {
     logError("title_insight_failed", error);
 
     return jsonResponse({ insight: null, pairs: [] });
+  }
+});
+
+curatorRoutes.get("/pinned", async (context) => {
+  const user = context.get("viewer");
+
+  if (!user) {
+    return jsonResponse({ sections: [] });
+  }
+
+  try {
+    context.header("cache-control", "no-store");
+
+    const shelves = await readPinnedShelves(context.env.DB, user.id);
+    const titles = await readItems(
+      context.env.DB,
+      shelves.flatMap((shelf) => shelf.titleIds),
+      60,
+    );
+    const byId = new Map(titles.map((title) => [title.id, title]));
+
+    return jsonResponse({
+      sections: shelves.flatMap((shelf) => {
+        const items = shelf.titleIds.flatMap((titleId) => {
+          const item = byId.get(titleId);
+
+          return item ? [item] : [];
+        });
+
+        return items.length
+          ? [
+              {
+                id: `pinned-${shelf.id}`,
+                title: shelf.name,
+                description: shelf.reason || shelf.prompt,
+                items,
+              },
+            ]
+          : [];
+      }),
+    });
+  } catch (error) {
+    logError("pinned_read_failed", error);
+
+    return jsonResponse({ sections: [] });
+  }
+});
+
+curatorRoutes.post("/pinned", async (context) => {
+  const user = context.get("viewer");
+
+  if (!user) {
+    return jsonResponse({ error: "Sign in to pin a shelf" }, 401);
+  }
+
+  const body = await readJsonObject(context.req.raw);
+  const titleIds = Array.isArray(body?.titleIds)
+    ? [...new Set(body.titleIds.filter(isKnownTitle))].slice(0, 12)
+    : [];
+
+  if (titleIds.length === 0) {
+    return jsonResponse({ error: "Nothing to pin" }, 400);
+  }
+
+  const name = typeof body?.name === "string" ? body.name.trim().slice(0, 60) : "";
+
+  try {
+    const id = await pinShelf(context.env.DB, user.id, {
+      name: name || "Pinned",
+      prompt: typeof body?.prompt === "string" ? body.prompt.trim().slice(0, 200) : "",
+      reason: typeof body?.reason === "string" ? body.reason.trim().slice(0, 200) : "",
+      titleIds,
+    });
+
+    recordEvent(context.env, { name: "shelf_pinned", viewerId: user.id, value: titleIds.length });
+
+    return jsonResponse({ id });
+  } catch (error) {
+    logError("pinned_write_failed", error);
+
+    return jsonResponse({ error: "Could not pin that shelf" }, 500);
+  }
+});
+
+curatorRoutes.delete("/pinned/:id", async (context) => {
+  const user = context.get("viewer");
+
+  if (!user) {
+    return jsonResponse({ error: "Sign in to unpin a shelf" }, 401);
+  }
+
+  try {
+    const removed = await unpinShelf(context.env.DB, user.id, context.req.param("id"));
+
+    return removed ? jsonResponse({ removed: true }) : jsonResponse({ error: "Unknown" }, 404);
+  } catch (error) {
+    logError("pinned_delete_failed", error);
+
+    return jsonResponse({ error: "Could not unpin that shelf" }, 500);
   }
 });

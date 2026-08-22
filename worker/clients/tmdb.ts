@@ -16,7 +16,9 @@ import type { Bindings } from "../types.ts";
 const API_BASE = "https://api.themoviedb.org/3";
 const PROVIDER_REGION = "GB";
 const HYDRATE_BATCH = 12;
-const TMDB_MAX_PAGES = 500;
+
+export const TMDB_MAX_PAGES = 500;
+export const TMDB_PAGE_SIZE = 20;
 
 export async function getItems(env: Bindings, ids: string[]) {
   const summaries = ids.flatMap((id): TmdbSummary[] => {
@@ -74,23 +76,58 @@ async function hydrateTitles(env: Bindings, summaries: TmdbSummary[]) {
   return titles;
 }
 
-export async function getDiscoverPageCount(env: Bindings, mediaType: MediaType) {
-  const response = await requestTmdb(env, `/discover/${mediaType}`, {
-    include_adult: "false",
-    page: "1",
-    sort_by: "popularity.desc",
-  });
-  const total = isRecord(response) ? Number(response.total_pages) : 0;
+export type DiscoverWindow = { startDate: string; endDate: string };
 
-  return Number.isFinite(total) ? Math.min(Math.max(Math.trunc(total), 1), TMDB_MAX_PAGES) : 1;
+function windowParameters(mediaType: MediaType, window: DiscoverWindow | null) {
+  if (!window) {
+    return {};
+  }
+
+  const field = mediaType === "movie" ? "primary_release_date" : "first_air_date";
+
+  return { [`${field}.gte`]: window.startDate, [`${field}.lte`]: window.endDate };
 }
 
-export async function getDiscoverPage(env: Bindings, mediaType: MediaType, page: number) {
-  const response = await requestTmdb(env, `/discover/${mediaType}`, {
+function discoverParameters(mediaType: MediaType, window: DiscoverWindow | null, page: number) {
+  return {
     include_adult: "false",
+    include_video: "false",
     page: String(page),
     sort_by: "popularity.desc",
-  });
+    ...windowParameters(mediaType, window),
+  };
+}
+
+export async function measureDiscoverWindow(
+  env: Bindings,
+  mediaType: MediaType,
+  window: DiscoverWindow | null,
+) {
+  const response = await requestTmdb(
+    env,
+    `/discover/${mediaType}`,
+    discoverParameters(mediaType, window, 1),
+  );
+  const totalResults = isRecord(response) ? Number(response.total_results) : 0;
+  const totalPages = isRecord(response) ? Number(response.total_pages) : 0;
+
+  return {
+    totalResults: Number.isFinite(totalResults) ? Math.max(0, Math.trunc(totalResults)) : 0,
+    totalPages: Number.isFinite(totalPages) ? Math.max(0, Math.trunc(totalPages)) : 0,
+  };
+}
+
+export async function getDiscoverPage(
+  env: Bindings,
+  mediaType: MediaType,
+  page: number,
+  window: DiscoverWindow | null = null,
+) {
+  const response = await requestTmdb(
+    env,
+    `/discover/${mediaType}`,
+    discoverParameters(mediaType, window, Math.min(Math.max(1, page), TMDB_MAX_PAGES)),
+  );
   const summaries = parseTmdbSummaries(response, mediaType);
 
   return hydrateTitles(env, summaries);
@@ -135,6 +172,10 @@ async function requestTmdb(env: Bindings, path: string, parameters: Record<strin
   });
 
   if (!response.ok) {
+    if (response.status === 429) {
+      throw new TmdbError("TMDB rate limited the request", 429);
+    }
+
     throw new TmdbError(
       response.status === 401 ? "TMDB credentials were rejected" : "TMDB request failed",
       response.status === 401 ? 503 : 502,

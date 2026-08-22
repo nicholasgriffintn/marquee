@@ -12,6 +12,14 @@ export function ArrowIcon() {
   );
 }
 
+export function ChevronIcon({ back }: { back?: boolean }) {
+  return (
+    <svg viewBox="0 0 20 20" aria-hidden="true">
+      <path d={back ? "M12 4l-6 6 6 6" : "M8 4l6 6-6 6"} />
+    </svg>
+  );
+}
+
 export function PlusIcon() {
   return (
     <svg viewBox="0 0 20 20" aria-hidden="true">
