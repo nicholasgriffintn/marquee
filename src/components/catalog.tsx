@@ -236,9 +236,9 @@ export function DetailPanel({
             </div>
           )}
           <p className="detail-synopsis">{item.overview || "No synopsis available."}</p>
-          {(item.people?.length || item.keywords?.length) && (
+          {item.people?.length ? (
             <div className="detail-chips">
-              {(item.people ?? []).slice(0, 5).map((person) => (
+              {item.people.slice(0, 5).map((person) => (
                 <Link
                   key={person}
                   to={`/films?q=${encodeURIComponent(person)}`}
@@ -247,7 +247,11 @@ export function DetailPanel({
                   {person}
                 </Link>
               ))}
-              {(item.keywords ?? []).slice(0, 6).map((keyword) => (
+            </div>
+          ) : null}
+          {item.keywords?.length ? (
+            <div className="detail-chips">
+              {item.keywords.slice(0, 8).map((keyword) => (
                 <Link
                   key={keyword}
                   to={`/films?keywords=${encodeURIComponent(keyword)}`}
@@ -257,7 +261,7 @@ export function DetailPanel({
                 </Link>
               ))}
             </div>
-          )}
+          ) : null}
           <div className="score-row">
             <div>
               <strong>{scoreLabel(item)}</strong>

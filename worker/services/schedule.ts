@@ -126,35 +126,41 @@ export type ScheduleRow = {
   network: string | null;
 };
 
-export async function readTonight(env: Bindings, viewerId: string | null, hours = 36) {
-  const rows = await env.DB.prepare(
-    viewerId
-      ? `SELECT s.title_id AS titleId, s.show_name AS showName, s.season, s.episode,
+const VIEWER_QUERY = `SELECT s.title_id AS titleId, s.show_name AS showName, s.season, s.episode,
                 s.episode_name AS episodeName, s.airs_at AS airsAt, s.network
          FROM title_schedule AS s
          JOIN viewing_entries AS v
            ON v.title_id = s.title_id AND v.viewer_id = ? AND v.status IN ('watching', 'watchlist')
          WHERE s.airs_at BETWEEN datetime('now', '-6 hours') AND datetime('now', ?)
          ORDER BY s.airs_at
-         LIMIT 40`
-      : `SELECT s.title_id AS titleId, s.show_name AS showName, s.season, s.episode,
+         LIMIT 40`;
+
+const POPULAR_QUERY = `SELECT s.title_id AS titleId, s.show_name AS showName, s.season, s.episode,
                 s.episode_name AS episodeName, s.airs_at AS airsAt, s.network
          FROM title_schedule AS s
          JOIN catalog_titles AS t ON t.id = s.title_id
          WHERE s.airs_at BETWEEN datetime('now', '-6 hours') AND datetime('now', ?)
          ORDER BY t.popularity DESC, s.airs_at
-         LIMIT 40`,
-  )
-    .bind(...(viewerId ? [viewerId, `+${hours} hours`] : [`+${hours} hours`]))
-    .all<ScheduleRow>();
+         LIMIT 40`;
+
+export async function readTonight(env: Bindings, viewerId: string | null, hours = 36) {
+  const window = `+${hours} hours`;
+  let rows = viewerId
+    ? (await env.DB.prepare(VIEWER_QUERY).bind(viewerId, window).all<ScheduleRow>()).results
+    : [];
+
+  if (rows.length === 0) {
+    rows = (await env.DB.prepare(POPULAR_QUERY).bind(window).all<ScheduleRow>()).results;
+  }
+
   const titles = await readItems(
     env.DB,
-    rows.results.flatMap((row) => (row.titleId ? [row.titleId] : [])),
+    rows.flatMap((row) => (row.titleId ? [row.titleId] : [])),
     40,
   );
   const byId = new Map(titles.map((title) => [title.id, title]));
 
-  return rows.results.map((row) => ({
+  return rows.map((row) => ({
     ...row,
     item: row.titleId ? (byId.get(row.titleId) ?? null) : null,
   }));

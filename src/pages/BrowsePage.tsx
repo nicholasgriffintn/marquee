@@ -48,6 +48,10 @@ export function BrowsePage({
       provider.status === "feed" &&
       Boolean(provider.watchmodeSourceIds?.length || provider.tmdbProviderIds?.length),
   );
+  const shownKeywords = [
+    ...selectedKeywords,
+    ...keywords.filter((keyword) => !selectedKeywords.includes(keyword)).slice(0, 28),
+  ];
   const browse = useBrowse({
     mediaType: preset.mediaType,
     sort,
@@ -132,11 +136,11 @@ export function BrowsePage({
           </div>
         </div>
 
-        {keywords.length > 0 && (
+        {shownKeywords.length > 0 && (
           <div className="browse-facet">
             <span>Tag</span>
             <div className="browse-chips">
-              {keywords.slice(0, 28).map((keyword) => (
+              {shownKeywords.map((keyword) => (
                 <button
                   type="button"
                   key={keyword}

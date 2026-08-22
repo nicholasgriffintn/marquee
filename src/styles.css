@@ -2556,8 +2556,11 @@ h2 em {
 .detail-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 16px;
+  gap: 9px 10px;
+  margin-top: 18px;
+}
+.detail-chips + .detail-chips {
+  margin-top: 10px;
 }
 .detail-chip {
   border: 1px solid var(--paper-line);

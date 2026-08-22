@@ -121,6 +121,13 @@ function imageUrl(path: string | null, size: string) {
 }
 
 const KEYWORD_LIMIT = 24;
+const KEYWORD_DENYLIST = new Set([
+  "aftercreditsstinger",
+  "duringcreditsstinger",
+  "woman director",
+  "based on novel or book",
+  "live action remake",
+]);
 const CAST_LIMIT = 6;
 
 function names(value: unknown, limit: number) {
@@ -150,9 +157,11 @@ function parseKeywords(details: Record<string, unknown>) {
     return [];
   }
 
-  const entries = names(container.keywords ?? container.results, KEYWORD_LIMIT);
+  const entries = names(container.keywords ?? container.results, KEYWORD_LIMIT * 2);
 
-  return [...new Set(entries.map((keyword) => keyword.toLowerCase()))];
+  return [...new Set(entries.map((keyword) => keyword.toLowerCase()))]
+    .filter((keyword) => !KEYWORD_DENYLIST.has(keyword))
+    .slice(0, KEYWORD_LIMIT);
 }
 
 function parsePeople(mediaType: MediaType, details: Record<string, unknown>) {
