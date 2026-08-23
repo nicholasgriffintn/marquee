@@ -46,7 +46,10 @@ genre list, and where one end of one has a character to it he writes it in the m
 not read something on your shelf yet he says so, and goes and reads it.
 
 Bring a history with you if you have one: link Trakt and your watch history, ratings and watchlist
-come across, and a Letterboxd export can be walked in through the door.
+come across, and a Letterboxd export can be walked in through the door. It goes back the other way
+too — _send it there_ puts what you have marked here onto your Trakt account, watched as history,
+stars as ratings out of ten, the rest as watchlist. It asks first, tells you what it is about to
+send, and only sends what has changed since the last time, so nothing is counted twice.
 
 ## One episode at a time
 
@@ -58,6 +61,20 @@ Every write rolls up into the shelf: the pointer moves to the furthest episode w
 watchlisted series becomes one you are watching, and when the last aired episode is ticked the
 whole thing goes down as watched. Your episode notes are read alongside your title notes when the
 Usher works out what he thinks of you.
+
+## Names on the credits
+
+Every credited name has a page — everything of theirs in the catalogue, newest first, and how much
+of it is already on your shelf. The names on a panel go there rather than into a search box.
+
+There is one button on it that matters. Following someone writes a note in the notebook in your own
+hand, and that note is what the `person` alert detector has always been reading; until now the only
+way to get one was to have the Usher notice a name recurring in what you saved. Unfollow and he
+crosses it out without arguing. Behind both is a name-to-title index rebuilt with the rest of the
+people index, which the detector now reads instead of scanning every payload for a matching name.
+
+A film that belongs to a collection carries the rest of it under the panel, in release order, with
+the one you are looking at marked.
 
 ## Take it with you
 
@@ -229,8 +246,10 @@ work grows with the audience rather than with the map.
 }
 ```
 
-It exposes `search_catalogue`, `find_similar`, `get_title`, `get_shelf`, `save_to_shelf` and
-`whats_on_tonight`.
+It exposes `search_catalogue`, `find_similar`, `get_title`, `get_shelf`, `save_to_shelf`,
+`whats_on_tonight`, `whats_on_this_week`, `titles_by_person` and `follow_person`. The week tool
+answers from the same shelf-aware diary the calendar feed is built from, so an agent sees exactly
+what the subscription would show.
 
 **Posters** are cached in R2 and served from the app's own hostname through Cloudflare Images. Keep
 the four widths in `src/lib/media.ts` and `worker/routes/media.ts` aligned, or the number of

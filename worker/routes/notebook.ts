@@ -13,7 +13,12 @@ import {
   setAlertSetting,
   stageAlertEmail,
 } from "../repositories/alerts.ts";
-import { editBelief, readBeliefs } from "../repositories/beliefs.ts";
+import {
+  editBelief,
+  readBeliefs,
+  readFollowedPeople,
+  setPersonFollow,
+} from "../repositories/beliefs.ts";
 import type { FeedKey } from "../repositories/feeds.ts";
 import {
   mintFeedToken,
@@ -176,6 +181,32 @@ notebookRoutes.delete("/feeds", async (context) => {
     logError("feed_token_revoke_failed", error);
 
     return jsonResponse({ error: "That key would not come off the ring." }, 500);
+  }
+});
+
+notebookRoutes.get("/people", async (context) => {
+  const user = context.get("authenticatedUser");
+
+  return jsonResponse({ following: await readFollowedPeople(context.env.DB, user.id) });
+});
+
+notebookRoutes.post("/people", async (context) => {
+  const user = context.get("authenticatedUser");
+  const body = await readJsonObject(context.req.raw);
+  const name = typeof body?.name === "string" ? body.name.trim().slice(0, 120) : "";
+
+  if (name.length < 2) {
+    return jsonResponse({ error: "Give me a name to watch for." }, 400);
+  }
+
+  try {
+    await setPersonFollow(context.env.DB, user.id, name, body?.follow !== false);
+
+    return jsonResponse({ following: await readFollowedPeople(context.env.DB, user.id) });
+  } catch (error) {
+    logError("person_follow_failed", error);
+
+    return jsonResponse({ error: "I could not write that down." }, 500);
   }
 });
 

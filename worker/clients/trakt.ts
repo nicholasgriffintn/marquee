@@ -131,6 +131,95 @@ async function requestTrakt(env: Bindings, path: string, accessToken: string) {
   return response.json();
 }
 
+export type TraktPushItem = {
+  tmdbId: number;
+  mediaType: "movie" | "tv";
+  watchedAt?: string;
+  rating?: number;
+};
+
+function pushBody(items: TraktPushItem[]) {
+  const entry = (item: TraktPushItem) => ({
+    ids: { tmdb: item.tmdbId },
+    ...(item.watchedAt ? { watched_at: item.watchedAt } : {}),
+    ...(item.rating ? { rating: item.rating } : {}),
+  });
+
+  return {
+    movies: items.filter((item) => item.mediaType === "movie").map(entry),
+    shows: items.filter((item) => item.mediaType === "tv").map(entry),
+  };
+}
+
+async function postTrakt(env: Bindings, path: string, accessToken: string, body: unknown) {
+  assertConfigured(env);
+
+  const response = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      "content-type": "application/json",
+      authorization: `Bearer ${accessToken}`,
+      "trakt-api-version": API_VERSION,
+      "trakt-api-key": env.TRAKT_CLIENT_ID as string,
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(20_000),
+  });
+
+  if (response.status === 401) {
+    throw new TraktError("Trakt authorisation expired", 401);
+  }
+
+  if (!response.ok) {
+    throw new TraktError(`Trakt write failed (${response.status})`, response.status);
+  }
+
+  return response.json();
+}
+
+function addedCount(payload: unknown) {
+  const added = isRecord(payload) && isRecord(payload.added) ? payload.added : null;
+
+  if (!added) {
+    return 0;
+  }
+
+  return (
+    (numberAt(added, "movies") ?? 0) +
+    (numberAt(added, "shows") ?? 0) +
+    (numberAt(added, "episodes") ?? 0)
+  );
+}
+
+export async function pushTraktHistory(env: Bindings, accessToken: string, items: TraktPushItem[]) {
+  if (items.length === 0) {
+    return 0;
+  }
+
+  return addedCount(await postTrakt(env, "/sync/history", accessToken, pushBody(items)));
+}
+
+export async function pushTraktRatings(env: Bindings, accessToken: string, items: TraktPushItem[]) {
+  if (items.length === 0) {
+    return 0;
+  }
+
+  return addedCount(await postTrakt(env, "/sync/ratings", accessToken, pushBody(items)));
+}
+
+export async function pushTraktWatchlist(
+  env: Bindings,
+  accessToken: string,
+  items: TraktPushItem[],
+) {
+  if (items.length === 0) {
+    return 0;
+  }
+
+  return addedCount(await postTrakt(env, "/sync/watchlist", accessToken, pushBody(items)));
+}
+
 function idsOf(container: Record<string, unknown> | null) {
   const ids = container && isRecord(container.ids) ? container.ids : null;
 

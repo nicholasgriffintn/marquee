@@ -8,6 +8,7 @@ import {
 import { readBudgets, resumeSource } from "../repositories/budgets.ts";
 import { readCinemaCoverage } from "../repositories/cinemas.ts";
 import { readBackfillProgress } from "../repositories/discover.ts";
+import { rebuildPeopleIndex } from "../repositories/usher.ts";
 import { readWorkingSetStats, rebuildWorkingSet } from "../repositories/working-set.ts";
 import type { Bindings, EnrichmentSource, IngestionJob } from "../types.ts";
 import { dispatchAlerts, previewAlerts } from "./alerts/dispatch.ts";
@@ -33,6 +34,7 @@ export const ADMIN_ACTIONS = [
   "alerts-preview",
   "alerts-send",
   "angle-scores",
+  "people",
 ] as const;
 
 export type AdminAction = (typeof ADMIN_ACTIONS)[number];
@@ -157,6 +159,12 @@ export async function runAdminAction(env: Bindings, action: AdminAction) {
           ? `Sent ${result.emails} email${result.emails === 1 ? "" : "s"}, ${result.feeds} to feeds`
           : `${result.candidates} candidate${result.candidates === 1 ? "" : "s"} waiting, nothing sent`,
     };
+  }
+
+  if (action === "people") {
+    const people = await rebuildPeopleIndex(env.DB);
+
+    return { people, detail: `Indexed ${people.toLocaleString()} credited names` };
   }
 
   if (action === "angle-scores") {

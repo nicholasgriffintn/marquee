@@ -45,6 +45,7 @@ const ACTION_GROUPS: {
       { id: "alerts-preview", label: "Preview the post" },
       { id: "alerts-send", label: "Send the post" },
       { id: "angle-scores", label: "Rescore shelves" },
+      { id: "people", label: "Reindex credits" },
     ],
   },
   {

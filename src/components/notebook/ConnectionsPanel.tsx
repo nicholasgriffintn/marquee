@@ -5,6 +5,7 @@ import { useLinks } from "../../hooks/useLinks";
 export function ConnectionsPanel({ isSignedIn }: { isSignedIn: boolean }) {
   const connections = useLinks(isSignedIn);
   const [tokenLabel, setTokenLabel] = useState("");
+  const [confirmPush, setConfirmPush] = useState(false);
   const trakt = connections.links.find((link) => link.provider === "trakt");
 
   if (!isSignedIn) {
@@ -25,7 +26,10 @@ export function ConnectionsPanel({ isSignedIn }: { isSignedIn: boolean }) {
             </small>
             <span className="spacer" />
             <button type="button" onClick={() => void connections.syncTrakt()}>
-              Sync now
+              Bring it here
+            </button>
+            <button type="button" onClick={() => setConfirmPush(true)}>
+              Send it there
             </button>
             <button type="button" onClick={() => void connections.unlinkTrakt()}>
               Unlink
@@ -44,6 +48,31 @@ export function ConnectionsPanel({ isSignedIn }: { isSignedIn: boolean }) {
           </>
         )}
       </div>
+
+      {confirmPush && trakt?.connected && (
+        <div className="connection-row">
+          <strong>Send it there</strong>
+          <small>
+            {connections.pending
+              ? `${connections.pending.watched} watched, ${connections.pending.rated} rated and ${connections.pending.listed} waiting would go onto your Trakt account. Only what has changed since the last send.`
+              : "Your shelf would go onto your Trakt account."}
+          </small>
+          <span className="spacer" />
+          <button
+            type="button"
+            className="link-button-primary"
+            onClick={() => {
+              void connections.pushTrakt();
+              setConfirmPush(false);
+            }}
+          >
+            Send it
+          </button>
+          <button type="button" onClick={() => setConfirmPush(false)}>
+            Leave it
+          </button>
+        </div>
+      )}
 
       <div className="connection-row">
         <strong>API tokens</strong>

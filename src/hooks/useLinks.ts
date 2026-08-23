@@ -17,10 +17,18 @@ export type ApiToken = {
   lastUsedAt: string | null;
 };
 
+export type TraktPending = {
+  pushedAt: string | null;
+  watched: number;
+  listed: number;
+  rated: number;
+};
+
 export function useLinks(isSignedIn: boolean) {
   const [links, setLinks] = useState<AccountLink[]>([]);
   const [tokens, setTokens] = useState<ApiToken[]>([]);
   const [freshToken, setFreshToken] = useState("");
+  const [pending, setPending] = useState<TraktPending | null>(null);
   const [error, setError] = useState("");
 
   const reload = useCallback(async () => {
@@ -36,6 +44,10 @@ export function useLinks(isSignedIn: boolean) {
 
       setLinks(linkResponse.links);
       setTokens(tokenResponse.tokens);
+
+      if (linkResponse.links.some((link) => link.provider === "trakt" && link.connected)) {
+        setPending(await requestJson<TraktPending>("/api/links/trakt/push"));
+      }
     } catch {
       setError("Could not read your connected accounts.");
     }
@@ -57,6 +69,27 @@ export function useLinks(isSignedIn: boolean) {
       setError("Could not start the Trakt sync.");
     }
   }, [reload]);
+
+  const pushTrakt = useCallback(async () => {
+    setError("");
+
+    try {
+      const response = await requestJson<{ queued: boolean }>(
+        "/api/links/trakt/push",
+        jsonRequest("POST"),
+      );
+
+      if (!response.queued) {
+        setError("Nothing new to send since the last time.");
+
+        return;
+      }
+
+      setPending({ pushedAt: new Date().toISOString(), watched: 0, listed: 0, rated: 0 });
+    } catch {
+      setError("Could not send your shelf to Trakt.");
+    }
+  }, []);
 
   const unlinkTrakt = useCallback(async () => {
     setError("");
@@ -106,10 +139,12 @@ export function useLinks(isSignedIn: boolean) {
     links,
     tokens,
     freshToken,
+    pending,
     error,
     createToken,
     revokeToken,
     syncTrakt,
+    pushTrakt,
     unlinkTrakt,
     dismissToken: () => setFreshToken(""),
   };

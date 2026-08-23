@@ -7,11 +7,14 @@ import { logError } from "../lib/logging.ts";
 import { canonicalOrigin } from "../lib/security.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { isRecord } from "../lib/values.ts";
+import { readFollowedPeople, setPersonFollow } from "../repositories/beliefs.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
 import { readRanked } from "../repositories/catalog-search.ts";
+import { readPerson, readPersonTitleIds } from "../repositories/people.ts";
 import { readViewerContext } from "../repositories/viewer-context.ts";
 import { getTonight } from "../services/catalog.ts";
 import { similarTo } from "../services/embeddings.ts";
+import { readWeekAhead } from "../services/feeds.ts";
 import { updateProfile } from "../services/profile.ts";
 import { retrieveTitles } from "../services/retrieval.ts";
 import { getTitleInsight } from "../services/title-insight.ts";
@@ -85,6 +88,42 @@ const TOOLS = [
     name: "whats_on_tonight",
     description: "Episodes airing in the next day and a half, from the viewer's own shows first.",
     inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "whats_on_this_week",
+    description:
+      "Dated things from the viewer's own shelf: episodes with times where the schedule has them, announced episode dates beyond that, and releases of unwatched watchlist titles. Anything already watched is left out.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        days: { type: "number", description: "How far ahead to look, 1 to 60. Defaults to 7." },
+      },
+    },
+  },
+  {
+    name: "titles_by_person",
+    description: "Everything in the catalogue credited to a person, newest first.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "A credited name, e.g. Tilda Swinton" },
+        limit: { type: "number" },
+      },
+      required: ["name"],
+    },
+  },
+  {
+    name: "follow_person",
+    description:
+      "Follow or unfollow a credited name. Followed names are alerted on when something new of theirs appears.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        follow: { type: "boolean", description: "Defaults to true." },
+      },
+      required: ["name"],
+    },
   },
 ];
 
@@ -217,6 +256,43 @@ async function callTool(
         network: episode.network,
       })),
     });
+  }
+
+  if (name === "whats_on_this_week") {
+    const days =
+      typeof input.days === "number" ? Math.max(1, Math.min(60, Math.round(input.days))) : 7;
+
+    return textResult({ days, entries: await readWeekAhead(env, user.id, days) });
+  }
+
+  if (name === "titles_by_person") {
+    const wanted = typeof input.name === "string" ? input.name.trim().slice(0, 120) : "";
+    const person = wanted ? await readPerson(env.DB, wanted) : null;
+
+    if (!person) {
+      return textResult({ error: "No one in the catalogue by that name" }, true);
+    }
+
+    const limit = typeof input.limit === "number" ? Math.min(48, input.limit) : 20;
+    const ids = await readPersonTitleIds(env.DB, person.name, limit);
+
+    return textResult({
+      person: person.name,
+      credits: person.titles,
+      results: compact(await readItems(env.DB, ids, limit)),
+    });
+  }
+
+  if (name === "follow_person") {
+    const wanted = typeof input.name === "string" ? input.name.trim().slice(0, 120) : "";
+
+    if (wanted.length < 2) {
+      return textResult({ error: "Give a name to follow" }, true);
+    }
+
+    await setPersonFollow(env.DB, user.id, wanted, input.follow !== false);
+
+    return textResult({ following: await readFollowedPeople(env.DB, user.id) });
   }
 
   return textResult({ error: `Unknown tool ${name}` }, true);

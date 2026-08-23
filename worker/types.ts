@@ -99,6 +99,7 @@ export type IngestionJob =
     }
   | { type: "embed-titles"; titleIds: string[] }
   | { type: "import-trakt-history"; viewerId: string; origin: string }
+  | { type: "push-trakt-shelf"; viewerId: string; origin: string }
   | { type: "sync-schedule" }
   | { type: "sync-buzz" }
   | { type: "sync-cinemas"; source: string }

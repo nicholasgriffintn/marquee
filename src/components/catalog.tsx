@@ -12,6 +12,7 @@ import { Link } from "react-router-dom";
 import type { CatalogSection, MediaTitle } from "../domain/catalog";
 import { blendedRating, ratingSources } from "../domain/ratings";
 import { useAvailability } from "../hooks/useAvailability";
+import { useCollection } from "../hooks/usePerson";
 import { useRecommendations } from "../hooks/useRecommendations";
 import { useShowings } from "../hooks/useShowings";
 import { useTitleInsight } from "../hooks/useTitleInsight";
@@ -21,6 +22,7 @@ import {
   artworkSrcSet,
   changeLabel,
   compactCount,
+  languageLabel,
   mediaMeta,
   moneyLabel,
   scoreLabel,
@@ -392,6 +394,12 @@ export function DetailPanel({
   const { insight, pairs, isLoading: isInsightLoading } = useTitleInsight(item.id);
   const similar = useRecommendations(item.id, item.recommendationIds, SIMILAR_LIMIT);
   const showings = useShowings(item, canSave);
+  const collection = useCollection(item.collection?.id);
+  const spokenIn = languageLabel(item.originalLanguage);
+  const upcomingAir =
+    item.nextAirDate && item.nextAirDate >= new Date().toISOString().slice(0, 10)
+      ? item.nextAirDate
+      : null;
   const [exit, setExit] = useState<Exit | null>(null);
   const panelRef = useRef<HTMLDialogElement>(null);
 
@@ -513,6 +521,28 @@ export function DetailPanel({
                 </>
               )}
             </div>
+          )}
+          {!nextEpisode && upcomingAir && (
+            <p className="detail-next">
+              <span>Next episode</span>{" "}
+              {new Date(upcomingAir).toLocaleDateString(undefined, {
+                weekday: "long",
+                day: "numeric",
+                month: "long",
+              })}
+              , date only
+            </p>
+          )}
+          {!nextEpisode && !upcomingAir && item.mediaType === "tv" && item.lastAirDate && (
+            <p className="detail-next">
+              <span>Last aired</span>{" "}
+              {new Date(item.lastAirDate).toLocaleDateString(undefined, {
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              })}
+              {item.status ? ` · ${item.status}` : ""}
+            </p>
           )}
           {nextEpisode && (
             <p className="detail-next">
@@ -660,13 +690,20 @@ export function DetailPanel({
               </div>
             )}
           </div>
-          {item.ratings?.awards && <p className="detail-awards">{item.ratings.awards}</p>}
+          {item.ratings?.awards && (
+            <p className="detail-awards">
+              {item.ratings.awards}
+              {item.ratings.awardWins
+                ? ` · ${item.ratings.awardWins} win${item.ratings.awardWins === 1 ? "" : "s"}`
+                : ""}
+            </p>
+          )}
           {item.people?.length ? (
             <div className="detail-chips">
               {item.people.slice(0, 5).map((person) => (
                 <Link
                   key={person}
-                  to={`/listings?type=${item.mediaType}&q=${encodeURIComponent(person)}`}
+                  to={`/person/${encodeURIComponent(person)}`}
                   className="detail-chip detail-chip-person"
                 >
                   {person}
@@ -706,12 +743,41 @@ export function DetailPanel({
               </small>
             </div>
           )}
-          {(item.studios?.length || item.collection) && (
+          {(item.studios?.length || spokenIn) && (
             <p className="detail-original">
-              {[item.collection?.name, item.studios?.slice(0, 2).join(", ")]
+              {[item.studios?.slice(0, 2).join(", "), spokenIn ? `In ${spokenIn}` : null]
                 .filter(Boolean)
                 .join(" · ")}
             </p>
+          )}
+          {item.collection && collection.length > 1 && (
+            <div className="detail-similar">
+              <span>{item.collection.name}</span>
+              <div className="detail-similar-track">
+                {collection.map((title) => (
+                  <button
+                    type="button"
+                    key={title.id}
+                    className={`detail-similar-card${title.id === item.id ? " current" : ""}`}
+                    onClick={() => onOpen(title)}
+                  >
+                    {title.posterUrl ? (
+                      <img
+                        src={artwork(title.posterUrl, 160) ?? title.posterUrl}
+                        srcSet={artworkSrcSet(title.posterUrl, 160)}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    ) : (
+                      <ArtPlaceholder seed={title.id} label={title.title} />
+                    )}
+                    <strong>{title.title}</strong>
+                    <small>{title.year ?? "—"}</small>
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
           {pairs.length > 0 && (
             <div className="detail-pairs">

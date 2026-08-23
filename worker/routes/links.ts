@@ -12,7 +12,7 @@ import {
   saveLink,
   storeLinkState,
 } from "../repositories/links.ts";
-import { traktRedirectUri } from "../services/trakt.ts";
+import { traktPushPreview, traktRedirectUri } from "../services/trakt.ts";
 import type { Bindings } from "../types.ts";
 
 export const linkRoutes = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
@@ -121,6 +121,43 @@ linkRoutes.post("/trakt/sync", async (context) => {
   );
 
   return jsonResponse({ queued: true });
+});
+
+linkRoutes.get("/trakt/push", async (context) => {
+  const user = context.get("authenticatedUser");
+  const link = await readLink(context.env, user.id, "trakt");
+
+  if (!link) {
+    return jsonResponse({ error: "Trakt is not linked" }, 400);
+  }
+
+  return jsonResponse(await traktPushPreview(context.env, user.id));
+});
+
+linkRoutes.post("/trakt/push", async (context) => {
+  const user = context.get("authenticatedUser");
+  const link = await readLink(context.env, user.id, "trakt");
+
+  if (!link) {
+    return jsonResponse({ error: "Trakt is not linked" }, 400);
+  }
+
+  const pending = await traktPushPreview(context.env, user.id);
+
+  if (pending.watched + pending.listed + pending.rated === 0) {
+    return jsonResponse({ queued: false, ...pending });
+  }
+
+  await context.env.INGESTION_QUEUE.send(
+    {
+      type: "push-trakt-shelf",
+      viewerId: user.id,
+      origin: canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN),
+    },
+    { contentType: "json" },
+  );
+
+  return jsonResponse({ queued: true, ...pending });
 });
 
 linkRoutes.delete("/trakt", async (context) => {
