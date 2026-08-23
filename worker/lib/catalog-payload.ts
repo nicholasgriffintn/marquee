@@ -90,10 +90,35 @@ function isProvidersResponse(value: unknown): value is ProvidersResponse {
   );
 }
 
+function dedupeProviders(providers: MediaTitle["providers"]): MediaTitle["providers"] {
+  const byId = new Map<string, MediaTitle["providers"][number]>();
+
+  for (const provider of providers) {
+    const existing = byId.get(provider.id);
+
+    if (!existing) {
+      byId.set(provider.id, { ...provider, offerTypes: [...new Set(provider.offerTypes)] });
+      continue;
+    }
+
+    byId.set(provider.id, {
+      ...existing,
+      offerTypes: [...new Set([...existing.offerTypes, ...provider.offerTypes])],
+      webUrl: existing.webUrl ?? provider.webUrl,
+    });
+  }
+
+  return [...byId.values()];
+}
+
 export function parseStoredTitle(value: string) {
   const parsed = parseJson(value);
 
-  return isMediaTitle(parsed) ? parsed : null;
+  if (!isMediaTitle(parsed)) {
+    return null;
+  }
+
+  return { ...parsed, providers: dedupeProviders(parsed.providers) };
 }
 
 export function parseStoredTitleIds(value: string) {

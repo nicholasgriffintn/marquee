@@ -221,6 +221,7 @@ export function SourcesPage({
                         type="button"
                         disabled={!isLive}
                         aria-pressed={isSelected}
+                        aria-label={`${provider.name}${isSelected ? ", selected" : ""}`}
                         onClick={() => toggleProvider(provider.id)}
                       >
                         {isLive ? (isSelected ? "Included" : "Add") : "Unavailable"}

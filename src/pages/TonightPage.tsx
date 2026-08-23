@@ -273,10 +273,17 @@ export function TonightPage({
                   className={isSelected ? "selected" : ""}
                   onClick={() => toggleProvider(provider.id)}
                   aria-pressed={isSelected}
+                  aria-label={
+                    isSelected
+                      ? `${provider.name}, showing. Select to stop filtering by it.`
+                      : `${provider.name}, not showing. Select to filter by it.`
+                  }
                   title={provider.name}
                 >
                   <ProviderBadge provider={provider} />
-                  {selectedProviderIds.length > 0 && <small>{isSelected ? "ON" : ""}</small>}
+                  <small aria-hidden="true">
+                    {selectedProviderIds.length > 0 && isSelected ? "ON" : ""}
+                  </small>
                 </button>
               );
             })}

@@ -5383,3 +5383,55 @@ h2 em {
     transform: none;
   }
 }
+
+/* Scrollers: no native bars, snap, and an edge fade */
+
+.rail-track,
+.usher-strip,
+.provider-picker,
+.detail-similar-track,
+.usher-grid,
+.digest-episodes {
+  scrollbar-width: none;
+}
+.rail-track::-webkit-scrollbar,
+.usher-strip::-webkit-scrollbar,
+.provider-picker::-webkit-scrollbar,
+.detail-similar-track::-webkit-scrollbar {
+  display: none;
+}
+.rail-track,
+.detail-similar-track {
+  scroll-snap-type: x proximity;
+}
+.rail-track > *,
+.detail-similar-track > * {
+  scroll-snap-align: start;
+}
+.content-rail {
+  position: relative;
+}
+.content-rail::after {
+  background: linear-gradient(90deg, transparent, var(--ink));
+  bottom: 0;
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: clamp(24px, var(--gutter), 82px);
+  z-index: 1;
+}
+.provider-strip {
+  position: relative;
+}
+.provider-strip::after {
+  background: linear-gradient(90deg, transparent, var(--panel));
+  bottom: 28px;
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+  top: 64px;
+  width: clamp(20px, 4vw, 60px);
+}

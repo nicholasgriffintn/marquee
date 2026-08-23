@@ -193,8 +193,16 @@ export async function getProviderLedger(env: Bindings): Promise<ProvidersRespons
   const watchmodeSources = watchmodeResult.status === "fulfilled" ? watchmodeResult.value : [];
   const tmdbSources = tmdbResult.status === "fulfilled" ? tmdbResult.value : [];
   const errors = [
-    ...(watchmodeResult.status === "rejected" ? ["Watchmode provider data is unavailable"] : []),
-    ...(tmdbResult.status === "rejected" ? ["TMDB provider data is unavailable"] : []),
+    ...(watchmodeResult.status === "rejected"
+      ? [
+          "Watchmode did not answer on the last sweep. Its services are still listed from the last good run.",
+        ]
+      : []),
+    ...(tmdbResult.status === "rejected"
+      ? [
+          "TMDB did not answer on the last sweep. Its services are still listed from the last good run.",
+        ]
+      : []),
   ];
 
   return mergeProviderLedger(watchmodeSources, tmdbSources, errors);
