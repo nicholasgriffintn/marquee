@@ -6,6 +6,7 @@ import { consumeDeadLetters, consumeIngestion } from "./jobs/ingestion-consumer.
 import { scheduleIngestion } from "./jobs/ingestion-scheduler.ts";
 import { automatedSyncAllowed } from "./lib/environment.ts";
 import { hasTrustedOrigin } from "./lib/http.ts";
+import { logEvent } from "./lib/logging.ts";
 import { canonicalOrigin } from "./lib/security.ts";
 import { withPageMetadata } from "./lib/share.ts";
 import { adminRoutes } from "./routes/admin.ts";
@@ -129,7 +130,7 @@ export default {
   fetch: app.fetch,
   scheduled(controller, env, context) {
     if (!automatedSyncAllowed(env)) {
-      console.log(JSON.stringify({ event: "scheduled_skipped_local_dev", cron: controller.cron }));
+      logEvent("scheduled_skipped_local_dev", { cron: controller.cron });
 
       return;
     }

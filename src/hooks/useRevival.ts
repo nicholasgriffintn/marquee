@@ -14,7 +14,7 @@ export function useProgramme(isReady: boolean) {
 
   useEffect(() => {
     if (!isReady) {
-      return;
+      return undefined;
     }
 
     const controller = new AbortController();
@@ -44,7 +44,7 @@ export function useScreening(workId: string | undefined) {
 
   useEffect(() => {
     if (!workId) {
-      return;
+      return undefined;
     }
 
     const controller = new AbortController();
@@ -80,7 +80,7 @@ export function useTitleReels(titleId: string, mediaType: string, tmdbId: number
 
   useEffect(() => {
     if (!titleId) {
-      return;
+      return undefined;
     }
 
     const controller = new AbortController();

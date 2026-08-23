@@ -3,11 +3,14 @@ import type { ViewerOrigin } from "../../src/domain/cinema.ts";
 const EARTH_RADIUS_KM = 6_371;
 const DEGREE_KM = 111.32;
 
+function toRadians(value: number) {
+  return (value * Math.PI) / 180;
+}
+
 export function haversineKm(
   from: { latitude: number; longitude: number },
   to: { latitude: number; longitude: number },
 ) {
-  const toRadians = (value: number) => (value * Math.PI) / 180;
   const deltaLat = toRadians(to.latitude - from.latitude);
   const deltaLon = toRadians(to.longitude - from.longitude);
   const a =

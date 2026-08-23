@@ -7,7 +7,8 @@ import {
   getPageviews,
 } from "../clients/wikimedia.ts";
 import { buzzScore, MIN_TRENDING_VIEWS } from "../lib/buzz.ts";
-import { logError } from "../lib/logging.ts";
+import { logError, logEvent } from "../lib/logging.ts";
+import { clamp } from "../lib/numbers.ts";
 import type { Bindings } from "../types.ts";
 
 const SAMPLE_SIZE = 250;
@@ -152,13 +153,10 @@ export async function syncBuzz(env: Bindings) {
   });
   const measured: BuzzRow[] = [];
 
-  console.log(
-    JSON.stringify({
-      event: "buzz_articles_resolved",
-      exact: byImdb.size,
-      candidates: pending.length,
-    }),
-  );
+  logEvent("buzz_articles_resolved", {
+    exact: byImdb.size,
+    candidates: pending.length,
+  });
 
   for (let index = 0; index < pending.length; index += CONCURRENCY) {
     const wave = pending.slice(index, index + CONCURRENCY);
@@ -209,14 +207,11 @@ export async function syncBuzz(env: Bindings) {
 
   const resolved = measured.filter((row) => row.article !== "").length;
 
-  console.log(
-    JSON.stringify({
-      event: "buzz_synced",
-      titles: measured.length,
-      resolved,
-      unresolved: measured.length - resolved,
-    }),
-  );
+  logEvent("buzz_synced", {
+    titles: measured.length,
+    resolved,
+    unresolved: measured.length - resolved,
+  });
 
   return resolved;
 }
@@ -236,9 +231,7 @@ export async function buzzBoosts(env: Bindings, titleIds: string[]) {
     .bind(JSON.stringify(unique))
     .all<{ titleId: string; delta: number }>();
 
-  return new Map(
-    rows.results.map((row) => [row.titleId, Math.max(0, Math.min(MAX_BOOST, row.delta)) * 0.15]),
-  );
+  return new Map(rows.results.map((row) => [row.titleId, clamp(row.delta, 0, MAX_BOOST) * 0.15]));
 }
 
 export async function readBuzz(db: D1Database, titleIds: string[]) {
@@ -279,7 +272,7 @@ export async function readTrendingBuzz(env: Bindings, limit = 20) {
      ORDER BY b.score DESC
      LIMIT ?`,
   )
-    .bind(Math.max(1, Math.min(60, limit)))
+    .bind(clamp(limit, 1, 60))
     .all<BuzzReadRow>();
 
   return rows.results.map((row) => ({ titleId: row.titleId, buzz: toBuzz(row) }));

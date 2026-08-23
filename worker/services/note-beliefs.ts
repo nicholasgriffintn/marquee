@@ -1,3 +1,4 @@
+import { slugify } from "../../src/domain/slug.ts";
 import { USHER_VOICE } from "../ai/usher-voice.ts";
 import { fastModel, requestAiCompletion } from "../clients/ai-gateway.ts";
 import type { ChatMessage } from "../lib/curator-payload.ts";
@@ -10,6 +11,7 @@ const MIN_NOTES = 5;
 const MAX_NOTES = 30;
 const MAX_HUNCHES = 3;
 const HUNCH_EXPIRY_DAYS = 60;
+const BELIEF_SLUG_LIMIT = 40;
 
 const NOTE_PROMPT = [
   USHER_VOICE,
@@ -22,14 +24,6 @@ const NOTE_PROMPT = [
 ].join(" ");
 
 type NoteRow = { title: string; rating: number | null; thoughts: string };
-
-function slugify(value: string) {
-  return value
-    .toLowerCase()
-    .replaceAll(/[^a-z0-9]+/gu, "-")
-    .replaceAll(/^-|-$/gu, "")
-    .slice(0, 40);
-}
 
 export async function noteHunches(env: Bindings, viewerId: string): Promise<BeliefDraft[]> {
   try {
@@ -89,7 +83,10 @@ export async function noteHunches(env: Bindings, viewerId: string): Promise<Beli
         }
 
         const claim = entry.claim.trim().slice(0, 160);
-        const slug = slugify(typeof entry.slug === "string" ? entry.slug : claim);
+        const slug = slugify(
+          typeof entry.slug === "string" ? entry.slug : claim,
+          BELIEF_SLUG_LIMIT,
+        );
 
         if (!claim || !slug) {
           return [];

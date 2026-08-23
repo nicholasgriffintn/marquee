@@ -15,44 +15,29 @@ export type WatchmodeSource = {
   regions: string[];
 };
 
+const OFFER_LABELS: Record<string, string> = {
+  sub: "Subscription",
+  free: "Free",
+  rent: "Rent",
+  buy: "Buy",
+  purchase: "Buy",
+  tve: "TV provider",
+};
+
+const OFFER_KINDS: Record<string, ProviderOfferKind> = {
+  sub: "subscription",
+  free: "free",
+  rent: "rent",
+  buy: "buy",
+  purchase: "buy",
+};
+
 function offerLabel(type: string) {
-  if (type === "sub") {
-    return "Subscription";
-  }
-
-  if (type === "free") {
-    return "Free";
-  }
-
-  if (type === "rent") {
-    return "Rent";
-  }
-
-  if (type === "buy" || type === "purchase") {
-    return "Buy";
-  }
-
-  return type === "tve" ? "TV provider" : type;
+  return OFFER_LABELS[type] ?? type;
 }
 
 export function watchmodeOfferKind(type: string): ProviderOfferKind {
-  if (type === "sub") {
-    return "subscription";
-  }
-
-  if (type === "free") {
-    return "free";
-  }
-
-  if (type === "rent") {
-    return "rent";
-  }
-
-  if (type === "buy" || type === "purchase") {
-    return "buy";
-  }
-
-  return "other";
+  return OFFER_KINDS[type] ?? "other";
 }
 
 export function parseWatchmodeSources(value: unknown) {

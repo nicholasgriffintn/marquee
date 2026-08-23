@@ -1,20 +1,20 @@
 import type { MediaType } from "../../src/domain/catalog.ts";
 import { isRecord } from "../lib/values.ts";
 import type { Bindings, TitleRatings } from "../types.ts";
+import { upstreamFetch } from "./fetch.ts";
+import { upstreamError } from "./upstream.ts";
+
+const TIMEOUT_MS = 12_000;
+const POSTER_TIMEOUT_MS = 20_000;
+const SEARCH_TIMEOUT_MS = 8_000;
+const RATINGS_CACHE_TTL = 86_400;
+const SEARCH_CACHE_TTL = 3_600;
 
 const API_BASE = "https://www.omdbapi.com/";
 const POSTER_BASE = "https://img.omdbapi.com/";
 const POSTER_HEIGHT = 1_000;
 
-export class OmdbError extends Error {
-  constructor(
-    message: string,
-    readonly status = 502,
-  ) {
-    super(message);
-    this.name = "OmdbError";
-  }
-}
+export const OmdbError = upstreamError("OmdbError");
 
 function ratingValue(payload: Record<string, unknown>, source: string) {
   const ratings = Array.isArray(payload.Ratings) ? payload.Ratings : [];
@@ -64,10 +64,9 @@ export async function getOmdbRatings(env: Bindings, imdbId: string): Promise<Tit
     tomatoes: "true",
   }).toString();
 
-  const response = await fetch(url, {
-    headers: { accept: "application/json" },
-    signal: AbortSignal.timeout(12_000),
-    cf: { cacheEverything: true, cacheTtl: 86_400 },
+  const response = await upstreamFetch(url, {
+    timeoutMs: TIMEOUT_MS,
+    cacheTtl: RATINGS_CACHE_TTL,
   });
 
   if (!response.ok) {
@@ -113,9 +112,10 @@ export async function getOmdbPoster(env: Bindings, imdbId: string, height = POST
     h: String(height),
   }).toString();
 
-  const response = await fetch(url, {
-    signal: AbortSignal.timeout(20_000),
-    cf: { cacheEverything: true, cacheTtl: 86_400 },
+  const response = await upstreamFetch(url, {
+    headers: { accept: "image/*" },
+    timeoutMs: POSTER_TIMEOUT_MS,
+    cacheTtl: RATINGS_CACHE_TTL,
   });
 
   if (response.status === 404) {
@@ -159,10 +159,9 @@ export async function searchOmdb(env: Bindings, query: string, page = 1) {
     page: String(page),
   }).toString();
 
-  const response = await fetch(url, {
-    headers: { accept: "application/json" },
-    signal: AbortSignal.timeout(8_000),
-    cf: { cacheEverything: true, cacheTtl: 3_600 },
+  const response = await upstreamFetch(url, {
+    timeoutMs: SEARCH_TIMEOUT_MS,
+    cacheTtl: SEARCH_CACHE_TTL,
   });
 
   if (!response.ok) {

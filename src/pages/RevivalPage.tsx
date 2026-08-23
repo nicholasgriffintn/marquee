@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 
 import { ErrorBoundary } from "../components/ErrorBoundary";
+import { PageTitle } from "../components/PageTitle";
 import { ProjectionNote } from "../components/revival/ProjectionNote";
 import { ReelCard } from "../components/revival/ReelCard";
 import { UsherMark } from "../components/usher/UsherMark";
@@ -34,17 +35,14 @@ export function RevivalPage({ isReady }: { isReady: boolean }) {
 
   return (
     <section className="page-section revival-shelves">
-      <div className="page-title-row">
-        <div>
-          <h1>The revival house</h1>
-        </div>
+      <PageTitle heading="The revival house">
         <p>
           The small screen at the back. When the building came down, the sign went in a skip and
           this did not. The prints are out of copyright, the projectionist is somewhere behind that
           door, and the ticket is nothing.{" "}
           {programme.total ? `${programme.total} in the vault.` : ""}
         </p>
-      </div>
+      </PageTitle>
 
       {error && (
         <p className="auth-message" role="alert">

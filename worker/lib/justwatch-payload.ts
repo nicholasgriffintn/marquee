@@ -10,44 +10,33 @@ import { isRecord, numberAt, recordAt, records, stringAt } from "./values.ts";
 
 const PHYSICAL_PRESENTATIONS = new Set(["DVD", "BLURAY", "_4K_BLURAY"]);
 
+const OFFER_LABELS: Record<string, string> = {
+  FLATRATE: "Subscription",
+  FLATRATE_AND_BUY: "Subscription",
+  FREE: "Free",
+  ADS: "Free with ads",
+  FAST: "Free with ads",
+  RENT: "Rent",
+  BUY: "Buy",
+  CINEMA: "Cinema",
+};
+
+const OFFER_KINDS: Record<string, ProviderOfferKind> = {
+  FLATRATE: "subscription",
+  FLATRATE_AND_BUY: "subscription",
+  FREE: "free",
+  ADS: "free",
+  FAST: "free",
+  RENT: "rent",
+  BUY: "buy",
+};
+
 function offerLabel(monetizationType: string) {
-  if (monetizationType === "FLATRATE" || monetizationType === "FLATRATE_AND_BUY") {
-    return "Subscription";
-  }
-
-  if (monetizationType === "FREE") {
-    return "Free";
-  }
-
-  if (monetizationType === "ADS" || monetizationType === "FAST") {
-    return "Free with ads";
-  }
-
-  if (monetizationType === "RENT") {
-    return "Rent";
-  }
-
-  if (monetizationType === "BUY") {
-    return "Buy";
-  }
-
-  return monetizationType === "CINEMA" ? "Cinema" : "Other";
+  return OFFER_LABELS[monetizationType] ?? "Other";
 }
 
 export function justwatchOfferKind(monetizationType: string): ProviderOfferKind {
-  if (monetizationType === "FLATRATE" || monetizationType === "FLATRATE_AND_BUY") {
-    return "subscription";
-  }
-
-  if (monetizationType === "FREE" || monetizationType === "ADS" || monetizationType === "FAST") {
-    return "free";
-  }
-
-  if (monetizationType === "RENT") {
-    return "rent";
-  }
-
-  return monetizationType === "BUY" ? "buy" : "other";
+  return OFFER_KINDS[monetizationType] ?? "other";
 }
 
 function offerUrl(value: unknown) {

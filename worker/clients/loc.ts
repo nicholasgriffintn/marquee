@@ -1,6 +1,10 @@
 import type { RevivalKind, RevivalRightsBasis, RevivalTag } from "../../src/domain/revival.ts";
 import { personName, splitSubjects, tagList } from "../lib/revival-tags.ts";
+import { firstString, yearFrom } from "../lib/text.ts";
 import { isRecord } from "../lib/values.ts";
+import { upstreamFetch } from "./fetch.ts";
+
+const CACHE_TTL = 3_600;
 
 const COLLECTION_ENDPOINT = "https://www.loc.gov/collections/national-screening-room/";
 const TIMEOUT_MS = 25_000;
@@ -31,14 +35,6 @@ export type LocCandidate = {
   tags: RevivalTag[];
 };
 
-function firstString(value: unknown) {
-  if (typeof value === "string") {
-    return value.trim();
-  }
-
-  return Array.isArray(value) && typeof value[0] === "string" ? value[0].trim() : "";
-}
-
 function positiveNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
 }
@@ -55,12 +51,6 @@ function itemIdFrom(url: string) {
   const match = /\/item\/([\w.-]+)\/?$/u.exec(url);
 
   return match ? match[1] : "";
-}
-
-function yearFrom(value: string) {
-  const match = /(1[6-9]\d{2}|20\d{2})/u.exec(value);
-
-  return match ? Number(match[1]) : null;
 }
 
 function directorFrom(contributors: unknown) {
@@ -120,11 +110,7 @@ export async function searchScreeningRoom(page: number) {
   url.searchParams.set("sp", String(Math.max(1, page)));
   url.searchParams.set("at", "results,pagination");
 
-  const response = await fetch(url.toString(), {
-    signal: AbortSignal.timeout(TIMEOUT_MS),
-    headers: { accept: "application/json" },
-    cf: { cacheEverything: true, cacheTtl: 3_600 },
-  });
+  const response = await upstreamFetch(url, { timeoutMs: TIMEOUT_MS, cacheTtl: CACHE_TTL });
 
   if (!response.ok) {
     throw new Error(`Library of Congress responded ${response.status}`);

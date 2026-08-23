@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { jsonRequest, requestJson } from "../lib/api";
+import { isAbortError, jsonRequest, requestJson } from "../lib/api";
 import type { EntryStatus, ViewingEntry } from "../types";
 
 type ProfileSummary = {
@@ -56,7 +56,7 @@ export function useProfile(isSignedIn: boolean) {
         setSummary(profile);
         announce("");
       } catch (error) {
-        if (!(error instanceof DOMException && error.name === "AbortError")) {
+        if (!isAbortError(error)) {
           announce("Could not load your saved profile. New changes may not sync.", ERROR_HOLD_MS);
         }
       } finally {
@@ -67,7 +67,7 @@ export function useProfile(isSignedIn: boolean) {
     void loadProfile();
 
     return () => controller.abort();
-  }, [isSignedIn, version]);
+  }, [announce, isSignedIn, version]);
 
   const refresh = useCallback(() => setVersion((current) => current + 1), []);
 

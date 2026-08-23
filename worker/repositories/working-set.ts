@@ -1,3 +1,5 @@
+import { logEvent } from "../lib/logging.ts";
+
 const POPULAR_TITLES = 30_000;
 
 export const DEMAND_MAX_AGE_DAYS = 7;
@@ -35,14 +37,11 @@ export async function rebuildWorkingSet(db: D1Database) {
     .prepare(`SELECT count(*) AS titles, sum(demand) AS demanded FROM title_working_set`)
     .first<{ titles: number; demanded: number }>();
 
-  console.log(
-    JSON.stringify({
-      event: "working_set_rebuilt",
-      titles: kept?.titles ?? 0,
-      demanded: kept?.demanded ?? 0,
-      pruned: pruned.meta.changes,
-    }),
-  );
+  logEvent("working_set_rebuilt", {
+    titles: kept?.titles ?? 0,
+    demanded: kept?.demanded ?? 0,
+    pruned: pruned.meta.changes,
+  });
 
   return kept?.titles ?? 0;
 }

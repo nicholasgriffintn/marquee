@@ -1,7 +1,7 @@
 import { useParams } from "react-router-dom";
 
-import { TitleCard } from "../components/catalog";
 import { ErrorBoundary } from "../components/ErrorBoundary";
+import { TitleCard } from "../components/TitleCard";
 import { UsherMark } from "../components/usher/UsherMark";
 import type { MediaTitle } from "../domain/catalog";
 import { usePerson } from "../hooks/usePerson";

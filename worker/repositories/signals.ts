@@ -1,5 +1,7 @@
 import { logError } from "../lib/logging.ts";
+import { clamp } from "../lib/numbers.ts";
 import { isKnownTitle } from "../lib/validation.ts";
+import { isRecord, parseJson, stringAt } from "../lib/values.ts";
 
 export const SIGNAL_TYPES = ["rejection", "never", "provider_exit", "watched"] as const;
 
@@ -92,7 +94,7 @@ export async function readSignals(
             AND type IN (${types.map(() => "?").join(",")})
             AND (expires_at IS NULL OR julianday(expires_at) > julianday('now'))
           ORDER BY created_at DESC
-          LIMIT ${Math.max(1, Math.min(500, limit))}`,
+          LIMIT ${clamp(limit, 1, 500)}`,
       )
       .bind(viewerId, ...types)
       .all<SignalRow>();
@@ -153,20 +155,12 @@ export async function recentExitFor(db: D1Database, viewerId: string, titleId: s
       return null;
     }
 
-    let source = "";
+    const parsed = parseJson(row.context);
 
-    try {
-      const parsed: unknown = JSON.parse(row.context);
-
-      source =
-        parsed && typeof parsed === "object" && "source" in parsed
-          ? String((parsed as { source: unknown }).source ?? "")
-          : "";
-    } catch {
-      source = "";
-    }
-
-    return { journeyId: row.journeyId ?? "", source };
+    return {
+      journeyId: row.journeyId ?? "",
+      source: (isRecord(parsed) && stringAt(parsed, "source")) || "",
+    };
   } catch (error) {
     logError("exit_lookup_failed", error);
 

@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 
 import type { MapNeighbour, MapPoint, TasteMapResponse } from "../../domain/notebook";
-import { requestJson } from "../../lib/api";
+import { isAbortError, requestJson } from "../../lib/api";
 import { TasteMapCard } from "./TasteMapCard";
 
 const SIZE = 560;
@@ -117,7 +117,7 @@ export function TasteMap({ isSignedIn }: { isSignedIn: boolean }) {
 
   useEffect(() => {
     if (!isSignedIn) {
-      return;
+      return undefined;
     }
 
     const controller = new AbortController();
@@ -131,7 +131,7 @@ export function TasteMap({ isSignedIn }: { isSignedIn: boolean }) {
         setMap(response);
         setError("");
       } catch (caught) {
-        if (caught instanceof DOMException && caught.name === "AbortError") {
+        if (isAbortError(caught)) {
           return;
         }
 
@@ -149,7 +149,7 @@ export function TasteMap({ isSignedIn }: { isSignedIn: boolean }) {
 
   useEffect(() => {
     if (!activeId || activeId === artId) {
-      return;
+      return undefined;
     }
 
     const timer = setTimeout(() => setArtId(activeId), ART_SETTLE);

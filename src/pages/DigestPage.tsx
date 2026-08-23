@@ -1,38 +1,30 @@
-import { ArtPlaceholder } from "../components/ArtPlaceholder";
-import { TitleCard } from "../components/catalog";
 import { ErrorBoundary } from "../components/ErrorBoundary";
+import { TitleArt } from "../components/TitleArt";
+import { TitleCard } from "../components/TitleCard";
 import { UsherMark } from "../components/usher/UsherMark";
 import type { MediaTitle } from "../domain/catalog";
 import { useDigest } from "../hooks/useDigest";
-import { artwork, mediaMeta } from "../lib/media";
+import { formatDateTime, parseDate } from "../lib/dates";
+import { mediaMeta } from "../lib/media";
+
+const FIRST_ISSUE = Date.UTC(1974, 0, 1);
+
+function issuedOn(value: string | undefined) {
+  return parseDate(value) ?? new Date();
+}
 
 function weekOf(value: string | undefined) {
-  const created = value ? new Date(value) : new Date();
-  const date = Number.isNaN(created.getTime()) ? new Date() : created;
-
-  return date.toLocaleDateString(undefined, { day: "numeric", month: "long" });
+  return issuedOn(value).toLocaleDateString(undefined, { day: "numeric", month: "long" });
 }
 
 function issueNumber(value: string | undefined) {
-  const created = value ? new Date(value) : new Date();
-  const date = Number.isNaN(created.getTime()) ? new Date() : created;
-  const weeks = Math.floor((date.getTime() - Date.UTC(1974, 0, 1)) / (7 * 86_400_000));
+  const weeks = Math.floor((issuedOn(value).getTime() - FIRST_ISSUE) / (7 * 86_400_000));
 
   return weeks.toLocaleString();
 }
 
 function formatWhen(value: string) {
-  const airsAt = new Date(value);
-
-  if (Number.isNaN(airsAt.getTime())) {
-    return "";
-  }
-
-  return airsAt.toLocaleString(undefined, {
-    weekday: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatDateTime(value, { weekday: "short", hour: "2-digit", minute: "2-digit" });
 }
 
 export function DigestPage({
@@ -92,22 +84,14 @@ export function DigestPage({
               className="programme-lead-art"
               onClick={() => digest.lead?.item && onOpen(digest.lead.item)}
             >
-              {digest.lead.item.backdropUrl || digest.lead.item.posterUrl ? (
-                <img
-                  src={
-                    artwork(
-                      digest.lead.item.backdropUrl ?? digest.lead.item.posterUrl,
-                      780,
-                      digest.lead.item.backdropUrl ? "backdrop" : "poster",
-                    ) ?? ""
-                  }
-                  alt=""
-                  loading="lazy"
-                  decoding="async"
-                />
-              ) : (
-                <ArtPlaceholder seed={digest.lead.item.id} label={digest.lead.item.title} wide />
-              )}
+              <TitleArt
+                url={digest.lead.item.backdropUrl ?? digest.lead.item.posterUrl}
+                seed={digest.lead.item.id}
+                label={digest.lead.item.title}
+                width={780}
+                kind={digest.lead.item.backdropUrl ? "backdrop" : "poster"}
+                wide
+              />
             </button>
             <div className="programme-lead-copy">
               <span>The pick of the week</span>

@@ -1,5 +1,5 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
-import { logError } from "../lib/logging.ts";
+import { logError, logEvent } from "../lib/logging.ts";
 import { readRanked } from "../repositories/catalog-search.ts";
 import type { Bindings } from "../types.ts";
 import { prepareRails, readRailViewer } from "./ai-rails.ts";
@@ -152,13 +152,10 @@ export async function buildDigest(env: Bindings, viewerId: string) {
     .bind(viewerId, JSON.stringify(digest))
     .run();
 
-  console.log(
-    JSON.stringify({
-      event: "digest_built",
-      fresh: fresh.length,
-      episodes: digest.episodes.length,
-    }),
-  );
+  logEvent("digest_built", {
+    fresh: fresh.length,
+    episodes: digest.episodes.length,
+  });
 
   return digest;
 }

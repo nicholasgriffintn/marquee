@@ -1,4 +1,4 @@
-import { logError } from "../lib/logging.ts";
+import { logError, logEvent } from "../lib/logging.ts";
 import type { Bindings } from "../types.ts";
 
 export function emailConfigured(env: Bindings) {
@@ -7,7 +7,7 @@ export function emailConfigured(env: Bindings) {
 
 export async function sendSignInEmail(env: Bindings, to: string, link: string, expiresAt: Date) {
   if (!env.EMAIL || !env.MAIL_FROM) {
-    console.log(JSON.stringify({ event: "magic_link_unsent", reason: "not_configured" }));
+    logEvent("magic_link_unsent", { reason: "not_configured" });
 
     throw new Error("Email delivery is not configured");
   }

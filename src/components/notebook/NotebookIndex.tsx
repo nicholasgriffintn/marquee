@@ -11,7 +11,7 @@ export function NotebookIndex({ dividers }: { dividers: Divider[] }) {
       .filter((element): element is HTMLElement => element !== null);
 
     if (sections.length === 0) {
-      return;
+      return undefined;
     }
 
     const observer = new IntersectionObserver(

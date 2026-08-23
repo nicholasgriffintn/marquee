@@ -1,3 +1,4 @@
+import { clamp } from "../lib/numbers.ts";
 import { isRecord, parseJson } from "../lib/values.ts";
 import { rebuildPersonTitles } from "./people.ts";
 
@@ -185,7 +186,7 @@ export async function searchPeople(db: D1Database, query: string, limit: number)
        ORDER BY CASE WHEN lower(name) LIKE ? THEN 0 ELSE 1 END, titles DESC
        LIMIT ?`,
     )
-    .bind(`%${term}%`, `${term}%`, Math.max(1, Math.min(20, limit)))
+    .bind(`%${term}%`, `${term}%`, clamp(limit, 1, 20))
     .all<{ name: string }>();
 
   return rows.results.map((row) => row.name);
@@ -194,7 +195,7 @@ export async function searchPeople(db: D1Database, query: string, limit: number)
 export async function popularPeople(db: D1Database, limit: number) {
   const rows = await db
     .prepare(`SELECT name FROM catalog_people ORDER BY titles DESC LIMIT ?`)
-    .bind(Math.max(1, Math.min(24, limit)))
+    .bind(clamp(limit, 1, 24))
     .all<{ name: string }>();
 
   return rows.results.map((row) => row.name);

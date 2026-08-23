@@ -1,3 +1,5 @@
+import { parseDate } from "../lib/dates";
+
 export type ScreeningPrecision = "exact" | "day" | "listing";
 
 export type Cinema = {
@@ -100,17 +102,19 @@ export function screeningTime(screening: Screening) {
     return null;
   }
 
-  const parsed = new Date(screening.startsAt);
-
-  return Number.isNaN(parsed.getTime())
-    ? null
-    : parsed.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false });
+  return (
+    parseDate(screening.startsAt)?.toLocaleTimeString(undefined, {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }) ?? null
+  );
 }
 
 export function dayLabel(businessDay: string, now = new Date()) {
-  const parsed = new Date(`${businessDay}T00:00:00`);
+  const parsed = parseDate(`${businessDay}T00:00:00`);
 
-  if (Number.isNaN(parsed.getTime())) {
+  if (!parsed) {
     return businessDay;
   }
 

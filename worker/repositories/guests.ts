@@ -1,4 +1,5 @@
 import { logError } from "../lib/logging.ts";
+import { jsonStringList } from "../lib/values.ts";
 
 export type Guest = {
   id: string;
@@ -10,17 +11,10 @@ export type Guest = {
 type GuestRow = { id: string; name: string; vetoes: string; leanings: string };
 
 const MAX_GUESTS = 8;
+const GUEST_TRAITS = 8;
 
-function parseList(value: string) {
-  try {
-    const parsed: unknown = JSON.parse(value);
-
-    return Array.isArray(parsed)
-      ? parsed.filter((entry): entry is string => typeof entry === "string").slice(0, 8)
-      : [];
-  } catch {
-    return [];
-  }
+function guestTraits(value: string) {
+  return jsonStringList(value, { limit: GUEST_TRAITS });
 }
 
 export async function readGuests(db: D1Database, viewerId: string): Promise<Guest[]> {
@@ -40,8 +34,8 @@ export async function readGuests(db: D1Database, viewerId: string): Promise<Gues
     return rows.results.map((row) => ({
       id: row.id,
       name: row.name,
-      vetoes: parseList(row.vetoes),
-      leanings: parseList(row.leanings),
+      vetoes: guestTraits(row.vetoes),
+      leanings: guestTraits(row.leanings),
     }));
   } catch (error) {
     logError("guests_read_failed", error);

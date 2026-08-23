@@ -1,3 +1,5 @@
+import { formatDate } from "../lib/dates";
+
 export type SeasonSummary = {
   seasonNumber: number;
   name: string;
@@ -81,22 +83,11 @@ export function hasAired(airDate: string | null, now = Date.now()) {
 }
 
 export function airLabel(airDate: string | null) {
-  if (!airDate) {
-    return "Date to be announced";
-  }
-
-  const parsed = new Date(`${airDate}T00:00:00Z`);
-
-  if (Number.isNaN(parsed.getTime())) {
-    return "Date to be announced";
-  }
-
-  return parsed.toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  });
+  return formatDate(
+    airDate && `${airDate}T00:00:00Z`,
+    { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" },
+    "Date to be announced",
+  );
 }
 
 export function runtimeLabel(minutes: number | null) {

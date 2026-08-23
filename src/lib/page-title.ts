@@ -23,14 +23,17 @@ export function titleForItem(item: MediaTitle) {
   return `${item.title}${item.year ? ` (${item.year})` : ""} · Marquee`;
 }
 
+const PREFIX_TITLES: [string, string][] = [
+  ["/revival/", "The revival house · Marquee"],
+  ["/person/", "People · Marquee"],
+];
+
 export function titleForRoute(pathname: string, query: string) {
   if (pathname === "/search") {
     return query ? `${query} · Search · Marquee` : "Search · Marquee";
   }
 
-  if (pathname.startsWith("/revival/")) {
-    return "The revival house · Marquee";
-  }
+  const prefixed = PREFIX_TITLES.find(([prefix]) => pathname.startsWith(prefix));
 
-  return ROUTE_TITLES[pathname] ?? "Not found · Marquee";
+  return prefixed?.[1] ?? ROUTE_TITLES[pathname] ?? "Not found · Marquee";
 }

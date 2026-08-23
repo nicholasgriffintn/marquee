@@ -1,5 +1,5 @@
 import { getTvmazeSchedule, type ScheduledEpisode } from "../clients/tvmaze.ts";
-import { logError } from "../lib/logging.ts";
+import { logError, logEvent } from "../lib/logging.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
 import type { Bindings } from "../types.ts";
 
@@ -109,9 +109,7 @@ export async function syncSchedule(env: Bindings) {
     );
   }
 
-  console.log(
-    JSON.stringify({ event: "schedule_synced", fetched: entries.length, matched: known.length }),
-  );
+  logEvent("schedule_synced", { fetched: entries.length, matched: known.length });
 
   return known.length;
 }

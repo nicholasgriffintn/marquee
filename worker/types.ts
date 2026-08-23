@@ -1,3 +1,5 @@
+import type { EntryStatus } from "../src/domain/entries.ts";
+
 export type Bindings = {
   ASSETS: Fetcher;
   DB: D1Database;
@@ -116,7 +118,7 @@ export type IngestionJob =
   | { type: "mirror-revival-work"; workId: string }
   | { type: "build-sections" };
 
-export type EntryStatus = "watchlist" | "watching" | "watched" | "dropped";
+export type { EntryStatus };
 
 export type ViewingContext = {
   titleId: string;

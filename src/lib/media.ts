@@ -152,12 +152,10 @@ export function scoreLabel(item: MediaTitle) {
   return item.tmdbScore === null ? "Not yet rated" : `${item.tmdbScore.toFixed(1)} / 10`;
 }
 
-export function voteLabel(item: MediaTitle) {
-  if (item.tmdbScore === null || item.tmdbVoteCount === 0) {
+export function votesLabel(count: number) {
+  if (count <= 0) {
     return "";
   }
 
-  return item.tmdbVoteCount >= 1_000
-    ? `${(item.tmdbVoteCount / 1_000).toFixed(item.tmdbVoteCount >= 10_000 ? 0 : 1)}k votes`
-    : `${item.tmdbVoteCount} vote${item.tmdbVoteCount === 1 ? "" : "s"}`;
+  return count >= 1_000 ? `${compactCount(count)} votes` : `${count} vote${count === 1 ? "" : "s"}`;
 }

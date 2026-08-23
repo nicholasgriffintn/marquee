@@ -3,16 +3,17 @@ import { useEffect, useState } from "react";
 import type { MediaTitle, Provider } from "../../domain/catalog";
 import type { UsherQuestion } from "../../domain/usher";
 import { requestJson } from "../../lib/api";
-import { artwork, artworkSrcSet } from "../../lib/media";
-import { ArtPlaceholder } from "../ArtPlaceholder";
+import { TitleArt } from "../TitleArt";
 import { ProviderBadge } from "../ui";
 
 const SEEN_GRID = 18;
 
+const NO_PROVIDERS: Provider[] = [];
+
 export function UsherAnswer({
   question,
   isSaving,
-  providers = [],
+  providers = NO_PROVIDERS,
   onSubmit,
 }: {
   question: UsherQuestion;
@@ -156,7 +157,7 @@ function PeopleAnswer({
 
   useEffect(() => {
     if (term.length < 2) {
-      return;
+      return undefined;
     }
 
     const controller = new AbortController();
@@ -324,17 +325,7 @@ function TitleAnswer({
                 )
               }
             >
-              {item.posterUrl ? (
-                <img
-                  src={artwork(item.posterUrl, 160) ?? item.posterUrl}
-                  srcSet={artworkSrcSet(item.posterUrl, 160)}
-                  alt=""
-                  loading="lazy"
-                  decoding="async"
-                />
-              ) : (
-                <ArtPlaceholder seed={item.id} label={item.title} />
-              )}
+              <TitleArt url={item.posterUrl} seed={item.id} label={item.title} width={160} />
               <small>{item.title}</small>
             </button>
           );

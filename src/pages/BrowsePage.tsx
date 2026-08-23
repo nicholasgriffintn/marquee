@@ -1,7 +1,8 @@
 import { useSearchParams } from "react-router-dom";
 
-import { TitleCard } from "../components/catalog";
 import { ErrorBoundary } from "../components/ErrorBoundary";
+import { PageTitle } from "../components/PageTitle";
+import { TitleCard } from "../components/TitleCard";
 import { ProviderBadge } from "../components/ui";
 import type { MediaTitle, Provider } from "../domain/catalog";
 import { useBrowse, useGenres, useKeywords } from "../hooks/useBrowse";
@@ -102,12 +103,9 @@ export function BrowsePage({
 
   return (
     <section className="page-section">
-      <div className="page-title-row">
-        <div>
-          <h1>{preset.title}</h1>
-        </div>
+      <PageTitle heading={preset.title}>
         <p>{preset.description}</p>
-      </div>
+      </PageTitle>
 
       <div className="browse-filters">
         <label className="browse-search">

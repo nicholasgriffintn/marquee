@@ -1,14 +1,7 @@
 import type { ScreeningPrecision } from "../../../src/domain/cinema.ts";
+import { upstreamError } from "../upstream.ts";
 
-export class CinemaSourceError extends Error {
-  constructor(
-    message: string,
-    readonly status = 502,
-  ) {
-    super(message);
-    this.name = "CinemaSourceError";
-  }
-}
+export const CinemaSourceError = upstreamError("CinemaSourceError");
 
 export type SourceCinema = {
   siteId: string;

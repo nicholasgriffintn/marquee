@@ -8,7 +8,7 @@ import { logError } from "../lib/logging.ts";
 import { isKnownTitle, validProviderIds } from "../lib/validation.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
 import { pinShelf, readPinnedShelves, unpinShelf } from "../repositories/shelves.ts";
-import { getPersonalRails } from "../services/ai-rails.ts";
+import { getAiRails } from "../services/ai-rails.ts";
 import { readDigest } from "../services/digest.ts";
 import { getTitleInsight } from "../services/title-insight.ts";
 import type { Bindings } from "../types.ts";
@@ -109,7 +109,7 @@ curatorRoutes.get("/rails", async (context) => {
   try {
     context.header("cache-control", "no-store");
 
-    const { sections, isFresh } = await getPersonalRails(context.env, user.id);
+    const { sections, isFresh } = await getAiRails(context.env, user.id);
 
     if (isFresh) {
       recordEvent(context.env, {

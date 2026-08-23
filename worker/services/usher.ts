@@ -12,6 +12,7 @@ import {
 } from "../../src/domain/usher.ts";
 import { logError } from "../lib/logging.ts";
 import { isKnownTitle, validProviderIds } from "../lib/validation.ts";
+import { stringList } from "../lib/values.ts";
 import { readGenres } from "../repositories/catalog-search.ts";
 import {
   readAnswers,
@@ -61,7 +62,7 @@ function awayPhrase(days: number) {
   return `Not seen you in ${Math.round(days / 7)} weeks.`;
 }
 
-function days(count: number) {
+function daysFromNow(count: number) {
   return new Date(Date.now() + count * 86_400_000).toISOString();
 }
 
@@ -551,7 +552,7 @@ export async function dismissMoment(
 
   if (scope === "kind") {
     await writeUsherRecord(env.DB, viewerId, {
-      muted: { ...record.muted, [kind]: days(30) },
+      muted: { ...record.muted, [kind]: daysFromNow(30) },
       ignored: 0,
     });
 
@@ -562,7 +563,7 @@ export async function dismissMoment(
 
   await writeUsherRecord(env.DB, viewerId, {
     ignored: ignored >= IGNORE_LIMIT ? 0 : ignored,
-    snoozedUntil: ignored >= IGNORE_LIMIT ? days(QUIET_DAYS) : record.snoozedUntil,
+    snoozedUntil: ignored >= IGNORE_LIMIT ? daysFromNow(QUIET_DAYS) : record.snoozedUntil,
     lastPromptedAt: new Date().toISOString(),
   });
 }
@@ -591,12 +592,6 @@ const NO_PREFERENCES: ViewerPreferences = {
   novelty: "",
 };
 
-function stringList(value: unknown, limit: number) {
-  return Array.isArray(value)
-    ? value.filter((item): item is string => typeof item === "string").slice(0, limit)
-    : [];
-}
-
 export async function readViewerPreferences(
   db: D1Database,
   viewerId: string,
@@ -615,11 +610,11 @@ export async function readViewerPreferences(
 
     return {
       providerIds: validProviderIds(answers.get("providers")),
-      genres: stringList(answers.get("genres"), 8),
+      genres: stringList(answers.get("genres"), { limit: 8 }),
       frequency: single("frequency"),
-      motivation: stringList(answers.get("motivation"), 4),
-      actors: stringList(answers.get("actors"), MAX_PEOPLE),
-      directors: stringList(answers.get("directors"), MAX_PEOPLE),
+      motivation: stringList(answers.get("motivation"), { limit: 4 }),
+      actors: stringList(answers.get("actors"), { limit: MAX_PEOPLE }),
+      directors: stringList(answers.get("directors"), { limit: MAX_PEOPLE }),
       runtime: single("runtime"),
       subtitles: single("subtitles"),
       novelty: single("novelty"),

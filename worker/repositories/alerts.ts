@@ -1,4 +1,5 @@
 import { logError } from "../lib/logging.ts";
+import { clamp } from "../lib/numbers.ts";
 import type { AlertKind } from "../services/alerts/types.ts";
 
 export type AlertRecord = {
@@ -219,7 +220,7 @@ export async function recentAlerts(db: D1Database, viewerId: string, limit = 40)
           ORDER BY sent_at DESC
           LIMIT ?2`,
       )
-      .bind(viewerId, Math.max(1, Math.min(100, limit)))
+      .bind(viewerId, clamp(limit, 1, 100))
       .all<SentAlert>();
 
     return rows.results;

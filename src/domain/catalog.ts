@@ -1,4 +1,5 @@
 import type { ProviderCategory, ProviderIntegration, ProviderStatus } from "./providers";
+import { slugify } from "./slug";
 
 export type MediaType = "movie" | "tv";
 
@@ -142,14 +143,8 @@ export type CuratorCandidate = Pick<
   | "overview"
 >;
 
-export function titleSlug(title: string) {
-  return (
-    title
-      .toLowerCase()
-      .replaceAll(/[^a-z0-9]+/gu, "-")
-      .replaceAll(/^-|-$/gu, "")
-      .slice(0, 60) || "title"
-  );
+function titleSlug(title: string) {
+  return slugify(title) || "title";
 }
 
 export function titlePath(item: Pick<MediaTitle, "mediaType" | "tmdbId" | "title">) {

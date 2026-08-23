@@ -1,52 +1,34 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 
 import { jsonRequest, requestJson } from "../lib/api";
 import type { User } from "../types";
+import { useResource } from "./useResource";
 
 type SessionResponse = { user: User | null };
 
 export function useSession() {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(authCallbackError);
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    async function loadSession() {
-      try {
-        const session = await requestJson<SessionResponse>("/api/auth/session", {
-          signal: controller.signal,
-        });
-
-        setUser(session.user);
-      } catch (caught) {
-        if (!(caught instanceof DOMException && caught.name === "AbortError")) {
-          setError("Could not check your sign-in status. Try again in a moment.");
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setIsLoading(false);
-        }
-      }
-    }
-
-    void loadSession();
-
-    return () => controller.abort();
-  }, []);
+  const [signedOut, setSignedOut] = useState(false);
+  const [issue, setIssue] = useState(authCallbackError);
+  const { data, error, isLoading } = useResource<SessionResponse>("/api/auth/session", {
+    errorMessage: "Could not check your sign-in status. Try again in a moment.",
+  });
 
   const logout = useCallback(async () => {
     try {
       await requestJson("/api/auth/logout", jsonRequest("POST"));
-      setUser(null);
-      setError("");
+      setSignedOut(true);
+      setIssue("");
     } catch {
-      setError("Could not sign you out. Try again.");
+      setIssue("Could not sign you out. Try again.");
     }
   }, []);
 
-  return { error, isLoading, logout, user };
+  return {
+    error: issue || error,
+    isLoading,
+    logout,
+    user: signedOut ? null : (data?.user ?? null),
+  };
 }
 
 const AUTH_ERRORS: Record<string, string> = {

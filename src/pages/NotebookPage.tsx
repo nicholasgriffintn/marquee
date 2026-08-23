@@ -15,7 +15,7 @@ import { TasteMap } from "../components/notebook/TasteMap";
 import { UsherMark } from "../components/usher/UsherMark";
 import type { Provider, ProvidersResponse } from "../domain/catalog";
 import type { Belief, Guest } from "../domain/notebook";
-import { jsonRequest, requestJson } from "../lib/api";
+import { isAbortError, jsonRequest, requestJson } from "../lib/api";
 
 type NotebookResponse = { beliefs: Belief[] };
 
@@ -53,7 +53,7 @@ export function NotebookPage({
 
   useEffect(() => {
     if (!isSignedIn) {
-      return;
+      return undefined;
     }
 
     const controller = new AbortController();
@@ -67,7 +67,7 @@ export function NotebookPage({
         setBeliefs(response.beliefs);
         setError("");
       } catch (caught) {
-        if (caught instanceof DOMException && caught.name === "AbortError") {
+        if (isAbortError(caught)) {
           return;
         }
 

@@ -1,7 +1,7 @@
 import { SHOWING_HORIZON_DAYS } from "../../src/domain/cinema.ts";
 import { geocodeChain, matchVenue } from "../clients/cinema/geocoder.ts";
 import { cinemaSource, CINEMA_SOURCES } from "../clients/cinema/index.ts";
-import { logError } from "../lib/logging.ts";
+import { logError, logEvent } from "../lib/logging.ts";
 import {
   cinemaKey,
   locateCinema,
@@ -80,9 +80,7 @@ async function locateCinemas(env: Bindings, sourceId: string, chain: string) {
     located += 1;
   }
 
-  console.log(
-    JSON.stringify({ event: "cinemas_located", source: sourceId, located, of: pending.length }),
-  );
+  logEvent("cinemas_located", { source: sourceId, located, of: pending.length });
 
   return located;
 }
@@ -141,14 +139,11 @@ export async function matchFilms(env: Bindings, sourceId: string) {
   }
 
   if (pending.length > 0) {
-    console.log(
-      JSON.stringify({
-        event: "cinema_films_matched",
-        source: sourceId,
-        matched,
-        of: pending.length,
-      }),
-    );
+    logEvent("cinema_films_matched", {
+      source: sourceId,
+      matched,
+      of: pending.length,
+    });
   }
 
   return matched;

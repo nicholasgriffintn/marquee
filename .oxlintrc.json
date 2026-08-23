@@ -17,14 +17,12 @@
       "linkComponents": [
         {
           "name": "Link",
-          "attribute": "",
           "linkAttribute": ["href", "to"]
         }
       ]
     },
     "jsx-a11y": {
       "components": {
-        "Link": "a",
         "Button": "button",
         "IconButton": "button"
       },

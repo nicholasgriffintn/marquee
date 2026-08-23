@@ -48,7 +48,7 @@ export function AlertSettings({ isSignedIn }: { isSignedIn: boolean }) {
 
   useEffect(() => {
     if (!isSignedIn) {
-      return;
+      return undefined;
     }
 
     const controller = new AbortController();

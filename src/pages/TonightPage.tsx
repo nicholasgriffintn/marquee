@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 
-import { ArtPlaceholder } from "../components/ArtPlaceholder";
-import { ContentRail } from "../components/catalog";
+import { ContentRail } from "../components/ContentRail";
 import { ErrorBoundary } from "../components/ErrorBoundary";
+import { TitleArt } from "../components/TitleArt";
 import { ArrowIcon, ProviderBadge } from "../components/ui";
 import { UsherBanner } from "../components/usher/UsherBanner";
 import { UsherCard } from "../components/usher/UsherCard";
@@ -16,14 +16,15 @@ import type { TonightOrder, UsherMoment } from "../domain/usher";
 import type { CuratorState } from "../hooks/useCurator";
 import type { ScheduledEpisode } from "../hooks/useTonight";
 import type { UsherOrderState, UsherPickState } from "../hooks/useUsher";
-import { artwork, artworkSrcSet, heroTitleClass, mediaMeta, scoreLabel } from "../lib/media";
+import { parseDate } from "../lib/dates";
+import { heroTitleClass, mediaMeta, scoreLabel } from "../lib/media";
 
 const IDLE_NUDGE_MS = 40_000;
 
 function formatAirTime(value: string) {
-  const airsAt = new Date(value);
+  const airsAt = parseDate(value);
 
-  if (Number.isNaN(airsAt.getTime())) {
+  if (!airsAt) {
     return "";
   }
 
@@ -127,7 +128,7 @@ export function TonightPage({
 
   useEffect(() => {
     if (isUsherMode) {
-      return;
+      return undefined;
     }
 
     const timer = window.setTimeout(() => setIsIdle(true), IDLE_NUDGE_MS);
@@ -161,91 +162,80 @@ export function TonightPage({
               onSkip={onUsherSkip}
               onDismiss={() => onUsherDismiss("all")}
             />
+          ) : order.isOpen ? (
+            <UsherOrder
+              state={order}
+              guests={guests}
+              onSubmit={onOrder}
+              onOpen={onOpen}
+              onAnother={onOrderAnother}
+              onEdit={onOrderEdit}
+              onClose={onClearCurator}
+            />
+          ) : isUsherMode ? (
+            <UsherHero
+              curator={curator}
+              error={curatorError}
+              isAsking={isAsking}
+              isPinned={isPinned}
+              pick={pick}
+              aside={aside}
+              onAsk={(prompt, isRefinement) => void onAsk(prompt, isRefinement)}
+              onClear={onClearCurator}
+              onOpen={onOpen}
+              onPin={onPin}
+              onReject={onRejectPick}
+            />
           ) : (
-            <>
-              {order.isOpen ? (
-                <UsherOrder
-                  state={order}
-                  guests={guests}
-                  onSubmit={onOrder}
-                  onOpen={onOpen}
-                  onAnother={onOrderAnother}
-                  onEdit={onOrderEdit}
-                  onClose={onClearCurator}
-                />
-              ) : isUsherMode ? (
-                <UsherHero
-                  curator={curator}
-                  error={curatorError}
-                  isAsking={isAsking}
-                  isPinned={isPinned}
-                  pick={pick}
-                  aside={aside}
-                  onAsk={onAsk}
-                  onClear={onClearCurator}
-                  onOpen={onOpen}
-                  onPin={onPin}
-                  onReject={onRejectPick}
-                />
-              ) : (
-                <section
-                  className={`hero-section${featured?.backdropUrl ? "" : " hero-empty"}${
-                    featured ? "" : " hero-loading"
-                  }`}
-                >
-                  {featured && (
-                    <div className="hero-art" aria-hidden="true">
-                      {featured.backdropUrl ? (
-                        <img
-                          src={
-                            artwork(featured.backdropUrl, 1280, "backdrop") ?? featured.backdropUrl
-                          }
-                          srcSet={artworkSrcSet(featured.backdropUrl, 1280, "backdrop")}
-                          alt=""
-                          decoding="async"
-                        />
-                      ) : (
-                        <ArtPlaceholder seed={featured.id} label={featured.title} wide />
-                      )}
-                    </div>
-                  )}
-                  <div className="hero-gradient" />
-                  <div className="hero-copy">
-                    {featured ? (
-                      <>
-                        <h1 className={heroTitleClass(featured.title)}>{featured.title}</h1>
-                        <p className="hero-meta">
-                          {mediaMeta(featured)} · {scoreLabel(featured)}
-                        </p>
-                        <p className="hero-lede">{featured.overview || "No synopsis available."}</p>
-                        <div className="hero-actions">
-                          <button
-                            type="button"
-                            className="hero-play"
-                            onClick={() => onOpen(featured)}
-                          >
-                            <span className="play-icon">↗</span> See where to watch
-                          </button>
-                        </div>
-                      </>
-                    ) : !isHeroReady ? (
-                      <div className="hero-skeleton" aria-hidden="true">
-                        <span className="skeleton skeleton-title" />
-                        <span className="skeleton skeleton-meta" />
-                        <span className="skeleton skeleton-line" />
-                        <span className="skeleton skeleton-line short" />
-                        <span className="skeleton skeleton-button" />
-                      </div>
-                    ) : (
-                      <div className="honest-empty" aria-live="polite">
-                        <h1>Nothing matched.</h1>
-                        <p>{error || "Try another search or change your services."}</p>
-                      </div>
-                    )}
-                  </div>
-                </section>
+            <section
+              className={`hero-section${featured?.backdropUrl ? "" : " hero-empty"}${
+                featured ? "" : " hero-loading"
+              }`}
+            >
+              {featured && (
+                <div className="hero-art" aria-hidden="true">
+                  <TitleArt
+                    url={featured.backdropUrl}
+                    seed={featured.id}
+                    label={featured.title}
+                    width={1280}
+                    kind="backdrop"
+                    wide
+                    eager
+                  />
+                </div>
               )}
-            </>
+              <div className="hero-gradient" />
+              <div className="hero-copy">
+                {featured ? (
+                  <>
+                    <h1 className={heroTitleClass(featured.title)}>{featured.title}</h1>
+                    <p className="hero-meta">
+                      {mediaMeta(featured)} · {scoreLabel(featured)}
+                    </p>
+                    <p className="hero-lede">{featured.overview || "No synopsis available."}</p>
+                    <div className="hero-actions">
+                      <button type="button" className="hero-play" onClick={() => onOpen(featured)}>
+                        <span className="play-icon">↗</span> See where to watch
+                      </button>
+                    </div>
+                  </>
+                ) : !isHeroReady ? (
+                  <div className="hero-skeleton" aria-hidden="true">
+                    <span className="skeleton skeleton-title" />
+                    <span className="skeleton skeleton-meta" />
+                    <span className="skeleton skeleton-line" />
+                    <span className="skeleton skeleton-line short" />
+                    <span className="skeleton skeleton-button" />
+                  </div>
+                ) : (
+                  <div className="honest-empty" aria-live="polite">
+                    <h1>Nothing matched.</h1>
+                    <p>{error || "Try another search or change your services."}</p>
+                  </div>
+                )}
+              </div>
+            </section>
           )}
           {!onboardingMoment && !isUsherMode && (
             <UsherConsole

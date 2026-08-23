@@ -1,21 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  Link,
-  Navigate,
-  Route,
-  Routes,
-  useLocation,
-  useMatch,
-  useNavigate,
-} from "react-router-dom";
+import { Navigate, Route, Routes, useLocation, useMatch, useNavigate } from "react-router-dom";
 
-import { DetailPanel } from "./components/catalog";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { SearchBox } from "./components/SearchBox";
-import { MarqueeLogo, TicketIcon } from "./components/ui";
+import { SiteFooter } from "./components/SiteFooter";
+import { SiteHeader } from "./components/SiteHeader";
+import { TitleOverlay } from "./components/TitleOverlay";
 import { ManagersDoor } from "./components/usher/ManagersDoor";
-import { UsherCard } from "./components/usher/UsherCard";
-import { UsherMark } from "./components/usher/UsherMark";
 import { titlePath, weaveSections, type CatalogSection, type MediaTitle } from "./domain/catalog";
 import { asideFor, type UsherMoment } from "./domain/usher";
 import { useAiRails } from "./hooks/useAiRails";
@@ -37,28 +28,25 @@ import { BrowsePage, type BrowsePreset } from "./pages/BrowsePage";
 import { DigestPage } from "./pages/DigestPage";
 import { LibraryPage } from "./pages/LibraryPage";
 import { NotebookPage } from "./pages/NotebookPage";
+import { NotFoundPage } from "./pages/NotFoundPage";
 import { PersonPage } from "./pages/PersonPage";
 import { RevivalPage } from "./pages/RevivalPage";
 import { RevivalScreenPage } from "./pages/RevivalScreenPage";
 import { SearchPage } from "./pages/SearchPage";
+import { SignedOutShelf } from "./pages/SignedOutShelf";
 import { SignInPage } from "./pages/SignInPage";
 import { SourcesPage } from "./pages/SourcesPage";
 import { TonightPage } from "./pages/TonightPage";
 import { UsherPage } from "./pages/UsherPage";
-import type { EntryStatus, ViewingEntry } from "./types";
 
 const TONIGHT_EPISODES = 16;
 const HOME_DRIP_DELAY_MS = 45_000;
 
-const NAV: { to: string; label: string; private: boolean; admin?: boolean }[] = [
-  { to: "/", label: "Tonight", private: false },
-  { to: "/listings", label: "Listings", private: false },
-  { to: "/revival", label: "Revival house", private: false },
-  { to: "/shelf", label: "My shelf", private: true },
-  { to: "/this-week", label: "This week", private: true },
-  { to: "/notebook", label: "Notebook", private: true },
-  { to: "/admin", label: "Admin", private: true, admin: true },
-];
+function isTitlePath(pathname: string) {
+  return (
+    pathname.startsWith("/title/") || pathname.startsWith("/movie/") || pathname.startsWith("/tv/")
+  );
+}
 
 const LEGACY_BROWSE: Record<string, string> = {
   "/films": "type=movie",
@@ -113,8 +101,6 @@ export function App() {
   const routedTitleId = openMediaType && openTmdbId ? `${openMediaType}:${openTmdbId}` : "";
   const titleMatch = Boolean(routedTitleId || legacyMatch);
   const storedBackground = (location.state as { background?: typeof location } | null)?.background;
-  const isTitlePath = (pathname: string) =>
-    pathname.startsWith("/title/") || pathname.startsWith("/movie/") || pathname.startsWith("/tv/");
   const background =
     storedBackground && isTitlePath(storedBackground.pathname) ? undefined : storedBackground;
   const pageLocation =
@@ -164,7 +150,7 @@ export function App() {
 
   useEffect(() => {
     if (!wantsDrip) {
-      return;
+      return undefined;
     }
 
     const timer = window.setTimeout(() => void requestMoment("home"), HOME_DRIP_DELAY_MS);
@@ -337,28 +323,14 @@ export function App() {
 
   return (
     <main className="site-shell">
-      <header className="site-header">
-        <Link to="/" className="brand">
-          <MarqueeLogo />
-          <span>Marquee</span>
-        </Link>
-        <nav aria-label="Primary navigation">
-          {NAV.filter(
-            (item) =>
-              (!item.private || isSignedIn) && (!item.admin || session.user?.role === "admin"),
-          ).map((item) => (
-            <Link
-              key={item.to}
-              to={item.to}
-              className={location.pathname === item.to ? "active" : ""}
-              aria-current={location.pathname === item.to ? "page" : undefined}
-            >
-              {item.label}
-              {item.to === "/shelf" && <sup>{profile.shelved}</sup>}
-            </Link>
-          ))}
-        </nav>
-        <div className="header-tools">
+      <SiteHeader
+        user={session.user}
+        isSessionLoading={session.isLoading}
+        currentPath={location.pathname}
+        returnTo={`${pagePath}${location.search}`}
+        shelvedCount={profile.shelved}
+        onSignOut={() => void session.logout()}
+        searchSlot={
           <ErrorBoundary label="The search box" resetKey={pagePath}>
             <SearchBox
               query={query}
@@ -374,42 +346,8 @@ export function App() {
               }}
             />
           </ErrorBoundary>
-          {session.isLoading ? (
-            <span className="session-loading">Checking session</span>
-          ) : session.user ? (
-            <div className="account-tools">
-              {session.user.avatarUrl ? (
-                <img src={session.user.avatarUrl} alt="" />
-              ) : (
-                <span className="avatar-fallback">{session.user.name.slice(0, 1)}</span>
-              )}
-              <span className="account-name">{session.user.name}</span>
-              <button
-                type="button"
-                onClick={() => {
-                  void session.logout();
-                }}
-              >
-                Sign out
-              </button>
-            </div>
-          ) : (
-            <Link
-              className="sign-in-button"
-              to={`/sign-in?returnTo=${encodeURIComponent(`${pagePath}${location.search}`)}`}
-              aria-label="Sign in"
-            >
-              <span className="sign-in-icon">
-                <TicketIcon />
-              </span>
-              <span className="sign-in-copy">
-                <strong>Sign in</strong>
-                <small>get a ticket</small>
-              </span>
-            </Link>
-          )}
-        </div>
-      </header>
+        }
+      />
 
       {session.error && (
         <p className="auth-message" role="alert">
@@ -592,6 +530,7 @@ export function App() {
             onUsherAction={onUsherAction}
             onUsherDismiss={(scope) => void usher.dismiss(scope)}
             title={openDetails.title}
+            isMissing={openDetails.isMissing}
             canSave={isSignedIn}
             entries={profile.entries}
             selectedProviderIds={selectedProviderIds}
@@ -609,148 +548,7 @@ export function App() {
         </ErrorBoundary>
       )}
 
-      <footer className="site-footer">
-        <div className="brand">
-          <MarqueeLogo />
-          <span>Marquee</span>
-        </div>
-        <p>
-          Data by TMDB · Availability by Watchmode and JustWatch ·{" "}
-          <Link className="footer-link" to="/sources">
-            Services and sources
-          </Link>
-        </p>
-        <Link className="footer-egg" to="/usher">
-          Made for movie night
-        </Link>
-      </footer>
+      <SiteFooter />
     </main>
-  );
-}
-
-function SignedOutShelf() {
-  return (
-    <section className="page-section">
-      <div className="page-title-row">
-        <div>
-          <h1>My shelf</h1>
-        </div>
-        <p>Sign in to keep a shelf of what you have watched.</p>
-      </div>
-      <div className="search-empty">
-        <h2>You are signed out.</h2>
-        <p>Your shelf lives with your account, so sign in to see it.</p>
-        <Link className="button-link" to="/sign-in?returnTo=%2Fshelf">
-          Get a ticket
-        </Link>
-      </div>
-    </section>
-  );
-}
-
-function NotFoundPage() {
-  return (
-    <section className="page-section">
-      <div className="page-title-row">
-        <div>
-          <h1>Not found</h1>
-        </div>
-        <p>That page does not exist.</p>
-      </div>
-      <div className="search-empty lost">
-        <UsherMark face="unimpressed" crop="head" />
-        <h2>Wrong door.</h2>
-        <p>Nothing showing down here. The screens are the other way.</p>
-        <div className="lost-actions">
-          <Link className="button-link" to="/">
-            Back to tonight
-          </Link>
-          <Link className="lost-aside" to="/usher">
-            Who are you, anyway?
-          </Link>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function TitleOverlay({
-  titleId,
-  title,
-  canSave,
-  entries,
-  usherMoment,
-  onUsherRequest,
-  onUsherAction,
-  onUsherDismiss,
-  availabilityEnabled,
-  onClose,
-  onOpen,
-  onSave,
-  onSaveEntry,
-  onRemove,
-  onStatus,
-  onUpdateDraft,
-  onTracked,
-  onLoadEntry,
-  selectedProviderIds,
-}: {
-  titleId: string;
-  title: MediaTitle | null;
-  canSave: boolean;
-  entries: Record<string, ViewingEntry>;
-  usherMoment: UsherMoment | null;
-  onUsherRequest: (titleId: string) => void;
-  onUsherAction: (moment: UsherMoment, actionId: string) => void;
-  onUsherDismiss: (scope: "once" | "kind") => void;
-  availabilityEnabled: boolean;
-  onClose: () => void;
-  onOpen: (item: MediaTitle) => void;
-  onSave: (item: MediaTitle) => void;
-  onSaveEntry: (entry: ViewingEntry) => void;
-  onRemove: (titleId: string) => void;
-  onStatus: (titleId: string, status: EntryStatus) => void;
-  onUpdateDraft: (titleId: string, patch: Partial<ViewingEntry>) => void;
-  onTracked: () => void;
-  onLoadEntry: (titleId: string) => Promise<void>;
-  selectedProviderIds: string[];
-}) {
-  const isSaved = Boolean(entries[titleId]);
-
-  useEffect(() => {
-    void onLoadEntry(titleId);
-  }, [onLoadEntry, titleId]);
-
-  useEffect(() => {
-    if (isSaved) {
-      onUsherRequest(titleId);
-    }
-  }, [isSaved, onUsherRequest, titleId]);
-
-  if (!title) {
-    return null;
-  }
-
-  return (
-    <DetailPanel
-      item={title}
-      canSave={canSave}
-      entry={entries[title.id]}
-      usherSlot={
-        usherMoment ? (
-          <UsherCard moment={usherMoment} onAction={onUsherAction} onDismiss={onUsherDismiss} />
-        ) : undefined
-      }
-      availabilityEnabled={availabilityEnabled}
-      onClose={onClose}
-      onOpen={onOpen}
-      onSave={onSave}
-      onSaveEntry={onSaveEntry}
-      onRemove={onRemove}
-      onStatus={onStatus}
-      onUpdateDraft={onUpdateDraft}
-      onTracked={onTracked}
-      selectedProviderIds={selectedProviderIds}
-    />
   );
 }

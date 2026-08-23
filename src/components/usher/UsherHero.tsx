@@ -5,8 +5,8 @@ import type { MediaTitle } from "../../domain/catalog";
 import type { UsherFace } from "../../domain/usher";
 import type { CuratorState } from "../../hooks/useCurator";
 import type { UsherPickState } from "../../hooks/useUsher";
-import { artwork, artworkSrcSet, heroTitleClass, mediaMeta, scoreLabel } from "../../lib/media";
-import { ArtPlaceholder } from "../ArtPlaceholder";
+import { heroTitleClass, mediaMeta, scoreLabel } from "../../lib/media";
+import { TitleArt } from "../TitleArt";
 import { UsherMark } from "./UsherMark";
 
 const REFINEMENTS = ["Shorter", "Lighter", "Older", "Weirder", "More acclaimed"];
@@ -85,16 +85,15 @@ export function UsherHero({
     >
       {active && (
         <div className="hero-art" aria-hidden="true">
-          {active.backdropUrl ? (
-            <img
-              src={artwork(active.backdropUrl, 1280, "backdrop") ?? active.backdropUrl}
-              srcSet={artworkSrcSet(active.backdropUrl, 1280, "backdrop")}
-              alt=""
-              decoding="async"
-            />
-          ) : (
-            <ArtPlaceholder seed={active.id} label={active.title} wide />
-          )}
+          <TitleArt
+            url={active.backdropUrl}
+            seed={active.id}
+            label={active.title}
+            width={1280}
+            kind="backdrop"
+            wide
+            eager
+          />
         </div>
       )}
       <div className="hero-gradient" />
@@ -186,17 +185,13 @@ export function UsherHero({
                 aria-current={item.id === active?.id}
                 onClick={() => setSelection({ prompt: curator.prompt, id: item.id })}
               >
-                {item.posterUrl ? (
-                  <img
-                    src={artwork(item.posterUrl, 160) ?? item.posterUrl}
-                    srcSet={artworkSrcSet(item.posterUrl, 160)}
-                    alt={item.title}
-                    loading="lazy"
-                    decoding="async"
-                  />
-                ) : (
-                  <ArtPlaceholder seed={item.id} label={item.title} />
-                )}
+                <TitleArt
+                  url={item.posterUrl}
+                  seed={item.id}
+                  label={item.title}
+                  width={160}
+                  alt={item.title}
+                />
               </button>
             ))}
           </div>

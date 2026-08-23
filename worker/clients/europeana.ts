@@ -1,6 +1,10 @@
 import type { RevivalKind, RevivalRightsBasis, RevivalTag } from "../../src/domain/revival.ts";
 import { splitSubjects, tagList } from "../lib/revival-tags.ts";
+import { firstString, stripMarkup, yearFrom } from "../lib/text.ts";
 import { isRecord } from "../lib/values.ts";
+import { upstreamFetch } from "./fetch.ts";
+
+const CACHE_TTL = 3_600;
 
 const SEARCH_ENDPOINT = "https://api.europeana.eu/record/v2/search.json";
 const RECORD_ORIGIN = "https://www.europeana.eu/en/item";
@@ -46,27 +50,6 @@ export type EuropeanaCandidate = {
   rightsUrl: string | null;
   tags: RevivalTag[];
 };
-
-function firstString(value: unknown) {
-  if (typeof value === "string") {
-    return value.trim();
-  }
-
-  return Array.isArray(value) && typeof value[0] === "string" ? value[0].trim() : "";
-}
-
-function stripMarkup(value: string) {
-  return value
-    .replaceAll(/<[^>]*>/gu, " ")
-    .replaceAll(/\s+/gu, " ")
-    .trim();
-}
-
-function yearFrom(value: string) {
-  const match = /(1[6-9]\d{2}|20\d{2})/u.exec(value);
-
-  return match ? Number(match[1]) : null;
-}
 
 function basisFor(rights: string): RevivalRightsBasis | null {
   const value = rights.toLowerCase();
@@ -128,10 +111,10 @@ export async function searchEuropeana(apiKey: string, country: string, page: num
   url.searchParams.append("qf", "MEDIA:true");
   url.searchParams.append("qf", `COUNTRY:"${country}"`);
 
-  const response = await fetch(url, {
-    headers: { accept: "application/json", "x-api-key": apiKey },
-    signal: AbortSignal.timeout(TIMEOUT_MS),
-    cf: { cacheEverything: true, cacheTtl: 3_600 },
+  const response = await upstreamFetch(url, {
+    headers: { "x-api-key": apiKey },
+    timeoutMs: TIMEOUT_MS,
+    cacheTtl: CACHE_TTL,
   });
 
   if (!response.ok) {

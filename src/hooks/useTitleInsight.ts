@@ -1,7 +1,5 @@
-import { useEffect, useState } from "react";
-
 import type { MediaTitle } from "../domain/catalog";
-import { requestJson } from "../lib/api";
+import { useResource } from "./useResource";
 
 export type TitleInsight = {
   hook: string;
@@ -10,51 +8,14 @@ export type TitleInsight = {
 
 export type InsightPair = { item: MediaTitle; reason: string };
 
+type InsightResponse = { insight: TitleInsight | null; pairs: InsightPair[] };
+
+const NO_PAIRS: InsightPair[] = [];
+
 export function useTitleInsight(titleId: string | null) {
-  const [insight, setInsight] = useState<TitleInsight | null>(null);
-  const [pairs, setPairs] = useState<InsightPair[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const { data, isLoading } = useResource<InsightResponse>(
+    titleId ? `/api/curator/insight/${encodeURIComponent(titleId)}` : null,
+  );
 
-  useEffect(() => {
-    if (!titleId) {
-      return;
-    }
-
-    const controller = new AbortController();
-    let active = true;
-
-    async function load() {
-      setIsLoading(true);
-
-      try {
-        const response = await requestJson<{ insight: TitleInsight | null; pairs: InsightPair[] }>(
-          `/api/curator/insight/${encodeURIComponent(titleId as string)}`,
-          { signal: controller.signal },
-        );
-
-        if (active) {
-          setInsight(response.insight);
-          setPairs(response.pairs ?? []);
-        }
-      } catch {
-        if (active) {
-          setInsight(null);
-          setPairs([]);
-        }
-      } finally {
-        if (active) {
-          setIsLoading(false);
-        }
-      }
-    }
-
-    void load();
-
-    return () => {
-      active = false;
-      controller.abort();
-    };
-  }, [titleId]);
-
-  return { insight, pairs, isLoading };
+  return { insight: data?.insight ?? null, pairs: data?.pairs ?? NO_PAIRS, isLoading };
 }

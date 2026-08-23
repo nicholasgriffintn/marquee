@@ -4,7 +4,7 @@ import { recordEvent } from "../lib/events.ts";
 import {
   buildOneRail,
   dedupeRails,
-  getPersonalRails,
+  getAiRails,
   persistRails,
   prepareRails,
   readRailViewer,
@@ -20,7 +20,7 @@ export class RailsWorkflow extends WorkflowEntrypoint<Bindings, RailsParameters>
   async run(event: Readonly<WorkflowEvent<RailsParameters>>, step: WorkflowStep) {
     const { viewerId } = event.payload;
     const { viewer, preferences } = await readRailViewer(this.env, viewerId);
-    const { signature } = await getPersonalRails(this.env, viewerId);
+    const { signature } = await getAiRails(this.env, viewerId);
     const prepared = await step.do("read taste", { retries: RETRIES }, async () =>
       prepareRails(this.env, viewer, viewerId, preferences),
     );

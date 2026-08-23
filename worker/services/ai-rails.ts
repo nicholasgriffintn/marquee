@@ -2,7 +2,7 @@ import type { CatalogSection, MediaTitle } from "../../src/domain/catalog.ts";
 import { CURATOR_TOOLS, executeCuratorTool } from "../ai/curator-tools.ts";
 import { fastModel, requestAiCompletion } from "../clients/ai-gateway.ts";
 import type { ChatMessage } from "../lib/curator-payload.ts";
-import { logError } from "../lib/logging.ts";
+import { logError, logEvent } from "../lib/logging.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { isRecord, parseJson } from "../lib/values.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
@@ -261,14 +261,11 @@ async function seedCandidates(
     claimed.add(title.id);
   }
 
-  console.log(
-    JSON.stringify({
-      event: "rail_seeds",
-      angle: angle.id,
-      seeds: seeds.length,
-      claimed: claimed.size,
-    }),
-  );
+  logEvent("rail_seeds", {
+    angle: angle.id,
+    seeds: seeds.length,
+    claimed: claimed.size,
+  });
 
   return seeds;
 }
@@ -408,7 +405,7 @@ export async function buildOneRail(
   summary = "",
 ): Promise<StoredRail | null> {
   if (seeds.length < RAIL_MIN) {
-    console.log(JSON.stringify({ event: "rail_skipped", angle: angle.id, seeds: seeds.length }));
+    logEvent("rail_skipped", { angle: angle.id, seeds: seeds.length });
 
     return null;
   }
@@ -478,15 +475,12 @@ export async function buildOneRail(
       return { ...rail, angle: angle.id };
     }
 
-    console.log(
-      JSON.stringify({
-        event: "rail_retry",
-        angle: angle.id,
-        round,
-        available: availableIds.size,
-        raw: response.content?.slice(0, 160),
-      }),
-    );
+    logEvent("rail_retry", {
+      angle: angle.id,
+      round,
+      available: availableIds.size,
+      raw: response.content?.slice(0, 160),
+    });
     messages.push(response, { role: "user", content: nudge() });
   }
 
@@ -499,15 +493,12 @@ export async function buildOneRail(
   });
   const rail = parseRail(response.content, availableIds);
 
-  console.log(
-    JSON.stringify({
-      event: "rail_final",
-      angle: angle.id,
-      ok: Boolean(rail),
-      available: availableIds.size,
-      raw: rail ? undefined : response.content?.slice(0, 200),
-    }),
-  );
+  logEvent("rail_final", {
+    angle: angle.id,
+    ok: Boolean(rail),
+    available: availableIds.size,
+    raw: rail ? undefined : response.content?.slice(0, 200),
+  });
 
   return rail ? { ...rail, angle: angle.id } : null;
 }
@@ -530,7 +521,7 @@ async function readStoredRails(env: Bindings, viewerId: string): Promise<StoredR
   return Array.isArray(parsed) ? (parsed as StoredRail[]) : [];
 }
 
-async function rejectedTitleIds(env: Bindings, viewerId: string) {
+async function titlesInDislikedRails(env: Bindings, viewerId: string) {
   try {
     const [rails, feedback] = await Promise.all([
       readStoredRails(env, viewerId),
@@ -616,10 +607,10 @@ export async function persistRails(
     .bind(viewerId, signature, JSON.stringify(rails))
     .run();
 
-  console.log(JSON.stringify({ event: "ai_rails_generated", rails: rails.length }));
+  logEvent("ai_rails_generated", { rails: rails.length });
 }
 
-export async function getPersonalRails(env: Bindings, viewerId: string) {
+export async function getAiRails(env: Bindings, viewerId: string) {
   const { viewer, preferences } = await readRailViewer(env, viewerId);
   const signature = viewerSignature(viewer, preferences);
   const cached = await env.DB.prepare(
@@ -660,7 +651,7 @@ export async function prepareRails(
     readViewerAffinity(env.DB, viewerId),
     readShelfDetail(env.DB, viewerId),
     readGenres(env.DB).catch((): string[] => []),
-    rejectedTitleIds(env, viewerId),
+    titlesInDislikedRails(env, viewerId),
   ]);
   const affinity: ViewerAffinity = {
     ...behaviour,

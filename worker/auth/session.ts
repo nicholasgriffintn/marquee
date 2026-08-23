@@ -95,40 +95,28 @@ export const attachViewer: MiddlewareHandler<{
   return context.res;
 };
 
-export const requireAdmin: MiddlewareHandler<{
-  Bindings: Bindings;
-  Variables: AuthVariables;
-}> = async (context, next) => {
-  const principal = await sessionPrincipal(context.env, context.req.raw);
+function requirePrincipal(
+  check?: (user: MarqueeUser) => boolean,
+): MiddlewareHandler<{ Bindings: Bindings; Variables: AuthVariables }> {
+  return async (context, next) => {
+    const principal = await sessionPrincipal(context.env, context.req.raw);
 
-  if (!principal) {
-    return jsonResponse({ error: "Sign in required" }, 401);
-  }
+    if (!principal) {
+      return jsonResponse({ error: "Sign in required" }, 401);
+    }
 
-  if (principal.user.role !== "admin") {
-    return jsonResponse({ error: "The manager is not in. He is never in." }, 403);
-  }
+    if (check && !check(principal.user)) {
+      return jsonResponse({ error: "The manager is not in. He is never in." }, 403);
+    }
 
-  context.set("authenticatedUser", principal.user);
-  context.set("sessionToken", principal.token);
-  await next();
+    context.set("authenticatedUser", principal.user);
+    context.set("sessionToken", principal.token);
+    await next();
 
-  return context.res;
-};
+    return context.res;
+  };
+}
 
-export const requireAuthentication: MiddlewareHandler<{
-  Bindings: Bindings;
-  Variables: AuthVariables;
-}> = async (context, next) => {
-  const principal = await sessionPrincipal(context.env, context.req.raw);
+export const requireAuthentication = requirePrincipal();
 
-  if (!principal) {
-    return jsonResponse({ error: "Sign in required" }, 401);
-  }
-
-  context.set("authenticatedUser", principal.user);
-  context.set("sessionToken", principal.token);
-  await next();
-
-  return context.res;
-};
+export const requireAdmin = requirePrincipal((user) => user.role === "admin");

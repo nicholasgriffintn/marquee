@@ -20,7 +20,7 @@ export function useAiRails(isSignedIn: boolean, savedKey: string) {
 
   useEffect(() => {
     if (!isSignedIn) {
-      return;
+      return undefined;
     }
 
     const controller = new AbortController();

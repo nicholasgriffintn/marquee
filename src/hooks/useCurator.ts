@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 
 import type { MediaTitle } from "../domain/catalog";
+import { isAbortError } from "../lib/api";
 
 type CuratorEvent =
   | { type: "status"; label: string }
@@ -115,7 +116,7 @@ export function useCurator() {
           }
         }
       } catch (caught) {
-        if (!(caught instanceof DOMException && caught.name === "AbortError")) {
+        if (!isAbortError(caught)) {
           setError(caught instanceof Error ? caught.message : "The AI curator is unavailable");
           setState((current) => ({ ...current, isStreaming: false, status: "" }));
         }

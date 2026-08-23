@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
 
-import { TitleCard } from "../components/catalog";
 import { ErrorBoundary } from "../components/ErrorBoundary";
+import { PageTitle } from "../components/PageTitle";
+import { TitleCard } from "../components/TitleCard";
 import { UsherCard } from "../components/usher/UsherCard";
 import { UsherMark } from "../components/usher/UsherMark";
 import type { MediaTitle } from "../domain/catalog";
@@ -35,10 +36,7 @@ export function SearchPage({
 
   return (
     <section className="page-section">
-      <div className="page-title-row">
-        <div>
-          <h1>{trimmed ? `“${trimmed}”` : "Search"}</h1>
-        </div>
+      <PageTitle heading={trimmed ? `“${trimmed}”` : "Search"}>
         <p>
           {error
             ? error
@@ -50,7 +48,7 @@ export function SearchPage({
                   }`
                 : "Type a film or show name to search."}
         </p>
-      </div>
+      </PageTitle>
 
       {isLookingForHim && (
         <Link className="search-usher" to="/usher">

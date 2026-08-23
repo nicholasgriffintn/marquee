@@ -1,5 +1,6 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
-import { logError } from "../lib/logging.ts";
+import { logError, logEvent } from "../lib/logging.ts";
+import { clamp } from "../lib/numbers.ts";
 import { isRecord, vectorValues } from "../lib/values.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
 import type { Bindings } from "../types.ts";
@@ -150,9 +151,7 @@ export async function embedTitles(
     );
   }
 
-  console.log(
-    JSON.stringify({ event: "titles_embedded", count: stored, skipped: unchanged.length }),
-  );
+  logEvent("titles_embedded", { count: stored, skipped: unchanged.length });
 
   return stored;
 }
@@ -191,7 +190,7 @@ export async function selectUnembedded(env: Bindings, limit: number) {
      ORDER BY t.popularity DESC
      LIMIT ?`,
   )
-    .bind(EMBEDDING_MODEL, Math.max(1, Math.min(5_000, limit)))
+    .bind(EMBEDDING_MODEL, clamp(limit, 1, 5_000))
     .all<{ titleId: string }>();
 
   return rows.results.map((row) => row.titleId);

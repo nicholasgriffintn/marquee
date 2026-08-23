@@ -1,3 +1,4 @@
+import { clamp } from "../lib/numbers.ts";
 import type { UnmatchedFilm } from "../repositories/cinemas.ts";
 
 const MAX_TOKENS = 8;
@@ -106,7 +107,7 @@ export function scoreCandidate(film: UnmatchedFilm, candidate: CandidateRow) {
     score += 0.05;
   }
 
-  return Math.max(0, Math.min(1, score));
+  return clamp(score, 0, 1);
 }
 
 export const MATCH_THRESHOLD = 0.62;

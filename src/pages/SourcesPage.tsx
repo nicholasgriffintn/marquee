@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 
+import { PageTitle } from "../components/PageTitle";
 import type { ProvidersResponse } from "../domain/catalog";
 
 const TMDB_LOGO =
@@ -8,19 +9,19 @@ const TMDB_LOGO =
 export function SourcesPage({ stats }: { stats: ProvidersResponse["stats"] }) {
   return (
     <section className="page-section sources-page">
-      <div className="page-title-row">
-        <div>
-          <h1>
+      <PageTitle
+        heading={
+          <>
             Where all this <em>actually comes from.</em>
-          </h1>
-        </div>
-
+          </>
+        }
+      >
         <p>
           None of it is mine. JustWatch provides availability and deep links, with TMDB covering the
           service directory and Watchmode filling the gaps on saved titles. Services without a feed
           still link out, so you can see what is missing rather than wonder.
         </p>
-      </div>
+      </PageTitle>
 
       <div className="source-summary">
         <div>

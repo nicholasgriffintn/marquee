@@ -1,6 +1,7 @@
 import { Link, useParams } from "react-router-dom";
 
 import { ErrorBoundary } from "../components/ErrorBoundary";
+import { PageTitle } from "../components/PageTitle";
 import { ReelCard } from "../components/revival/ReelCard";
 import { ReelPlayer } from "../components/revival/ReelPlayer";
 import { UsherMark } from "../components/usher/UsherMark";
@@ -45,12 +46,9 @@ export function RevivalScreenPage({ isSignedIn }: { isSignedIn: boolean }) {
 
   return (
     <section className="page-section revival-screen revival-shelves">
-      <div className="page-title-row">
-        <div>
-          <h1>{work.title}</h1>
-        </div>
+      <PageTitle heading={work.title}>
         <p>{workMeta(work) || "Public domain in the UK"}</p>
-      </div>
+      </PageTitle>
 
       <ErrorBoundary label="The projector" resetKey={work.id}>
         <ReelPlayer

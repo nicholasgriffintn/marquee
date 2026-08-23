@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { useFeeds } from "../../hooks/useFeeds";
+import { formatDate } from "../../lib/dates";
 
 function webcal(url: string) {
   return url.replace(/^https?:/u, "webcal:");
@@ -31,9 +32,9 @@ export function FeedPanel({ isSignedIn }: { isSignedIn: boolean }) {
         <strong>Your own diary</strong>
         <small>
           {feeds.keys.subscribed
-            ? `Key cut ${new Date(feeds.keys.createdAt ?? "").toLocaleDateString()}${
+            ? `Key cut ${formatDate(feeds.keys.createdAt, {})}${
                 feeds.keys.lastUsedAt
-                  ? `, last read ${new Date(feeds.keys.lastUsedAt).toLocaleDateString()}`
+                  ? `, last read ${formatDate(feeds.keys.lastUsedAt, {})}`
                   : ", never read"
               }.`
             : "Episodes and releases from your shelf, in whatever calendar you already keep."}

@@ -1,6 +1,7 @@
 import type { CatalogSection } from "../../src/domain/catalog.ts";
 import type { ViewerOrigin } from "../../src/domain/cinema.ts";
 import { logError } from "../lib/logging.ts";
+import { titleCase } from "../lib/text.ts";
 import { readFollowedPeople } from "../repositories/beliefs.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
 import { readNearbyCinemas, readShowingTitles } from "../repositories/cinemas.ts";
@@ -13,10 +14,6 @@ const PEOPLE_RAILS = 3;
 const CINEMA_RADIUS_KM = 30;
 const CINEMA_HORIZON_DAYS = 7;
 const BROADCAST_HORIZON_DAYS = 7;
-
-function titleCase(value: string) {
-  return value.replaceAll(/\b\w/gu, (character) => character.toUpperCase());
-}
 
 function placeName(origin: ViewerOrigin | null) {
   return origin?.label?.trim() || null;

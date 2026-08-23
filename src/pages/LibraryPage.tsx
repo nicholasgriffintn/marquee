@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { ErrorBoundary } from "../components/ErrorBoundary";
+import { PageTitle } from "../components/PageTitle";
 import { ArrowIcon, Poster } from "../components/ui";
 import { UsherCard } from "../components/usher/UsherCard";
 import { UsherMark } from "../components/usher/UsherMark";
@@ -10,6 +11,7 @@ import { episodeLabel } from "../domain/seasons";
 import { isShelfSort, type ShelfSort } from "../domain/shelf";
 import type { UsherMoment } from "../domain/usher";
 import { useShelf } from "../hooks/useShelf";
+import { formatDate } from "../lib/dates";
 import type { EntryStatus, ViewingEntry } from "../types";
 
 const SORTS: { value: ShelfSort; label: string }[] = [
@@ -30,11 +32,7 @@ const STATUS_LABELS: Record<EntryStatus, string> = {
 const STATUS_ORDER: EntryStatus[] = ["watching", "watchlist", "watched", "dropped"];
 
 function sinceLabel(entry: ViewingEntry) {
-  const updated = entry.updatedAt ? new Date(entry.updatedAt) : null;
-
-  return updated && !Number.isNaN(updated.getTime())
-    ? updated.toLocaleDateString(undefined, { month: "long" })
-    : "a while back";
+  return formatDate(entry.updatedAt, { month: "long" }, "a while back");
 }
 
 function groupFor(sort: ShelfSort, item: MediaTitle, entry: ViewingEntry) {
@@ -157,16 +155,13 @@ export function LibraryPage({
 
   return (
     <section className="page-section library-page">
-      <div className="page-title-row">
-        <div>
-          <h1>My shelf</h1>
-        </div>
+      <PageTitle heading="My shelf">
         <p>
           {savedCount
             ? `${shelf.matched.toLocaleString()} of ${savedCount.toLocaleString()} title${savedCount === 1 ? "" : "s"}. Click a poster to rate it or add notes.`
             : "Ratings and notes stay in your account and shape your recommendations."}
         </p>
-      </div>
+      </PageTitle>
 
       {usherMoment && (
         <UsherCard moment={usherMoment} onAction={onUsherAction} onDismiss={onUsherDismiss} />

@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { MediaTitle } from "../domain/catalog";
-import { artwork, artworkSrcSet } from "../lib/media";
-import { ArtPlaceholder } from "./ArtPlaceholder";
+import { TitleArt } from "./TitleArt";
 import { ArrowIcon } from "./ui";
 
 export function SearchBox({
@@ -122,17 +121,7 @@ export function SearchBox({
                 onOpen(item);
               }}
             >
-              {item.posterUrl ? (
-                <img
-                  src={artwork(item.posterUrl, 160) ?? item.posterUrl}
-                  srcSet={artworkSrcSet(item.posterUrl, 160)}
-                  alt=""
-                  loading="lazy"
-                  decoding="async"
-                />
-              ) : (
-                <ArtPlaceholder seed={item.id} label={item.title} />
-              )}
+              <TitleArt url={item.posterUrl} seed={item.id} label={item.title} width={160} />
               <span>
                 <strong>{item.title}</strong>
                 <small>

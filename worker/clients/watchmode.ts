@@ -5,19 +5,17 @@ import {
   type WatchmodeSource,
 } from "../lib/watchmode-payload.ts";
 import type { Bindings } from "../types.ts";
+import { upstreamFetch } from "./fetch.ts";
+import { upstreamError } from "./upstream.ts";
+
+const TIMEOUT_MS = 12_000;
+const CACHE_TTL = 900;
+const SOURCES_CACHE_TTL = 21_600;
 
 const API_BASE = "https://api.watchmode.com/v1";
 const PROVIDER_REGION = "GB";
 
-export class WatchmodeError extends Error {
-  constructor(
-    message: string,
-    readonly status = 502,
-  ) {
-    super(message);
-    this.name = "WatchmodeError";
-  }
-}
+export const WatchmodeError = upstreamError("WatchmodeError");
 
 async function requestWatchmode(
   env: Bindings,
@@ -32,16 +30,10 @@ async function requestWatchmode(
 
   url.search = new URLSearchParams(parameters).toString();
 
-  const response = await fetch(url, {
-    headers: {
-      accept: "application/json",
-      "x-api-key": env.WATCHMODE_API_KEY,
-    },
-    signal: AbortSignal.timeout(12_000),
-    cf: {
-      cacheEverything: true,
-      cacheTtl: path === "/sources/" ? 21_600 : 900,
-    },
+  const response = await upstreamFetch(url, {
+    headers: { "x-api-key": env.WATCHMODE_API_KEY },
+    timeoutMs: TIMEOUT_MS,
+    cacheTtl: path === "/sources/" ? SOURCES_CACHE_TTL : CACHE_TTL,
   });
 
   if (response.status === 404) {

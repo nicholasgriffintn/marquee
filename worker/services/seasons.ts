@@ -167,7 +167,7 @@ export async function getShowProgress(
     readEpisodeEntries(db, viewerId, titleId),
   ]);
   const watched = entries.filter((entry) => entry.scope === "episode" && entry.watched);
-  const byKey = new Set(watched.map((entry) => `${entry.season}:${entry.episode}`));
+  const byKey = new Set(watched.map(slotKey));
   const counted = stored.filter((season) => season.seasonNumber > 0);
   const seasons = counted.map((season) => {
     const inSeason = watched.filter((entry) => entry.season === season.seasonNumber);

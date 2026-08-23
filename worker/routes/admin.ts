@@ -2,7 +2,7 @@ import { Hono } from "hono";
 
 import { requireAdmin, type AuthVariables } from "../auth/session.ts";
 import { readJsonObject } from "../lib/http.ts";
-import { logError } from "../lib/logging.ts";
+import { logError, logEvent } from "../lib/logging.ts";
 import { SOURCE_BUDGETS } from "../repositories/budgets.ts";
 import {
   isRevivalId,
@@ -48,13 +48,10 @@ adminRoutes.post("/actions/:action", async (context) => {
   try {
     const result = await runAdminAction(context.env, action);
 
-    console.log(
-      JSON.stringify({
-        event: "admin_action",
-        action,
-        actor: context.get("authenticatedUser").githubLogin,
-      }),
-    );
+    logEvent("admin_action", {
+      action,
+      actor: context.get("authenticatedUser").githubLogin,
+    });
 
     return context.json({ action, ...result });
   } catch (error) {

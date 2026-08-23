@@ -44,6 +44,27 @@ export function isNullableNumber(value: unknown): value is number | null {
   return value === null || (typeof value === "number" && Number.isFinite(value));
 }
 
+export function stringList(value: unknown, options: { limit?: number; itemLength?: number } = {}) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const strings = value.filter((entry): entry is string => typeof entry === "string");
+  const itemLength = options.itemLength;
+  const cleaned = itemLength
+    ? strings.map((entry) => entry.trim().slice(0, itemLength)).filter(Boolean)
+    : strings;
+
+  return options.limit === undefined ? cleaned : cleaned.slice(0, options.limit);
+}
+
+export function jsonStringList(
+  value: string | null | undefined,
+  options: { limit?: number; itemLength?: number } = {},
+) {
+  return stringList(parseJson(value ?? ""), options);
+}
+
 export function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === "string");
 }

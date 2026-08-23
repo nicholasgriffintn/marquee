@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 import type { MediaTitle } from "../domain/catalog";
-import { ApiError, requestJson } from "../lib/api";
+import { ApiError, isAbortError, requestJson } from "../lib/api";
 
 type SearchResponse = {
   items: MediaTitle[];
@@ -19,7 +19,7 @@ export function useSearch(query: string, providerIds: string[]) {
 
   useEffect(() => {
     if (isShort) {
-      return;
+      return undefined;
     }
 
     const controller = new AbortController();
@@ -44,7 +44,7 @@ export function useSearch(query: string, providerIds: string[]) {
             setError("");
           }
         } catch (caught) {
-          if (active && !(caught instanceof DOMException && caught.name === "AbortError")) {
+          if (active && !isAbortError(caught)) {
             setItems([]);
             setError(caught instanceof ApiError ? caught.message : "Search is unavailable");
           }

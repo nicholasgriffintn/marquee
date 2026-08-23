@@ -35,7 +35,7 @@ export function ReelPlayer({
     const resumeAt = resumeRef.current;
 
     if (!video || resumeAt < RESUME_FLOOR_SECONDS) {
-      return;
+      return undefined;
     }
 
     const seek = () => {
@@ -53,7 +53,7 @@ export function ReelPlayer({
     if (video.readyState >= HTMLMediaElement.HAVE_METADATA) {
       seek();
 
-      return;
+      return undefined;
     }
 
     video.addEventListener("loadedmetadata", seek);
@@ -79,7 +79,7 @@ export function ReelPlayer({
 
   useEffect(() => {
     if (!raising) {
-      return;
+      return undefined;
     }
 
     const timer = window.setTimeout(() => setStarted(true), CURTAIN_MS);

@@ -36,9 +36,9 @@ export function UsherOnboarding({
       <div className="usher-bulbs" aria-hidden="true">
         {SIGN.map((glyph, index) =>
           glyph === "." ? (
-            <i key={index} />
+            <i key={`bulb-${index}-${glyph}`} />
           ) : (
-            <span key={index} className={`letter${index === 9 ? " dim" : ""}`}>
+            <span key={`bulb-${index}-${glyph}`} className={`letter${index === 9 ? " dim" : ""}`}>
               {glyph}
             </span>
           ),

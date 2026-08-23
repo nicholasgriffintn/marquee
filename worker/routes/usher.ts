@@ -189,8 +189,7 @@ usherRoutes.post("/dismiss", async (context) => {
   const user = context.get("authenticatedUser");
   const body = await readJsonObject(context.req.raw);
   const kind = typeof body?.kind === "string" ? body.kind.slice(0, 40) : "";
-  const scope =
-    body?.scope === "kind" || body?.scope === "all" ? (body.scope as "kind" | "all") : "once";
+  const scope = body?.scope === "kind" || body?.scope === "all" ? body.scope : "once";
 
   try {
     await dismissMoment(context.env, user.id, kind, scope);

@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 
 import type { MediaTitle, ProviderAvailability } from "../domain/catalog";
-import { requestJson } from "../lib/api";
+import { useResource } from "./useResource";
 
 export type NextEpisode = {
   season: number | null;
@@ -17,49 +17,12 @@ type AvailabilityResponse = {
 };
 
 export function useAvailability(item: MediaTitle, enabled: boolean) {
-  const [loaded, setLoaded] = useState<{
-    titleId: string;
-    providers: ProviderAvailability[];
-    nextEpisode: NextEpisode | null;
-  } | null>(null);
-  const { id, mediaType, tmdbId, providers: listed, watchLink } = item;
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    if (!enabled) {
-      return () => controller.abort();
-    }
-
-    async function load() {
-      try {
-        const response = await requestJson<AvailabilityResponse>(
-          `/api/catalog/${mediaType}/${tmdbId}/availability`,
-          { signal: controller.signal },
-        );
-
-        if (!response.providers.length && !response.nextEpisode) {
-          return;
-        }
-
-        setLoaded({
-          titleId: id,
-          nextEpisode: response.nextEpisode ?? null,
-          providers: response.providers,
-        });
-      } catch (error) {
-        if (!(error instanceof DOMException && error.name === "AbortError")) {
-          return;
-        }
-      }
-    }
-
-    void load();
-
-    return () => controller.abort();
-  }, [enabled, id, mediaType, tmdbId]);
-
-  const live = enabled && loaded?.titleId === id ? loaded : null;
+  const { mediaType, tmdbId, providers: listed, watchLink } = item;
+  const { data } = useResource<AvailabilityResponse>(
+    `/api/catalog/${mediaType}/${tmdbId}/availability`,
+    { enabled },
+  );
+  const live = data?.providers.length || data?.nextEpisode ? data : null;
   const providers = useMemo(() => {
     if (!live?.providers.length) {
       return listed;

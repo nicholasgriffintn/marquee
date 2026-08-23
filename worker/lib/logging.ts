@@ -1,3 +1,7 @@
+export function logEvent(event: string, detail: Record<string, unknown> = {}) {
+  console.log(JSON.stringify({ event, ...detail }));
+}
+
 export function logError(event: string, error: unknown, detail: Record<string, unknown> = {}) {
   console.error(
     JSON.stringify({

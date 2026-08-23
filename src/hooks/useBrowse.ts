@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 
 import type { MediaTitle } from "../domain/catalog";
-import { requestJson } from "../lib/api";
+import { isAbortError, requestJson } from "../lib/api";
+import { useResource } from "./useResource";
+
+const NO_FACETS: string[] = [];
 
 export type BrowseFilters = {
   mediaType?: "movie" | "tv";
@@ -81,7 +84,7 @@ export function useBrowse(filters: BrowseFilters) {
             setHasMore(response.hasMore);
             setError("");
           } catch (caught) {
-            if (active && !(caught instanceof DOMException && caught.name === "AbortError")) {
+            if (active && !isAbortError(caught)) {
               setError("Could not load titles");
             }
           } finally {
@@ -113,71 +116,13 @@ export function useBrowse(filters: BrowseFilters) {
 }
 
 export function useKeywords(limit: number) {
-  const [keywords, setKeywords] = useState<string[]>([]);
+  const { data } = useResource<{ keywords: string[] }>(`/api/catalog/keywords?limit=${limit}`);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    let active = true;
-
-    async function load() {
-      try {
-        const response = await requestJson<{ keywords: string[] }>(
-          `/api/catalog/keywords?limit=${limit}`,
-          { signal: controller.signal },
-        );
-
-        if (active) {
-          setKeywords(response.keywords);
-        }
-      } catch {
-        if (active) {
-          setKeywords([]);
-        }
-      }
-    }
-
-    void load();
-
-    return () => {
-      active = false;
-      controller.abort();
-    };
-  }, [limit]);
-
-  return keywords;
+  return data?.keywords ?? NO_FACETS;
 }
 
 export function useGenres(limit: number) {
-  const [genres, setGenres] = useState<string[]>([]);
+  const { data } = useResource<{ genres: string[] }>(`/api/catalog/genres?limit=${limit}`);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    let active = true;
-
-    async function load() {
-      try {
-        const response = await requestJson<{ genres: string[] }>(
-          `/api/catalog/genres?limit=${limit}`,
-          { signal: controller.signal },
-        );
-
-        if (active) {
-          setGenres(response.genres);
-        }
-      } catch {
-        if (active) {
-          setGenres([]);
-        }
-      }
-    }
-
-    void load();
-
-    return () => {
-      active = false;
-      controller.abort();
-    };
-  }, [limit]);
-
-  return genres;
+  return data?.genres ?? NO_FACETS;
 }

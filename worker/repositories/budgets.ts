@@ -1,3 +1,4 @@
+import { logEvent } from "../lib/logging.ts";
 import type { Bindings, EnrichmentSource } from "../types.ts";
 
 type BudgetRow = {
@@ -68,14 +69,11 @@ export async function ensureBudgets(env: Bindings) {
     .bind(...sources)
     .run();
 
-  console.log(
-    JSON.stringify({
-      event: "budgets_reconciled",
-      sources: sources.length,
-      reconciled,
-      dropped: dropped.meta.changes,
-    }),
-  );
+  logEvent("budgets_reconciled", {
+    sources: sources.length,
+    reconciled,
+    dropped: dropped.meta.changes,
+  });
 
   return reconciled;
 }
@@ -140,7 +138,7 @@ export async function pauseSource(env: Bindings, source: EnrichmentSource, minut
     .bind(`+${Math.max(1, Math.trunc(minutes))} minutes`, budgetSource(source))
     .run();
 
-  console.log(JSON.stringify({ event: "source_paused", source, minutes }));
+  logEvent("source_paused", { source, minutes });
 }
 
 export async function resumeSource(env: Bindings, source: EnrichmentSource) {

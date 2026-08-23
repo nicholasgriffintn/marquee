@@ -1,18 +1,15 @@
 import type { CuratorCandidate, ProviderAvailability } from "../../src/domain/catalog.ts";
+import { isEntryStatus } from "../../src/domain/entries.ts";
 import { providerRegistryIds } from "../../src/domain/providers.ts";
 import { isArchiveCollection } from "../clients/archive.ts";
 import { isCinemaSourceId } from "../clients/cinema/index.ts";
 import { isEuropeanaCountry } from "../clients/europeana.ts";
 import { isPartitionId } from "../repositories/discover.ts";
 import { isRevivalId, isRevivalSource } from "../repositories/revival.ts";
-import type { EntryStatus, IngestionJob, ViewingContext } from "../types.ts";
+import type { IngestionJob, ViewingContext } from "../types.ts";
 import { isRecord } from "./values.ts";
 
-export function isEntryStatus(value: unknown): value is EntryStatus {
-  return (
-    value === "watchlist" || value === "watching" || value === "watched" || value === "dropped"
-  );
-}
+export { isEntryStatus };
 
 export function validProviderIds(value: unknown) {
   if (!Array.isArray(value)) {

@@ -47,7 +47,15 @@ const NO_ORDER: UsherOrderState = {
 };
 
 const UNINVITED_PER_SESSION = 1;
+const REJECTED_MEMORY = 40;
+const WEEKEND_DAYS = new Set([0, 6]);
 const INVITED_SURFACES = new Set<UsherSurface>(["first-run", "search-empty"]);
+
+function viewingMoment() {
+  const now = new Date();
+
+  return { hour: now.getHours(), isWeekend: WEEKEND_DAYS.has(now.getDay()) };
+}
 
 export function useUsher(isSignedIn: boolean) {
   const [moment, setMoment] = useState<UsherMoment | null>(null);
@@ -234,8 +242,7 @@ export function useUsher(isSignedIn: boolean) {
           jsonRequest("POST", {
             providerIds,
             rejected: rejected.current,
-            hour: new Date().getHours(),
-            isWeekend: [0, 6].includes(new Date().getDay()),
+            ...viewingMoment(),
           }),
         );
 
@@ -276,7 +283,7 @@ export function useUsher(isSignedIn: boolean) {
   const rejectPick = useCallback(
     async (providerIds: string[]) => {
       if (pick.item) {
-        rejected.current = [...rejected.current, pick.item.id].slice(-40);
+        rejected.current = [...rejected.current, pick.item.id].slice(-REJECTED_MEMORY);
         void remember(pick.item.id, "pick", { providerIds });
       }
 
@@ -309,8 +316,7 @@ export function useUsher(isSignedIn: boolean) {
             guestIds,
             providerIds,
             rejected: rejected.current,
-            hour: new Date().getHours(),
-            isWeekend: [0, 6].includes(new Date().getDay()),
+            ...viewingMoment(),
           }),
         );
 
@@ -367,7 +373,9 @@ export function useUsher(isSignedIn: boolean) {
         (entry): entry is OrderResult => entry !== null,
       );
 
-      rejected.current = [...rejected.current, ...shown.map((entry) => entry.item.id)].slice(-40);
+      rejected.current = [...rejected.current, ...shown.map((entry) => entry.item.id)].slice(
+        -REJECTED_MEMORY,
+      );
 
       for (const entry of shown) {
         void remember(entry.item.id, "order", { providerIds, order: brief });
@@ -397,7 +405,7 @@ export function useUsher(isSignedIn: boolean) {
     () => ({
       moment: isSignedIn ? moment : null,
       isOnboarding: isSignedIn && isOnboarding,
-      pick,
+      pick: isSignedIn ? pick : NO_PICK,
       order: isSignedIn ? order : NO_ORDER,
       guests: isSignedIn ? guests : [],
       aside: isSignedIn ? aside : "",

@@ -1,6 +1,7 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
 import { buzzScoreSql } from "../lib/buzz.ts";
 import { parseStoredTitle } from "../lib/catalog-payload.ts";
+import { clamp } from "../lib/numbers.ts";
 import { blendedRatingSql, weightedRatingSql } from "../lib/ratings.ts";
 import { isKnownTitle, validProviderIds } from "../lib/validation.ts";
 
@@ -88,8 +89,8 @@ export async function searchCatalogue(db: D1Database, search: CatalogueSearch) {
     .slice(0, 10);
   const providerIds = validProviderIds(search.providerIds);
   const excludedIds = [...new Set((search.excludeIds ?? []).filter(isKnownTitle))].slice(0, 300);
-  const limit = Math.max(1, Math.min(60, Math.floor(search.limit ?? 12)));
-  const offset = Math.max(0, Math.min(2_000, Math.floor(search.offset ?? 0)));
+  const limit = clamp(Math.floor(search.limit ?? 12), 1, 60);
+  const offset = clamp(Math.floor(search.offset ?? 0), 0, 2_000);
   const sort = search.sort ?? (match ? "relevance" : "popularity");
   const orderBindings: unknown[] = [];
   let orderBy = ORDER_BY[match ? sort : sort === "relevance" ? "popularity" : sort];
@@ -148,7 +149,7 @@ export async function searchCatalogue(db: D1Database, search: CatalogueSearch) {
 
   if (Number.isFinite(search.minScore)) {
     conditions.push(`${BLENDED_RATING} >= ?`);
-    bindings.push(Math.max(0, Math.min(10, search.minScore ?? 0)));
+    bindings.push(clamp(search.minScore ?? 0, 0, 10));
   }
 
   const minVotes = Number.isFinite(search.minVotes)
@@ -167,12 +168,12 @@ export async function searchCatalogue(db: D1Database, search: CatalogueSearch) {
       `(json_extract(t.payload, '$.runtimeMinutes') IS NULL
         OR json_extract(t.payload, '$.runtimeMinutes') <= ?)`,
     );
-    bindings.push(Math.max(30, Math.min(600, Math.trunc(search.maxRuntime ?? 600))));
+    bindings.push(clamp(Math.trunc(search.maxRuntime ?? 600), 30, 600));
   }
 
   if (Number.isFinite(search.releasedAfter)) {
     conditions.push("COALESCE(t.year, 0) >= ?");
-    bindings.push(Math.max(1900, Math.min(2100, Math.trunc(search.releasedAfter ?? 0))));
+    bindings.push(clamp(Math.trunc(search.releasedAfter ?? 0), 1900, 2100));
   }
 
   if (excludedIds.length) {
@@ -209,7 +210,7 @@ export async function searchCatalogue(db: D1Database, search: CatalogueSearch) {
 }
 
 export async function searchTitlesFirst(db: D1Database, search: CatalogueSearch) {
-  const limit = Math.max(1, Math.min(60, Math.floor(search.limit ?? 12)));
+  const limit = clamp(Math.floor(search.limit ?? 12), 1, 60);
 
   if (!search.query?.trim()) {
     return searchCatalogue(db, search);
@@ -266,7 +267,7 @@ export async function readGenres(db: D1Database, limit = 100) {
        ORDER BY titles DESC
        LIMIT ?`,
     )
-    .bind(Math.max(1, Math.min(200, limit)))
+    .bind(clamp(limit, 1, 200))
     .all<{ genre: string; titles: number }>();
 
   return rows.results
@@ -284,7 +285,7 @@ export async function readKeywords(db: D1Database, limit = 120) {
        ORDER BY titles DESC
        LIMIT ?`,
     )
-    .bind(Math.max(1, Math.min(400, limit)))
+    .bind(clamp(limit, 1, 400))
     .all<{ keyword: string; titles: number }>();
 
   return rows.results

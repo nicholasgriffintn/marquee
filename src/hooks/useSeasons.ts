@@ -11,7 +11,7 @@ import {
   type SeasonSummary,
   type ShowProgress,
 } from "../domain/seasons";
-import { jsonRequest, requestJson } from "../lib/api";
+import { isAbortError, jsonRequest, requestJson } from "../lib/api";
 
 type SeasonIndexResponse = { seasons: SeasonSummary[]; source: string; fetchedAt: string };
 
@@ -31,9 +31,9 @@ function firstOpenSeason(seasons: SeasonSummary[], progress: ShowProgress | null
     return progress.furthest.season;
   }
 
-  const running = seasons.filter((season) => season.seasonNumber > 0);
+  const running = seasons.find((season) => season.seasonNumber > 0);
 
-  return running[0]?.seasonNumber ?? seasons[0]?.seasonNumber ?? null;
+  return running?.seasonNumber ?? seasons[0]?.seasonNumber ?? null;
 }
 
 export function useSeasons(item: MediaTitle, enabled: boolean, progress: ShowProgress | null) {
@@ -50,7 +50,7 @@ export function useSeasons(item: MediaTitle, enabled: boolean, progress: ShowPro
 
   useEffect(() => {
     if (!active) {
-      return;
+      return undefined;
     }
 
     const controller = new AbortController();
@@ -67,7 +67,7 @@ export function useSeasons(item: MediaTitle, enabled: boolean, progress: ShowPro
         setIndex({ titleId: `tv:${tmdbId}`, seasons: response.seasons });
         setError("");
       } catch (loadError) {
-        if (!(loadError instanceof DOMException && loadError.name === "AbortError")) {
+        if (!isAbortError(loadError)) {
           setError("The series listing is not answering.");
         }
       } finally {
@@ -87,7 +87,7 @@ export function useSeasons(item: MediaTitle, enabled: boolean, progress: ShowPro
 
   useEffect(() => {
     if (!active || selected === null || isDetailLoaded) {
-      return;
+      return undefined;
     }
 
     const controller = new AbortController();
@@ -103,7 +103,7 @@ export function useSeasons(item: MediaTitle, enabled: boolean, progress: ShowPro
 
         setDetails((current) => ({ ...current, [`tv:${tmdbId}:${selected}`]: response }));
       } catch (loadError) {
-        if (!(loadError instanceof DOMException && loadError.name === "AbortError")) {
+        if (!isAbortError(loadError)) {
           setError("That season would not come off the shelf.");
         }
       } finally {
@@ -158,7 +158,7 @@ export function useEpisodeEntries(titleId: string, enabled: boolean) {
 
   useEffect(() => {
     if (!active) {
-      return;
+      return undefined;
     }
 
     const controller = new AbortController();
@@ -173,7 +173,7 @@ export function useEpisodeEntries(titleId: string, enabled: boolean) {
         setTracked({ titleId, entries: response.entries, progress: response.progress });
         setMessage("");
       } catch (error) {
-        if (!(error instanceof DOMException && error.name === "AbortError")) {
+        if (!isAbortError(error)) {
           setMessage("I could not read your episode notes.");
         }
       }

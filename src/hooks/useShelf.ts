@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 
 import type { ShelfItem, ShelfResponse } from "../domain/shelf";
 import { requestJson } from "../lib/api";
+import { useResource } from "./useResource";
 
 const NO_ITEMS: ShelfItem[] = [];
 const NO_GENRES: string[] = [];
+const NO_PAGES: ShelfResponse[] = [];
 const EMPTY_SET: ReadonlySet<string> = new Set();
 
 export type ShelfFilters = {
@@ -13,6 +15,8 @@ export type ShelfFilters = {
   genre: string;
   query: string;
 };
+
+type Marked = { key: string; claimed: ReadonlySet<string>; discarded: ReadonlySet<string> };
 
 function toSearch(filters: ShelfFilters, page: number) {
   const params = new URLSearchParams({ sort: filters.sort, page: String(page) });
@@ -34,25 +38,23 @@ function toSearch(filters: ShelfFilters, page: number) {
 
 export function useShelf(isSignedIn: boolean, filters: ShelfFilters) {
   const key = toSearch(filters, 0);
-  const [loaded, setLoaded] = useState<{
-    key: string;
-    pages: ShelfResponse[];
-  } | null>(null);
+  const [extra, setExtra] = useState<{ key: string; pages: ShelfResponse[] } | null>(null);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [error, setError] = useState("");
-  const [settled, setSettled] = useState<{
-    key: string;
-    claimed: ReadonlySet<string>;
-    discarded: ReadonlySet<string>;
-  } | null>(null);
-  const live = loaded?.key === key ? loaded : null;
-  const first = live?.pages[0] ?? null;
-  const claimed = settled?.key === key ? settled.claimed : EMPTY_SET;
-  const discarded = settled?.key === key ? settled.discarded : EMPTY_SET;
+  const [pageError, setPageError] = useState("");
+  const [marked, setMarked] = useState<Marked | null>(null);
+  const first = useResource<ShelfResponse>(`/api/profile/shelf?${key}`, {
+    enabled: isSignedIn,
+    errorMessage: "Your shelf is out of reach for a moment.",
+  });
+  const head = first.data;
+  const pages = extra?.key === key ? extra.pages : NO_PAGES;
+  const claimed = marked?.key === key ? marked.claimed : EMPTY_SET;
+  const discarded = marked?.key === key ? marked.discarded : EMPTY_SET;
+  const last = pages[pages.length - 1] ?? head;
 
   const note = useCallback(
     (titleId: string, binned: boolean) =>
-      setSettled((current) => {
+      setMarked((current) => {
         const base =
           current?.key === key ? current : { key, claimed: EMPTY_SET, discarded: EMPTY_SET };
 
@@ -64,35 +66,6 @@ export function useShelf(isSignedIn: boolean, filters: ShelfFilters) {
       }),
     [key],
   );
-
-  useEffect(() => {
-    if (!isSignedIn) {
-      return;
-    }
-
-    const controller = new AbortController();
-
-    async function load() {
-      try {
-        const response = await requestJson<ShelfResponse>(`/api/profile/shelf?${key}`, {
-          signal: controller.signal,
-        });
-
-        setLoaded({ key, pages: [response] });
-        setError("");
-      } catch (caught) {
-        if (!(caught instanceof DOMException && caught.name === "AbortError")) {
-          setError("Your shelf is out of reach for a moment.");
-        }
-      }
-    }
-
-    void load();
-
-    return () => controller.abort();
-  }, [isSignedIn, key]);
-
-  const last = live?.pages[live.pages.length - 1] ?? null;
 
   const loadMore = useCallback(async () => {
     if (!last?.hasMore || isLoadingMore) {
@@ -106,30 +79,33 @@ export function useShelf(isSignedIn: boolean, filters: ShelfFilters) {
         `/api/profile/shelf?${toSearch(filters, last.page + 1)}`,
       );
 
-      setLoaded((current) =>
-        current?.key === key ? { key, pages: [...current.pages, response] } : current,
-      );
+      setExtra((current) => ({
+        key,
+        pages: current?.key === key ? [...current.pages, response] : [response],
+      }));
     } catch {
-      setError("That page would not come off the shelf.");
+      setPageError("That page would not come off the shelf.");
     } finally {
       setIsLoadingMore(false);
     }
   }, [filters, isLoadingMore, key, last]);
 
-  const items = live
-    ? live.pages.flatMap((page) => page.items).filter((item) => !discarded.has(item.entry.titleId))
+  const items = head
+    ? [head, ...pages]
+        .flatMap((page) => page.items)
+        .filter((item) => !discarded.has(item.entry.titleId))
     : NO_ITEMS;
 
   return {
     items,
-    lost: (first?.lost ?? NO_ITEMS).filter((item) => !claimed.has(item.entry.titleId)),
-    genres: first?.genres ?? NO_GENRES,
-    matched: Math.max(0, (first?.matched ?? 0) - discarded.size),
-    shelved: Math.max(0, (first?.shelved ?? 0) - discarded.size),
+    lost: (head?.lost ?? NO_ITEMS).filter((item) => !claimed.has(item.entry.titleId)),
+    genres: head?.genres ?? NO_GENRES,
+    matched: Math.max(0, (head?.matched ?? 0) - discarded.size),
+    shelved: Math.max(0, (head?.shelved ?? 0) - discarded.size),
     hasMore: last?.hasMore ?? false,
-    isLoading: isSignedIn && !live,
+    isLoading: isSignedIn && !head,
     isLoadingMore,
-    error,
+    error: pageError || first.error,
     loadMore,
     note,
   };

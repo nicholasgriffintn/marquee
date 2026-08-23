@@ -1,18 +1,15 @@
 import type { MediaType } from "../../src/domain/catalog.ts";
 import { isRecord } from "../lib/values.ts";
 import type { Bindings, ExternalIds } from "../types.ts";
+import { upstreamFetch } from "./fetch.ts";
+import { upstreamError } from "./upstream.ts";
+
+const TIMEOUT_MS = 12_000;
+const CACHE_TTL = 86_400;
 
 const API_BASE = "https://api.simkl.com";
 
-export class SimklError extends Error {
-  constructor(
-    message: string,
-    readonly status = 502,
-  ) {
-    super(message);
-    this.name = "SimklError";
-  }
-}
+export const SimklError = upstreamError("SimklError");
 
 function text(value: unknown) {
   return typeof value === "string" && value.length > 0 ? value : null;
@@ -45,10 +42,10 @@ export async function getSimklIds(
     client_id: env.SIMKL_CLIENT_ID,
   }).toString();
 
-  const response = await fetch(url, {
-    headers: { accept: "application/json", "simkl-api-key": env.SIMKL_CLIENT_ID },
-    signal: AbortSignal.timeout(12_000),
-    cf: { cacheEverything: true, cacheTtl: 86_400 },
+  const response = await upstreamFetch(url, {
+    headers: { "simkl-api-key": env.SIMKL_CLIENT_ID },
+    timeoutMs: TIMEOUT_MS,
+    cacheTtl: CACHE_TTL,
   });
 
   if (response.status === 404) {

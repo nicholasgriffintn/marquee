@@ -4,6 +4,7 @@ import type {
   MediaTitle,
   MediaType,
 } from "../../src/domain/catalog.ts";
+import { clamp } from "../lib/numbers.ts";
 import {
   parseTmdbProviders,
   parseTmdbSeason,
@@ -14,6 +15,14 @@ import {
 } from "../lib/tmdb-payload.ts";
 import { isRecord, numberAt, records } from "../lib/values.ts";
 import type { Bindings } from "../types.ts";
+import { upstreamFetch } from "./fetch.ts";
+import { upstreamError } from "./upstream.ts";
+
+const TIMEOUT_MS = 12_000;
+const CACHE_TTL = 900;
+const PROVIDERS_CACHE_TTL = 21_600;
+
+export const TmdbError = upstreamError("TmdbError");
 
 const API_BASE = "https://api.themoviedb.org/3";
 const PROVIDER_REGION = "GB";
@@ -128,7 +137,7 @@ export async function getDiscoverPage(
   const response = await requestTmdb(
     env,
     `/discover/${mediaType}`,
-    discoverParameters(mediaType, window, Math.min(Math.max(1, page), TMDB_MAX_PAGES)),
+    discoverParameters(mediaType, window, clamp(page, 1, TMDB_MAX_PAGES)),
   );
   const summaries = parseTmdbSummaries(response, mediaType);
 
@@ -161,16 +170,10 @@ async function requestTmdb(env: Bindings, path: string, parameters: Record<strin
 
   url.search = new URLSearchParams(parameters).toString();
 
-  const response = await fetch(url, {
-    headers: {
-      accept: "application/json",
-      authorization: `Bearer ${env.TMDB_API_TOKEN}`,
-    },
-    signal: AbortSignal.timeout(12_000),
-    cf: {
-      cacheEverything: true,
-      cacheTtl: path.startsWith("/watch/providers") ? 21_600 : 900,
-    },
+  const response = await upstreamFetch(url, {
+    headers: { authorization: `Bearer ${env.TMDB_API_TOKEN}` },
+    timeoutMs: TIMEOUT_MS,
+    cacheTtl: path.startsWith("/watch/providers") ? PROVIDERS_CACHE_TTL : CACHE_TTL,
   });
 
   if (!response.ok) {
@@ -195,16 +198,6 @@ function providerParameters(providerIds: string[]): Record<string, string> {
         with_watch_monetization_types: "flatrate|free|ads|rent|buy",
       }
     : {};
-}
-
-export class TmdbError extends Error {
-  constructor(
-    message: string,
-    readonly status = 502,
-  ) {
-    super(message);
-    this.name = "TmdbError";
-  }
 }
 
 export async function getCatalog(

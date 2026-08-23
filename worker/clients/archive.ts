@@ -1,6 +1,10 @@
 import type { RevivalKind, RevivalRightsBasis, RevivalTag } from "../../src/domain/revival.ts";
 import { personName, splitSubjects, tagList } from "../lib/revival-tags.ts";
+import { firstString, stripMarkup } from "../lib/text.ts";
 import { isRecord } from "../lib/values.ts";
+import { upstreamFetch } from "./fetch.ts";
+
+const CACHE_TTL = 3_600;
 
 const SEARCH_ENDPOINT = "https://archive.org/advancedsearch.php";
 const METADATA_ENDPOINT = "https://archive.org/metadata";
@@ -53,11 +57,7 @@ type SearchDocument = {
 };
 
 async function readJson(url: string) {
-  const response = await fetch(url, {
-    signal: AbortSignal.timeout(TIMEOUT_MS),
-    headers: { accept: "application/json" },
-    cf: { cacheEverything: true, cacheTtl: 3_600 },
-  });
+  const response = await upstreamFetch(url, { timeoutMs: TIMEOUT_MS, cacheTtl: CACHE_TTL });
 
   if (!response.ok) {
     throw new Error(`Internet Archive responded ${response.status}`);
@@ -97,26 +97,10 @@ export async function searchArchiveCollection(collection: string, page: number, 
   };
 }
 
-function firstString(value: unknown) {
-  if (typeof value === "string") {
-    return value.trim();
-  }
-
-  return Array.isArray(value) && typeof value[0] === "string" ? value[0].trim() : "";
-}
-
 function numberOrNull(value: unknown) {
   const parsed = Number(firstString(value) || value);
 
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-}
-
-function stripMarkup(value: string) {
-  return value
-    .replaceAll(/<[^>]*>/gu, " ")
-    .replaceAll(/&[a-z]+;/giu, " ")
-    .replaceAll(/\s+/gu, " ")
-    .trim();
 }
 
 function licenseBasis(licenseUrl: string): RevivalRightsBasis | null {

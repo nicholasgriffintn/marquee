@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { useLinks } from "../../hooks/useLinks";
+import { formatDate } from "../../lib/dates";
 
 export function ConnectionsPanel({ isSignedIn }: { isSignedIn: boolean }) {
   const connections = useLinks(isSignedIn);
@@ -22,7 +23,7 @@ export function ConnectionsPanel({ isSignedIn }: { isSignedIn: boolean }) {
           <>
             <small>
               {trakt.account ? `Linked as ${trakt.account}` : "Linked"}
-              {trakt.syncedAt ? ` · synced ${new Date(trakt.syncedAt).toLocaleDateString()}` : ""}
+              {trakt.syncedAt ? ` · synced ${formatDate(trakt.syncedAt, {})}` : ""}
             </small>
             <span className="spacer" />
             <button type="button" onClick={() => void connections.syncTrakt()}>
@@ -113,9 +114,7 @@ export function ConnectionsPanel({ isSignedIn }: { isSignedIn: boolean }) {
             <li key={token.id}>
               <strong>{token.label}</strong>
               <small>
-                {token.lastUsedAt
-                  ? `used ${new Date(token.lastUsedAt).toLocaleDateString()}`
-                  : "never used"}
+                {token.lastUsedAt ? `used ${formatDate(token.lastUsedAt, {})}` : "never used"}
               </small>
               <span className="spacer" />
               <button type="button" onClick={() => void connections.revokeToken(token.id)}>

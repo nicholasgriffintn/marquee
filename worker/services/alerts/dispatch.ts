@@ -1,5 +1,5 @@
 import { sendAlertEmail } from "../../clients/email.ts";
-import { logError } from "../../lib/logging.ts";
+import { logError, logEvent } from "../../lib/logging.ts";
 import {
   alreadySent,
   mutedKinds,
@@ -41,14 +41,11 @@ async function runAlerts(env: Bindings, origin: string, options: { send: boolean
   const flat = found.flat();
 
   if (flat.length === 0) {
-    console.log(
-      JSON.stringify({
-        event: options.send ? "alerts_dispatched" : "alerts_previewed",
-        candidates: 0,
-        emails: 0,
-        feeds: 0,
-      }),
-    );
+    logEvent(options.send ? "alerts_dispatched" : "alerts_previewed", {
+      candidates: 0,
+      emails: 0,
+      feeds: 0,
+    });
 
     return { candidates: 0, emails: 0, feeds: 0 };
   }
@@ -167,9 +164,7 @@ async function runAlerts(env: Bindings, origin: string, options: { send: boolean
     await pruneSignals(env.DB);
   }
 
-  console.log(
-    JSON.stringify({ event: "alerts_dispatched", candidates: flat.length, emails, feeds }),
-  );
+  logEvent("alerts_dispatched", { candidates: flat.length, emails, feeds });
 
   return { candidates: flat.length, emails, feeds };
 }

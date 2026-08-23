@@ -5,6 +5,7 @@ import { edgeCache } from "../lib/cache.ts";
 import { recordEvent } from "../lib/events.ts";
 import { edgeOrigin } from "../lib/geo.ts";
 import { logError } from "../lib/logging.ts";
+import { pathInteger, queryInteger, queryList, queryText } from "../lib/params.ts";
 import { canonicalOrigin } from "../lib/security.ts";
 import { validProviderIds } from "../lib/validation.ts";
 import { readCollectionTitleIds, readItems } from "../repositories/catalog-reader.ts";
@@ -26,15 +27,21 @@ import { getSeason, getSeasonIndex } from "../services/seasons.ts";
 import type { Bindings } from "../types.ts";
 
 const TONIGHT_DEFAULT_LIMIT = 12;
+const QUERY_LIMIT = 120;
+const PROVIDER_LIMIT = 500;
+const FACET_LIMIT = 6;
+const ITEMS_LIMIT = 30;
+const MAX_BROWSE_PAGE = 80;
 const KEYWORDS_DEFAULT_LIMIT = 120;
 const GENRES_DEFAULT_LIMIT = 40;
 const SEASON_LIMIT = 100;
+const MAX_TMDB_ID = 9_999_999_999;
 
 export const catalogRoutes = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
 
 catalogRoutes.get("/", edgeCache(900), async (context) => {
-  const query = (context.req.query("query") ?? "").trim().slice(0, 120);
-  const providerIds = validProviderIds((context.req.query("providers") ?? "").split(","));
+  const query = queryText(context, "query", QUERY_LIMIT);
+  const providerIds = validProviderIds(queryList(context, "providers", PROVIDER_LIMIT));
 
   try {
     const catalogue = await getCatalogue(context.env, providerIds);
@@ -70,8 +77,8 @@ catalogRoutes.get("/rails", requireAuthentication, async (context) => {
 });
 
 catalogRoutes.get("/search", async (context) => {
-  const query = (context.req.query("query") ?? "").trim().slice(0, 120);
-  const providerIds = validProviderIds((context.req.query("providers") ?? "").split(","));
+  const query = queryText(context, "query", QUERY_LIMIT);
+  const providerIds = validProviderIds(queryList(context, "providers", PROVIDER_LIMIT));
 
   if (!query) {
     return context.json({ items: [], query: "", source: "Marquee catalogue", fetchedAt: "" });
@@ -100,10 +107,7 @@ catalogRoutes.get("/search", async (context) => {
 });
 
 catalogRoutes.get("/genres", edgeCache(3_600), async (context) => {
-  const requestedLimit = Number.parseInt(context.req.query("limit") ?? "", 10);
-  const limit = Number.isInteger(requestedLimit)
-    ? Math.max(1, Math.min(200, requestedLimit))
-    : GENRES_DEFAULT_LIMIT;
+  const limit = queryInteger(context, "limit", GENRES_DEFAULT_LIMIT, 1, 200);
 
   try {
     context.header("cache-control", "public, max-age=3600");
@@ -119,10 +123,7 @@ catalogRoutes.get("/genres", edgeCache(3_600), async (context) => {
 
 catalogRoutes.get("/tonight", async (context) => {
   const principal = await sessionPrincipal(context.env, context.req.raw);
-  const requestedLimit = Number.parseInt(context.req.query("limit") ?? "", 10);
-  const limit = Number.isInteger(requestedLimit)
-    ? Math.max(1, Math.min(40, requestedLimit))
-    : TONIGHT_DEFAULT_LIMIT;
+  const limit = queryInteger(context, "limit", TONIGHT_DEFAULT_LIMIT, 1, 40);
 
   try {
     context.header("cache-control", "no-store");
@@ -154,10 +155,7 @@ catalogRoutes.get("/trending", edgeCache(1_800), async (context) => {
 });
 
 catalogRoutes.get("/keywords", edgeCache(3_600), async (context) => {
-  const requestedLimit = Number.parseInt(context.req.query("limit") ?? "", 10);
-  const limit = Number.isInteger(requestedLimit)
-    ? Math.max(1, Math.min(400, requestedLimit))
-    : KEYWORDS_DEFAULT_LIMIT;
+  const limit = queryInteger(context, "limit", KEYWORDS_DEFAULT_LIMIT, 1, 400);
 
   try {
     return context.json({ keywords: await getKeywords(context.env, limit) });
@@ -172,7 +170,6 @@ catalogRoutes.get("/keywords", edgeCache(3_600), async (context) => {
 catalogRoutes.get("/browse", edgeCache(120), async (context) => {
   const mediaTypeParam = context.req.query("mediaType");
   const sortParam = context.req.query("sort");
-  const page = Number.parseInt(context.req.query("page") ?? "0", 10);
 
   try {
     context.header("cache-control", "public, max-age=120");
@@ -181,23 +178,15 @@ catalogRoutes.get("/browse", edgeCache(120), async (context) => {
       await browseCatalogue(context.env, {
         mediaType:
           mediaTypeParam === "movie" || mediaTypeParam === "tv" ? mediaTypeParam : undefined,
-        genres: (context.req.query("genres") ?? "")
-          .split(",")
-          .map((genre) => genre.trim())
-          .filter(Boolean)
-          .slice(0, 6),
-        keywords: (context.req.query("keywords") ?? "")
-          .split(",")
-          .map((keyword) => keyword.trim())
-          .filter(Boolean)
-          .slice(0, 6),
-        providerIds: validProviderIds((context.req.query("providers") ?? "").split(",")),
-        query: (context.req.query("query") ?? "").trim().slice(0, 120),
+        genres: queryList(context, "genres", FACET_LIMIT),
+        keywords: queryList(context, "keywords", FACET_LIMIT),
+        providerIds: validProviderIds(queryList(context, "providers", PROVIDER_LIMIT)),
+        query: queryText(context, "query", QUERY_LIMIT),
         sort:
           sortParam === "score" || sortParam === "recent" || sortParam === "trending"
             ? sortParam
             : "popularity",
-        page: Number.isInteger(page) && page > 0 ? Math.min(page, 80) : 0,
+        page: queryInteger(context, "page", 0, 0, MAX_BROWSE_PAGE),
       }),
     );
   } catch (error) {
@@ -208,7 +197,7 @@ catalogRoutes.get("/browse", edgeCache(120), async (context) => {
 });
 
 catalogRoutes.get("/items", edgeCache(900), async (context) => {
-  const ids = (context.req.query("ids") ?? "").split(",").filter(Boolean).slice(0, 30);
+  const ids = queryList(context, "ids", ITEMS_LIMIT);
 
   try {
     context.header("cache-control", "public, max-age=900");
@@ -253,9 +242,9 @@ catalogRoutes.get("/people/:name", async (context) => {
 });
 
 catalogRoutes.get("/collections/:id", edgeCache(3_600), async (context) => {
-  const collectionId = Number(context.req.param("id"));
+  const collectionId = pathInteger(context, "id", 1, MAX_TMDB_ID);
 
-  if (!Number.isInteger(collectionId) || collectionId < 1) {
+  if (collectionId === null) {
     return context.json({ error: "Unknown collection" }, 400);
   }
 
@@ -291,9 +280,9 @@ catalogRoutes.get("/providers", edgeCache(300), async (context) => {
 });
 
 catalogRoutes.get("/tv/:tmdbId/seasons", edgeCache(3_600), async (context) => {
-  const tmdbId = Number(context.req.param("tmdbId"));
+  const tmdbId = pathInteger(context, "tmdbId", 1, MAX_TMDB_ID);
 
-  if (!Number.isInteger(tmdbId) || tmdbId < 1) {
+  if (tmdbId === null) {
     return context.json({ error: "Unknown series" }, 404);
   }
 
@@ -311,14 +300,10 @@ catalogRoutes.get("/tv/:tmdbId/seasons", edgeCache(3_600), async (context) => {
 });
 
 catalogRoutes.get("/tv/:tmdbId/seasons/:seasonNumber", edgeCache(3_600), async (context) => {
-  const tmdbId = Number(context.req.param("tmdbId"));
-  const seasonNumber = Number(context.req.param("seasonNumber"));
+  const tmdbId = pathInteger(context, "tmdbId", 1, MAX_TMDB_ID);
+  const seasonNumber = pathInteger(context, "seasonNumber", 0, SEASON_LIMIT);
 
-  if (!Number.isInteger(tmdbId) || tmdbId < 1 || !Number.isInteger(seasonNumber)) {
-    return context.json({ error: "Unknown season" }, 404);
-  }
-
-  if (seasonNumber < 0 || seasonNumber > SEASON_LIMIT) {
+  if (tmdbId === null || seasonNumber === null) {
     return context.json({ error: "Unknown season" }, 404);
   }
 
@@ -341,9 +326,9 @@ catalogRoutes.get("/tv/:tmdbId/seasons/:seasonNumber", edgeCache(3_600), async (
 
 catalogRoutes.get("/:mediaType/:tmdbId/availability", edgeCache(900), async (context) => {
   const mediaType = context.req.param("mediaType");
-  const tmdbId = Number(context.req.param("tmdbId"));
+  const tmdbId = pathInteger(context, "tmdbId", 1, MAX_TMDB_ID);
 
-  if ((mediaType !== "movie" && mediaType !== "tv") || !Number.isInteger(tmdbId) || tmdbId < 1) {
+  if ((mediaType !== "movie" && mediaType !== "tv") || tmdbId === null) {
     return context.json({ error: "Unknown title" }, 404);
   }
 

@@ -77,6 +77,8 @@ export function RevivalReview({ revision: outerRevision = 0 }: { revision?: numb
       .then((response) => {
         setData(response);
         setError("");
+
+        return response;
       })
       .catch((caught: unknown) => {
         if (!controller.signal.aborted) {

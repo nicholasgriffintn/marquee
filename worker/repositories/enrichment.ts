@@ -1,4 +1,5 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
+import { logEvent } from "../lib/logging.ts";
 import type { Bindings, EnrichmentSource } from "../types.ts";
 import { readRawItems } from "./catalog-reader.ts";
 
@@ -18,7 +19,7 @@ export async function storeEnrichment<S extends Exclude<EnrichmentSource, "watch
   const enrichedTitle = title ? ({ ...title, ...fields } satisfies MediaTitle) : null;
 
   if (!enrichedTitle) {
-    console.log(JSON.stringify({ event: "enrichment_title_unreadable", titleId, source }));
+    logEvent("enrichment_title_unreadable", { titleId, source });
   }
 
   await env.DB.batch([

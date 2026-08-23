@@ -2213,6 +2213,10 @@ h2 em {
   position: relative;
   width: min(92vw, 1060px);
 }
+.detail-panel-missing {
+  grid-template-columns: 1fr;
+  place-items: center;
+}
 @keyframes panel-in {
   from {
     transform: translateX(100%);

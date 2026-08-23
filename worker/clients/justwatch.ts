@@ -1,6 +1,10 @@
 import type { MediaType } from "../../src/domain/catalog.ts";
 import { parseJustwatchAvailability } from "../lib/justwatch-payload.ts";
 import { isRecord } from "../lib/values.ts";
+import { upstreamFetch } from "./fetch.ts";
+import { upstreamError } from "./upstream.ts";
+
+const TIMEOUT_MS = 12_000;
 
 const API_URL = "https://apis.justwatch.com/graphql";
 const COUNTRY = "GB";
@@ -31,15 +35,7 @@ const AVAILABILITY_QUERY = `query MarqueeTitleOffers($country: Country!, $langua
   }
 }`;
 
-export class JustwatchError extends Error {
-  constructor(
-    message: string,
-    readonly status = 502,
-  ) {
-    super(message);
-    this.name = "JustwatchError";
-  }
-}
+export const JustwatchError = upstreamError("JustwatchError");
 
 export async function getJustwatchAvailability(
   mediaType: MediaType,
@@ -50,12 +46,10 @@ export async function getJustwatchAvailability(
     return null;
   }
 
-  const response = await fetch(API_URL, {
+  const response = await upstreamFetch(API_URL, {
     method: "POST",
-    headers: {
-      accept: "application/json",
-      "content-type": "application/json",
-    },
+    headers: { "content-type": "application/json" },
+    timeoutMs: TIMEOUT_MS,
     body: JSON.stringify({
       operationName: "MarqueeTitleOffers",
       query: AVAILABILITY_QUERY,
@@ -70,7 +64,6 @@ export async function getJustwatchAvailability(
         },
       },
     }),
-    signal: AbortSignal.timeout(12_000),
   });
 
   if (!response.ok) {

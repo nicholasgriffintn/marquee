@@ -6,6 +6,7 @@ import { requireAuthentication, type AuthVariables } from "../auth/session.ts";
 import { recordEvent } from "../lib/events.ts";
 import { jsonResponse, readJsonObject } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
+import { queryInteger, queryText } from "../lib/params.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { isRecord } from "../lib/values.ts";
 import { recentExitFor, recordSignal } from "../repositories/signals.ts";
@@ -20,6 +21,9 @@ import {
 import type { Bindings } from "../types.ts";
 
 const IMPORT_BATCH = 100;
+const MAX_SHELF_PAGE = 500;
+const GENRE_LIMIT = 60;
+const QUERY_LIMIT = 80;
 
 export const profileRoutes = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
 
@@ -57,18 +61,15 @@ profileRoutes.get("/entry/:titleId", async (context) => {
 
 profileRoutes.get("/shelf", async (context) => {
   const user = context.get("authenticatedUser");
-  const requestedPage = Number.parseInt(context.req.query("page") ?? "0", 10);
-  const page =
-    Number.isInteger(requestedPage) && requestedPage > 0 ? Math.min(requestedPage, 500) : 0;
   const sortParam = context.req.query("sort");
 
   try {
     const shelf = await getShelf(context.env.DB, user.id, {
       status: shelfStatus(context.req.query("status")),
-      genre: (context.req.query("genre") ?? "").trim().slice(0, 60) || null,
-      query: (context.req.query("q") ?? "").trim().slice(0, 80),
+      genre: queryText(context, "genre", GENRE_LIMIT) || null,
+      query: queryText(context, "q", QUERY_LIMIT),
       sort: isShelfSort(sortParam) ? sortParam : "added",
-      page,
+      page: queryInteger(context, "page", 0, 0, MAX_SHELF_PAGE),
       pageSize: SHELF_PAGE_SIZE,
     });
 

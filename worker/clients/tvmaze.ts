@@ -1,16 +1,13 @@
 import { numberAt, records, recordAt, stringAt } from "../lib/values.ts";
+import { upstreamFetch } from "./fetch.ts";
+import { upstreamError } from "./upstream.ts";
+
+const TIMEOUT_MS = 15_000;
+const CACHE_TTL = 3_600;
 
 const API_BASE = "https://api.tvmaze.com";
 
-export class TvmazeError extends Error {
-  constructor(
-    message: string,
-    readonly status = 502,
-  ) {
-    super(message);
-    this.name = "TvmazeError";
-  }
-}
+export const TvmazeError = upstreamError("TvmazeError");
 
 export type ScheduledEpisode = {
   id: string;
@@ -54,11 +51,7 @@ function scheduleUrl(countryCode: string | null, date: string) {
 export async function getTvmazeSchedule(countryCode: string | null, date: string) {
   const url = scheduleUrl(countryCode, date);
 
-  const response = await fetch(url, {
-    headers: { accept: "application/json" },
-    signal: AbortSignal.timeout(15_000),
-    cf: { cacheEverything: true, cacheTtl: 3_600 },
-  });
+  const response = await upstreamFetch(url, { timeoutMs: TIMEOUT_MS, cacheTtl: CACHE_TTL });
 
   if (!response.ok) {
     throw new TvmazeError(`TVmaze request failed (${response.status})`, response.status);

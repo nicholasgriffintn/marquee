@@ -1,7 +1,5 @@
-import { useEffect, useState } from "react";
-
 import type { MediaTitle } from "../domain/catalog";
-import { requestJson } from "../lib/api";
+import { useResource } from "./useResource";
 
 export type ScheduledEpisode = {
   titleId: string | null;
@@ -16,24 +14,12 @@ export type ScheduledEpisode = {
 
 type TonightResponse = { episodes: ScheduledEpisode[]; fetchedAt: string };
 
+const NO_EPISODES: ScheduledEpisode[] = [];
+
 export function useTonight(isReady: boolean, limit: number) {
-  const [episodes, setEpisodes] = useState<ScheduledEpisode[]>([]);
+  const { data } = useResource<TonightResponse>(`/api/catalog/tonight?limit=${limit}`, {
+    enabled: isReady,
+  });
 
-  useEffect(() => {
-    if (!isReady) {
-      return;
-    }
-
-    const controller = new AbortController();
-
-    requestJson<TonightResponse>(`/api/catalog/tonight?limit=${limit}`, {
-      signal: controller.signal,
-    })
-      .then((response) => setEpisodes(response.episodes))
-      .catch(() => setEpisodes([]));
-
-    return () => controller.abort();
-  }, [isReady, limit]);
-
-  return episodes;
+  return data?.episodes ?? NO_EPISODES;
 }

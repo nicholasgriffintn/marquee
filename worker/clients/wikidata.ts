@@ -1,18 +1,15 @@
 import { isRecord, records, stringAt } from "../lib/values.ts";
+import { upstreamFetch } from "./fetch.ts";
+import { upstreamError } from "./upstream.ts";
+
+const TIMEOUT_MS = 20_000;
+const CACHE_TTL = 604_800;
 
 const SPARQL_ENDPOINT = "https://query.wikidata.org/sparql";
 const USER_AGENT = "Marquee/1.0 (personal streaming discovery; https://marquee.pashi.app)";
 const BATCH = 60;
 
-export class WikidataError extends Error {
-  constructor(
-    message: string,
-    readonly status = 502,
-  ) {
-    super(message);
-    this.name = "WikidataError";
-  }
-}
+export const WikidataError = upstreamError("WikidataError");
 
 function articleTitle(url: string) {
   const match = /\/wiki\/(.+)$/u.exec(url);
@@ -31,10 +28,10 @@ async function queryBatch(imdbIds: string[]) {
 
   url.search = new URLSearchParams({ query, format: "json" }).toString();
 
-  const response = await fetch(url, {
+  const response = await upstreamFetch(url, {
     headers: { accept: "application/sparql-results+json", "user-agent": USER_AGENT },
-    signal: AbortSignal.timeout(20_000),
-    cf: { cacheEverything: true, cacheTtl: 604_800 },
+    timeoutMs: TIMEOUT_MS,
+    cacheTtl: CACHE_TTL,
   });
 
   if (!response.ok) {

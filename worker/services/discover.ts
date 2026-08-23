@@ -1,5 +1,6 @@
 import type { MediaType } from "../../src/domain/catalog.ts";
 import { measureDiscoverWindow, TMDB_MAX_PAGES, TMDB_PAGE_SIZE } from "../clients/tmdb.ts";
+import { logEvent } from "../lib/logging.ts";
 import { enqueue } from "../lib/queue.ts";
 import {
   addDays,
@@ -103,7 +104,7 @@ export async function measureDiscoverPartition(env: Bindings, id: string) {
       },
     ]);
 
-    console.log(JSON.stringify({ event: "discover_partition_split", partition: id, totalResults }));
+    logEvent("discover_partition_split", { partition: id, totalResults });
 
     return;
   }
@@ -112,16 +113,13 @@ export async function measureDiscoverPartition(env: Bindings, id: string) {
 
   await markPartitionMeasured(env.DB, id, totalResults, reachable);
 
-  console.log(
-    JSON.stringify({
-      event: "discover_partition_measured",
-      partition: id,
-      totalResults,
-      totalPages,
-      reachable,
-      truncated: totalPages > TMDB_MAX_PAGES,
-    }),
-  );
+  logEvent("discover_partition_measured", {
+    partition: id,
+    totalResults,
+    totalPages,
+    reachable,
+    truncated: totalPages > TMDB_MAX_PAGES,
+  });
 }
 
 export async function advanceDiscoverFrontier(env: Bindings) {
@@ -175,17 +173,14 @@ export async function advanceDiscoverFrontier(env: Bindings) {
 
   const pages = PAGES_PER_SWEEP - remaining;
 
-  console.log(
-    JSON.stringify({
-      event: "discover_frontier_advanced",
-      seeded,
-      requeued,
-      reopened,
-      measuring: pending.length,
-      pages,
-      titles: pages * TMDB_PAGE_SIZE,
-    }),
-  );
+  logEvent("discover_frontier_advanced", {
+    seeded,
+    requeued,
+    reopened,
+    measuring: pending.length,
+    pages,
+    titles: pages * TMDB_PAGE_SIZE,
+  });
 
   return { seeded, requeued, reopened, measuring: pending.length, pages };
 }

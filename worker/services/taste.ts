@@ -1,4 +1,5 @@
-import { logError } from "../lib/logging.ts";
+import { logError, logEvent } from "../lib/logging.ts";
+import { normalise } from "../lib/vector.ts";
 import type { Bindings, ViewerContext, ViewingContext } from "../types.ts";
 import { embedQuery, readVectors } from "./embeddings.ts";
 import { preferenceSummary, type ViewerPreferences } from "./usher.ts";
@@ -121,12 +122,6 @@ function blend(vectors: { values: number[]; weight: number }[]) {
   return result;
 }
 
-function normalise(vector: number[]) {
-  const length = Math.sqrt(vector.reduce((total, value) => total + value * value, 0));
-
-  return length > 0 ? vector.map((value) => value / length) : vector;
-}
-
 export async function behaviourVector(env: Bindings, weighted: WeightedTitle[]) {
   if (weighted.length === 0) {
     return null;
@@ -202,7 +197,7 @@ export async function tasteVector(
     (value, index) => value * (1 - weight) + (stated[index] ?? 0) * weight,
   );
 
-  console.log(JSON.stringify({ event: "taste_blended", weight: Math.round(weight * 100) / 100 }));
+  logEvent("taste_blended", { weight: Math.round(weight * 100) / 100 });
 
   return normalise(blended);
 }

@@ -1,3 +1,5 @@
+import { slugify } from "./slug";
+
 export type RevivalSource = "archive" | "loc" | "europeana";
 
 export type RevivalKind = "feature" | "short" | "episode" | "ephemeral";
@@ -162,12 +164,7 @@ export function runtimeBand(seconds: number | null) {
 }
 
 export function tagSlug(value: string) {
-  return value
-    .toLowerCase()
-    .normalize("NFKD")
-    .replaceAll(/[^a-z0-9]+/gu, "-")
-    .replaceAll(/^-|-$/gu, "")
-    .slice(0, 60);
+  return slugify(value);
 }
 
 export function runtimeLabel(seconds: number | null) {

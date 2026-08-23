@@ -1,6 +1,10 @@
 import { parseAssistantMessage, type ChatMessage } from "../lib/curator-payload.ts";
+import { logEvent } from "../lib/logging.ts";
 import { isRecord } from "../lib/values.ts";
 import type { Bindings } from "../types.ts";
+import { upstreamError } from "./upstream.ts";
+
+export const AiGatewayError = upstreamError("AiGatewayError");
 
 function assertConfiguration(env: Bindings) {
   if (!env.CLOUDFLARE_API_TOKEN) {
@@ -39,16 +43,6 @@ function isRetryable(error: unknown) {
   );
 }
 
-export class AiGatewayError extends Error {
-  constructor(
-    message: string,
-    readonly status: number,
-  ) {
-    super(message);
-    this.name = "AiGatewayError";
-  }
-}
-
 export async function requestAiCompletion(
   env: Bindings,
   messages: ChatMessage[],
@@ -80,13 +74,10 @@ export async function requestAiCompletion(
         throw error;
       }
 
-      console.log(
-        JSON.stringify({
-          event: "ai_model_fallback",
-          from: candidate,
-          status: error instanceof AiGatewayError ? error.status : null,
-        }),
-      );
+      logEvent("ai_model_fallback", {
+        from: candidate,
+        status: error instanceof AiGatewayError ? error.status : null,
+      });
     }
   }
 

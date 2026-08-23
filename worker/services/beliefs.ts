@@ -1,5 +1,6 @@
 import type { Belief } from "../../src/domain/notebook.ts";
 import { logError } from "../lib/logging.ts";
+import { jsonStringList } from "../lib/values.ts";
 import {
   activeBeliefs,
   readBeliefs,
@@ -45,22 +46,6 @@ type TitleFacts = {
 
 type FactRow = { id: string; genres: string | null; people: string | null; runtime: number | null };
 
-function parseList(value: string | null) {
-  if (!value) {
-    return [];
-  }
-
-  try {
-    const parsed: unknown = JSON.parse(value);
-
-    return Array.isArray(parsed)
-      ? parsed.filter((entry): entry is string => typeof entry === "string")
-      : [];
-  } catch {
-    return [];
-  }
-}
-
 async function factsFor(db: D1Database, titleIds: string[]): Promise<TitleFacts[]> {
   if (titleIds.length === 0) {
     return [];
@@ -80,8 +65,8 @@ async function factsFor(db: D1Database, titleIds: string[]): Promise<TitleFacts[
 
   return rows.results.map((row) => ({
     titleId: row.id,
-    genres: canonicalGenres(parseList(row.genres)),
-    people: parseList(row.people),
+    genres: canonicalGenres(jsonStringList(row.genres)),
+    people: jsonStringList(row.people),
     runtimeMinutes: row.runtime,
   }));
 }

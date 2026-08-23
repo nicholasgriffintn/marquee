@@ -1,4 +1,5 @@
 import { logError } from "../lib/logging.ts";
+import { clamp } from "../lib/numbers.ts";
 
 const CREDIT_LIMIT = 400_000;
 
@@ -58,7 +59,7 @@ export async function readPersonTitleIds(db: D1Database, name: string, limit = 4
           ORDER BY COALESCE(t.year, 0) DESC, t.popularity DESC
           LIMIT ?2`,
       )
-      .bind(term, Math.max(1, Math.min(96, limit)))
+      .bind(term, clamp(limit, 1, 96))
       .all<{ titleId: string }>();
 
     return rows.results.map((row) => row.titleId);

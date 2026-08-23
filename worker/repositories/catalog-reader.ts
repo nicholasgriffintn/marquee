@@ -5,6 +5,7 @@ import {
   parseStoredTitleIds,
 } from "../lib/catalog-payload.ts";
 import { logError } from "../lib/logging.ts";
+import { clamp } from "../lib/numbers.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { searchTitlesFirst } from "./catalog-search.ts";
 
@@ -263,7 +264,7 @@ export async function readCollectionTitleIds(db: D1Database, collectionId: numbe
        ORDER BY COALESCE(json_extract(payload, '$.releaseDate'), '9999-12-31'), popularity DESC
        LIMIT ?2`,
     )
-    .bind(collectionId, Math.max(1, Math.min(48, limit)))
+    .bind(collectionId, clamp(limit, 1, 48))
     .all<{ id: string }>();
 
   return rows.results.map((row) => row.id);

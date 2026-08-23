@@ -1,18 +1,24 @@
-import { isRecord, numberAt, records, stringAt } from "../lib/values.ts";
+import { clamp } from "../lib/numbers.ts";
+import { isRecord, numberAt, recordAt, records, stringAt } from "../lib/values.ts";
 import type { Bindings } from "../types.ts";
+import { upstreamFetch } from "./fetch.ts";
+import { upstreamError } from "./upstream.ts";
 
 const API_BASE = "https://api.trakt.tv";
 const API_VERSION = "2";
+const TOKEN_TIMEOUT_MS = 12_000;
+const READ_TIMEOUT_MS = 15_000;
+const WRITE_TIMEOUT_MS = 20_000;
 
-export class TraktError extends Error {
-  constructor(
-    message: string,
-    readonly status = 502,
-  ) {
-    super(message);
-    this.name = "TraktError";
-  }
+function traktHeaders(env: Bindings, accessToken: string) {
+  return {
+    authorization: `Bearer ${accessToken}`,
+    "trakt-api-version": API_VERSION,
+    "trakt-api-key": env.TRAKT_CLIENT_ID ?? "",
+  };
 }
+
+export const TraktError = upstreamError("TraktError");
 
 export type TraktTokens = {
   accessToken: string;
@@ -77,15 +83,15 @@ function parseTokens(payload: unknown): TraktTokens {
 async function requestToken(env: Bindings, body: Record<string, string>) {
   assertConfigured(env);
 
-  const response = await fetch(`${API_BASE}/oauth/token`, {
+  const response = await upstreamFetch(`${API_BASE}/oauth/token`, {
     method: "POST",
-    headers: { "content-type": "application/json", accept: "application/json" },
+    headers: { "content-type": "application/json" },
     body: JSON.stringify({
       ...body,
       client_id: env.TRAKT_CLIENT_ID,
       client_secret: env.TRAKT_CLIENT_SECRET,
     }),
-    signal: AbortSignal.timeout(12_000),
+    timeoutMs: TOKEN_TIMEOUT_MS,
   });
 
   if (!response.ok) {
@@ -110,14 +116,9 @@ export function refreshTraktTokens(env: Bindings, refreshToken: string, redirect
 async function requestTrakt(env: Bindings, path: string, accessToken: string) {
   assertConfigured(env);
 
-  const response = await fetch(`${API_BASE}${path}`, {
-    headers: {
-      accept: "application/json",
-      authorization: `Bearer ${accessToken}`,
-      "trakt-api-version": API_VERSION,
-      "trakt-api-key": env.TRAKT_CLIENT_ID as string,
-    },
-    signal: AbortSignal.timeout(15_000),
+  const response = await upstreamFetch(`${API_BASE}${path}`, {
+    headers: traktHeaders(env, accessToken),
+    timeoutMs: READ_TIMEOUT_MS,
   });
 
   if (response.status === 401) {
@@ -138,33 +139,29 @@ export type TraktPushItem = {
   rating?: number;
 };
 
-function pushBody(items: TraktPushItem[]) {
-  const entry = (item: TraktPushItem) => ({
+function pushEntry(item: TraktPushItem) {
+  return {
     ids: { tmdb: item.tmdbId },
     ...(item.watchedAt ? { watched_at: item.watchedAt } : {}),
     ...(item.rating ? { rating: item.rating } : {}),
-  });
+  };
+}
 
+function pushBody(items: TraktPushItem[]) {
   return {
-    movies: items.filter((item) => item.mediaType === "movie").map(entry),
-    shows: items.filter((item) => item.mediaType === "tv").map(entry),
+    movies: items.filter((item) => item.mediaType === "movie").map(pushEntry),
+    shows: items.filter((item) => item.mediaType === "tv").map(pushEntry),
   };
 }
 
 async function postTrakt(env: Bindings, path: string, accessToken: string, body: unknown) {
   assertConfigured(env);
 
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await upstreamFetch(`${API_BASE}${path}`, {
     method: "POST",
-    headers: {
-      accept: "application/json",
-      "content-type": "application/json",
-      authorization: `Bearer ${accessToken}`,
-      "trakt-api-version": API_VERSION,
-      "trakt-api-key": env.TRAKT_CLIENT_ID as string,
-    },
+    headers: { ...traktHeaders(env, accessToken), "content-type": "application/json" },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(20_000),
+    timeoutMs: WRITE_TIMEOUT_MS,
   });
 
   if (response.status === 401) {
@@ -233,7 +230,7 @@ function parseEntries(payload: unknown, mediaType: "movie" | "tv"): TraktEntry[]
   const key = mediaType === "movie" ? "movie" : "show";
 
   return records(payload).flatMap((item): TraktEntry[] => {
-    const container = isRecord(item[key]) ? (item[key] as Record<string, unknown>) : null;
+    const container = recordAt(item, key);
     const { tmdbId, imdbId } = idsOf(container);
 
     if (!tmdbId) {
@@ -286,13 +283,13 @@ export async function getTraktCalendar(env: Bindings, accessToken: string, days 
   const start = new Date().toISOString().slice(0, 10);
   const payload = await requestTrakt(
     env,
-    `/calendars/my/shows/${start}/${Math.max(1, Math.min(33, days))}`,
+    `/calendars/my/shows/${start}/${clamp(days, 1, 33)}`,
     accessToken,
   );
 
   return records(payload).flatMap((item): TraktEpisode[] => {
-    const show = isRecord(item.show) ? (item.show as Record<string, unknown>) : null;
-    const episode = isRecord(item.episode) ? (item.episode as Record<string, unknown>) : null;
+    const show = recordAt(item, "show");
+    const episode = recordAt(item, "episode");
     const airsAt = stringAt(item, "first_aired");
     const showName = show ? stringAt(show, "title") : null;
 

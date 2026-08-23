@@ -12,7 +12,8 @@ import {
   type TraktEntry,
   type TraktPushItem,
 } from "../clients/trakt.ts";
-import { logError } from "../lib/logging.ts";
+import { logError, logEvent } from "../lib/logging.ts";
+import { clamp } from "../lib/numbers.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { databaseDate } from "../lib/values.ts";
 import { storeItems } from "../repositories/catalog-writer.ts";
@@ -68,7 +69,7 @@ function titleIdOf(entry: TraktEntry) {
 }
 
 function marqueeRating(rating: number | null) {
-  return rating === null ? null : Math.max(1, Math.min(5, Math.round(rating / 2)));
+  return rating === null ? null : clamp(Math.round(rating / 2), 1, 5);
 }
 
 type Planned = { titleId: string; status: EntryStatus; rating: number | null };
@@ -137,7 +138,7 @@ async function hydrateMissing(env: Bindings, titleIds: string[]) {
 
   await storeItems(env.DB, titles, new Date().toISOString());
 
-  console.log(JSON.stringify({ event: "trakt_titles_hydrated", count: titles.length }));
+  logEvent("trakt_titles_hydrated", { count: titles.length });
 }
 
 export async function importTraktHistory(env: Bindings, viewerId: string, origin: string) {
@@ -180,7 +181,7 @@ export async function importTraktHistory(env: Bindings, viewerId: string, origin
 
   await markLinkSynced(env, viewerId, "trakt");
 
-  console.log(JSON.stringify({ event: "trakt_history_imported", entries: planned.length }));
+  logEvent("trakt_history_imported", { entries: planned.length });
 
   return planned.length;
 }
@@ -276,7 +277,7 @@ export async function exportTraktShelf(env: Bindings, viewerId: string, origin: 
     }
 
     if (row.rating) {
-      ratings.push({ ...item, rating: Math.max(1, Math.min(10, row.rating * 2)) });
+      ratings.push({ ...item, rating: clamp(row.rating * 2, 1, 10) });
     }
   }
 
@@ -286,7 +287,7 @@ export async function exportTraktShelf(env: Bindings, viewerId: string, origin: 
 
   await markLinkPushed(env, viewerId, "trakt");
 
-  console.log(JSON.stringify({ event: "trakt_shelf_pushed", watched, rated, listed }));
+  logEvent("trakt_shelf_pushed", { watched, rated, listed });
 
   return { watched, rated, listed, considered: rows.results.length };
 }

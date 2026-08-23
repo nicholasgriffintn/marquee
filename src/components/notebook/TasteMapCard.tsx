@@ -11,8 +11,7 @@ import {
   type MapPoint,
   type TasteMapResponse,
 } from "../../domain/notebook";
-import { artwork, artworkSrcSet } from "../../lib/media";
-import { TitleImage } from "../TitleImage";
+import { TitleArt } from "../TitleArt";
 
 const POSTER_WIDTH = 92;
 const STARS = [1, 2, 3, 4, 5];
@@ -60,11 +59,11 @@ export const TasteMapCard = memo(function TasteMapCard({
       <div className="taste-card-head">
         <div className="taste-card-art">
           {artReady && (
-            <TitleImage
-              src={artwork(point.posterUrl, POSTER_WIDTH)}
-              srcSet={artworkSrcSet(point.posterUrl, POSTER_WIDTH)}
+            <TitleArt
+              url={point.posterUrl}
               seed={point.titleId}
               label={point.title}
+              width={POSTER_WIDTH}
               eager
             />
           )}

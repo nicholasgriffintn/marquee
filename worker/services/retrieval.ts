@@ -1,5 +1,6 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
 import { logError } from "../lib/logging.ts";
+import { clamp } from "../lib/numbers.ts";
 import { isRecord } from "../lib/values.ts";
 import { searchCatalogue, type CatalogueSearch } from "../repositories/catalog-search.ts";
 import type { Bindings } from "../types.ts";
@@ -79,7 +80,7 @@ async function vectorCandidates(env: Bindings, query: RetrievalQuery, text: stri
 }
 
 export async function retrieveTitles(env: Bindings, query: RetrievalQuery) {
-  const limit = Math.max(1, Math.min(40, query.limit ?? 12));
+  const limit = clamp(query.limit ?? 12, 1, 40);
   const text = query.text?.trim() || query.query?.trim() || "";
   const keywordSearch: CatalogueSearch = {
     ...query,

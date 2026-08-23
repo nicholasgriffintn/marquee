@@ -95,7 +95,7 @@ export function UsherPage() {
     const root = rootRef.current;
 
     if (!root || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      return;
+      return undefined;
     }
 
     const scenes = [...root.querySelectorAll<HTMLElement>(".reel-scene")];

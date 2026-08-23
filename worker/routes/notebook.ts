@@ -7,6 +7,7 @@ import { jsonResponse, readJsonObject } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
 import { retryTransient } from "../lib/retry.ts";
 import { canonicalOrigin } from "../lib/security.ts";
+import { stringList } from "../lib/values.ts";
 import {
   readAlertEmail,
   readAlertSettings,
@@ -75,6 +76,12 @@ notebookRoutes.get("/", async (context) => {
 });
 
 const CONFIRM_MINUTES = 60;
+const GUEST_TRAITS = 8;
+const GUEST_TRAIT_LENGTH = 40;
+
+function guestList(value: unknown) {
+  return stringList(value, { limit: GUEST_TRAITS, itemLength: GUEST_TRAIT_LENGTH });
+}
 
 notebookRoutes.get("/alerts", async (context) => {
   const user = context.get("authenticatedUser");
@@ -236,16 +243,6 @@ notebookRoutes.get("/guests", async (context) => {
   return jsonResponse({ guests: await readGuests(context.env.DB, user.id) });
 });
 
-function stringList(value: unknown) {
-  return Array.isArray(value)
-    ? value
-        .filter((entry): entry is string => typeof entry === "string")
-        .map((entry) => entry.trim().slice(0, 40))
-        .filter(Boolean)
-        .slice(0, 8)
-    : [];
-}
-
 notebookRoutes.post("/guests", async (context) => {
   const user = context.get("authenticatedUser");
   const body = await readJsonObject(context.req.raw);
@@ -265,8 +262,8 @@ notebookRoutes.post("/guests", async (context) => {
     await saveGuest(context.env.DB, user.id, {
       ...(id ? { id } : {}),
       name,
-      vetoes: stringList(body?.vetoes),
-      leanings: stringList(body?.leanings),
+      vetoes: guestList(body?.vetoes),
+      leanings: guestList(body?.leanings),
     });
 
     return jsonResponse({ guests: await readGuests(context.env.DB, user.id) });

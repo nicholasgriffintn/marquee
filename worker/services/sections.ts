@@ -1,7 +1,8 @@
 import type { SectionAudience } from "../../src/domain/catalog.ts";
 import { providerRegistryIds } from "../../src/domain/providers.ts";
-import { logError } from "../lib/logging.ts";
+import { logError, logEvent } from "../lib/logging.ts";
 import { blendedRatingSql } from "../lib/ratings.ts";
+import { titleCase } from "../lib/text.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import type { Bindings } from "../types.ts";
 
@@ -15,7 +16,7 @@ const ROTATING_MOODS = 2;
 const ROTATING_STUDIOS = 2;
 const SERVICE_ROWS = 10;
 
-const JUNK_KEYWORDS = ["duringcreditsstinger", "aftercreditsstinger", "woman director"];
+const JUNK_KEYWORDS = new Set(["duringcreditsstinger", "aftercreditsstinger", "woman director"]);
 
 type Section = {
   id: string;
@@ -34,10 +35,6 @@ const STATUS = `COALESCE(json_extract(payload, '$.status'), '')`;
 const LANGUAGE = `COALESCE(json_extract(payload, '$.originalLanguage'), '')`;
 const REVENUE = `COALESCE(json_extract(payload, '$.revenue'), 0)`;
 const AWARD_WINS = `COALESCE(json_extract(payload, '$.ratings.awardWins'), 0)`;
-
-function titleCase(value: string) {
-  return value.replaceAll(/\b\w/gu, (character) => character.toUpperCase());
-}
 
 function dailySeed() {
   return Math.floor(Date.now() / 86_400_000);
@@ -99,11 +96,11 @@ async function topValues(env: Bindings, path: string, minimum: number, limit: nu
      LIMIT ?`,
   )
     .bind(path, minimum, limit)
-    .all<{ value: string; uses: number }>();
+    .all<{ value: unknown; uses: number }>();
 
   return rows.results
     .map((row) => row.value)
-    .filter((value) => typeof value === "string" && value.length > 1);
+    .filter((value): value is string => typeof value === "string" && value.length > 1);
 }
 
 async function topStudios(env: Bindings, limit: number): Promise<string[]> {
@@ -381,7 +378,7 @@ export async function buildSections(env: Bindings) {
   }
 
   const moods = (await topValues(env, "$.keywords", 60, 40)).filter(
-    (keyword) => !JUNK_KEYWORDS.includes(keyword) && !keyword.startsWith("based on"),
+    (keyword) => !JUNK_KEYWORDS.has(keyword) && !keyword.startsWith("based on"),
   );
 
   for (const mood of rotate(moods, ROTATING_MOODS, seed * 7)) {
@@ -430,14 +427,11 @@ export async function buildSections(env: Bindings) {
     ),
   ]);
 
-  console.log(
-    JSON.stringify({
-      event: "sections_built",
-      sections: chosen.length,
-      gated: chosen.filter((section) => section.audience?.providerIds?.length).length,
-      titles: chosen.reduce((total, section) => total + section.titleIds.length, 0),
-    }),
-  );
+  logEvent("sections_built", {
+    sections: chosen.length,
+    gated: chosen.filter((section) => section.audience?.providerIds?.length).length,
+    titles: chosen.reduce((total, section) => total + section.titleIds.length, 0),
+  });
 
   return chosen.length;
 }

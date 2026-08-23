@@ -46,6 +46,10 @@ function fold(line: string) {
   return folded;
 }
 
+function escapeUri(value: string) {
+  return value.replaceAll(/[\r\n]/gu, "");
+}
+
 function stamp(value: Date) {
   return `${value.toISOString().replaceAll(/[-:]/gu, "").slice(0, 15)}Z`;
 }
@@ -83,7 +87,7 @@ function eventLines(event: CalendarEvent, now: Date) {
     moment("DTEND", end),
     `SUMMARY:${escapeText(event.summary)}`,
     ...(event.description ? [`DESCRIPTION:${escapeText(event.description)}`] : []),
-    ...(event.url ? [`URL;VALUE=URI:${escapeText(event.url)}`] : []),
+    ...(event.url ? [`URL;VALUE=URI:${escapeUri(event.url)}`] : []),
     ...(event.categories?.length
       ? [`CATEGORIES:${event.categories.map(escapeText).join(",")}`]
       : []),

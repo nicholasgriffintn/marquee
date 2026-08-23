@@ -1,3 +1,4 @@
+import { logEvent } from "../lib/logging.ts";
 import type { Bindings, IngestionJob } from "../types.ts";
 import { executeIngestionJob } from "./ingestion.ts";
 
@@ -100,7 +101,7 @@ export async function pruneIngestionRuns(env: Bindings) {
     .bind(`-${RUN_RETENTION_DAYS} days`, RUN_PRUNE_LIMIT)
     .run();
 
-  console.log(JSON.stringify({ event: "ingestion_runs_pruned", removed: result.meta.changes }));
+  logEvent("ingestion_runs_pruned", { removed: result.meta.changes });
 
   return result.meta.changes;
 }

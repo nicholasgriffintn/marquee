@@ -1,0 +1,108 @@
+import { useEffect } from "react";
+
+import type { MediaTitle } from "../domain/catalog";
+import type { UsherMoment } from "../domain/usher";
+import type { EntryStatus, ViewingEntry } from "../types";
+import { DetailPanel } from "./detail/DetailPanel";
+import { UsherCard } from "./usher/UsherCard";
+import { UsherMark } from "./usher/UsherMark";
+
+function MissingTitle({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="detail-backdrop" role="presentation" onMouseDown={onClose}>
+      <dialog open className="detail-panel detail-panel-missing" aria-modal="true">
+        <button type="button" className="detail-close" onClick={onClose} aria-label="Close details">
+          ×
+        </button>
+        <div className="detail-copy search-empty lost">
+          <UsherMark face="unimpressed" crop="head" />
+          <h2>Not in the building.</h2>
+          <p>I have no record of that one. It may never have been booked here.</p>
+        </div>
+      </dialog>
+    </div>
+  );
+}
+
+export function TitleOverlay({
+  titleId,
+  title,
+  isMissing,
+  canSave,
+  entries,
+  usherMoment,
+  onUsherRequest,
+  onUsherAction,
+  onUsherDismiss,
+  availabilityEnabled,
+  onClose,
+  onOpen,
+  onSave,
+  onSaveEntry,
+  onRemove,
+  onStatus,
+  onUpdateDraft,
+  onTracked,
+  onLoadEntry,
+  selectedProviderIds,
+}: {
+  titleId: string;
+  title: MediaTitle | null;
+  isMissing: boolean;
+  canSave: boolean;
+  entries: Record<string, ViewingEntry>;
+  usherMoment: UsherMoment | null;
+  onUsherRequest: (titleId: string) => void;
+  onUsherAction: (moment: UsherMoment, actionId: string) => void;
+  onUsherDismiss: (scope: "once" | "kind") => void;
+  availabilityEnabled: boolean;
+  onClose: () => void;
+  onOpen: (item: MediaTitle) => void;
+  onSave: (item: MediaTitle) => void;
+  onSaveEntry: (entry: ViewingEntry) => void;
+  onRemove: (titleId: string) => void;
+  onStatus: (titleId: string, status: EntryStatus) => void;
+  onUpdateDraft: (titleId: string, patch: Partial<ViewingEntry>) => void;
+  onTracked: () => void;
+  onLoadEntry: (titleId: string) => Promise<void>;
+  selectedProviderIds: string[];
+}) {
+  const isSaved = Boolean(entries[titleId]);
+
+  useEffect(() => {
+    void onLoadEntry(titleId);
+  }, [onLoadEntry, titleId]);
+
+  useEffect(() => {
+    if (isSaved) {
+      onUsherRequest(titleId);
+    }
+  }, [isSaved, onUsherRequest, titleId]);
+
+  if (!title) {
+    return isMissing ? <MissingTitle onClose={onClose} /> : null;
+  }
+
+  return (
+    <DetailPanel
+      item={title}
+      canSave={canSave}
+      entry={entries[title.id]}
+      usherSlot={
+        usherMoment ? (
+          <UsherCard moment={usherMoment} onAction={onUsherAction} onDismiss={onUsherDismiss} />
+        ) : undefined
+      }
+      availabilityEnabled={availabilityEnabled}
+      onClose={onClose}
+      onOpen={onOpen}
+      onSave={onSave}
+      onSaveEntry={onSaveEntry}
+      onRemove={onRemove}
+      onStatus={onStatus}
+      onUpdateDraft={onUpdateDraft}
+      onTracked={onTracked}
+      selectedProviderIds={selectedProviderIds}
+    />
+  );
+}

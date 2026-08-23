@@ -1,3 +1,8 @@
+import type { EntryStatus } from "./domain/entries";
+
+export { isEntryStatus } from "./domain/entries";
+export type { EntryStatus };
+
 export type UserRole = "viewer" | "admin";
 
 export type User = {
@@ -7,14 +12,6 @@ export type User = {
   avatarUrl: string | null;
   role: UserRole;
 };
-
-export type EntryStatus = "watchlist" | "watching" | "watched" | "dropped";
-
-export function isEntryStatus(value: string): value is EntryStatus {
-  return (
-    value === "watchlist" || value === "watching" || value === "watched" || value === "dropped"
-  );
-}
 
 export type ViewingEntry = {
   id?: string;

@@ -4,6 +4,7 @@ import { bearerUser } from "../auth/api-tokens.ts";
 import type { MarqueeUser } from "../auth/model.ts";
 import { readJsonObject } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
+import { clamp } from "../lib/numbers.ts";
 import { canonicalOrigin } from "../lib/security.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { isRecord } from "../lib/values.ts";
@@ -259,8 +260,7 @@ async function callTool(
   }
 
   if (name === "whats_on_this_week") {
-    const days =
-      typeof input.days === "number" ? Math.max(1, Math.min(60, Math.round(input.days))) : 7;
+    const days = typeof input.days === "number" ? clamp(Math.round(input.days), 1, 60) : 7;
 
     return textResult({ days, entries: await readWeekAhead(env, user.id, days) });
   }

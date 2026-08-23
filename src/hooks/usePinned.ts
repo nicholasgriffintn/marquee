@@ -1,40 +1,17 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 
 import type { CatalogSection } from "../domain/catalog";
 import { jsonRequest, requestJson } from "../lib/api";
+import { useResource } from "./useResource";
 
-type PinnedResponse = { sections: CatalogSection[] };
+const NO_SECTIONS: CatalogSection[] = [];
 
 export function usePinned(isSignedIn: boolean) {
-  const [sections, setSections] = useState<CatalogSection[]>([]);
   const [pinnedPrompt, setPinnedPrompt] = useState("");
-  const [version, setVersion] = useState(0);
-  const [isResolved, setIsResolved] = useState(false);
-
-  useEffect(() => {
-    if (!isSignedIn) {
-      return;
-    }
-
-    const controller = new AbortController();
-
-    async function load() {
-      try {
-        const response = await requestJson<PinnedResponse>("/api/curator/pinned", {
-          signal: controller.signal,
-        });
-
-        setSections(response.sections);
-        setIsResolved(true);
-      } catch {
-        setIsResolved(true);
-      }
-    }
-
-    void load();
-
-    return () => controller.abort();
-  }, [isSignedIn, version]);
+  const { data, isLoading, reload } = useResource<{ sections: CatalogSection[] }>(
+    "/api/curator/pinned",
+    { enabled: isSignedIn },
+  );
 
   const pin = useCallback(
     async (shelf: { name: string; prompt: string; reason: string; titleIds: string[] }) => {
@@ -42,7 +19,7 @@ export function usePinned(isSignedIn: boolean) {
 
       try {
         await requestJson("/api/curator/pinned", jsonRequest("POST", shelf));
-        setVersion((current) => current + 1);
+        reload();
 
         return true;
       } catch {
@@ -51,21 +28,25 @@ export function usePinned(isSignedIn: boolean) {
         return false;
       }
     },
-    [],
+    [reload],
   );
 
-  const unpin = useCallback(async (sectionId: string) => {
-    const id = sectionId.replace(/^pinned-/u, "");
+  const unpin = useCallback(
+    async (sectionId: string) => {
+      const id = sectionId.replace(/^pinned-/u, "");
 
-    await requestJson(`/api/curator/pinned/${encodeURIComponent(id)}`, jsonRequest("DELETE")).catch(
-      () => undefined,
-    );
-    setVersion((current) => current + 1);
-  }, []);
+      await requestJson(
+        `/api/curator/pinned/${encodeURIComponent(id)}`,
+        jsonRequest("DELETE"),
+      ).catch(() => undefined);
+      reload();
+    },
+    [reload],
+  );
 
   return {
-    sections: isSignedIn ? sections : [],
-    isResolved: !isSignedIn || isResolved,
+    sections: isSignedIn ? (data?.sections ?? NO_SECTIONS) : NO_SECTIONS,
+    isResolved: !isSignedIn || !isLoading,
     pin,
     unpin,
     pinnedPrompt,

@@ -2,10 +2,12 @@ import { MEAN_SCORE, RATING_WEIGHTS, VOTE_PRIOR } from "../../src/domain/ratings
 
 type SqlRatingSource = { weight: number; guard: string; value: string; damped: string };
 
+function damped(score: string, votes: string) {
+  return `((${votes} * COALESCE(${score}, 0) + ${VOTE_PRIOR} * ${MEAN_SCORE}) / (${votes} + ${VOTE_PRIOR}))`;
+}
+
 function ratingSources(payload: string): SqlRatingSource[] {
   const at = (path: string) => `json_extract(${payload}, '$.${path}')`;
-  const damped = (score: string, votes: string) =>
-    `((${votes} * COALESCE(${score}, 0) + ${VOTE_PRIOR} * ${MEAN_SCORE}) / (${votes} + ${VOTE_PRIOR}))`;
   const tmdbScore = at("tmdbScore");
   const tmdbVotes = `COALESCE(${at("tmdbVoteCount")}, 0)`;
   const imdbScore = at("ratings.imdbScore");

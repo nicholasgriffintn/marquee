@@ -1,5 +1,5 @@
 import { eventsTable, queryAnalytics } from "../clients/analytics.ts";
-import { logError } from "../lib/logging.ts";
+import { logError, logEvent } from "../lib/logging.ts";
 import type { Bindings } from "../types.ts";
 
 const WINDOW_DAYS = 28;
@@ -101,7 +101,7 @@ export async function computeAngleScores(env: Bindings) {
     logError("angle_scores_write_failed", error);
   }
 
-  console.log(JSON.stringify({ event: "angle_scores", angles: scores.length }));
+  logEvent("angle_scores", { angles: scores.length });
 
   return scores;
 }

@@ -4,8 +4,8 @@ import type { MediaTitle } from "../../domain/catalog";
 import type { Guest } from "../../domain/notebook";
 import { orderPhrase, USHER_ORDER, type TonightOrder } from "../../domain/usher";
 import type { OrderResult, UsherOrderState } from "../../hooks/useUsher";
-import { artwork, artworkSrcSet, heroTitleClass, mediaMeta, scoreLabel } from "../../lib/media";
-import { ArtPlaceholder } from "../ArtPlaceholder";
+import { heroTitleClass, mediaMeta, scoreLabel } from "../../lib/media";
+import { TitleArt } from "../TitleArt";
 import { UsherMark } from "./UsherMark";
 
 function serviceLine(service: string) {
@@ -73,11 +73,14 @@ export function UsherOrder({
         >
           {pick?.item.backdropUrl && (
             <div className="hero-art" aria-hidden="true">
-              <img
-                src={artwork(pick.item.backdropUrl, 1280, "backdrop") ?? pick.item.backdropUrl}
-                srcSet={artworkSrcSet(pick.item.backdropUrl, 1280, "backdrop")}
-                alt=""
-                decoding="async"
+              <TitleArt
+                url={pick.item.backdropUrl}
+                seed={pick.item.id}
+                label={pick.item.title}
+                width={1280}
+                kind="backdrop"
+                wide
+                eager
               />
             </div>
           )}
@@ -165,17 +168,12 @@ export function UsherOrder({
                   onClick={() => onOpen(backup.item)}
                 >
                   <span className="usher-backup-art">
-                    {backup.item.posterUrl ? (
-                      <img
-                        src={artwork(backup.item.posterUrl, 160) ?? backup.item.posterUrl}
-                        srcSet={artworkSrcSet(backup.item.posterUrl, 160)}
-                        alt=""
-                        loading="lazy"
-                        decoding="async"
-                      />
-                    ) : (
-                      <ArtPlaceholder seed={backup.item.id} label={backup.item.title} />
-                    )}
+                    <TitleArt
+                      url={backup.item.posterUrl}
+                      seed={backup.item.id}
+                      label={backup.item.title}
+                      width={160}
+                    />
                   </span>
                   <span className="usher-backup-copy">
                     <strong>{backup.item.title}</strong>

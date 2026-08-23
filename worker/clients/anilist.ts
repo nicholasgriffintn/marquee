@@ -1,4 +1,8 @@
 import { numberAt, records, recordAt, stringAt } from "../lib/values.ts";
+import { upstreamFetch } from "./fetch.ts";
+import { upstreamError } from "./upstream.ts";
+
+const TIMEOUT_MS = 12_000;
 
 const API_BASE = "https://graphql.anilist.co";
 
@@ -12,15 +16,7 @@ const QUERY = `query ($id: Int) {
   }
 }`;
 
-export class AnilistError extends Error {
-  constructor(
-    message: string,
-    readonly status = 502,
-  ) {
-    super(message);
-    this.name = "AnilistError";
-  }
-}
+export const AnilistError = upstreamError("AnilistError");
 
 export type AnilistDetails = {
   score: number | null;
@@ -30,11 +26,11 @@ export type AnilistDetails = {
 };
 
 export async function getAnilistDetails(anilistId: number): Promise<AnilistDetails | null> {
-  const response = await fetch(API_BASE, {
+  const response = await upstreamFetch(API_BASE, {
     method: "POST",
-    headers: { "content-type": "application/json", accept: "application/json" },
+    headers: { "content-type": "application/json" },
     body: JSON.stringify({ query: QUERY, variables: { id: anilistId } }),
-    signal: AbortSignal.timeout(12_000),
+    timeoutMs: TIMEOUT_MS,
   });
 
   if (response.status === 404) {

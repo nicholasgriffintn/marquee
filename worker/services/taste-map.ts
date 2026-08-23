@@ -1,6 +1,8 @@
 import type { MediaTitle, MediaType } from "../../src/domain/catalog.ts";
 import { ratingSources } from "../../src/domain/ratings.ts";
 import { logError } from "../lib/logging.ts";
+import { clamp } from "../lib/numbers.ts";
+import { centre, cosine, dot, normalise } from "../lib/vector.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
 import { readViewerContext } from "../repositories/viewer-context.ts";
 import type { Bindings, EntryStatus, ViewingContext } from "../types.ts";
@@ -73,35 +75,6 @@ export type TasteMap = {
   axes: { x: MapAxis; y: MapAxis };
 };
 
-function centre(vectors: number[][]) {
-  const dimensions = vectors[0].length;
-  const mean = Array.from<number>({ length: dimensions }).fill(0);
-
-  for (const vector of vectors) {
-    for (let index = 0; index < dimensions; index += 1) {
-      mean[index] += (vector[index] ?? 0) / vectors.length;
-    }
-  }
-
-  return vectors.map((vector) => vector.map((value, index) => value - (mean[index] ?? 0)));
-}
-
-function normalise(vector: number[]) {
-  const length = Math.sqrt(vector.reduce((total, value) => total + value * value, 0));
-
-  return length > 0 ? vector.map((value) => value / length) : vector;
-}
-
-function dot(left: number[], right: number[]) {
-  let total = 0;
-
-  for (let index = 0; index < left.length; index += 1) {
-    total += (left[index] ?? 0) * (right[index] ?? 0);
-  }
-
-  return total;
-}
-
 function leadingComponent(rows: number[][], seed: number) {
   const dimensions = rows[0].length;
   let vector = Array.from({ length: dimensions }, (_, index) =>
@@ -142,12 +115,6 @@ function deflate(rows: number[][], component: number[]) {
   });
 }
 
-function cosine(left: number[], right: number[]) {
-  const scale = Math.sqrt(dot(left, left)) * Math.sqrt(dot(right, right));
-
-  return scale > 0 ? dot(left, right) / scale : 0;
-}
-
 function nearestNeighbours(vectors: number[][]) {
   return vectors.map((vector, index) => {
     const ranked: { index: number; score: number }[] = [];
@@ -176,10 +143,6 @@ function nearestNeighbours(vectors: number[][]) {
 
 type Placed = { x: number; y: number };
 
-function clamp(value: number) {
-  return Math.min(1, Math.max(0, value));
-}
-
 function relax(placed: Placed[]) {
   const spaced = placed.map((point) => ({ ...point }));
 
@@ -199,10 +162,10 @@ function relax(placed: Placed[]) {
         const angle = distance > 0 ? Math.atan2(dy, dx) : (left * 2.399963) % (Math.PI * 2);
         const push = (SEPARATION - distance) / 2;
 
-        spaced[left].x = clamp(spaced[left].x - Math.cos(angle) * push);
-        spaced[left].y = clamp(spaced[left].y - Math.sin(angle) * push);
-        spaced[right].x = clamp(spaced[right].x + Math.cos(angle) * push);
-        spaced[right].y = clamp(spaced[right].y + Math.sin(angle) * push);
+        spaced[left].x = clamp(spaced[left].x - Math.cos(angle) * push, 0, 1);
+        spaced[left].y = clamp(spaced[left].y - Math.sin(angle) * push, 0, 1);
+        spaced[right].x = clamp(spaced[right].x + Math.cos(angle) * push, 0, 1);
+        spaced[right].y = clamp(spaced[right].y + Math.sin(angle) * push, 0, 1);
         moved = true;
       }
     }
