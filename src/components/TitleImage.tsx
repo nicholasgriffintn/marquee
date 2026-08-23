@@ -4,6 +4,7 @@ import { ArtPlaceholder } from "./ArtPlaceholder";
 
 export function TitleImage({
   src,
+  srcSet,
   seed,
   label,
   alt = "",
@@ -11,6 +12,7 @@ export function TitleImage({
   eager = false,
 }: {
   src: string | null;
+  srcSet?: string;
   seed: string;
   label: string;
   alt?: string;
@@ -24,6 +26,13 @@ export function TitleImage({
   }
 
   return (
-    <img src={src} alt={alt} loading={eager ? "eager" : "lazy"} onError={() => setFailed(src)} />
+    <img
+      src={src}
+      srcSet={srcSet}
+      alt={alt}
+      decoding="async"
+      loading={eager ? "eager" : "lazy"}
+      onError={() => setFailed(src)}
+    />
   );
 }
