@@ -1,0 +1,30 @@
+import type { MediaTitle } from "../domain/catalog";
+
+export const SITE_TITLE = "Marquee — Streaming, without the hunt";
+
+const ROUTE_TITLES: Record<string, string> = {
+  "/": SITE_TITLE,
+  "/listings": "Listings · Marquee",
+  "/shelf": "My shelf · Marquee",
+  "/this-week": "This week · Marquee",
+  "/sources": "Sources · Marquee",
+  "/admin": "Admin · Marquee",
+  "/sign-in": "Box office · Marquee",
+  "/usher": "The Usher (1974) — Marquee",
+  "/films": "Listings · Marquee",
+  "/series": "Listings · Marquee",
+  "/new": "Listings · Marquee",
+  "/popular": "Listings · Marquee",
+};
+
+export function titleForItem(item: MediaTitle) {
+  return `${item.title}${item.year ? ` (${item.year})` : ""} · Marquee`;
+}
+
+export function titleForRoute(pathname: string, query: string) {
+  if (pathname === "/search") {
+    return query ? `${query} · Search · Marquee` : "Search · Marquee";
+  }
+
+  return ROUTE_TITLES[pathname] ?? "Not found · Marquee";
+}

@@ -92,16 +92,6 @@ export function UsherPage() {
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const previous = document.title;
-
-    document.title = "The Usher (1974) — Marquee";
-
-    return () => {
-      document.title = previous;
-    };
-  }, []);
-
-  useEffect(() => {
     const root = rootRef.current;
 
     if (!root || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {

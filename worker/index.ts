@@ -6,7 +6,7 @@ import { consumeDeadLetters, consumeIngestion } from "./jobs/ingestion-consumer.
 import { scheduleIngestion } from "./jobs/ingestion-scheduler.ts";
 import { hasTrustedOrigin } from "./lib/http.ts";
 import { canonicalOrigin } from "./lib/security.ts";
-import { withShareCard } from "./lib/share.ts";
+import { withPageMetadata } from "./lib/share.ts";
 import { adminRoutes } from "./routes/admin.ts";
 import { catalogRoutes } from "./routes/catalog.ts";
 import { curatorRoutes } from "./routes/curator.ts";
@@ -71,12 +71,8 @@ app.notFound(async (context) => {
   }
 
   const asset = await context.env.ASSETS.fetch(context.req.raw);
-  const decorated = await withShareCard(
-    context.env,
-    asset,
-    context.req.path,
-    canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN),
-  );
+  const origin = canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN);
+  const decorated = await withPageMetadata(context.env, asset, new URL(context.req.url), origin);
   const response = new Response(decorated.body, decorated);
   const scriptSource = import.meta.env.DEV ? "'self' 'unsafe-inline'" : "'self'";
 

@@ -29,6 +29,7 @@ import { useTitle } from "./hooks/useTitle";
 import { useTonight } from "./hooks/useTonight";
 import { useTrending } from "./hooks/useTrending";
 import { useUsher } from "./hooks/useUsher";
+import { titleForItem, titleForRoute } from "./lib/page-title";
 import { AdminPage } from "./pages/AdminPage";
 import { BrowsePage, type BrowsePreset } from "./pages/BrowsePage";
 import { DigestPage } from "./pages/DigestPage";
@@ -120,8 +121,32 @@ export function App() {
     window.scrollTo({ top: 0, left: 0, behavior: "instant" });
   }, [pagePath]);
 
+  const openTitleId = routedTitleId || (legacyMatch?.params.titleId ?? "");
+  const knownTitles = useMemo(
+    () =>
+      new Map([
+        ...catalog.titlesById,
+        ...search.items.map((item): [string, MediaTitle] => [item.id, item]),
+      ]),
+    [catalog.titlesById, search.items],
+  );
+  const openDetails = useTitle(openTitleId || undefined, knownTitles);
+
   const requestMoment = usher.request;
   const trimmedQuery = query.trim();
+
+  useEffect(() => {
+    if (openTitleId) {
+      if (openDetails.title) {
+        document.title = titleForItem(openDetails.title);
+      }
+
+      return;
+    }
+
+    document.title = titleForRoute(pagePath, trimmedQuery);
+  }, [openDetails.title, openTitleId, pagePath, trimmedQuery]);
+
   const hasEmptySearch =
     pagePath === "/search" && Boolean(trimmedQuery) && !search.isSearching && !search.items.length;
 
@@ -519,15 +544,14 @@ export function App() {
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
 
-      {(routedTitleId || legacyMatch?.params.titleId) && (
+      {openTitleId && (
         <TitleOverlay
-          titleId={routedTitleId || (legacyMatch?.params.titleId ?? "")}
+          titleId={openTitleId}
           usherMoment={usher.moment?.surface === "title" ? usher.moment : null}
           onUsherRequest={onTitleMoment}
           onUsherAction={onUsherAction}
           onUsherDismiss={(scope) => void usher.dismiss(scope)}
-          titlesById={catalog.titlesById}
-          searchItems={search.items}
+          title={openDetails.title}
           canSave={isSignedIn}
           entries={profile.entries}
           availabilityEnabled={catalog.providerSources.length > 0}
@@ -608,8 +632,7 @@ function NotFoundPage() {
 
 function TitleOverlay({
   titleId,
-  titlesById,
-  searchItems,
+  title,
   canSave,
   entries,
   usherMoment,
@@ -626,8 +649,7 @@ function TitleOverlay({
   onUpdateDraft,
 }: {
   titleId: string;
-  titlesById: Map<string, MediaTitle>;
-  searchItems: MediaTitle[];
+  title: MediaTitle | null;
   canSave: boolean;
   entries: Record<string, ViewingEntry>;
   usherMoment: UsherMoment | null;
@@ -643,12 +665,6 @@ function TitleOverlay({
   onStatus: (titleId: string, status: EntryStatus) => void;
   onUpdateDraft: (titleId: string, patch: Partial<ViewingEntry>) => void;
 }) {
-  const known = useMemo(
-    () =>
-      new Map([...titlesById, ...searchItems.map((item): [string, MediaTitle] => [item.id, item])]),
-    [searchItems, titlesById],
-  );
-  const { title, isLoading } = useTitle(titleId, known);
   const isSaved = Boolean(entries[titleId]);
 
   useEffect(() => {
@@ -657,7 +673,7 @@ function TitleOverlay({
     }
   }, [isSaved, onUsherRequest, titleId]);
 
-  if (isLoading || !title) {
+  if (!title) {
     return null;
   }
 
