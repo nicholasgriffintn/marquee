@@ -56,6 +56,17 @@ const SCENES: Scene[] = [
     line: "You see everything twice in this trade. Once on the screen. Once on their faces.",
   },
   {
+    id: "pad",
+    slug: "Int. The Foyer — A Wednesday, 1981",
+    face: "thinking",
+    action: [
+      "A couple have been reading the board for eleven minutes. He knows the type. They will read it until the film they are arguing about has started without them.",
+      "He takes the pad out of his waistcoat, the one the kiosk uses for refunds, and asks them three questions. Who is watching. How long they have. What they are in the mood for. Then he writes one title on it and hands it over.",
+      "They go in. On the way out she tells him it was the best thing they had seen all year. He says nothing, because a good usher does not say I told you so, and because the pad is already out for the next lot.",
+    ],
+    line: "Three questions. Nobody has ever needed a fourth.",
+  },
+  {
     id: "door",
     slug: "Int. The Corridor — Any Given Night",
     face: "unimpressed",

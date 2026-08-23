@@ -13,6 +13,16 @@ export function jsonResponse(payload: unknown, status = 200, extra?: Record<stri
   return new Response(JSON.stringify(payload), { headers, status });
 }
 
+export function withCookies(response: Response, ...cookies: (string | null | undefined)[]) {
+  for (const cookie of cookies) {
+    if (cookie) {
+      response.headers.append("set-cookie", cookie);
+    }
+  }
+
+  return response;
+}
+
 export async function readJsonObject(request: Request) {
   const contentLength = Number(request.headers.get("content-length") ?? "0");
 

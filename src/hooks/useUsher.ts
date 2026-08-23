@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { MediaTitle } from "../domain/catalog";
-import type { UsherMoment, UsherSurface } from "../domain/usher";
+import type { TonightOrder, UsherMoment, UsherSurface } from "../domain/usher";
 import { jsonRequest, requestJson } from "../lib/api";
 
 type StateResponse = { status: string; answered: string[]; awayDays?: number };
@@ -17,7 +17,29 @@ export type UsherPickState = {
   error: string;
 };
 
+export type OrderResult = { item: MediaTitle; line: string; service: string };
+
+export type UsherOrderState = {
+  isOpen: boolean;
+  order: TonightOrder | null;
+  pick: OrderResult | null;
+  backups: OrderResult[];
+  isWorking: boolean;
+  error: string;
+};
+
+type OrderResponse = { pick: OrderResult | null; backups: OrderResult[]; line: string };
+
 const NO_PICK: UsherPickState = { item: null, line: "", isPicking: false, error: "" };
+
+const NO_ORDER: UsherOrderState = {
+  isOpen: false,
+  order: null,
+  pick: null,
+  backups: [],
+  isWorking: false,
+  error: "",
+};
 
 const UNINVITED_PER_SESSION = 1;
 const INVITED_SURFACES = new Set<UsherSurface>(["first-run", "search-empty"]);
@@ -27,6 +49,7 @@ export function useUsher(isSignedIn: boolean) {
   const [isOnboarding, setIsOnboarding] = useState(false);
   const [pick, setPick] = useState<UsherPickState>(NO_PICK);
   const [aside, setAside] = useState("");
+  const [order, setOrder] = useState<UsherOrderState>(NO_ORDER);
   const uninvited = useRef(0);
   const rejected = useRef<string[]>([]);
   const inFlight = useRef(false);
@@ -232,9 +255,88 @@ export function useUsher(isSignedIn: boolean) {
     [askForPick, pick.item],
   );
 
+  const placeOrder = useCallback(
+    async (brief: TonightOrder, providerIds: string[]) => {
+      if (!isSignedIn) {
+        return;
+      }
+
+      setOrder({
+        isOpen: true,
+        order: brief,
+        pick: null,
+        backups: [],
+        isWorking: true,
+        error: "",
+      });
+
+      try {
+        const response = await requestJson<OrderResponse>(
+          "/api/usher/order",
+          jsonRequest("POST", {
+            order: brief,
+            providerIds,
+            rejected: rejected.current,
+            hour: new Date().getHours(),
+            isWeekend: [0, 6].includes(new Date().getDay()),
+          }),
+        );
+
+        setOrder({
+          isOpen: true,
+          order: brief,
+          pick: response.pick,
+          backups: response.backups ?? [],
+          isWorking: false,
+          error: response.pick ? "" : response.line || "Nothing fits that tonight.",
+        });
+      } catch (error) {
+        setOrder({
+          isOpen: true,
+          order: brief,
+          pick: null,
+          backups: [],
+          isWorking: false,
+          error: error instanceof Error ? error.message : "I can't take orders just now.",
+        });
+      }
+    },
+    [isSignedIn],
+  );
+
+  const openOrder = useCallback(() => {
+    setPick(NO_PICK);
+    setAside("");
+    setOrder({ ...NO_ORDER, isOpen: true });
+  }, []);
+
+  const reorder = useCallback(
+    async (providerIds: string[]) => {
+      const brief = order.order;
+
+      if (!brief) {
+        return;
+      }
+
+      const shown = [order.pick, ...order.backups].filter(
+        (entry): entry is OrderResult => entry !== null,
+      );
+
+      rejected.current = [...rejected.current, ...shown.map((entry) => entry.item.id)].slice(-40);
+
+      await placeOrder(brief, providerIds);
+    },
+    [order.backups, order.order, order.pick, placeOrder],
+  );
+
+  const editOrder = useCallback(() => {
+    setOrder((current) => ({ ...current, pick: null, backups: [], error: "", isWorking: false }));
+  }, []);
+
   const clearPick = useCallback(() => {
     setPick(NO_PICK);
     setAside("");
+    setOrder(NO_ORDER);
   }, []);
 
   const say = useCallback((line: string) => {
@@ -247,6 +349,7 @@ export function useUsher(isSignedIn: boolean) {
       moment: isSignedIn ? moment : null,
       isOnboarding: isSignedIn && isOnboarding,
       pick,
+      order: isSignedIn ? order : NO_ORDER,
       aside: isSignedIn ? aside : "",
       say,
       request,
@@ -257,6 +360,10 @@ export function useUsher(isSignedIn: boolean) {
       askForPick,
       rejectPick,
       clearPick,
+      openOrder,
+      placeOrder,
+      reorder,
+      editOrder,
     }),
     [
       answer,
@@ -264,12 +371,17 @@ export function useUsher(isSignedIn: boolean) {
       askForPick,
       clearPick,
       dismiss,
+      editOrder,
       isOnboarding,
       isSignedIn,
       moment,
+      openOrder,
+      order,
       pick,
+      placeOrder,
       railVerdict,
       rejectPick,
+      reorder,
       request,
       say,
       skip,

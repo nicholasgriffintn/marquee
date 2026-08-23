@@ -8,11 +8,12 @@ import { UsherCard } from "../components/usher/UsherCard";
 import { UsherConsole } from "../components/usher/UsherConsole";
 import { UsherHero } from "../components/usher/UsherHero";
 import { UsherOnboarding } from "../components/usher/UsherOnboarding";
+import { UsherOrder } from "../components/usher/UsherOrder";
 import type { CatalogSection, MediaTitle, Provider } from "../domain/catalog";
-import type { UsherMoment } from "../domain/usher";
+import type { TonightOrder, UsherMoment } from "../domain/usher";
 import type { CuratorState } from "../hooks/useCurator";
 import type { ScheduledEpisode } from "../hooks/useTonight";
-import type { UsherPickState } from "../hooks/useUsher";
+import type { UsherOrderState, UsherPickState } from "../hooks/useUsher";
 import { artwork, artworkSrcSet, heroTitleClass, mediaMeta, scoreLabel } from "../lib/media";
 
 const IDLE_NUDGE_MS = 40_000;
@@ -49,6 +50,7 @@ export function TonightPage({
   isPinned,
   usherMoment,
   pick,
+  order,
   aside,
   onAsk,
   onClearCurator,
@@ -56,6 +58,10 @@ export function TonightPage({
   onPin,
   onPick,
   onRejectPick,
+  onStartOrder,
+  onOrder,
+  onOrderAnother,
+  onOrderEdit,
   onSelectProviders,
   onShowSources,
   onUsherAction,
@@ -82,6 +88,7 @@ export function TonightPage({
   isPinned: boolean;
   usherMoment: UsherMoment | null;
   pick: UsherPickState;
+  order: UsherOrderState;
   aside: string;
   onAsk: (prompt: string, isRefinement?: boolean) => Promise<void>;
   onClearCurator: () => void;
@@ -89,6 +96,10 @@ export function TonightPage({
   onPin: () => void;
   onPick: () => void;
   onRejectPick: () => void;
+  onStartOrder: () => void;
+  onOrder: (order: TonightOrder) => void;
+  onOrderAnother: () => void;
+  onOrderEdit: () => void;
   onSelectProviders: (ids: string[]) => void;
   onShowSources: () => void;
   onUsherAction: (moment: UsherMoment, actionId: string) => void;
@@ -99,7 +110,13 @@ export function TonightPage({
 }) {
   const [isIdle, setIsIdle] = useState(false);
   const isUsherMode = Boolean(
-    curator.prompt || curatorError || pick.item || pick.isPicking || pick.error || aside,
+    curator.prompt ||
+    curatorError ||
+    pick.item ||
+    pick.isPicking ||
+    pick.error ||
+    aside ||
+    order.isOpen,
   );
   const onboardingMoment = usherMoment?.surface === "first-run" ? usherMoment : null;
   const dripMoment = usherMoment?.surface === "home" ? usherMoment : null;
@@ -141,7 +158,16 @@ export function TonightPage({
           />
         ) : (
           <>
-            {isUsherMode ? (
+            {order.isOpen ? (
+              <UsherOrder
+                state={order}
+                onSubmit={onOrder}
+                onOpen={onOpen}
+                onAnother={onOrderAnother}
+                onEdit={onOrderEdit}
+                onClose={onClearCurator}
+              />
+            ) : isUsherMode ? (
               <UsherHero
                 curator={curator}
                 error={curatorError}
@@ -223,6 +249,7 @@ export function TonightPage({
             hasAsked={isUsherMode}
             onAsk={(value) => void onAsk(value)}
             onPick={onPick}
+            onOrder={onStartOrder}
           />
         )}
       </div>

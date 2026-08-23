@@ -32,6 +32,12 @@ per session, and he takes a hint after three. He turns up where he is relevant: 
 shelf to ask whether it landed, on a title that has sat unwatched since spring, on a search that
 found nothing. And if you cannot decide, he will simply pick something and tell you why.
 
+When even that is too much, he takes your order. Three questions — who is in the room, how long you
+have, what you are in the mood for — and he comes back with one title he will stake his name on,
+the service it is on, and two backups in case you are difficult. He has been doing it that way
+since a couple spent eleven minutes reading the board in 1981. Nobody has ever needed a fourth
+question.
+
 He is also on the door. Most of the job is letting people in; the rest of it is not, and the API's
 rate limits and bot checks speak in his voice rather than a status code's. Ask too fast and you get
 _"Steady on. One at a time."_ Arrive as something that is not a person and you get told that he has

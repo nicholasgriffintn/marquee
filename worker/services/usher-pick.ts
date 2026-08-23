@@ -39,28 +39,44 @@ function fallbackLine(title: MediaTitle, showing: Showing) {
   return "This one. No committee needed.";
 }
 
-async function candidates(
+export type ShortlistConstraints = {
+  maxRuntime?: number | null;
+  mediaType?: "movie" | "tv";
+  genres?: string[];
+  text?: string;
+  limit?: number;
+};
+
+export async function shortlistFor(
   env: Bindings,
   viewerId: string,
-  providerIds: string[],
-  rejected: string[],
-  showing: Showing,
+  options: {
+    providerIds?: string[];
+    rejected?: string[];
+    constraints?: ShortlistConstraints;
+  } = {},
 ) {
+  const constraints = options.constraints ?? {};
   const preferences = await readViewerPreferences(env.DB, viewerId);
-  const services = [...new Set([...providerIds, ...preferences.providerIds])];
+  const services = [...new Set([...(options.providerIds ?? []), ...preferences.providerIds])];
   const viewer = await readViewerContext(env.DB, viewerId, services);
   const exclude = [
-    ...rejected,
+    ...(options.rejected ?? []),
     ...viewer.entries
       .filter((entry) => entry.status === "watched" || entry.status === "dropped")
       .map((entry) => entry.titleId),
   ];
-  const base = {
+  const loose = {
     providerIds: services,
     excludeIds: exclude,
-    limit: SHORTLIST,
+    limit: constraints.limit ?? SHORTLIST,
     minVotes: 200,
-    ...(showing.maxRuntime ? { maxRuntime: showing.maxRuntime } : {}),
+    ...(constraints.maxRuntime ? { maxRuntime: constraints.maxRuntime } : {}),
+    ...(constraints.mediaType ? { mediaType: constraints.mediaType } : {}),
+  };
+  const base = {
+    ...loose,
+    ...(constraints.genres?.length ? { genres: constraints.genres.slice(0, 6) } : {}),
   };
   const vector = await tasteVector(env, viewer, preferences);
 
@@ -84,10 +100,12 @@ async function candidates(
     }
   }
 
-  if (preferences.genres.length) {
+  const wanted = constraints.genres?.length ? constraints.genres : preferences.genres.slice(0, 4);
+
+  if (wanted.length) {
     const titles = await searchCatalogue(env.DB, {
       ...base,
-      genres: preferences.genres.slice(0, 4),
+      genres: wanted.slice(0, 6),
       sort: "score",
     });
 
@@ -98,8 +116,8 @@ async function candidates(
 
   return {
     titles: await retrieveTitles(env, {
-      ...base,
-      text: "a film worth putting on tonight without thinking about it",
+      ...loose,
+      text: constraints.text || "a film worth putting on tonight without thinking about it",
     }),
     preferences,
   };
@@ -113,7 +131,11 @@ export async function pickOne(
   const providerIds = options.providerIds ?? [];
   const rejected = (options.rejected ?? []).filter(isKnownTitle).slice(0, 40);
   const showing = showingFor(options.hour ?? 20, options.isWeekend ?? false);
-  const { titles, preferences } = await candidates(env, viewerId, providerIds, rejected, showing);
+  const { titles, preferences } = await shortlistFor(env, viewerId, {
+    providerIds,
+    rejected,
+    constraints: { maxRuntime: showing.maxRuntime },
+  });
 
   if (titles.length === 0) {
     return null;

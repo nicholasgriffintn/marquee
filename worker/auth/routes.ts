@@ -3,7 +3,7 @@ import { AuthError } from "@ngriffin_uk/auth-core";
 import { Hono } from "hono";
 
 import { emailConfigured } from "../clients/email.ts";
-import { jsonResponse, readJsonObject } from "../lib/http.ts";
+import { jsonResponse, readJsonObject, withCookies } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
 import { canonicalOrigin, safeReturnPath } from "../lib/security.ts";
 import { isRecord } from "../lib/values.ts";
@@ -66,14 +66,11 @@ async function completeMagicLink(context: AppContext) {
       throw new AuthError("unsupported_operation");
     }
 
-    context.header(
-      "set-cookie",
+    return withCookies(
+      context.redirect(returnTo || "/"),
       sessionCookie(context, result.session.token, result.session.expiresAt),
-      { append: true },
+      expiredCookie(context, RETURN_COOKIE),
     );
-    context.header("set-cookie", expiredCookie(context, RETURN_COOKIE), { append: true });
-
-    return context.redirect(returnTo || "/");
   } catch (error) {
     logError("magic_link_failed", error);
 
@@ -86,9 +83,7 @@ async function runAuthProtocol(context: AppContext) {
   const action = typeof body?.action === "string" ? body.action : "";
 
   if (action === "sign_out") {
-    await logout(context);
-
-    return jsonResponse({ status: "completed" });
+    return withCookies(jsonResponse({ status: "completed" }), await revokeSession(context));
   }
 
   if (action === "request_magic_link") {
@@ -105,22 +100,19 @@ async function runAuthProtocol(context: AppContext) {
 
     const returnTo = safeReturnPath(typeof values.returnTo === "string" ? values.returnTo : "");
 
-    if (returnTo) {
-      context.header("set-cookie", temporaryCookie(context, RETURN_COOKIE, returnTo), {
-        append: true,
-      });
-    }
-
     try {
       await authenticationFor(context.env, context.req.raw).requestMagicLink(email);
     } catch (error) {
       logError("magic_link_request_failed", error);
     }
 
-    return jsonResponse({
-      status: "completed",
-      message: "Check your email. The link works once, and not for long.",
-    });
+    return withCookies(
+      jsonResponse({
+        status: "completed",
+        message: "Check your email. The link works once, and not for long.",
+      }),
+      returnTo ? temporaryCookie(context, RETURN_COOKIE, returnTo) : null,
+    );
   }
 
   if (action !== "start_oauth") {
@@ -145,16 +137,13 @@ async function runAuthProtocol(context: AppContext) {
       throw new AuthError("provider_error");
     }
 
-    context.header("set-cookie", stateCookie(context, state), { append: true });
-    context.header(
-      "set-cookie",
+    return withCookies(
+      jsonResponse({ status: "redirect_required", provider, url: url.href }),
+      stateCookie(context, state),
       returnTo
         ? temporaryCookie(context, RETURN_COOKIE, returnTo)
         : expiredCookie(context, RETURN_COOKIE),
-      { append: true },
     );
-
-    return jsonResponse({ status: "redirect_required", provider, url: url.href });
   } catch (error) {
     logError("auth_start_failed", error, { provider });
 
@@ -192,14 +181,11 @@ async function completeGitHub(context: AppContext) {
       throw new AuthError("unsupported_operation");
     }
 
-    expireFlowCookies(context);
-    context.header(
-      "set-cookie",
+    return withCookies(
+      context.redirect(destination(context, returnTo).href),
+      ...flowCookies(context),
       sessionCookie(context, result.session.token, result.session.expiresAt),
-      { append: true },
     );
-
-    return context.redirect(destination(context, returnTo).href);
   } catch (error) {
     const codeValue = error instanceof AuthError ? error.code : "authentication_failed";
 
@@ -227,16 +213,18 @@ async function getSession(context: AppContext) {
   });
 }
 
-async function logout(context: AppContext) {
+async function revokeSession(context: AppContext) {
   const principal = await sessionPrincipal(context.env, context.req.raw);
 
   if (principal) {
     await authenticationFor(context.env, context.req.raw).logout(principal.token);
   }
 
-  context.header("set-cookie", expiredCookie(context, SESSION_COOKIE));
+  return expiredCookie(context, SESSION_COOKIE);
+}
 
-  return jsonResponse({ ok: true });
+async function logout(context: AppContext) {
+  return withCookies(jsonResponse({ ok: true }), await revokeSession(context));
 }
 
 async function listTokens(context: AppContext) {
@@ -282,9 +270,8 @@ function failedCallback(context: AppContext, error: string) {
   const url = destination(context);
 
   url.searchParams.set("authError", error);
-  expireFlowCookies(context);
 
-  return context.redirect(url.href);
+  return withCookies(context.redirect(url.href), ...flowCookies(context));
 }
 
 function destination(context: AppContext, returnTo?: string) {
@@ -294,9 +281,8 @@ function destination(context: AppContext, returnTo?: string) {
   );
 }
 
-function expireFlowCookies(context: AppContext) {
-  context.header("set-cookie", expiredCookie(context, STATE_COOKIE), { append: true });
-  context.header("set-cookie", expiredCookie(context, RETURN_COOKIE), { append: true });
+function flowCookies(context: AppContext) {
+  return [expiredCookie(context, STATE_COOKIE), expiredCookie(context, RETURN_COOKIE)];
 }
 
 function stateCookie(context: AppContext, state: string) {

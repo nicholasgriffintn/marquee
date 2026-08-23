@@ -106,6 +106,7 @@ export const RULES: readonly Rule[] = [
   { path: "/api/curator/insight/*", policy: "insight" },
   { path: "/api/events", policy: "telemetry" },
   { path: "/api/usher/pick", methods: ["POST"], policy: "usher" },
+  { path: "/api/usher/order", methods: ["POST"], policy: "usher" },
   { path: "/api/links/trakt/start", policy: "auth" },
   { path: "/api/links/trakt/callback", policy: "auth" },
   { path: "/mcp", policy: "machine" },

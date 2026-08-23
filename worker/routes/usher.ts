@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 
-import { isUsherSurface } from "../../src/domain/usher.ts";
+import { isTonightOrder, isUsherSurface } from "../../src/domain/usher.ts";
 import { requireAuthentication, type AuthVariables } from "../auth/session.ts";
 import { recordEvent } from "../lib/events.ts";
 import { jsonResponse, readJsonObject } from "../lib/http.ts";
@@ -14,6 +14,7 @@ import {
   recordRailFeedback,
   searchPeople,
 } from "../repositories/usher.ts";
+import { pickToOrder } from "../services/usher-order.ts";
 import { pickOne } from "../services/usher-pick.ts";
 import {
   applyAnswer,
@@ -255,5 +256,44 @@ usherRoutes.post("/pick", async (context) => {
     logError("usher_pick_route_failed", error);
 
     return jsonResponse({ error: "I can't pick just now." }, 500);
+  }
+});
+
+usherRoutes.post("/order", async (context) => {
+  const user = context.get("authenticatedUser");
+  const body = await readJsonObject(context.req.raw);
+
+  if (!isTonightOrder(body?.order)) {
+    return jsonResponse({ error: "I did not catch all of that. Ask me again." }, 400);
+  }
+
+  try {
+    const result = await pickToOrder(context.env, user.id, body.order, {
+      providerIds: validProviderIds(body?.providerIds),
+      rejected: Array.isArray(body?.rejected) ? body.rejected.filter(isKnownTitle) : [],
+      hour: viewerHour(body?.hour),
+      isWeekend: body?.isWeekend === true,
+    });
+
+    if (!result) {
+      return jsonResponse({
+        pick: null,
+        backups: [],
+        line: "Not with those answers and those services. Widen one or the other.",
+      });
+    }
+
+    recordEvent(context.env, {
+      name: "usher_order",
+      viewerId: user.id,
+      titleId: result.pick.item.id,
+      detail: `${body.order.company}:${body.order.length}:${body.order.mood}`,
+    });
+
+    return jsonResponse({ pick: result.pick, backups: result.backups, line: "" });
+  } catch (error) {
+    logError("usher_order_route_failed", error);
+
+    return jsonResponse({ error: "I can't take orders just now." }, 500);
   }
 });

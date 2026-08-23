@@ -16,6 +16,7 @@ export type MarqueeEvent = {
     | "usher_shown"
     | "usher_answered"
     | "usher_dismissed"
+    | "usher_order"
     | "usher_pick"
     | "shelf_pinned"
     | "guard_blocked"

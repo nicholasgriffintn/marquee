@@ -17,6 +17,7 @@ export function UsherConsole({
   hasAsked,
   onAsk,
   onPick,
+  onOrder,
 }: {
   isAsking: boolean;
   isPicking: boolean;
@@ -24,6 +25,7 @@ export function UsherConsole({
   hasAsked: boolean;
   onAsk: (prompt: string) => void;
   onPick: () => void;
+  onOrder: () => void;
 }) {
   const [prompt, setPrompt] = useState("");
   const isBusy = isAsking || isPicking;
@@ -63,6 +65,9 @@ export function UsherConsole({
           onClick={onPick}
         >
           {isPicking ? "Deciding…" : "Just pick something"}
+        </button>
+        <button type="button" className="usher-order-start" disabled={isBusy} onClick={onOrder}>
+          Ask me three things
         </button>
         {!hasAsked &&
           SEED_PROMPTS.map((seed) => (

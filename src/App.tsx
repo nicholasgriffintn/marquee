@@ -236,6 +236,10 @@ export function App() {
     [askCurator, profile, query, usher],
   );
 
+  const askForTicket = useCallback(() => {
+    void navigate(`/sign-in?returnTo=${encodeURIComponent("/")}`);
+  }, [navigate]);
+
   const clearAll = useCallback(() => {
     curator.clear();
     usher.clearPick();
@@ -394,13 +398,20 @@ export function App() {
               isPinned={isPinned}
               usherMoment={usher.moment}
               pick={usher.pick}
+              order={usher.order}
               aside={usher.aside}
               onAsk={askCurator}
               onClearCurator={clearAll}
               onOpen={openTitle}
               onPin={pinCurrentShelf}
-              onPick={() => void usher.askForPick(selectedProviderIds)}
+              onPick={() =>
+                isSignedIn ? void usher.askForPick(selectedProviderIds) : askForTicket()
+              }
               onRejectPick={() => void usher.rejectPick(selectedProviderIds)}
+              onStartOrder={() => (isSignedIn ? usher.openOrder() : askForTicket())}
+              onOrder={(order) => void usher.placeOrder(order, selectedProviderIds)}
+              onOrderAnother={() => void usher.reorder(selectedProviderIds)}
+              onOrderEdit={usher.editOrder}
               onSelectProviders={selectProviders}
               onShowSources={() => void navigate("/sources")}
               onUsherAction={onUsherAction}

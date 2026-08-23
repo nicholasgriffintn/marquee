@@ -49,10 +49,17 @@ export function useSession() {
   return { error, isLoading, logout, user };
 }
 
+const AUTH_ERRORS: Record<string, string> = {
+  invalid_callback: "That stub does not match the one I kept. Start again at the box office.",
+  provider_not_found: "We do not take that ticket here.",
+  identity_conflict: "That seat is already someone else's. Sign in the way you did last time.",
+};
+
 function authCallbackError() {
   const parameters = new URLSearchParams(window.location.search);
+  const code = parameters.get("authError");
 
-  if (!parameters.has("authError")) {
+  if (code === null) {
     return "";
   }
 
@@ -61,5 +68,5 @@ function authCallbackError() {
 
   window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
 
-  return "GitHub sign-in did not complete. Please try again.";
+  return AUTH_ERRORS[code] ?? "Sign-in did not complete. Try again.";
 }

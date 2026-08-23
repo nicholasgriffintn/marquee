@@ -89,6 +89,84 @@ export const NOVELTY: UsherOption[] = [
   { value: "rewatch", label: "I rewatch what I love" },
 ];
 
+export type OrderStepId = "company" | "length" | "mood";
+
+export type OrderStep = {
+  id: OrderStepId;
+  line: string;
+  hint: string;
+  options: UsherOption[];
+};
+
+export const USHER_ORDER: OrderStep[] = [
+  {
+    id: "company",
+    line: "Who is in tonight?",
+    hint: "I ask because the room changes the film. It always has.",
+    options: [
+      { value: "alone", label: "Just me", hint: "Nobody to apologise to." },
+      { value: "two", label: "Two of us", hint: "Both of you have to want it." },
+      { value: "room", label: "A full room", hint: "Someone will talk through it." },
+      { value: "family", label: "Children about", hint: "Understood. I'll behave." },
+    ],
+  },
+  {
+    id: "length",
+    line: "How long have I got?",
+    hint: "Be honest with me. I have watched people start a three-hour epic at eleven.",
+    options: [
+      { value: "short", label: "Ninety minutes, tops", hint: "In, out, bed." },
+      { value: "evening", label: "A proper evening", hint: "The usual." },
+      { value: "long", label: "As long as it takes", hint: "Now we're talking." },
+      { value: "episode", label: "Just start me on something", hint: "A series, then." },
+    ],
+  },
+  {
+    id: "mood",
+    line: "Last one. What are we in the mood for?",
+    hint: "There are no wrong answers. There are answers I will raise an eyebrow at.",
+    options: [
+      { value: "easy", label: "Easy going", hint: "Nothing that asks much." },
+      { value: "clever", label: "Something clever" },
+      { value: "funny", label: "Make me laugh" },
+      { value: "tense", label: "Wind me up" },
+      { value: "moving", label: "Break my heart", hint: "Tissues are by the door." },
+      { value: "surprise", label: "Surprise me", hint: "Brave." },
+    ],
+  },
+];
+
+export type TonightOrder = { company: string; length: string; mood: string };
+
+export function orderStep(id: OrderStepId) {
+  return USHER_ORDER.find((step) => step.id === id);
+}
+
+export function isOrderChoice(id: OrderStepId, value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    Boolean(orderStep(id)?.options.some((option) => option.value === value))
+  );
+}
+
+export function isTonightOrder(value: unknown): value is TonightOrder {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const order = value as Record<string, unknown>;
+
+  return USHER_ORDER.every((step) => isOrderChoice(step.id, order[step.id]));
+}
+
+export function orderPhrase(order: TonightOrder) {
+  return USHER_ORDER.map((step) =>
+    step.options.find((option) => option.value === order[step.id])?.label.toLowerCase(),
+  )
+    .filter(Boolean)
+    .join(", ");
+}
+
 export type TimeSlot = "small-hours" | "morning" | "afternoon" | "evening" | "late";
 
 export type Showing = {

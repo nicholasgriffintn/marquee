@@ -816,7 +816,9 @@ svg {
   -webkit-box-orient: vertical;
   display: -webkit-box;
   -webkit-line-clamp: 4;
+  margin-bottom: -0.28em;
   overflow: hidden;
+  padding-bottom: 0.28em;
 }
 .hero-copy h1.hero-title-small {
   font-size: clamp(42px, 4.8vw, 66px);
@@ -3729,6 +3731,7 @@ h2 em {
   flex-wrap: wrap;
   gap: 8px;
   justify-content: flex-end;
+  margin-top: 8px;
 }
 .usher-decide {
   background: rgba(27, 31, 25, 0.82);
@@ -3861,6 +3864,12 @@ h2 em {
   padding: 0 20px;
   text-transform: uppercase;
 }
+.usher-pin:hover:not(:disabled),
+.hero-actions button.usher-pin:hover:not(:disabled) {
+  background: var(--acid);
+  border-color: var(--acid);
+  color: var(--ink);
+}
 .usher-pin:disabled {
   border-color: var(--line);
   color: var(--muted);
@@ -3892,6 +3901,160 @@ h2 em {
   height: 87px;
   object-fit: cover;
   width: 100%;
+}
+
+/* The order pad */
+
+.usher-order-start {
+  background: rgba(27, 31, 25, 0.82);
+  border: 1px solid rgba(255, 254, 248, 0.34);
+  color: var(--white);
+  cursor: pointer;
+  font: 600 12px/1 var(--sans);
+  padding: 12px 14px;
+}
+.usher-order-start:hover:not(:disabled) {
+  border-color: var(--acid);
+  color: var(--acid);
+}
+.usher-order-start:disabled {
+  color: var(--muted);
+  cursor: default;
+}
+.usher-order-pad-inner {
+  animation: usher-step 0.34s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+.usher-order-count {
+  color: var(--muted);
+  font: 700 10px/1 var(--mono);
+  letter-spacing: 2px;
+  margin: 0 0 10px;
+  text-transform: uppercase;
+}
+.usher-order-reply {
+  color: var(--acid);
+  font: italic 400 16px/1.3 var(--serif);
+  margin: 0 0 8px;
+}
+.usher-order-pad .hero-copy h1 {
+  font-size: clamp(28px, 3.2vw, 42px);
+  letter-spacing: -0.02em;
+  line-height: 1.06;
+  margin: 0 0 8px;
+  max-width: 22ch;
+}
+.usher-order-ticket {
+  border-top: 1px dashed var(--panel-line);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  margin: 6px 0 0;
+  padding-top: 12px;
+}
+.usher-order-ticket span {
+  color: var(--muted);
+  font: 700 10px/1 var(--mono);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+.usher-order-ticket span.filled {
+  color: var(--white);
+}
+.hero-actions button.usher-quiet {
+  backdrop-filter: none;
+  background: none;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  font: 500 13px/1 var(--sans);
+  letter-spacing: 0;
+  min-height: 43px;
+  padding: 0 6px;
+  text-decoration: underline;
+  text-transform: none;
+  text-underline-offset: 4px;
+}
+.hero-actions button.usher-quiet:hover {
+  color: var(--white);
+}
+.usher-order-service {
+  color: var(--acid);
+  font: 700 11px/1 var(--mono);
+  letter-spacing: 1.5px;
+  margin: 0;
+  text-transform: uppercase;
+}
+.usher-backups {
+  padding: 24px var(--gutter) 34px;
+}
+.usher-backups-head {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 12px;
+}
+.usher-backups-head span {
+  font: 700 10px/1 var(--mono);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+.usher-backups-head em {
+  color: var(--muted);
+  font: italic 400 14px/1 var(--serif);
+}
+.usher-backups-list {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+.usher-backup {
+  align-items: stretch;
+  background: var(--panel-tile);
+  border: 1px solid var(--panel-line);
+  cursor: pointer;
+  display: flex;
+  gap: 14px;
+  padding: 0;
+  text-align: left;
+}
+.usher-backup:hover {
+  border-color: var(--acid);
+}
+.usher-backup-art {
+  flex: 0 0 auto;
+  width: 64px;
+}
+.usher-backup-art img {
+  display: block;
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+.usher-backup-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px 12px 0;
+}
+.usher-backup-copy strong {
+  color: var(--white);
+  font: 600 15px/1.2 var(--sans);
+}
+.usher-backup-copy small {
+  color: var(--muted);
+  font: 400 12px/1 var(--sans);
+}
+.usher-backup-copy em {
+  color: var(--paper);
+  font: italic 400 14px/1.4 var(--serif);
+}
+.usher-backup-service {
+  color: var(--acid);
+  font: 700 10px/1 var(--mono);
+  letter-spacing: 1.5px;
+  margin-top: 2px;
+  text-transform: uppercase;
 }
 
 /* The in-flow banner */
@@ -4109,9 +4272,16 @@ h2 em {
   .schedule-list {
     padding-inline: 18px;
   }
+  .usher-backups {
+    padding-inline: 18px;
+  }
+  .usher-backups-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .usher-order-pad-inner,
   .usher-bulbs i,
   .usher-decide.nudging {
     animation: none;
