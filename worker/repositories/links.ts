@@ -95,6 +95,25 @@ export async function markLinkSynced(env: Bindings, viewerId: string, provider: 
     .run();
 }
 
+export async function readPushedAt(env: Bindings, viewerId: string, provider: LinkProvider) {
+  const row = await env.DB.prepare(
+    `SELECT pushed_at AS pushedAt FROM linked_accounts WHERE viewer_id = ? AND provider = ?`,
+  )
+    .bind(viewerId, provider)
+    .first<{ pushedAt: string | null }>();
+
+  return row?.pushedAt ?? null;
+}
+
+export async function markLinkPushed(env: Bindings, viewerId: string, provider: LinkProvider) {
+  await env.DB.prepare(
+    `UPDATE linked_accounts SET pushed_at = CURRENT_TIMESTAMP
+     WHERE viewer_id = ? AND provider = ?`,
+  )
+    .bind(viewerId, provider)
+    .run();
+}
+
 export async function deleteLink(env: Bindings, viewerId: string, provider: LinkProvider) {
   const result = await env.DB.prepare(
     `DELETE FROM linked_accounts WHERE viewer_id = ? AND provider = ?`,

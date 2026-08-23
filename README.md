@@ -46,7 +46,10 @@ genre list, and where one end of one has a character to it he writes it in the m
 not read something on your shelf yet he says so, and goes and reads it.
 
 Bring a history with you if you have one: link Trakt and your watch history, ratings and watchlist
-come across, and a Letterboxd export can be walked in through the door.
+come across, and a Letterboxd export can be walked in through the door. It goes back the other way
+too — _send it there_ puts what you have marked here onto your Trakt account, watched as history,
+stars as ratings out of ten, the rest as watchlist. It asks first, tells you what it is about to
+send, and only sends what has changed since the last time, so nothing is counted twice.
 
 ## One episode at a time
 

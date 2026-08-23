@@ -33,7 +33,7 @@ import { advanceDiscoverFrontier, measureDiscoverPartition } from "../services/d
 import { embedTitles, selectUnembedded } from "../services/embeddings.ts";
 import { syncSchedule } from "../services/schedule.ts";
 import { buildSections } from "../services/sections.ts";
-import { importTraktHistory } from "../services/trakt.ts";
+import { exportTraktShelf, importTraktHistory } from "../services/trakt.ts";
 import type { Bindings, EnrichmentSource, IngestionJob } from "../types.ts";
 import { getProviderLedger } from "./provider-ledger.ts";
 
@@ -731,6 +731,12 @@ export async function executeIngestionJob(env: Bindings, job: IngestionJob) {
 
   if (job.type === "import-trakt-history") {
     await importTraktHistory(env, job.viewerId, job.origin);
+
+    return;
+  }
+
+  if (job.type === "push-trakt-shelf") {
+    await exportTraktShelf(env, job.viewerId, job.origin);
 
     return;
   }
