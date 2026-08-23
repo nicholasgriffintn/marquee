@@ -1,8 +1,9 @@
 import type { MediaTitle, MediaType } from "../../src/domain/catalog.ts";
+import { ratingSources } from "../../src/domain/ratings.ts";
 import { logError } from "../lib/logging.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
 import { readViewerContext } from "../repositories/viewer-context.ts";
-import type { Bindings } from "../types.ts";
+import type { Bindings, EntryStatus, ViewingContext } from "../types.ts";
 import { embedTitles, readVectors } from "./embeddings.ts";
 import { weighTitles } from "./taste.ts";
 
@@ -18,6 +19,28 @@ const AXIS_MIN_HITS = 2;
 const AXIS_MIN_MARGIN = 0.3;
 const TRAIT_GENRES = 3;
 const TRAIT_KEYWORDS = 6;
+const NEIGHBOURS = 3;
+const POINT_GENRES = 3;
+const OVERVIEW_LIMIT = 190;
+const NOTE_LIMIT = 220;
+const SCORE_LIMIT = 3;
+
+export type MapNeighbour = {
+  titleId: string;
+  title: string;
+  year: number | null;
+  mediaType: MediaType;
+  tmdbId: number;
+};
+
+export type MapMark = {
+  status: EntryStatus;
+  rating: number | null;
+  note: string;
+  markedAt: string;
+};
+
+export type MapScore = { label: string; display: string };
 
 export type MapPoint = {
   titleId: string;
@@ -26,10 +49,18 @@ export type MapPoint = {
   mediaType: MediaType;
   tmdbId: number;
   genre: string;
+  genres: string[];
   weight: number;
   x: number;
   y: number;
-  nearest: string | null;
+  posterUrl: string | null;
+  overview: string;
+  runtimeMinutes: number | null;
+  numberOfSeasons: number | null;
+  certification: string | null;
+  scores: MapScore[];
+  mark: MapMark | null;
+  neighbours: MapNeighbour[];
 };
 
 export type MapAxis = { low: string; high: string } | null;
@@ -119,8 +150,7 @@ function cosine(left: number[], right: number[]) {
 
 function nearestNeighbours(vectors: number[][]) {
   return vectors.map((vector, index) => {
-    let best = -1;
-    let bestScore = -Infinity;
+    const ranked: { index: number; score: number }[] = [];
 
     for (let other = 0; other < vectors.length; other += 1) {
       if (other === index) {
@@ -128,14 +158,19 @@ function nearestNeighbours(vectors: number[][]) {
       }
 
       const score = cosine(vector, vectors[other]);
+      let slot = ranked.length;
 
-      if (score > bestScore) {
-        bestScore = score;
-        best = other;
+      while (slot > 0 && ranked[slot - 1].score < score) {
+        slot -= 1;
+      }
+
+      if (slot < NEIGHBOURS) {
+        ranked.splice(slot, 0, { index: other, score });
+        ranked.length = Math.min(ranked.length, NEIGHBOURS);
       }
     }
 
-    return best;
+    return ranked.map((entry) => entry.index);
   });
 }
 
@@ -238,6 +273,45 @@ function nameAxis(order: number[], traitsByIndex: string[][]): MapAxis {
   return low && high && low.toLowerCase() !== high.toLowerCase() ? { low, high } : null;
 }
 
+function trim(value: string, limit: number) {
+  const text = value.replaceAll(/\s+/gu, " ").trim();
+
+  if (text.length <= limit) {
+    return text;
+  }
+
+  const cut = text.slice(0, limit);
+  const breakAt = cut.lastIndexOf(" ");
+
+  return `${(breakAt > limit * 0.6 ? cut.slice(0, breakAt) : cut).replace(/[,;:.\s]+$/u, "")}…`;
+}
+
+function markFor(entry: ViewingContext | undefined): MapMark | null {
+  if (!entry) {
+    return null;
+  }
+
+  return {
+    status: entry.status,
+    rating: entry.rating,
+    note: trim(entry.thoughts, NOTE_LIMIT),
+    markedAt: entry.updatedAt,
+  };
+}
+
+function scoresFor(title: MediaTitle | undefined): MapScore[] {
+  if (!title) {
+    return [];
+  }
+
+  return ratingSources(title)
+    .slice(0, SCORE_LIMIT)
+    .map((source) => ({
+      label: source.label,
+      display: source.outOfTen ? `${source.display}/10` : source.display,
+    }));
+}
+
 async function repairVectors(env: Bindings, titleIds: string[], force: boolean) {
   try {
     await embedTitles(env, titleIds.slice(0, REPAIR_LIMIT), { force });
@@ -296,6 +370,7 @@ export async function buildTasteMap(
     found.length,
   );
   const byTitleId = new Map(titles.map((title) => [title.id, title]));
+  const entryByTitleId = new Map(viewer.entries.map((entry) => [entry.titleId, entry]));
   const raw = found.map((entry, index) => {
     const row = centred[index] ?? [];
 
@@ -320,8 +395,6 @@ export async function buildTasteMap(
 
   const points = found.map((entry, index): MapPoint => {
     const title = byTitleId.get(entry.titleId);
-    const neighbour = neighbours[index];
-    const nearestTitle = neighbour >= 0 ? byTitleId.get(found[neighbour].titleId) : undefined;
 
     return {
       titleId: entry.titleId,
@@ -330,10 +403,32 @@ export async function buildTasteMap(
       mediaType: title?.mediaType ?? "movie",
       tmdbId: title?.tmdbId ?? 0,
       genre: title?.genres[0] ?? "Other",
+      genres: title?.genres.slice(0, POINT_GENRES) ?? [],
       weight: Math.round(entry.weight * 1000) / 1000,
       x: Math.round(placed[index].x * 1000) / 1000,
       y: Math.round(placed[index].y * 1000) / 1000,
-      nearest: nearestTitle?.title ?? null,
+      posterUrl: title?.posterUrl ?? null,
+      overview: title?.overview ? trim(title.overview, OVERVIEW_LIMIT) : "",
+      runtimeMinutes: title?.runtimeMinutes ?? null,
+      numberOfSeasons: title?.numberOfSeasons ?? null,
+      certification: title?.certification ?? null,
+      scores: scoresFor(title),
+      mark: markFor(entryByTitleId.get(entry.titleId)),
+      neighbours: neighbours[index].flatMap((neighbour): MapNeighbour[] => {
+        const near = byTitleId.get(found[neighbour].titleId);
+
+        return near
+          ? [
+              {
+                titleId: near.id,
+                title: near.title,
+                year: near.year,
+                mediaType: near.mediaType,
+                tmdbId: near.tmdbId,
+              },
+            ]
+          : [];
+      }),
     };
   });
 

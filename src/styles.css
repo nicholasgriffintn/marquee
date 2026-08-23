@@ -4437,9 +4437,10 @@ h2 em {
 }
 
 .taste-map-frame {
+  align-items: start;
   display: grid;
-  gap: 14px;
-  grid-template-columns: minmax(0, 560px) minmax(0, 1fr);
+  gap: 26px;
+  grid-template-columns: minmax(0, 560px) minmax(240px, 400px);
   margin-bottom: 14px;
 }
 .taste-map-axis {
@@ -4458,6 +4459,12 @@ h2 em {
 }
 .taste-map-ground {
   fill: var(--panel-tile);
+}
+.taste-thread {
+  stroke: var(--white);
+  stroke-dasharray: 3 5;
+  stroke-opacity: 0.3;
+  stroke-width: 1.2;
 }
 .taste-point {
   cursor: pointer;
@@ -4490,28 +4497,176 @@ h2 em {
 }
 .taste-map-readout {
   align-content: start;
+  container-type: inline-size;
   display: grid;
-  gap: 4px;
+  margin: 0;
+  min-height: 0;
+}
+.taste-card {
+  align-content: start;
+  display: grid;
+  gap: 14px;
+}
+.taste-card-blank {
+  gap: 18px;
+}
+.taste-card-hint {
+  color: var(--muted);
+  font: 400 13px/1.5 var(--sans);
   margin: 0;
 }
-.taste-map-readout strong {
-  color: var(--white);
-  font: 500 20px/1.2 var(--serif);
+.taste-card-head {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 84px minmax(0, 1fr);
 }
-.taste-map-readout span {
+.taste-card-art {
+  aspect-ratio: 2 / 3;
+  background: var(--panel-tile);
+  border: 1px solid var(--panel-line);
+  overflow: hidden;
+}
+.taste-card-art img {
+  display: block;
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+.taste-card-name {
+  align-content: start;
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+.taste-card-name strong {
+  color: var(--white);
+  font: 500 21px/1.15 var(--serif);
+}
+.taste-card-name span {
   color: var(--muted);
   font: 400 13px/1.4 var(--sans);
 }
-.taste-map-readout em {
-  color: var(--acid);
+.taste-card-name em {
   font: 700 10px/1 var(--mono);
   letter-spacing: 1.5px;
   text-transform: uppercase;
 }
-.taste-map-readout .taste-map-nearest {
+.taste-card-name em.liked {
+  color: var(--acid);
+}
+.taste-card-name em.cooled {
+  color: var(--coral);
+}
+.taste-card-genres {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.taste-card-genres li {
+  border: 1px solid var(--panel-line);
+  color: var(--muted);
+  font: 400 11px/1 var(--sans);
+  padding: 5px 8px;
+}
+.taste-card-label {
+  color: var(--muted);
+  font: 700 10px/1 var(--mono);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+.taste-card-mark {
   border-top: 1px solid var(--panel-line);
-  margin-top: 6px;
-  padding-top: 8px;
+  display: grid;
+  gap: 7px;
+  padding-top: 12px;
+}
+.taste-card-mark p {
+  color: var(--white);
+  font: 400 13px/1.5 var(--sans);
+  margin: 0;
+}
+.taste-card-stars {
+  color: var(--panel-line);
+  font-size: 13px;
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+.taste-card-stars .on {
+  color: var(--acid);
+}
+.taste-card-mark blockquote {
+  border-left: 2px solid var(--panel-line);
+  color: var(--muted);
+  font: 400 13px/1.5 var(--serif);
+  margin: 0;
+  padding-left: 10px;
+}
+.taste-card-overview {
+  color: var(--muted);
+  display: -webkit-box;
+  font: 400 13px/1.5 var(--sans);
+  margin: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+.taste-card-facts {
+  border-top: 1px solid var(--panel-line);
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-top: 12px;
+}
+.taste-card-facts div {
+  display: grid;
+  gap: 3px;
+}
+.taste-card-facts dt {
+  color: var(--muted);
+  font: 700 10px/1 var(--mono);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+.taste-card-facts dd {
+  color: var(--white);
+  font: 400 13px/1.4 var(--sans);
+  margin: 0;
+}
+.taste-card-near {
+  border-top: 1px solid var(--panel-line);
+  display: grid;
+  gap: 7px;
+  padding-top: 12px;
+}
+.taste-card-near ul {
+  display: grid;
+  gap: 2px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.taste-card-near button {
+  background: none;
+  border: 0;
+  color: var(--white);
+  display: flex;
+  font: 400 13px/1.4 var(--sans);
+  gap: 8px;
+  justify-content: space-between;
+  padding: 4px 0;
+  text-align: left;
+  width: 100%;
+}
+.taste-card-near button:hover,
+.taste-card-near button:focus-visible {
+  color: var(--acid);
+}
+.taste-card-near button small {
+  color: var(--muted);
+  font: 400 12px/1.4 var(--mono);
 }
 .taste-map-open {
   color: var(--white);
@@ -4552,7 +4707,11 @@ h2 em {
 
 @media (max-width: 860px) {
   .taste-map-frame {
+    gap: 18px;
     grid-template-columns: minmax(0, 1fr);
+  }
+  .taste-card-head {
+    grid-template-columns: 56px minmax(0, 1fr);
   }
 }
 
