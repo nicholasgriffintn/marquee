@@ -1,4 +1,4 @@
-import type { RevivalRightsBasis } from "../../src/domain/revival.ts";
+import type { RevivalRightsBasis, RevivalSource } from "../../src/domain/revival.ts";
 import { readFilmAuthors, type FilmAuthors } from "../clients/wikidata-rights.ts";
 import { logError } from "../lib/logging.ts";
 import { readUncheckedRights, storeUkRights } from "../repositories/revival.ts";
@@ -15,6 +15,7 @@ export type UkVerdict = {
 };
 
 export type RightsSubject = {
+  source: RevivalSource;
   year: number | null;
   director: string | null;
   rightsBasis: RevivalRightsBasis;
@@ -33,8 +34,11 @@ export function ukExpiryFromRelease(releaseYear: number) {
   return releaseYear + UK_ANONYMOUS_TERM_YEARS + 1;
 }
 
-function releasedByArchive(basis: RevivalRightsBasis) {
-  return basis === "eu-institution" || basis === "cc0";
+function releasedByArchive(subject: RightsSubject) {
+  return (
+    subject.source === "europeana" &&
+    (subject.rightsBasis === "eu-institution" || subject.rightsBasis === "cc0")
+  );
 }
 
 function unresolvedNote(subject: RightsSubject, authors: FilmAuthors | null) {
@@ -74,7 +78,7 @@ export function assessUk(
     };
   }
 
-  if (releasedByArchive(basis)) {
+  if (releasedByArchive(subject)) {
     return {
       clear: true,
       expiresYear: null,

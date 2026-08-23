@@ -177,6 +177,7 @@ export async function upsertWork(
 
 export type RightsRow = {
   id: string;
+  source: RevivalSource;
   year: number | null;
   director: string | null;
   rightsBasis: RevivalRightsBasis;
@@ -186,7 +187,8 @@ export type RightsRow = {
 export async function readUncheckedRights(db: D1Database, limit = 60) {
   const rows = await db
     .prepare(
-      `SELECT w.id, w.year, w.director, w.rights_basis AS rightsBasis, t.imdb_id AS imdbId
+      `SELECT w.id, w.source, w.year, w.director, w.rights_basis AS rightsBasis,
+              t.imdb_id AS imdbId
        FROM revival_works AS w
        LEFT JOIN catalog_titles AS t ON t.id = w.title_id
        WHERE w.status <> 'rejected'

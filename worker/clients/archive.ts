@@ -118,13 +118,7 @@ function stripMarkup(value: string) {
 }
 
 function licenseBasis(licenseUrl: string): RevivalRightsBasis | null {
-  const value = licenseUrl.toLowerCase();
-
-  if (value.includes("publicdomain/zero")) {
-    return "cc0";
-  }
-
-  return value.includes("publicdomain") ? "pd-mark" : null;
+  return licenseUrl.toLowerCase().includes("publicdomain") ? "pd-mark" : null;
 }
 
 function bestDerivative(files: unknown) {
@@ -234,7 +228,7 @@ export async function readArchiveItem(identifier: string): Promise<ArchiveCandid
     height: derivative.height,
     rightsBasis: basis ?? "unclear",
     rightsNote: basis
-      ? `Uploaded to the Internet Archive under ${licenseUrl}`
+      ? `An Internet Archive uploader tagged this ${licenseUrl}, which is a claim rather than a release`
       : "No public domain marker on the Internet Archive item",
     rightsUrl: licenseUrl || null,
   };

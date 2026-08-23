@@ -41,6 +41,14 @@ function positiveNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
 }
 
+function absoluteUrl(value: string) {
+  if (value.startsWith("//")) {
+    return `https:${value}`;
+  }
+
+  return value.startsWith("https://") ? value : "";
+}
+
 function itemIdFrom(url: string) {
   const match = /\/item\/([\w.-]+)\/?$/u.exec(url);
 
@@ -156,7 +164,7 @@ export async function searchScreeningRoom(page: number) {
         synopsis: firstString(result.description) || firstString(item.summary),
         kind: runtimeSeconds !== null && runtimeSeconds <= SHORT_MAX_SECONDS ? "short" : "feature",
         runtimeSeconds,
-        stillUrl: resource.poster ?? firstString(result.image_url) ?? null,
+        stillUrl: absoluteUrl(resource.poster ?? firstString(result.image_url)) || null,
         streamUrl: resource.video,
         streamBytes: null,
         streamType: "video/mp4",
