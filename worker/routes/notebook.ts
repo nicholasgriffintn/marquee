@@ -14,6 +14,13 @@ import {
   stageAlertEmail,
 } from "../repositories/alerts.ts";
 import { editBelief, readBeliefs } from "../repositories/beliefs.ts";
+import type { FeedKey } from "../repositories/feeds.ts";
+import {
+  mintFeedToken,
+  readFeedKey,
+  revokeFeedToken,
+  storeFeedToken,
+} from "../repositories/feeds.ts";
 import {
   GUEST_LIMIT,
   guestCount,
@@ -121,6 +128,55 @@ notebookRoutes.post("/alerts/settings", async (context) => {
   return jsonResponse({
     kinds: ALERT_KINDS.map((kind) => ({ kind, enabled: settings.get(kind) !== false })),
   });
+});
+
+function feedPayload(origin: string, token: string | null, key: FeedKey | null) {
+  return {
+    subscribed: Boolean(key),
+    createdAt: key?.createdAt ?? null,
+    lastUsedAt: key?.lastUsedAt ?? null,
+    calendarUrl: token ? `${origin}/feeds/${token}/diary.ics` : null,
+    alertsUrl: token ? `${origin}/feeds/${token}/alerts.atom` : null,
+  };
+}
+
+notebookRoutes.get("/feeds", async (context) => {
+  const user = context.get("authenticatedUser");
+  const origin = canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN);
+
+  return jsonResponse(feedPayload(origin, null, await readFeedKey(context.env.DB, user.id)));
+});
+
+notebookRoutes.post("/feeds", async (context) => {
+  const user = context.get("authenticatedUser");
+  const origin = canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN);
+  const token = mintFeedToken();
+
+  try {
+    await storeFeedToken(context.env.DB, user.id, token);
+
+    return jsonResponse(feedPayload(origin, token, await readFeedKey(context.env.DB, user.id)));
+  } catch (error) {
+    logError("feed_token_mint_failed", error);
+
+    return jsonResponse({ error: "I could not cut you a key just now." }, 500);
+  }
+});
+
+notebookRoutes.delete("/feeds", async (context) => {
+  const user = context.get("authenticatedUser");
+
+  try {
+    await revokeFeedToken(context.env.DB, user.id);
+
+    return jsonResponse(
+      feedPayload(canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN), null, null),
+    );
+  } catch (error) {
+    logError("feed_token_revoke_failed", error);
+
+    return jsonResponse({ error: "That key would not come off the ring." }, 500);
+  }
 });
 
 notebookRoutes.get("/map", async (context) => {

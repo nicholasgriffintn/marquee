@@ -224,3 +224,17 @@ export async function deleteEpisodeEntries(db: D1Database, viewerId: string, tit
     .bind(viewerId, titleId)
     .run();
 }
+
+export async function readWatchedEpisodeKeys(db: D1Database, viewerId: string, limit = 2_000) {
+  const rows = await db
+    .prepare(
+      `SELECT title_id AS titleId, season_number AS season, episode_number AS episode
+         FROM viewing_episode_entries
+        WHERE viewer_id = ?1 AND scope = 'episode' AND watched = 1
+        LIMIT ?2`,
+    )
+    .bind(viewerId, limit)
+    .all<{ titleId: string; season: number; episode: number }>();
+
+  return new Set(rows.results.map((row) => `${row.titleId}:${row.season}:${row.episode}`));
+}

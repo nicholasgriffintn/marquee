@@ -7,6 +7,7 @@ import {
   sentThisWeek,
   viewerContacts,
 } from "../../repositories/alerts.ts";
+import { subscribedViewers } from "../../repositories/feeds.ts";
 import { pruneSignals } from "../../repositories/signals.ts";
 import type { Bindings } from "../../types.ts";
 import { DETECTORS } from "./detectors.ts";
@@ -45,10 +46,11 @@ async function runAlerts(env: Bindings, origin: string, options: { send: boolean
         event: options.send ? "alerts_dispatched" : "alerts_previewed",
         candidates: 0,
         emails: 0,
+        feeds: 0,
       }),
     );
 
-    return { candidates: 0, emails: 0 };
+    return { candidates: 0, emails: 0, feeds: 0 };
   }
 
   const byViewer = new Map<string, { candidate: AlertCandidate; priority: number }[]>();
@@ -60,13 +62,17 @@ async function runAlerts(env: Bindings, origin: string, options: { send: boolean
     ]);
   }
 
-  const contacts = await viewerContacts(env.DB, [...byViewer.keys()]);
+  const [contacts, subscribers] = await Promise.all([
+    viewerContacts(env.DB, [...byViewer.keys()]),
+    subscribedViewers(env.DB, [...byViewer.keys()]),
+  ]);
   let emails = 0;
+  let feeds = 0;
 
   for (const [viewerId, entries] of byViewer) {
     const contact = contacts.get(viewerId);
 
-    if (!contact) {
+    if (!contact && !subscribers.has(viewerId)) {
       continue;
     }
 
@@ -114,22 +120,26 @@ async function runAlerts(env: Bindings, origin: string, options: { send: boolean
     }
 
     if (!options.send) {
-      emails += 1;
+      emails += contact ? 1 : 0;
+      feeds += contact ? 0 : 1;
 
       continue;
     }
 
     try {
-      // oxlint-disable-next-line no-await-in-loop
-      await sendAlertEmail(
-        env,
-        contact.email,
-        fresh.map((candidate) => ({
-          headline: candidate.headline,
-          detail: candidate.detail,
-          url: `${origin}${candidate.path}`,
-        })),
-      );
+      if (contact) {
+        // oxlint-disable-next-line no-await-in-loop
+        await sendAlertEmail(
+          env,
+          contact.email,
+          fresh.map((candidate) => ({
+            headline: candidate.headline,
+            detail: candidate.detail,
+            url: `${origin}${candidate.path}`,
+          })),
+        );
+      }
+
       // oxlint-disable-next-line no-await-in-loop
       await recordSent(
         env.DB,
@@ -139,9 +149,15 @@ async function runAlerts(env: Bindings, origin: string, options: { send: boolean
           key: candidate.key,
           titleId: candidate.titleId,
           detail: candidate.detail,
+          channel: contact ? ("email" as const) : ("feed" as const),
         })),
       );
-      emails += 1;
+
+      if (contact) {
+        emails += 1;
+      } else {
+        feeds += 1;
+      }
     } catch (error) {
       logError("alert_dispatch_failed", error, { viewerId });
     }
@@ -151,7 +167,9 @@ async function runAlerts(env: Bindings, origin: string, options: { send: boolean
     await pruneSignals(env.DB);
   }
 
-  console.log(JSON.stringify({ event: "alerts_dispatched", candidates: flat.length, emails }));
+  console.log(
+    JSON.stringify({ event: "alerts_dispatched", candidates: flat.length, emails, feeds }),
+  );
 
-  return { candidates: flat.length, emails };
+  return { candidates: flat.length, emails, feeds };
 }
