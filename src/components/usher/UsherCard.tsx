@@ -10,13 +10,20 @@ export function UsherCard({
   onAction: (moment: UsherMoment, actionId: string) => void;
   onDismiss: (scope: "once" | "kind") => void;
 }) {
+  const actions = moment.actions ?? [];
+
   return (
     <div className="usher-card">
       <UsherMark face={moment.face} crop="head" />
       <p>{moment.line}</p>
       <div className="usher-confirm">
-        {(moment.actions ?? []).map((action) => (
-          <button key={action.id} type="button" onClick={() => onAction(moment, action.id)}>
+        {actions.map((action) => (
+          <button
+            key={action.id}
+            type="button"
+            className={actions.length === 1 ? "usher-primary" : ""}
+            onClick={() => onAction(moment, action.id)}
+          >
             {action.label}
           </button>
         ))}

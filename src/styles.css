@@ -2349,7 +2349,7 @@ h2 em {
   font-size: 12px;
   font-weight: 800;
   gap: 10px;
-  margin-top: 8px;
+  margin: 8px 0 34px;
   padding: 15px;
   transition:
     transform 0.16s ease,
@@ -5074,17 +5074,18 @@ button.notebook-primary {
 .usher-card .usher-confirm button {
   padding: 9px 12px;
 }
-.usher-card-mute {
+.usher-card .usher-card-mute {
   align-self: flex-start;
   background: none;
   border: none;
   color: var(--muted);
   cursor: pointer;
   font: 500 11px/1 var(--sans);
+  min-height: 0;
   padding: 0;
   text-decoration: underline;
 }
-.usher-card-mute:hover {
+.usher-card .usher-card-mute:hover {
   color: var(--white);
 }
 .page-section > .usher-card,
