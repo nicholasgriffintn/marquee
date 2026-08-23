@@ -610,7 +610,7 @@ export function DetailPanel({
               {item.people.slice(0, 5).map((person) => (
                 <Link
                   key={person}
-                  to={`/films?q=${encodeURIComponent(person)}`}
+                  to={`/listings?type=${item.mediaType}&q=${encodeURIComponent(person)}`}
                   className="detail-chip detail-chip-person"
                 >
                   {person}
@@ -623,7 +623,7 @@ export function DetailPanel({
               {item.keywords.slice(0, 8).map((keyword) => (
                 <Link
                   key={keyword}
-                  to={`/films?keywords=${encodeURIComponent(keyword)}`}
+                  to={`/listings?type=${item.mediaType}&keywords=${encodeURIComponent(keyword)}`}
                   className="detail-chip"
                 >
                   {keyword}

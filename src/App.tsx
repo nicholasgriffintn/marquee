@@ -51,11 +51,22 @@ const NAV: { to: string; label: string; private: boolean; admin?: boolean }[] = 
 ];
 
 const LEGACY_BROWSE: Record<string, string> = {
-  "/films": "/listings?type=movie",
-  "/series": "/listings?type=tv",
-  "/new": "/listings?sort=recent",
-  "/popular": "/listings?sort=popularity",
+  "/films": "type=movie",
+  "/series": "type=tv",
+  "/new": "sort=recent",
+  "/popular": "sort=popularity",
 };
+
+function LegacyBrowse({ preset }: { preset: string }) {
+  const { search } = useLocation();
+  const merged = new URLSearchParams(search);
+
+  for (const [key, value] of new URLSearchParams(preset)) {
+    merged.set(key, value);
+  }
+
+  return <Navigate to={`/listings?${merged.toString()}`} replace />;
+}
 
 const LISTINGS: BrowsePreset = {
   title: "Listings",
@@ -404,7 +415,13 @@ export function App() {
 
         <Route
           path="/this-week"
-          element={<DigestPage isSignedIn={isSignedIn} onOpen={openTitle} />}
+          element={
+            <DigestPage
+              isSignedIn={isSignedIn}
+              isSessionLoading={session.isLoading}
+              onOpen={openTitle}
+            />
+          }
         />
 
         <Route
@@ -478,8 +495,8 @@ export function App() {
           }
         />
 
-        {Object.entries(LEGACY_BROWSE).map(([path, target]) => (
-          <Route key={path} path={path} element={<Navigate to={target} replace />} />
+        {Object.entries(LEGACY_BROWSE).map(([path, preset]) => (
+          <Route key={path} path={path} element={<LegacyBrowse preset={preset} />} />
         ))}
 
         <Route path="*" element={<NotFoundPage />} />

@@ -26,8 +26,10 @@ export type Digest = {
 };
 
 export function useDigest(isSignedIn: boolean) {
-  const [digest, setDigest] = useState<Digest | null>(null);
-  const [isLoading, setIsLoading] = useState(isSignedIn);
+  const [state, setState] = useState<{ digest: Digest | null; isLoading: boolean }>({
+    digest: null,
+    isLoading: true,
+  });
 
   useEffect(() => {
     if (!isSignedIn) {
@@ -35,14 +37,31 @@ export function useDigest(isSignedIn: boolean) {
     }
 
     const controller = new AbortController();
+    let active = true;
 
-    requestJson<{ digest: Digest | null }>("/api/curator/digest", { signal: controller.signal })
-      .then((response) => setDigest(response.digest))
-      .catch(() => setDigest(null))
-      .finally(() => setIsLoading(false));
+    async function load() {
+      try {
+        const response = await requestJson<{ digest: Digest | null }>("/api/curator/digest", {
+          signal: controller.signal,
+        });
 
-    return () => controller.abort();
+        if (active) {
+          setState({ digest: response.digest, isLoading: false });
+        }
+      } catch {
+        if (active) {
+          setState({ digest: null, isLoading: false });
+        }
+      }
+    }
+
+    void load();
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
   }, [isSignedIn]);
 
-  return { digest, isLoading };
+  return { digest: state.digest, isLoading: state.isLoading };
 }

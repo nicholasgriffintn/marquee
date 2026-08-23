@@ -36,12 +36,15 @@ function formatWhen(value: string) {
 
 export function DigestPage({
   isSignedIn,
+  isSessionLoading,
   onOpen,
 }: {
   isSignedIn: boolean;
+  isSessionLoading: boolean;
   onOpen: (item: MediaTitle) => void;
 }) {
   const { digest, isLoading } = useDigest(isSignedIn);
+  const isSettling = isSessionLoading || (isSignedIn && isLoading);
   const returning = (digest?.episodes ?? []).filter(
     (episode) => episode.episode === 1 && (episode.season ?? 1) > 1,
   );
@@ -64,16 +67,16 @@ export function DigestPage({
         </p>
       </header>
 
-      {!isSignedIn && (
+      {isSettling && <p className="rails-building">Setting the programme…</p>}
+
+      {!isSettling && !isSignedIn && (
         <div className="honest-empty">
           <h2>Sign in first.</h2>
           <p>The programme is set from your own shelf, so it needs to know whose it is.</p>
         </div>
       )}
 
-      {isSignedIn && isLoading && <p className="rails-building">Setting the programme…</p>}
-
-      {isSignedIn && !isLoading && !digest && (
+      {!isSettling && isSignedIn && !digest && (
         <div className="honest-empty">
           <h2>Nothing to print yet.</h2>
           <p>Save a few things to your shelf. The first programme goes out on Monday.</p>
