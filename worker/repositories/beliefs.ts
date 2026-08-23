@@ -7,6 +7,7 @@ export type BeliefDraft = {
   strength: number;
   confidence: number;
   sourceRule: string;
+  expiresInDays?: number;
   evidence: { kind: "signal" | "answer" | "entry"; id: string }[];
 };
 
@@ -105,13 +106,14 @@ export async function writeDerivedBeliefs(db: D1Database, viewerId: string, draf
           db
             .prepare(
               `INSERT INTO viewer_beliefs
-                 (id, viewer_id, key, value, strength, confidence, source_rule, revoked_at, updated_at)
-               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULL, CURRENT_TIMESTAMP)
+                 (id, viewer_id, key, value, strength, confidence, source_rule, expires_at, revoked_at, updated_at)
+               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, NULL, CURRENT_TIMESTAMP)
                ON CONFLICT (viewer_id, key) DO UPDATE SET
                  value = excluded.value,
                  strength = excluded.strength,
                  confidence = excluded.confidence,
                  source_rule = excluded.source_rule,
+                 expires_at = excluded.expires_at,
                  revoked_at = NULL,
                  updated_at = CURRENT_TIMESTAMP`,
             )
@@ -123,6 +125,9 @@ export async function writeDerivedBeliefs(db: D1Database, viewerId: string, draf
               draft.strength,
               draft.confidence,
               draft.sourceRule,
+              draft.expiresInDays
+                ? new Date(Date.now() + draft.expiresInDays * 86_400_000).toISOString()
+                : null,
             ),
         );
       }

@@ -6,6 +6,7 @@ export type MarqueeEvent = {
     | "browse"
     | "title_view"
     | "provider_exit"
+    | "title_watched"
     | "shelf_save"
     | "shelf_remove"
     | "curator_ask"

@@ -87,6 +87,14 @@ export type IngestionJob =
   | { type: "enrich-anilist"; titleId: string }
   | { type: "cache-poster"; titleId: string }
   | { type: "import-imdb-title"; imdbId: string }
+  | {
+      type: "import-diary-row";
+      viewerId: string;
+      name: string;
+      year: number | null;
+      rating: number | null;
+      watchedAt: string;
+    }
   | { type: "embed-titles"; titleIds: string[] }
   | { type: "import-trakt-history"; viewerId: string; origin: string }
   | { type: "sync-schedule" }

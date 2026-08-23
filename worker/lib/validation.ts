@@ -98,6 +98,15 @@ export function isIngestionJob(value: unknown): value is IngestionJob {
     return typeof value.imdbId === "string" && /^tt\d+$/u.test(value.imdbId);
   }
 
+  if (value.type === "import-diary-row") {
+    return (
+      typeof value.viewerId === "string" &&
+      typeof value.name === "string" &&
+      value.name.length > 0 &&
+      value.name.length <= 160
+    );
+  }
+
   if (
     value.type === "enrich-availability" ||
     value.type === "enrich-ratings" ||

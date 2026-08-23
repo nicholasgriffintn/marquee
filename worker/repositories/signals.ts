@@ -1,7 +1,7 @@
 import { logError } from "../lib/logging.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 
-export const SIGNAL_TYPES = ["rejection", "never", "provider_exit"] as const;
+export const SIGNAL_TYPES = ["rejection", "never", "provider_exit", "watched"] as const;
 
 export type SignalType = (typeof SIGNAL_TYPES)[number];
 
@@ -134,6 +134,44 @@ export async function rejectedTitleIds(db: D1Database, viewerId: string) {
   const signals = await readSignals(db, viewerId, ["rejection", "never"], 300);
 
   return [...new Set(signals.map((signal) => signal.titleId).filter(Boolean))];
+}
+
+export async function recentExitFor(db: D1Database, viewerId: string, titleId: string, days = 45) {
+  try {
+    const row = await db
+      .prepare(
+        `SELECT journey_id AS journeyId, context
+           FROM viewer_signals
+          WHERE viewer_id = ?1 AND title_id = ?2 AND type = 'provider_exit'
+            AND julianday(created_at) > julianday('now', ?3)
+          ORDER BY created_at DESC LIMIT 1`,
+      )
+      .bind(viewerId, titleId, `-${days} days`)
+      .first<{ journeyId: string | null; context: string }>();
+
+    if (!row) {
+      return null;
+    }
+
+    let source = "";
+
+    try {
+      const parsed: unknown = JSON.parse(row.context);
+
+      source =
+        parsed && typeof parsed === "object" && "source" in parsed
+          ? String((parsed as { source: unknown }).source ?? "")
+          : "";
+    } catch {
+      source = "";
+    }
+
+    return { journeyId: row.journeyId ?? "", source };
+  } catch (error) {
+    logError("exit_lookup_failed", error);
+
+    return null;
+  }
 }
 
 export async function neverTitleIds(db: D1Database, viewerId: string) {

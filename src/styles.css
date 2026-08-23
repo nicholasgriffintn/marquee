@@ -4063,6 +4063,34 @@ h2 em {
   min-height: 36px;
   padding: 0 12px;
 }
+.notebook-import {
+  align-items: center;
+  border: 1px dashed var(--panel-line);
+  cursor: pointer;
+  display: inline-flex;
+  gap: 12px;
+  padding: 14px 18px;
+}
+.notebook-import:hover {
+  border-color: var(--acid);
+}
+.notebook-import input {
+  color: var(--muted);
+  font: 400 13px/1 var(--sans);
+  max-width: 260px;
+}
+.notebook-import span {
+  color: var(--acid);
+  font: 700 10px/1 var(--mono);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+.notebook-import-status {
+  color: var(--paper);
+  font: italic 400 15px/1.5 var(--serif);
+  margin: 12px 0 0;
+  max-width: 56ch;
+}
 .notebook-guest-list {
   display: flex;
   flex-direction: column;

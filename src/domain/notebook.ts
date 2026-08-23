@@ -61,6 +61,7 @@ export const GROUP_TITLES: Record<string, string> = {
   avoid: "What you leave alone",
   person: "Faces you follow",
   runtime: "How long you sit still",
+  mood: "Lately",
   service: "Where you actually watch",
   habit: "How you watch",
 };

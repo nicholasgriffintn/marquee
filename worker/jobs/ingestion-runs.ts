@@ -20,6 +20,10 @@ export function jobSubject(job: IngestionJob) {
     return job.viewerId;
   }
 
+  if (job.type === "import-diary-row") {
+    return `${job.viewerId}#${job.name.slice(0, 40)}`;
+  }
+
   if (job.type === "sync-discover-page") {
     return `${job.partitionId ?? job.mediaType}#${job.page}`;
   }

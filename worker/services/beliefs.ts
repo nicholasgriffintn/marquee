@@ -220,6 +220,44 @@ function derivedDrafts(entries: { facts: TitleFacts; weight: number }[]): Belief
   return drafts;
 }
 
+const MOOD_WINDOW_DAYS = 30;
+const MOOD_EXPIRY_DAYS = 21;
+
+async function moodDrafts(db: D1Database, viewerId: string): Promise<BeliefDraft[]> {
+  const rejections = await readSignals(db, viewerId, ["rejection"], 120);
+  const recent = rejections.filter(
+    (signal) => Date.now() - Date.parse(signal.createdAt) < MOOD_WINDOW_DAYS * 86_400_000,
+  );
+
+  if (recent.length < MIN_EVIDENCE) {
+    return [];
+  }
+
+  const facts = await factsFor(db, recent.map((signal) => signal.titleId).filter(Boolean));
+  const byId = new Map(facts.map((entry) => [entry.titleId, entry]));
+  const totals = new Map<string, string[]>();
+
+  for (const signal of recent) {
+    for (const genre of byId.get(signal.titleId)?.genres ?? []) {
+      const key = genre.toLowerCase();
+
+      totals.set(key, [...(totals.get(key) ?? []), signal.titleId]);
+    }
+  }
+
+  return [...totals.entries()]
+    .filter(([, ids]) => ids.length >= MIN_EVIDENCE)
+    .map(([genre, ids]) => ({
+      key: `rule:mood:${genre}`,
+      value: `Lately you have turned down ${genre} more than once. Off it for now, perhaps.`,
+      strength: Math.min(1, ids.length / 5),
+      confidence: 0.4,
+      sourceRule: "rule:recent-rejections",
+      expiresInDays: MOOD_EXPIRY_DAYS,
+      evidence: ids.slice(0, 12).map((id) => ({ kind: "signal" as const, id })),
+    }));
+}
+
 async function serviceDrafts(db: D1Database, viewerId: string): Promise<BeliefDraft[]> {
   const exits = await readSignals(db, viewerId, ["provider_exit"], 200);
   const totals = new Map<string, string[]>();
@@ -265,6 +303,7 @@ export async function refreshBeliefs(env: Bindings, viewerId: string, viewer: Vi
       ...statedDrafts(preferences),
       ...derivedDrafts(entries),
       ...(await serviceDrafts(env.DB, viewerId)),
+      ...(await moodDrafts(env.DB, viewerId)),
     ];
 
     await writeDerivedBeliefs(env.DB, viewerId, drafts);

@@ -12,6 +12,7 @@ import {
   type Guest,
 } from "../domain/notebook";
 import { jsonRequest, requestJson } from "../lib/api";
+import { dedupeRows, parseLetterboxdCsv } from "../lib/letterboxd";
 
 type NotebookResponse = { beliefs: Belief[] };
 
@@ -40,6 +41,7 @@ export function NotebookPage({ isSignedIn }: { isSignedIn: boolean }) {
   const [reloads, setReloads] = useState(0);
   const [guests, setGuests] = useState<Guest[]>([]);
   const [draft, setDraft] = useState({ name: "", vetoes: "" });
+  const [importing, setImporting] = useState("");
 
   useEffect(() => {
     if (!isSignedIn) {
@@ -98,6 +100,46 @@ export function NotebookPage({ isSignedIn }: { isSignedIn: boolean }) {
     } catch {
       setError("Could not note them down.");
     }
+  }
+
+  async function importCsv(files: FileList | null) {
+    const rows = dedupeRows(
+      (await Promise.all([...(files ?? [])].map((file) => file.text()))).flatMap((text) =>
+        parseLetterboxdCsv(text),
+      ),
+    );
+
+    if (rows.length === 0) {
+      setImporting(
+        "Nothing I recognised in that. Letterboxd exports a folder of CSVs — send me diary.csv or ratings.csv.",
+      );
+
+      return;
+    }
+
+    let matched = 0;
+    let queued = 0;
+
+    for (let index = 0; index < rows.length; index += 100) {
+      setImporting(`Reading ${Math.min(index + 100, rows.length)} of ${rows.length}…`);
+
+      try {
+        const outcome = await requestJson<{ matched: number; queued: number }>(
+          "/api/profile/import/letterboxd",
+          jsonRequest("POST", { rows: rows.slice(index, index + 100) }),
+        );
+
+        matched += outcome.matched;
+        queued += outcome.queued;
+      } catch {
+        queued += 0;
+      }
+    }
+
+    setImporting(
+      `${matched} of ${rows.length} seated straight away. ${queued > 0 ? `${queued} I have sent for — they will appear over the next hour.` : ""}`.trim(),
+    );
+    setReloads((count) => count + 1);
   }
 
   async function dropGuest(guest: Guest) {
@@ -272,6 +314,26 @@ export function NotebookPage({ isSignedIn }: { isSignedIn: boolean }) {
           </div>
         ))
       )}
+      {isSignedIn && (
+        <div className="notebook-group">
+          <h2>Bring your history with you</h2>
+          <p className="notebook-lede">
+            Letterboxd will give you your whole account as a folder of CSV files, under Settings,
+            Data, Export. Hand me diary.csv or ratings.csv and I will fill in what I have missed.
+          </p>
+          <label className="notebook-import">
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              multiple
+              onChange={(event) => void importCsv(event.target.files)}
+            />
+            <span>Choose your export</span>
+          </label>
+          {importing && <p className="notebook-import-status">{importing}</p>}
+        </div>
+      )}
+
       {isSignedIn && (
         <div className="notebook-group notebook-guests">
           <h2>Who else sits with you</h2>

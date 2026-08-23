@@ -298,6 +298,22 @@ export async function getCatalog(
   };
 }
 
+export async function findByTitle(env: Bindings, name: string, year: number | null) {
+  const response = await requestTmdb(env, "/search/movie", {
+    query: name.slice(0, 120),
+    ...(year ? { primary_release_year: String(year) } : {}),
+  });
+
+  if (!isRecord(response)) {
+    return null;
+  }
+
+  const [match] = records(response.results);
+  const tmdbId = match ? numberAt(match, "id") : null;
+
+  return tmdbId ? `movie:${tmdbId}` : null;
+}
+
 export async function findByImdbId(env: Bindings, imdbId: string) {
   const response = await requestTmdb(env, `/find/${imdbId}`, { external_source: "imdb_id" });
 

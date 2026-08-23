@@ -4,7 +4,8 @@ import type { Bindings } from "../types.ts";
 
 const WINDOW_DAYS = 28;
 const CLICK_WEIGHT = 1;
-const EXIT_WEIGHT = 4;
+const EXIT_WEIGHT = 3;
+const WATCHED_WEIGHT = 8;
 const PRIOR_IMPRESSIONS = 20;
 const PRIOR_SCORE = 0.15;
 
@@ -15,11 +16,12 @@ export type AngleScore = {
   impressions: number;
   clicks: number;
   exits: number;
+  watched: number;
   score: number;
 };
 
-function scoreFor(impressions: number, clicks: number, exits: number) {
-  const value = clicks * CLICK_WEIGHT + exits * EXIT_WEIGHT;
+function scoreFor(impressions: number, clicks: number, exits: number, watched: number) {
+  const value = clicks * CLICK_WEIGHT + exits * EXIT_WEIGHT + watched * WATCHED_WEIGHT;
   const weight = impressions + PRIOR_IMPRESSIONS;
 
   return (value + PRIOR_IMPRESSIONS * PRIOR_SCORE) / weight;
@@ -31,7 +33,7 @@ export async function computeAngleScores(env: Bindings) {
     `SELECT blob6 AS source, blob1 AS name, sum(_sample_interval) AS total
        FROM ${eventsTable()}
       WHERE timestamp > NOW() - INTERVAL '${WINDOW_DAYS}' DAY
-        AND blob1 IN ('rail_impression', 'rail_click', 'provider_exit')
+        AND blob1 IN ('rail_impression', 'rail_click', 'provider_exit', 'title_watched')
         AND blob6 != ''
       GROUP BY source, name
       FORMAT JSON`,
@@ -49,6 +51,7 @@ export async function computeAngleScores(env: Bindings) {
       impressions: 0,
       clicks: 0,
       exits: 0,
+      watched: 0,
       score: 0,
     };
     const total = row.total || 0;
@@ -57,6 +60,8 @@ export async function computeAngleScores(env: Bindings) {
       current.impressions += total;
     } else if (row.name === "rail_click") {
       current.clicks += total;
+    } else if (row.name === "title_watched") {
+      current.watched += total;
     } else {
       current.exits += total;
     }
@@ -66,22 +71,30 @@ export async function computeAngleScores(env: Bindings) {
 
   const scores = [...totals.values()].map((entry) => ({
     ...entry,
-    score: scoreFor(entry.impressions, entry.clicks, entry.exits),
+    score: scoreFor(entry.impressions, entry.clicks, entry.exits, entry.watched),
   }));
 
   try {
     await env.DB.batch(
       scores.map((entry) =>
         env.DB.prepare(
-          `INSERT INTO angle_scores (angle, impressions, clicks, exits, score, computed_at)
-           VALUES (?1, ?2, ?3, ?4, ?5, CURRENT_TIMESTAMP)
+          `INSERT INTO angle_scores (angle, impressions, clicks, exits, watched, score, computed_at)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, CURRENT_TIMESTAMP)
            ON CONFLICT (angle) DO UPDATE SET
              impressions = excluded.impressions,
              clicks = excluded.clicks,
              exits = excluded.exits,
+             watched = excluded.watched,
              score = excluded.score,
              computed_at = CURRENT_TIMESTAMP`,
-        ).bind(entry.angle, entry.impressions, entry.clicks, entry.exits, entry.score),
+        ).bind(
+          entry.angle,
+          entry.impressions,
+          entry.clicks,
+          entry.exits,
+          entry.watched,
+          entry.score,
+        ),
       ),
     );
   } catch (error) {

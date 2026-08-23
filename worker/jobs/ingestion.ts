@@ -3,7 +3,13 @@ import { getAnilistDetails } from "../clients/anilist.ts";
 import { getJustwatchAvailability } from "../clients/justwatch.ts";
 import { getOmdbPoster, getOmdbRatings } from "../clients/omdb.ts";
 import { getSimklIds } from "../clients/simkl.ts";
-import { findByImdbId, getCatalog, getDiscoverPage, getItems } from "../clients/tmdb.ts";
+import {
+  findByImdbId,
+  findByTitle,
+  getCatalog,
+  getDiscoverPage,
+  getItems,
+} from "../clients/tmdb.ts";
 import { getWatchmodeAvailability } from "../clients/watchmode.ts";
 import { enqueue } from "../lib/queue.ts";
 import { isKnownTitle } from "../lib/validation.ts";
@@ -415,6 +421,51 @@ async function importImdbTitle(env: Bindings, imdbId: string) {
   await queueTitleEmbeddings(env, [titleId]);
 }
 
+async function importDiaryRow(
+  env: Bindings,
+  job: {
+    viewerId: string;
+    name: string;
+    year: number | null;
+    rating: number | null;
+    watchedAt: string;
+  },
+) {
+  const titleId = await findByTitle(env, job.name, job.year);
+
+  if (!titleId) {
+    console.log(JSON.stringify({ event: "diary_import_unmatched", name: job.name }));
+
+    return;
+  }
+
+  const [title] = await getItems(env, [titleId]);
+
+  if (!title) {
+    return;
+  }
+
+  await storeItems(env.DB, [title], new Date().toISOString());
+  await queueAvailability(env, [titleId]);
+  await queueTitleEmbeddings(env, [titleId]);
+  await env.DB.prepare(
+    `INSERT INTO viewing_entries (id, viewer_id, title_id, status, rating, thoughts, updated_at)
+     VALUES (?1, ?2, ?3, 'watched', ?4, '', ?5)
+     ON CONFLICT(viewer_id, title_id) DO UPDATE SET
+       status = 'watched',
+       rating = COALESCE(excluded.rating, viewing_entries.rating),
+       updated_at = excluded.updated_at`,
+  )
+    .bind(
+      crypto.randomUUID(),
+      job.viewerId,
+      titleId,
+      job.rating,
+      job.watchedAt ? `${job.watchedAt} 12:00:00` : new Date().toISOString(),
+    )
+    .run();
+}
+
 async function originPosterUrl(env: Bindings, titleId: string) {
   const row = await env.DB.prepare(
     `SELECT json_extract(payload, '$.posterUrl') AS posterUrl FROM catalog_titles WHERE id = ?`,
@@ -638,6 +689,12 @@ export async function executeIngestionJob(env: Bindings, job: IngestionJob) {
 
   if (job.type === "import-imdb-title") {
     await importImdbTitle(env, job.imdbId);
+
+    return;
+  }
+
+  if (job.type === "import-diary-row") {
+    await importDiaryRow(env, job);
 
     return;
   }
