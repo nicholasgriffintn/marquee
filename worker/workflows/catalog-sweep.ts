@@ -17,6 +17,9 @@ import { rebuildWorkingSet } from "../repositories/working-set.ts";
 import { syncBuzz } from "../services/buzz.ts";
 import { queueCinemaDirectories, queueCinemaScreenings } from "../services/cinema-sync.ts";
 import { advanceDiscoverFrontier } from "../services/discover.ts";
+import { queueRevivalMirrors } from "../services/revival-mirror.ts";
+import { checkRevivalRights } from "../services/revival-rights.ts";
+import { matchRevivalWorks, queueRevivalSources } from "../services/revival.ts";
 import { syncSchedule } from "../services/schedule.ts";
 import { buildSections } from "../services/sections.ts";
 import type { Bindings, CatalogSweepParameters } from "../types.ts";
@@ -95,6 +98,24 @@ export class CatalogSweep extends WorkflowEntrypoint<Bindings, CatalogSweepParam
 
     await step.do("index people", { retries: RETRIES }, async () =>
       rebuildPeopleIndex(this.env.DB),
+    );
+
+    if (deep) {
+      await step.do("sweep public domain sources", { retries: RETRIES }, async () =>
+        queueRevivalSources(this.env),
+      );
+    }
+
+    await step.do("match public domain works", { retries: RETRIES }, async () =>
+      matchRevivalWorks(this.env),
+    );
+
+    await step.do("check public domain rights", { retries: RETRIES }, async () =>
+      checkRevivalRights(this.env),
+    );
+
+    await step.do("queue reel mirrors", { retries: RETRIES }, async () =>
+      queueRevivalMirrors(this.env),
     );
 
     await step.do("prune run log", { retries: RETRIES }, async () => pruneIngestionRuns(this.env));

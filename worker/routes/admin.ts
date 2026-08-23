@@ -5,6 +5,13 @@ import { readJsonObject } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
 import { SOURCE_BUDGETS } from "../repositories/budgets.ts";
 import {
+  isRevivalId,
+  listForReview,
+  readRevivalStats,
+  resetMirror,
+  setWorkStatus,
+} from "../repositories/revival.ts";
+import {
   ADMIN_ACTIONS,
   clearSourcePause,
   isAdminAction,
@@ -70,6 +77,70 @@ adminRoutes.post("/sources/:source/resume", async (context) => {
     logError("admin_resume_failed", error, { area: "admin", source });
 
     return context.json({ error: "Could not resume that source" }, 500);
+  }
+});
+
+adminRoutes.get("/revival", async (context) => {
+  const requested = context.req.query("status") ?? "candidate";
+  const status =
+    requested === "approved" || requested === "rejected" || requested === "candidate"
+      ? requested
+      : "candidate";
+
+  try {
+    context.header("cache-control", "no-store");
+
+    const [works, stats] = await Promise.all([
+      listForReview(context.env.DB, status, 80),
+      readRevivalStats(context.env.DB),
+    ]);
+
+    return context.json({ status, works, stats });
+  } catch (error) {
+    logError("admin_revival_failed", error, { area: "revival" });
+
+    return context.json({ error: "Could not read the review queue" }, 500);
+  }
+});
+
+adminRoutes.post("/revival/:workId/:decision", async (context) => {
+  const workId = context.req.param("workId");
+  const decision = context.req.param("decision");
+
+  if (!isRevivalId(workId)) {
+    return context.json({ error: "Unknown work" }, 404);
+  }
+
+  if (decision !== "approve" && decision !== "reject" && decision !== "mirror") {
+    return context.json({ error: "Unknown decision" }, 400);
+  }
+
+  const actor = context.get("authenticatedUser");
+
+  try {
+    if (decision === "mirror") {
+      await resetMirror(context.env.DB, workId);
+      await context.env.REVIVAL_QUEUE.send({ type: "mirror-revival-work", workId });
+
+      return context.json({ workId, decision, queued: true });
+    }
+
+    const changed = await setWorkStatus(
+      context.env.DB,
+      workId,
+      decision === "approve" ? "approved" : "rejected",
+      actor.githubLogin ?? actor.id,
+    );
+
+    if (changed && decision === "approve") {
+      await context.env.REVIVAL_QUEUE.send({ type: "mirror-revival-work", workId });
+    }
+
+    return context.json({ workId, decision, changed });
+  } catch (error) {
+    logError("admin_revival_decision_failed", error, { area: "revival", workId });
+
+    return context.json({ error: "That decision did not stick" }, 500);
   }
 });
 

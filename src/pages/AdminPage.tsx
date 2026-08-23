@@ -1,4 +1,5 @@
 import { ErrorBoundary } from "../components/ErrorBoundary";
+import { RevivalReview } from "../components/revival/RevivalReview";
 import { UsherMark } from "../components/usher/UsherMark";
 import { useAdmin, type AdminAction } from "../hooks/useAdmin";
 import type { User } from "../types";
@@ -46,6 +47,16 @@ const ACTION_GROUPS: {
       { id: "alerts-send", label: "Send the post" },
       { id: "angle-scores", label: "Rescore shelves" },
       { id: "people", label: "Reindex credits" },
+    ],
+  },
+  {
+    title: "The revival house",
+    note: "Public domain prints from European archives, the Internet Archive and the Library of Congress. The UK term runs 70 years from the death of the last author, so a work is matched to the catalogue, checked against Wikidata for its authors' death dates, and only then cleared. Everything unresolved waits in the queue below. Mirroring copies an approved print into our own bucket, one chunk per run.",
+    actions: [
+      { id: "revival-sweep", label: "Sweep the sources" },
+      { id: "revival-match", label: "Match to catalogue" },
+      { id: "revival-rights", label: "Check UK rights" },
+      { id: "revival-mirror", label: "Mirror approved prints" },
     ],
   },
   {
@@ -397,6 +408,10 @@ export function AdminPage({ user }: { user: User }) {
             </ul>
           </section>
         )}
+      </ErrorBoundary>
+
+      <ErrorBoundary label="The vault">
+        <RevivalReview />
       </ErrorBoundary>
 
       <ErrorBoundary label="The staff list">

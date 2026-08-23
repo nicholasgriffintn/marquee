@@ -8,6 +8,7 @@ const ROUTE_TITLES: Record<string, string> = {
   "/shelf": "My shelf · Marquee",
   "/this-week": "This week · Marquee",
   "/notebook": "The notebook · Marquee",
+  "/revival": "The revival house · Marquee",
   "/sources": "Where it comes from · Marquee",
   "/admin": "Admin · Marquee",
   "/sign-in": "Box office · Marquee",
@@ -25,6 +26,10 @@ export function titleForItem(item: MediaTitle) {
 export function titleForRoute(pathname: string, query: string) {
   if (pathname === "/search") {
     return query ? `${query} · Search · Marquee` : "Search · Marquee";
+  }
+
+  if (pathname.startsWith("/revival/")) {
+    return "The revival house · Marquee";
   }
 
   return ROUTE_TITLES[pathname] ?? "Not found · Marquee";

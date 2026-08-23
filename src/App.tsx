@@ -38,6 +38,8 @@ import { DigestPage } from "./pages/DigestPage";
 import { LibraryPage } from "./pages/LibraryPage";
 import { NotebookPage } from "./pages/NotebookPage";
 import { PersonPage } from "./pages/PersonPage";
+import { RevivalPage } from "./pages/RevivalPage";
+import { RevivalScreenPage } from "./pages/RevivalScreenPage";
 import { SearchPage } from "./pages/SearchPage";
 import { SignInPage } from "./pages/SignInPage";
 import { SourcesPage } from "./pages/SourcesPage";
@@ -51,6 +53,7 @@ const HOME_DRIP_DELAY_MS = 45_000;
 const NAV: { to: string; label: string; private: boolean; admin?: boolean }[] = [
   { to: "/", label: "Tonight", private: false },
   { to: "/listings", label: "Listings", private: false },
+  { to: "/revival", label: "Revival house", private: false },
   { to: "/shelf", label: "My shelf", private: true },
   { to: "/this-week", label: "This week", private: true },
   { to: "/notebook", label: "Notebook", private: true },
@@ -475,6 +478,10 @@ export function App() {
           />
 
           <Route path="/usher" element={<UsherPage />} />
+
+          <Route path="/revival" element={<RevivalPage isReady={isViewerReady} />} />
+
+          <Route path="/revival/:workId" element={<RevivalScreenPage isSignedIn={isSignedIn} />} />
 
           <Route
             path="/notebook"

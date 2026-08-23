@@ -140,7 +140,8 @@
       "OMDB_API_KEY",
       "SIMKL_CLIENT_ID",
       "TRAKT_CLIENT_ID",
-      "TRAKT_CLIENT_SECRET"
+      "TRAKT_CLIENT_SECRET",
+      "EUROPEANA_API_KEY"
     ]
   },
   "observability": {
@@ -174,6 +175,10 @@
       {
         "binding": "EMBEDDING_QUEUE",
         "queue": "marquee-embeddings"
+      },
+      {
+        "binding": "REVIVAL_QUEUE",
+        "queue": "marquee-revival"
       }
     ],
     "consumers": [
@@ -230,6 +235,15 @@
         "dead_letter_queue": "marquee-ingestion-dead-letter",
         "max_concurrency": 4,
         "retry_delay": 30
+      },
+      {
+        "queue": "marquee-revival",
+        "max_batch_size": 1,
+        "max_batch_timeout": 5,
+        "max_retries": 5,
+        "dead_letter_queue": "marquee-ingestion-dead-letter",
+        "max_concurrency": 2,
+        "retry_delay": 60
       },
       {
         "queue": "marquee-ingestion-dead-letter",

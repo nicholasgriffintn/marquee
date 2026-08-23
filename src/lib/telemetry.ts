@@ -1,6 +1,6 @@
 import { journeyFor } from "./journey";
 
-type ClientEvent = "rail_impression" | "rail_click" | "title_view" | "provider_exit";
+type ClientEvent = "rail_impression" | "rail_click" | "title_view" | "provider_exit" | "reel_play";
 
 type TrackPayload = {
   detail?: string;

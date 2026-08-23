@@ -20,6 +20,8 @@ import { mcpRoutes } from "./routes/mcp.ts";
 import { mediaRoutes } from "./routes/media.ts";
 import { notebookRoutes } from "./routes/notebook.ts";
 import { profileRoutes } from "./routes/profile.ts";
+import { reelRoutes } from "./routes/reel.ts";
+import { revivalRoutes } from "./routes/revival.ts";
 import { usherRoutes } from "./routes/usher.ts";
 import { apiGuard } from "./security/guard.ts";
 import type { Bindings, IngestionJob } from "./types.ts";
@@ -50,6 +52,8 @@ app.use("*", apiGuard);
 
 app.get("/health", (context) => context.json({ ok: true, service: "marquee" }));
 
+app.route("/media/reel", reelRoutes);
+
 app.route("/media", mediaRoutes);
 
 app.route("/api/admin", adminRoutes);
@@ -67,6 +71,8 @@ app.route("/api/episodes", episodeRoutes);
 app.route("/api/curator", curatorRoutes);
 
 app.route("/api/usher", usherRoutes);
+
+app.route("/api/revival", revivalRoutes);
 
 app.route("/api/notebook", notebookRoutes);
 
@@ -91,7 +97,7 @@ app.notFound(async (context) => {
 
   response.headers.set(
     "content-security-policy",
-    `default-src 'self'; style-src 'self' 'unsafe-inline'; script-src ${scriptSource}; img-src 'self' data: https://image.tmdb.org https://www.themoviedb.org https://avatars.githubusercontent.com https://i.ytimg.com; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; frame-src https://www.youtube-nocookie.com https://www.youtube.com; worker-src 'self' blob:; form-action 'self'`,
+    `default-src 'self'; style-src 'self' 'unsafe-inline'; script-src ${scriptSource}; img-src 'self' data: https://image.tmdb.org https://www.themoviedb.org https://avatars.githubusercontent.com https://i.ytimg.com https://archive.org https://tile.loc.gov; media-src 'self' blob:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; frame-src https://www.youtube-nocookie.com https://www.youtube.com; worker-src 'self' blob:; form-action 'self'`,
   );
   response.headers.set(
     "permissions-policy",

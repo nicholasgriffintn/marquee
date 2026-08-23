@@ -21,7 +21,11 @@ export type AdminAction =
   | "angle-scores"
   | "people"
   | "cinemas"
-  | "showtimes";
+  | "showtimes"
+  | "revival-sweep"
+  | "revival-match"
+  | "revival-rights"
+  | "revival-mirror";
 
 export type AdminOverview = {
   catalogue: Record<string, number>;

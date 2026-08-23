@@ -14,6 +14,7 @@ import { blendedRating, ratingSources } from "../domain/ratings";
 import { useAvailability } from "../hooks/useAvailability";
 import { useCollection } from "../hooks/usePerson";
 import { useRecommendations } from "../hooks/useRecommendations";
+import { useTitleReels } from "../hooks/useRevival";
 import { useEpisodeEntries } from "../hooks/useSeasons";
 import { useShowings } from "../hooks/useShowings";
 import { useTitleInsight } from "../hooks/useTitleInsight";
@@ -35,6 +36,7 @@ import type { EntryStatus, ViewingEntry } from "../types";
 import { ArtPlaceholder } from "./ArtPlaceholder";
 import { ShowingsBlock } from "./cinema/ShowingsBlock";
 import { ErrorBoundary } from "./ErrorBoundary";
+import { RevivalBlock } from "./revival/RevivalBlock";
 import { SeasonsBlock } from "./seasons";
 import { ShelfForm } from "./ShelfForm";
 import { TrailerBlock } from "./TrailerBlock";
@@ -435,6 +437,7 @@ export function DetailPanel({
   const { insight, pairs, isLoading: isInsightLoading } = useTitleInsight(item.id);
   const similar = useRecommendations(item.id, item.recommendationIds, SIMILAR_LIMIT);
   const showings = useShowings(item, canSave);
+  const reels = useTitleReels(item.id, item.mediaType, item.tmdbId);
   const collection = useCollection(item.collection?.id);
   const spokenIn = languageLabel(item.originalLanguage);
   const upcomingAir =
@@ -653,6 +656,7 @@ export function DetailPanel({
                 providers={providers}
                 fallbackHref={item.watchLink}
                 selectedProviderIds={selectedProviderIds}
+                hideIfEmpty={reels.length > 0}
                 onLeave={leaveVia}
               />
             </ErrorBoundary>
@@ -664,6 +668,9 @@ export function DetailPanel({
                 <ArrowIcon />
               </button>
             )}
+            <ErrorBoundary label="The revival house">
+              <RevivalBlock works={reels} />
+            </ErrorBoundary>
             <ErrorBoundary label="Local showings">
               <ShowingsBlock
                 listings={showings.listings}

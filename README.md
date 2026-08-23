@@ -122,6 +122,46 @@ where there is neither.
 Odeon and Curzon publish nothing readable — both sit behind a bot challenge a Worker does not get
 through. They are absent rather than approximated.
 
+## The revival house
+
+There is a small screen at the back where the ticket is nothing, because the prints are out of
+copyright. `/revival` is a repertory programme that plays here rather than sending you somewhere
+else, on our own player, with no account and no service in the way.
+
+This is a British building, so the question is whether a print is free **here**, and that is not the
+question most public domain collections answer. Under section 13B of the CDPA a film's copyright
+runs for 70 years from the death of the last of its principal director, its screenplay and dialogue
+authors, and the composer of any music written for it. It is measured from people, not from a
+release date, so the American rule of thumb — published long enough ago — tells you nothing about
+Britain. _The Lost World_ (1925) is free in America and in copyright here until 2043. _Metropolis_
+(1927) until 2047. _Nosferatu_ (1922) came free in 2020, because Henrik Galeen died in 1949.
+
+So the gate is the UK term. A work is matched to the catalogue, its authors and their death dates
+are read off Wikidata, and it is cleared only when every named author has a death date and the
+latest of them is more than 70 years ago. Nothing else clears itself. In particular a work whose
+authors could not be established does **not** fall back to the anonymous rule, because "we could not
+find out" and "there is nobody to find" are not the same claim, and only the second one shortens the
+term. The reviewer is told which of the two it looks like, and what the term would be if the work
+really were anonymous.
+
+Everything unresolved sits in a queue on `/admin` for a person, including the large pile that is
+genuinely free in America and unprovable here. That is the right way round to be wrong, and it does
+mean the shelf fills slowly.
+
+Three places supply it. European archives through **Europeana**, filtered to things they have
+published outright as Public Domain Mark or CC0 and that they serve as an actual file rather than a
+landing page — a European institution releasing its own holding is the strongest signal available
+for European material. The **Library of Congress** National Screening Room, which offers the file
+for download when it is not aware of a restriction. And the **Internet Archive**, which is an open
+upload platform and is never taken at its word.
+
+Every print carries its provenance on its own page: which basis it is free under, when the UK term
+ran out, who holds the copy, and a link back to the source record. A viewer can check the reasoning
+rather than take our word for it either.
+
+Prints are matched to catalogue titles the same way cinema listings are, so a film's ordinary panel
+grows a _playing here, free_ row when we have one.
+
 ## The door
 
 Most of the job is letting people in; the rest of it is not, and the API's rate limits and bot
@@ -152,10 +192,17 @@ partial setup runs; it just knows less.
 | `OMDB_API_KEY`                         | Awards, box office, search beyond the catalogue    |
 | `SIMKL_CLIENT_ID`                      | Anime tags and scores                              |
 | `TRAKT_CLIENT_ID` / `_SECRET`          | Importing a viewer's history                       |
+| `EUROPEANA_API_KEY`                    | British and European prints for the revival house  |
 | `CLOUDFLARE_ACCOUNT_ID` / `_API_TOKEN` | AI Gateway                                         |
 
-TMDB is the one you cannot really run without. Air dates come from TVmaze and the trending rail
-from Wikipedia pageviews; neither needs a key.
+TMDB is the one you cannot really run without. Air dates come from TVmaze, the trending rail from
+Wikipedia pageviews, and the revival house's UK term checks from Wikidata; none of those needs a
+key. A [free Europeana key](https://pro.europeana.eu/page/get-api) is what turns on the British and
+European side of the revival house — without it the other two sources still run.
+
+A name only reaches `env` if it is listed under `secrets.required` in `wrangler.json`. Defining that
+list switches off Wrangler's inference from `.dev.vars`, so anything you add to `.dev.vars` and not
+to the list is silently absent at runtime. Add the name in both places.
 
 ## Running it locally
 
@@ -163,6 +210,7 @@ from Wikipedia pageviews; neither needs a key.
 cp .dev.vars.example .dev.vars
 pnpm install
 pnpm exec wrangler vectorize create marquee-titles --dimensions=1024 --metric=cosine
+pnpm exec wrangler queues create marquee-revival
 pnpm db:migrate:local
 pnpm dev
 ```
@@ -258,6 +306,15 @@ what the subscription would show.
 **Posters** are cached in R2 and served from the app's own hostname through Cloudflare Images. Keep
 the four widths in `src/lib/media.ts` and `worker/routes/media.ts` aligned, or the number of
 billable unique transformations stops being bounded.
+
+**Prints** are mirrored into R2 and served from `/media/reel/:id`, a byte-range route that answers
+206s so the scrubber works. The copy runs on the `marquee-revival` queue in 32 MB parts against an
+R2 multipart upload, persisting the upload id and the parts between runs and re-queueing itself, so
+a two-hour feature crosses several invocations without a Worker ever holding the whole file. Until
+the copy lands the same route proxies the source, which is what keeps a print watchable the moment
+it is approved and `media-src` at `'self'`. Nothing is transcoded — both sources already publish an
+H.264 MP4 derivative. The deep sweep walks each source a page at a time behind a cursor; discovery,
+matching and mirroring each have a button on `/admin`.
 
 **The artwork** is in `public/`, all of it cut from `usher.svg`, in ink, paper, acid and coral and
 nothing else. He is drawn to survive on his own dark background, so anything you add to him wants a

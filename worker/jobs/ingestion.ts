@@ -41,6 +41,14 @@ import { syncBuzz } from "../services/buzz.ts";
 import { syncCinemaDirectory, syncCinemaScreenings } from "../services/cinema-sync.ts";
 import { advanceDiscoverFrontier, measureDiscoverPartition } from "../services/discover.ts";
 import { embedTitles, selectUnembedded } from "../services/embeddings.ts";
+import { mirrorWork } from "../services/revival-mirror.ts";
+import { checkRevivalRights } from "../services/revival-rights.ts";
+import {
+  matchRevivalWorks,
+  syncArchiveCollection,
+  syncEuropeanaCountry,
+  syncScreeningRoom,
+} from "../services/revival.ts";
 import { syncSchedule } from "../services/schedule.ts";
 import { buildSections } from "../services/sections.ts";
 import { exportTraktShelf, importTraktHistory } from "../services/trakt.ts";
@@ -802,6 +810,40 @@ export async function executeIngestionJob(env: Bindings, job: IngestionJob) {
 
   if (job.type === "sync-cinema-screenings") {
     await syncCinemaScreenings(env, job.source, job.siteId);
+
+    return;
+  }
+
+  if (job.type === "sync-revival-source") {
+    if (job.source === "loc") {
+      await syncScreeningRoom(env);
+    } else if (job.source === "europeana") {
+      await syncEuropeanaCountry(env, job.collection ?? "United Kingdom");
+    } else {
+      await syncArchiveCollection(env, job.collection ?? "feature_films");
+    }
+
+    return;
+  }
+
+  if (job.type === "match-revival-works") {
+    await matchRevivalWorks(env);
+
+    return;
+  }
+
+  if (job.type === "check-revival-rights") {
+    await checkRevivalRights(env);
+
+    return;
+  }
+
+  if (job.type === "mirror-revival-work") {
+    const result = await mirrorWork(env, job.workId);
+
+    if (!result.done) {
+      await env.REVIVAL_QUEUE.send({ type: "mirror-revival-work", workId: job.workId });
+    }
 
     return;
   }

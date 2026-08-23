@@ -10,6 +10,8 @@ import { dispatchAlerts, previewAlerts } from "./alerts/dispatch.ts";
 import { computeAngleScores } from "./angle-scores.ts";
 import { queueCinemaDirectories, queueCinemaScreenings } from "./cinema-sync.ts";
 import { advanceDiscoverFrontier } from "./discover.ts";
+import { queueRevivalMirrors } from "./revival-mirror.ts";
+import { queueRevivalSources } from "./revival.ts";
 
 export const ADMIN_ACTIONS = [
   "sweep-light",
@@ -30,6 +32,10 @@ export const ADMIN_ACTIONS = [
   "alerts-send",
   "angle-scores",
   "people",
+  "revival-sweep",
+  "revival-match",
+  "revival-rights",
+  "revival-mirror",
 ] as const;
 
 const RUN_WINDOW_HOURS = 24;
@@ -45,6 +51,8 @@ const QUEUED_JOBS: Partial<Record<AdminAction, IngestionJob>> = {
   buzz: { type: "sync-buzz" },
   providers: { type: "sync-providers" },
   sections: { type: "build-sections" },
+  "revival-match": { type: "match-revival-works" },
+  "revival-rights": { type: "check-revival-rights" },
 };
 
 type CountRow = Record<string, number>;
@@ -242,6 +250,21 @@ export async function runAdminAction(env: Bindings, action: AdminAction) {
     return {
       queued: frontier.pages,
       detail: `Queued ${frontier.pages} discover pages and ${frontier.measuring} window measurements`,
+    };
+  }
+
+  if (action === "revival-sweep") {
+    const queued = await queueRevivalSources(env);
+
+    return { queued, detail: `Queued ${queued} public domain sources` };
+  }
+
+  if (action === "revival-mirror") {
+    const queued = await queueRevivalMirrors(env);
+
+    return {
+      queued,
+      detail: queued ? `Queued ${queued} prints for mirroring` : "Every approved print is mirrored",
     };
   }
 
