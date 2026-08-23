@@ -30,6 +30,13 @@ const TABS: { id: RevivalStatus; label: string }[] = [
   { id: "rejected", label: "Turned away" },
 ];
 
+const SOURCES = [
+  { id: "", label: "Every source" },
+  { id: "archive", label: "Internet Archive" },
+  { id: "loc", label: "Library of Congress" },
+  { id: "europeana", label: "Europeana" },
+] as const;
+
 const STAT_LABELS: { key: string; label: string }[] = [
   { key: "approved", label: "approved" },
   { key: "candidates", label: "waiting" },
@@ -52,8 +59,10 @@ function sizeLabel(bytes: number | null) {
     : `${Math.round(bytes / 1_048_576)} MB`;
 }
 
-export function RevivalReview() {
+export function RevivalReview({ revision: outerRevision = 0 }: { revision?: number }) {
   const [status, setStatus] = useState<RevivalStatus>("candidate");
+  const [source, setSource] = useState("");
+  const [query, setQuery] = useState("");
   const [revision, setRevision] = useState(0);
   const [data, setData] = useState<ReviewResponse | null>(null);
   const [error, setError] = useState("");
@@ -76,7 +85,7 @@ export function RevivalReview() {
       });
 
     return () => controller.abort();
-  }, [revision, status]);
+  }, [outerRevision, revision, status]);
 
   const decide = useCallback(async (workId: string, decision: "approve" | "reject" | "mirror") => {
     setPending(workId);
@@ -93,6 +102,12 @@ export function RevivalReview() {
       setPending("");
     }
   }, []);
+
+  const shown = (data?.works ?? []).filter(
+    (work) =>
+      (!source || work.source === source) &&
+      (!query || work.title.toLowerCase().includes(query.trim().toLowerCase())),
+  );
 
   return (
     <section className="panel-block" aria-labelledby="admin-revival-title">
@@ -134,8 +149,34 @@ export function RevivalReview() {
         </p>
       )}
 
+      <div className="admin-filters">
+        {SOURCES.map((entry) => (
+          <button
+            type="button"
+            key={entry.id || "all"}
+            aria-pressed={source === entry.id}
+            className={`admin-chip${source === entry.id ? " selected" : ""}`}
+            onClick={() => setSource(entry.id)}
+          >
+            {entry.label}
+            <em>
+              {entry.id
+                ? (data?.works.filter((work) => work.source === entry.id).length ?? 0)
+                : (data?.works.length ?? 0)}
+            </em>
+          </button>
+        ))}
+        <input
+          className="admin-search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Find a title"
+          aria-label="Filter the vault by title"
+        />
+      </div>
+
       <ul className="admin-list revival-review">
-        {data?.works.map((work) => (
+        {shown.map((work) => (
           <li key={work.id}>
             <strong>{work.title}</strong>
             <small>
@@ -178,7 +219,7 @@ export function RevivalReview() {
             )}
           </li>
         ))}
-        {data && data.works.length === 0 && <li className="rail-empty">Nothing in this pile.</li>}
+        {data && shown.length === 0 && <li className="rail-empty">Nothing in this pile.</li>}
       </ul>
     </section>
   );

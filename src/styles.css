@@ -7566,3 +7566,114 @@ a.showtime:hover small {
   aspect-ratio: 16 / 9;
   min-width: 260px;
 }
+
+.admin-tabs {
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 26px;
+  margin: 30px 0 4px;
+  padding: 0 10px;
+}
+.admin-tab {
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  font: 800 10px var(--mono);
+  letter-spacing: 0.12em;
+  margin-bottom: -1px;
+  padding: 0 0 11px;
+  text-transform: uppercase;
+  transition: color 0.16s ease;
+}
+.admin-tab:hover {
+  color: var(--paper);
+}
+.admin-tab.selected {
+  border-bottom-color: var(--acid);
+  color: var(--acid);
+}
+@media (prefers-reduced-motion: reduce) {
+  .admin-tab {
+    transition: none;
+  }
+}
+.admin-tabs + * .panel-block:first-child {
+  border-top: 0;
+}
+.admin-tabs .spacer {
+  flex: 1;
+}
+.admin-refresh {
+  align-items: baseline;
+  background: none;
+  border: 0;
+  color: var(--muted);
+  display: flex;
+  font: 800 10px var(--mono);
+  gap: 8px;
+  letter-spacing: 0.12em;
+  padding: 0 0 11px;
+  text-transform: uppercase;
+}
+.admin-refresh:hover {
+  color: var(--acid);
+}
+.admin-refresh em {
+  color: #6f7268;
+  font: 400 9px var(--mono);
+  font-style: normal;
+  letter-spacing: 0.06em;
+  text-transform: none;
+}
+.admin-filters {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 10px 14px;
+}
+.admin-chip {
+  align-items: center;
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  display: inline-flex;
+  font: 800 9px var(--mono);
+  gap: 7px;
+  letter-spacing: 0.07em;
+  padding: 6px 10px;
+  text-transform: uppercase;
+}
+.admin-chip:hover {
+  border-color: var(--muted);
+  color: var(--paper);
+}
+.admin-chip.selected {
+  border-color: var(--acid);
+  color: var(--acid);
+}
+.admin-chip em {
+  color: #6f7268;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+}
+.admin-chip.selected em {
+  color: var(--acid);
+}
+.admin-search {
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--paper);
+  font: 400 11px var(--mono);
+  min-width: 200px;
+  padding: 6px 10px;
+}
+.admin-search::placeholder {
+  color: #6f7268;
+}
+.admin-search:focus-visible {
+  border-color: var(--acid);
+  outline: none;
+}
