@@ -15,7 +15,9 @@ export type AdminAction =
   | "buzz"
   | "providers"
   | "sections"
-  | "working-set";
+  | "working-set"
+  | "cinemas"
+  | "showtimes";
 
 export type AdminOverview = {
   catalogue: Record<string, number>;
@@ -41,6 +43,14 @@ export type AdminOverview = {
     used: number;
     windowKind: string;
     pausedUntil: string | null;
+  }[];
+  cinemas: {
+    source: string;
+    cinemas: number;
+    located: number;
+    screenings: number;
+    matched: number;
+    films: number;
   }[];
   sections: { id: string; title: string; titles: number; builtAt: string }[];
   fetchedAt: string;

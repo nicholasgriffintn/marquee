@@ -22,6 +22,7 @@ import {
 import { storeProviders } from "../repositories/providers.ts";
 import { selectStaleWorkingSet } from "../repositories/working-set.ts";
 import { syncBuzz } from "../services/buzz.ts";
+import { syncCinemaDirectory, syncCinemaScreenings } from "../services/cinema-sync.ts";
 import { advanceDiscoverFrontier, measureDiscoverPartition } from "../services/discover.ts";
 import { embedTitles, selectUnembedded } from "../services/embeddings.ts";
 import { syncSchedule } from "../services/schedule.ts";
@@ -649,6 +650,18 @@ export async function executeIngestionJob(env: Bindings, job: IngestionJob) {
 
   if (job.type === "sync-buzz") {
     await syncBuzz(env);
+
+    return;
+  }
+
+  if (job.type === "sync-cinemas") {
+    await syncCinemaDirectory(env, job.source);
+
+    return;
+  }
+
+  if (job.type === "sync-cinema-screenings") {
+    await syncCinemaScreenings(env, job.source, job.siteId);
 
     return;
   }

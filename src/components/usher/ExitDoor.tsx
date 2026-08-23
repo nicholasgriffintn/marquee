@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 
 import { UsherMark } from "./UsherMark";
 
-export type ExitKind = "provider" | "trailer" | "tmdb" | "wikipedia" | "imdb" | "other";
+export type ExitKind = "provider" | "trailer" | "tmdb" | "wikipedia" | "imdb" | "cinema" | "other";
 
 export type Exit = { href: string; label: string; kind: ExitKind };
 
@@ -16,6 +16,8 @@ const LINES: Record<ExitKind, (label: string) => string> = {
   tmdb: () => "The records office. Nearly everything I know about this came from in there.",
   wikipedia: () => "The library. Mind the spoilers, they do not sort them.",
   imdb: () => "Another lot's records. Perfectly good. Do not read the comments.",
+  cinema: (label) =>
+    `${label}. A proper house, with a proper screen. Go on, then — I'll still be here.`,
   other: () => "That is outside the building. I cannot vouch for it.",
 };
 
