@@ -237,7 +237,7 @@ export async function queueRevivalSources(env: Bindings) {
   return jobs.length;
 }
 
-export async function matchRevivalWorks(env: Bindings, limit = 40) {
+export async function matchRevivalWorks(env: Bindings, limit = 400) {
   const pending = await selectUnmatched(env.DB, limit);
   let matched = 0;
 

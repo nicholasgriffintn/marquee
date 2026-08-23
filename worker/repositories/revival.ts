@@ -53,13 +53,23 @@ type WorkRow = {
   streamUrl: string;
   mirrorState: string;
   plays: number;
+  posterKey: string | null;
+  catalogueBackdrop: string | null;
+  cataloguePoster: string | null;
 };
 
-const WORK_COLUMNS = `id, source, source_url AS sourceUrl, title, year, director, synopsis,
-   kind, runtime_seconds AS runtimeSeconds, still_url AS stillUrl,
-   rights_basis AS rightsBasis, rights_note AS rightsNote, rights_url AS rightsUrl,
-   title_id AS titleId, country, uk_clear AS ukClear, uk_expires_year AS ukExpiresYear,
-   stream_url AS streamUrl, mirror_state AS mirrorState, plays`;
+const WORK_COLUMNS = `w.id, w.source, w.source_url AS sourceUrl, w.title, w.year, w.director,
+   w.synopsis,
+   w.kind, w.runtime_seconds AS runtimeSeconds, w.still_url AS stillUrl,
+   w.rights_basis AS rightsBasis, w.rights_note AS rightsNote, w.rights_url AS rightsUrl,
+   w.title_id AS titleId, w.country, w.uk_clear AS ukClear,
+   w.uk_expires_year AS ukExpiresYear, w.stream_url AS streamUrl,
+   w.mirror_state AS mirrorState, w.plays,
+   t.poster_key AS posterKey,
+   json_extract(t.payload, '$.backdropUrl') AS catalogueBackdrop,
+   json_extract(t.payload, '$.posterUrl') AS cataloguePoster`;
+
+const WORK_FROM = `FROM revival_works AS w LEFT JOIN catalog_titles AS t ON t.id = w.title_id`;
 
 const ID_PATTERN = /^(archive|loc|europeana)\.[\w.-]{1,120}$/u;
 
@@ -84,6 +94,20 @@ export function sortTitle(title: string) {
     .slice(0, 120);
 }
 
+function artFor(row: WorkRow) {
+  if (row.posterKey) {
+    return `/media/${row.posterKey}`;
+  }
+
+  const catalogue = row.catalogueBackdrop ?? row.cataloguePoster;
+
+  if (catalogue) {
+    return catalogue;
+  }
+
+  return row.stillUrl ? `/media/reel/still/${row.id}` : null;
+}
+
 function toWork(row: WorkRow): RevivalWork {
   return {
     id: row.id,
@@ -95,7 +119,7 @@ function toWork(row: WorkRow): RevivalWork {
     synopsis: row.synopsis,
     kind: row.kind as RevivalKind,
     runtimeSeconds: row.runtimeSeconds,
-    stillUrl: row.stillUrl,
+    stillUrl: artFor(row),
     rightsBasis: row.rightsBasis as RevivalRightsBasis,
     rightsNote: row.rightsNote,
     rightsUrl: row.rightsUrl,
@@ -290,9 +314,9 @@ export async function readApprovedWorks(db: D1Database, limit = 400) {
   const rows = await db
     .prepare(
       `SELECT ${WORK_COLUMNS}
-       FROM revival_works
-       WHERE status = 'approved'
-       ORDER BY plays DESC, sort_title
+       ${WORK_FROM}
+       WHERE w.status = 'approved'
+       ORDER BY w.plays DESC, w.sort_title
        LIMIT ?`,
     )
     .bind(Math.min(limit, 800))
@@ -303,7 +327,7 @@ export async function readApprovedWorks(db: D1Database, limit = 400) {
 
 export async function readWork(db: D1Database, id: string) {
   const row = await db
-    .prepare(`SELECT ${WORK_COLUMNS} FROM revival_works WHERE id = ? AND status = 'approved'`)
+    .prepare(`SELECT ${WORK_COLUMNS} ${WORK_FROM} WHERE w.id = ? AND w.status = 'approved'`)
     .bind(id)
     .first<WorkRow>();
 
@@ -320,9 +344,9 @@ export async function readWorksForTitle(db: D1Database, titleId: string) {
   const rows = await db
     .prepare(
       `SELECT ${WORK_COLUMNS}
-       FROM revival_works
-       WHERE title_id = ? AND status = 'approved'
-       ORDER BY mirror_state = 'mirrored' DESC, runtime_seconds DESC
+       ${WORK_FROM}
+       WHERE w.title_id = ? AND w.status = 'approved'
+       ORDER BY w.mirror_state = 'mirrored' DESC, w.runtime_seconds DESC
        LIMIT 4`,
     )
     .bind(titleId)
@@ -353,6 +377,15 @@ export async function readReelTarget(db: D1Database, id: string) {
   return row ?? null;
 }
 
+export async function readStillSource(db: D1Database, id: string) {
+  const row = await db
+    .prepare(`SELECT still_url AS stillUrl FROM revival_works WHERE id = ? AND status = 'approved'`)
+    .bind(id)
+    .first<{ stillUrl: string | null }>();
+
+  return row?.stillUrl ?? null;
+}
+
 export async function recordPlay(db: D1Database, id: string) {
   await db.prepare(`UPDATE revival_works SET plays = plays + 1 WHERE id = ?`).bind(id).run();
 }
@@ -368,11 +401,11 @@ type ReviewRow = WorkRow & {
 export async function listForReview(db: D1Database, status: RevivalStatus, limit = 60) {
   const rows = await db
     .prepare(
-      `SELECT ${WORK_COLUMNS}, status, stream_url AS streamUrl, stream_bytes AS streamBytes,
-              discovered_at AS discoveredAt, mirror_error AS mirrorError
-       FROM revival_works
-       WHERE status = ?
-       ORDER BY discovered_at DESC
+      `SELECT ${WORK_COLUMNS}, w.status, w.stream_bytes AS streamBytes,
+              w.discovered_at AS discoveredAt, w.mirror_error AS mirrorError
+       ${WORK_FROM}
+       WHERE w.status = ?
+       ORDER BY w.discovered_at DESC
        LIMIT ?`,
     )
     .bind(status, Math.min(limit, 200))
@@ -408,7 +441,7 @@ export async function setWorkStatus(
   return (result.meta.changes ?? 0) > 0;
 }
 
-export async function selectUnmatched(db: D1Database, limit = 40) {
+export async function selectUnmatched(db: D1Database, limit = 400) {
   const rows = await db
     .prepare(
       `SELECT id, title, year, runtime_seconds AS runtimeSeconds
@@ -420,7 +453,7 @@ export async function selectUnmatched(db: D1Database, limit = 40) {
        ORDER BY discovered_at DESC
        LIMIT ?`,
     )
-    .bind(Math.min(limit, 200))
+    .bind(Math.min(limit, 600))
     .all<{ id: string; title: string; year: number | null; runtimeSeconds: number | null }>();
 
   return rows.results;

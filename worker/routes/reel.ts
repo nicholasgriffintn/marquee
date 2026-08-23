@@ -1,7 +1,12 @@
 import { Hono } from "hono";
 
 import { logError } from "../lib/logging.ts";
-import { isRevivalId, readReelTarget, recordPlay } from "../repositories/revival.ts";
+import {
+  isRevivalId,
+  readReelTarget,
+  readStillSource,
+  recordPlay,
+} from "../repositories/revival.ts";
 import type { Bindings } from "../types.ts";
 
 export const reelRoutes = new Hono<{ Bindings: Bindings }>();
@@ -132,6 +137,63 @@ async function serveFromSource(url: string, contentType: string, range: string |
 
   return new Response(upstream.body, { status: upstream.status, headers });
 }
+
+const STILL_CACHE = "public, max-age=2592000";
+const STILL_WIDTH = 780;
+
+reelRoutes.get("/still/:workId", async (context) => {
+  const workId = decodeURIComponent(context.req.param("workId"));
+
+  if (!isRevivalId(workId)) {
+    return context.json({ error: "Not found" }, 404);
+  }
+
+  const source = await readStillSource(context.env.DB, workId);
+
+  if (!source) {
+    return context.json({ error: "Not found" }, 404);
+  }
+
+  try {
+    const upstream = await fetch(source, {
+      redirect: "follow",
+      signal: AbortSignal.timeout(12_000),
+      cf: { cacheEverything: true, cacheTtl: 2_592_000 },
+    });
+
+    if (!upstream.ok || !upstream.body) {
+      return context.json({ error: "Not found" }, 404);
+    }
+
+    if (!context.env.IMAGES) {
+      return new Response(upstream.body, {
+        headers: {
+          "cache-control": STILL_CACHE,
+          "content-type": upstream.headers.get("content-type") ?? "image/jpeg",
+          "x-content-type-options": "nosniff",
+        },
+      });
+    }
+
+    const result = await context.env.IMAGES.input(upstream.body)
+      .transform({ width: STILL_WIDTH, fit: "scale-down" })
+      .output({ format: "image/webp", quality: 82 });
+
+    const response = result.response();
+
+    return new Response(response.body, {
+      headers: {
+        "cache-control": STILL_CACHE,
+        "content-type": "image/webp",
+        "x-content-type-options": "nosniff",
+      },
+    });
+  } catch (error) {
+    logError("reel_still_failed", error, { area: "revival", workId });
+
+    return context.json({ error: "Not found" }, 404);
+  }
+});
 
 reelRoutes.get("/:workId", async (context) => {
   const workId = decodeURIComponent(context.req.param("workId"));
