@@ -1,4 +1,5 @@
-import type { RevivalKind, RevivalRightsBasis } from "../../src/domain/revival.ts";
+import type { RevivalKind, RevivalRightsBasis, RevivalTag } from "../../src/domain/revival.ts";
+import { personName, splitSubjects, tagList } from "../lib/revival-tags.ts";
 import { isRecord } from "../lib/values.ts";
 
 const COLLECTION_ENDPOINT = "https://www.loc.gov/collections/national-screening-room/";
@@ -27,6 +28,7 @@ export type LocCandidate = {
   rightsBasis: RevivalRightsBasis;
   rightsNote: string;
   rightsUrl: string | null;
+  tags: RevivalTag[];
 };
 
 function firstString(value: unknown) {
@@ -173,6 +175,18 @@ export async function searchScreeningRoom(page: number) {
         rightsBasis: basisFor(item.contributors),
         rightsNote: RIGHTS_NOTE,
         rightsUrl: `https://www.loc.gov/item/${sourceId}/`,
+        tags: [
+          ...tagList("genre", splitSubjects(item.genre)),
+          ...tagList("subject", splitSubjects(result.subject)),
+          ...tagList(
+            "person",
+            (Array.isArray(item.contributor_names) ? item.contributor_names : [])
+              .filter((entry): entry is string => typeof entry === "string")
+              .map(personName),
+          ),
+          ...tagList("language", splitSubjects(result.language)),
+          ...tagList("holder", ["Library of Congress"]),
+        ],
       },
     ];
   });

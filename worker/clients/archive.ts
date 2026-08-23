@@ -1,4 +1,5 @@
-import type { RevivalKind, RevivalRightsBasis } from "../../src/domain/revival.ts";
+import type { RevivalKind, RevivalRightsBasis, RevivalTag } from "../../src/domain/revival.ts";
+import { personName, splitSubjects, tagList } from "../lib/revival-tags.ts";
 import { isRecord } from "../lib/values.ts";
 
 const SEARCH_ENDPOINT = "https://archive.org/advancedsearch.php";
@@ -41,6 +42,7 @@ export type ArchiveCandidate = {
   rightsBasis: RevivalRightsBasis;
   rightsNote: string;
   rightsUrl: string | null;
+  tags: RevivalTag[];
 };
 
 type SearchDocument = {
@@ -231,6 +233,15 @@ export async function readArchiveItem(identifier: string): Promise<ArchiveCandid
       ? `An Internet Archive uploader tagged this ${licenseUrl}, which is a claim rather than a release`
       : "No public domain marker on the Internet Archive item",
     rightsUrl: licenseUrl || null,
+    tags: [
+      ...tagList("subject", splitSubjects(metadata.subject)),
+      ...tagList(
+        "person",
+        [firstString(metadata.director), firstString(metadata.creator)].map(personName),
+      ),
+      ...tagList("language", splitSubjects(metadata.language)),
+      ...tagList("holder", collections),
+    ],
   };
 }
 

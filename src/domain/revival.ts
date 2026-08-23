@@ -16,6 +16,10 @@ export type RevivalStatus = "candidate" | "approved" | "rejected";
 
 export type RevivalMirrorState = "remote" | "copying" | "mirrored" | "failed";
 
+export type RevivalTagKind = "subject" | "genre" | "person" | "language" | "holder";
+
+export type RevivalTag = { kind: RevivalTagKind; slug: string; label: string };
+
 export type RevivalWork = {
   id: string;
   source: RevivalSource;
@@ -37,6 +41,7 @@ export type RevivalWork = {
   mirrored: boolean;
   reelUrl: string;
   plays: number;
+  tags: RevivalTag[];
 };
 
 export type RevivalShelf = {
@@ -82,6 +87,30 @@ export function reelPath(workId: string) {
 
 export function revivalPath(work: Pick<RevivalWork, "id">) {
   return `/revival/${work.id}`;
+}
+
+export const RUNTIME_BANDS = [
+  { id: "short", label: "Under ten minutes", max: 600 },
+  { id: "half", label: "Ten to thirty minutes", max: 1_800 },
+  { id: "hour", label: "Half an hour to an hour", max: 3_600 },
+  { id: "feature", label: "An hour or more", max: Number.POSITIVE_INFINITY },
+] as const;
+
+export function runtimeBand(seconds: number | null) {
+  if (seconds === null || seconds <= 0) {
+    return null;
+  }
+
+  return RUNTIME_BANDS.find((band) => seconds < band.max) ?? null;
+}
+
+export function tagSlug(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFKD")
+    .replaceAll(/[^a-z0-9]+/gu, "-")
+    .replaceAll(/^-|-$/gu, "")
+    .slice(0, 60);
 }
 
 export function runtimeLabel(seconds: number | null) {

@@ -56,6 +56,18 @@ export function RevivalScreenPage({ isSignedIn }: { isSignedIn: boolean }) {
 
       {work.synopsis && <p className="detail-synopsis">{work.synopsis}</p>}
 
+      {work.tags.length > 0 && (
+        <div className="revival-tags">
+          {work.tags
+            .filter((tag) => tag.kind !== "language")
+            .map((tag) => (
+              <span key={`${tag.kind}-${tag.slug}`} className={`revival-tag tag-${tag.kind}`}>
+                {tag.label}
+              </span>
+            ))}
+        </div>
+      )}
+
       <dl className="revival-provenance">
         <div>
           <dt>Free to show in the UK because</dt>

@@ -1,4 +1,5 @@
-import type { RevivalKind, RevivalRightsBasis } from "../../src/domain/revival.ts";
+import type { RevivalKind, RevivalRightsBasis, RevivalTag } from "../../src/domain/revival.ts";
+import { splitSubjects, tagList } from "../lib/revival-tags.ts";
 import { isRecord } from "../lib/values.ts";
 
 const SEARCH_ENDPOINT = "https://api.europeana.eu/record/v2/search.json";
@@ -43,6 +44,7 @@ export type EuropeanaCandidate = {
   rightsBasis: RevivalRightsBasis;
   rightsNote: string;
   rightsUrl: string | null;
+  tags: RevivalTag[];
 };
 
 function firstString(value: unknown) {
@@ -99,6 +101,16 @@ function mimeFor(url: string) {
 }
 
 const MAX_SOURCE_ID = 120;
+
+function englishValues(value: unknown) {
+  if (!isRecord(value)) {
+    return [];
+  }
+
+  return Array.isArray(value.en)
+    ? value.en.filter((entry): entry is string => typeof entry === "string")
+    : [];
+}
 
 function recordId(value: string) {
   return value.replace(/^\//u, "").replaceAll("/", "_");
@@ -169,6 +181,12 @@ export async function searchEuropeana(apiKey: string, country: string, page: num
         rightsBasis: basis,
         rightsNote: `${firstString(item.dataProvider) || "A European archive"} published this as ${rights}`,
         rightsUrl: rights || null,
+        tags: [
+          ...tagList("genre", englishValues(item.edmConceptPrefLabelLangAware)),
+          ...tagList("subject", englishValues(item.dcSubjectLangAware)),
+          ...tagList("language", splitSubjects(item.language)),
+          ...tagList("holder", splitSubjects(item.dataProvider)),
+        ],
       },
     ];
   });

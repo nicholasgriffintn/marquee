@@ -5,6 +5,8 @@ import {
   type RevivalRightsBasis,
   type RevivalSource,
   type RevivalStatus,
+  type RevivalTag,
+  type RevivalTagKind,
   type RevivalWork,
 } from "../../src/domain/revival.ts";
 
@@ -27,6 +29,7 @@ export type RevivalCandidate = {
   rightsBasis: RevivalRightsBasis;
   rightsNote: string;
   rightsUrl: string | null;
+  tags?: RevivalTag[];
 };
 
 type WorkRow = {
@@ -102,7 +105,62 @@ function toWork(row: WorkRow): RevivalWork {
     mirrored: row.mirrorState === "mirrored",
     reelUrl: reelPath(row.id),
     plays: row.plays,
+    tags: [],
   };
+}
+
+type TagRow = { workId: string; kind: string; slug: string; label: string };
+
+const TAG_CHUNK = 60;
+
+export async function attachTags(db: D1Database, works: RevivalWork[]) {
+  if (works.length === 0) {
+    return works;
+  }
+
+  const byId = new Map<string, RevivalWork>(works.map((work) => [work.id, { ...work, tags: [] }]));
+  const ids = [...byId.keys()];
+
+  for (let index = 0; index < ids.length; index += TAG_CHUNK) {
+    const wave = ids.slice(index, index + TAG_CHUNK);
+    // oxlint-disable-next-line no-await-in-loop
+    const rows = await db
+      .prepare(
+        `SELECT work_id AS workId, kind, slug, label
+         FROM revival_tags
+         WHERE work_id IN (${wave.map(() => "?").join(",")})`,
+      )
+      .bind(...wave)
+      .all<TagRow>();
+
+    for (const row of rows.results) {
+      byId.get(row.workId)?.tags.push({
+        kind: row.kind as RevivalTagKind,
+        slug: row.slug,
+        label: row.label,
+      });
+    }
+  }
+
+  return works.map((work) => byId.get(work.id) ?? work);
+}
+
+export async function storeTags(db: D1Database, workId: string, tags: RevivalTag[]) {
+  await db.prepare(`DELETE FROM revival_tags WHERE work_id = ?`).bind(workId).run();
+
+  if (tags.length === 0) {
+    return;
+  }
+
+  await db.batch(
+    tags.map((tag) =>
+      db
+        .prepare(
+          `INSERT OR IGNORE INTO revival_tags (work_id, kind, slug, label) VALUES (?, ?, ?, ?)`,
+        )
+        .bind(workId, tag.kind, tag.slug, tag.label),
+    ),
+  );
 }
 
 export async function upsertWork(
@@ -171,6 +229,10 @@ export async function upsertWork(
       status,
     )
     .run();
+
+  if (candidate.tags) {
+    await storeTags(db, id, candidate.tags);
+  }
 
   return id;
 }
@@ -246,7 +308,7 @@ export async function readApprovedWorks(db: D1Database, limit = 400) {
     .bind(Math.min(limit, 800))
     .all<WorkRow>();
 
-  return rows.results.map(toWork);
+  return attachTags(db, rows.results.map(toWork));
 }
 
 export async function readWork(db: D1Database, id: string) {
@@ -255,7 +317,13 @@ export async function readWork(db: D1Database, id: string) {
     .bind(id)
     .first<WorkRow>();
 
-  return row ? toWork(row) : null;
+  if (!row) {
+    return null;
+  }
+
+  const [work] = await attachTags(db, [toWork(row)]);
+
+  return work ?? null;
 }
 
 export async function readWorksForTitle(db: D1Database, titleId: string) {
@@ -270,7 +338,7 @@ export async function readWorksForTitle(db: D1Database, titleId: string) {
     .bind(titleId)
     .all<WorkRow>();
 
-  return rows.results.map(toWork);
+  return attachTags(db, rows.results.map(toWork));
 }
 
 export type ReelTarget = {

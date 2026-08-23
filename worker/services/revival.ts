@@ -1,7 +1,9 @@
+import { runtimeBand } from "../../src/domain/revival.ts";
 import type {
   RevivalShelf,
   RevivalSource,
   RevivalStatus,
+  RevivalTagKind,
   RevivalWork,
 } from "../../src/domain/revival.ts";
 import {
@@ -37,6 +39,13 @@ const ARCHIVE_LANES = 5;
 const ARCHIVE_BUDGET_MS = 45_000;
 const ARCHIVE_PAGE = 25;
 const SHELF_LIMIT = 40;
+const MAX_SHELVES = 18;
+const GENRE_SHELVES = 5;
+const SUBJECT_SHELVES = 4;
+const COUNTRY_SHELVES = 3;
+const PERSON_SHELVES = 3;
+const RUNTIME_SHELVES = 2;
+const DECADE_SHELVES = 3;
 const SHELF_MIN = 3;
 
 export function usPublicDomainCutoff(now = new Date()) {
@@ -268,13 +277,43 @@ function shelf(id: string, title: string, description: string, works: RevivalWor
   return { id, title, description, works } satisfies RevivalShelf;
 }
 
+type Grouped = { key: string; label: string; works: RevivalWork[] };
+
+function groupBy(
+  works: RevivalWork[],
+  placed: Set<string>,
+  pick: (work: RevivalWork) => { key: string; label: string }[],
+) {
+  const groups = new Map<string, Grouped>();
+
+  for (const work of works) {
+    if (placed.has(work.id)) {
+      continue;
+    }
+
+    for (const { key, label } of pick(work)) {
+      const group = groups.get(key) ?? { key, label, works: [] };
+
+      group.works.push(work);
+      groups.set(key, group);
+    }
+  }
+
+  return [...groups.values()].sort((left, right) => right.works.length - left.works.length);
+}
+
+function tagsOf(work: RevivalWork, kind: RevivalTagKind) {
+  return work.tags
+    .filter((tag) => tag.kind === kind)
+    .map((tag) => ({ key: `${kind}:${tag.slug}`, label: tag.label }));
+}
+
 export function buildShelves(works: RevivalWork[]) {
   const shelves: RevivalShelf[] = [];
   const placed = new Set<string>();
-  const take = (matches: (work: RevivalWork) => boolean) =>
-    works.filter((work) => !placed.has(work.id) && matches(work)).slice(0, SHELF_LIMIT);
+  const topics = new Set<string>();
   const add = (id: string, title: string, description: string, items: RevivalWork[]) => {
-    if (items.length < SHELF_MIN) {
+    if (items.length < SHELF_MIN || shelves.length >= MAX_SHELVES) {
       return;
     }
 
@@ -282,7 +321,42 @@ export function buildShelves(works: RevivalWork[]) {
       placed.add(work.id);
     }
 
-    shelves.push(shelf(id, title, description, items));
+    shelves.push(shelf(id, title, description, items.slice(0, SHELF_LIMIT)));
+  };
+
+  const addGroups = (
+    groups: Grouped[],
+    limit: number,
+    title: (group: Grouped) => string,
+    description: (group: Grouped) => string,
+  ) => {
+    let used = 0;
+
+    for (const group of groups) {
+      if (used >= limit) {
+        return;
+      }
+
+      const topic = group.key.split(":").slice(1).join(":");
+
+      if (topics.has(topic)) {
+        continue;
+      }
+
+      const before = shelves.length;
+
+      add(
+        group.key,
+        title(group),
+        description(group),
+        group.works.filter((work) => !placed.has(work.id)),
+      );
+
+      if (shelves.length > before) {
+        topics.add(topic);
+        used += 1;
+      }
+    }
   };
 
   const showable = works.filter((work) => work.kind === "feature" || work.kind === "short");
@@ -302,49 +376,73 @@ export function buildShelves(works: RevivalWork[]) {
     "british",
     "Made here",
     "British and Irish prints, out of copyright and back on a screen.",
-    take((work) => HOME_NATIONS.has(work.country ?? "")),
+    works.filter((work) => HOME_NATIONS.has(work.country ?? "")),
   );
 
-  add(
-    "european",
-    "From the continent",
-    "Held by European archives and released by them for anyone to use.",
-    take((work) => Boolean(work.country) && work.source === "europeana"),
+  addGroups(
+    groupBy(works, placed, (work) => tagsOf(work, "genre")),
+    GENRE_SHELVES,
+    (group) => group.label,
+    (group) => `${group.works.length} of them, filed under ${group.label.toLowerCase()}.`,
   );
 
-  const decades = new Map<number, RevivalWork[]>();
+  addGroups(
+    groupBy(works, placed, (work) => tagsOf(work, "subject")),
+    SUBJECT_SHELVES,
+    (group) => group.label,
+    () => "Everything we hold on the subject.",
+  );
 
-  for (const work of works) {
-    if (work.kind !== "feature" || work.year === null || placed.has(work.id)) {
-      continue;
-    }
+  addGroups(
+    groupBy(works, placed, (work) =>
+      work.country ? [{ key: `country:${work.country}`, label: work.country }] : [],
+    ),
+    COUNTRY_SHELVES,
+    (group) => `From ${group.label}`,
+    (group) => `Held by archives in ${group.label} and released by them.`,
+  );
 
-    const decade = decadeOf(work.year);
+  addGroups(
+    groupBy(works, placed, (work) => tagsOf(work, "person")),
+    PERSON_SHELVES,
+    (group) => group.label,
+    () => "Their work, as far as we hold it.",
+  );
 
-    decades.set(decade, [...(decades.get(decade) ?? []), work]);
-  }
+  addGroups(
+    groupBy(works, placed, (work) => {
+      const band = runtimeBand(work.runtimeSeconds);
 
-  for (const [decade, items] of [...decades].sort(([left], [right]) => left - right)) {
-    add(
-      `decade-${decade}`,
-      `The ${decade}s`,
-      `${items.length} feature${items.length === 1 ? "" : "s"} from the ${decade}s.`,
-      [...items].sort((left, right) => (left.year ?? 0) - (right.year ?? 0)).slice(0, SHELF_LIMIT),
-    );
-  }
+      return band ? [{ key: `runtime:${band.id}`, label: band.label }] : [];
+    }),
+    RUNTIME_SHELVES,
+    (group) => group.label,
+    () => "Picked by how much of an evening it wants.",
+  );
+
+  addGroups(
+    groupBy(works, placed, (work) =>
+      work.kind === "feature" && work.year !== null
+        ? [{ key: `decade:${decadeOf(work.year)}`, label: `The ${decadeOf(work.year)}s` }]
+        : [],
+    ),
+    DECADE_SHELVES,
+    (group) => group.label,
+    (group) => `${group.works.length} from the decade.`,
+  );
 
   add(
     "shorts",
     "Shorts and serials",
     "The bit before the main feature.",
-    take((work) => work.kind === "short"),
+    works.filter((work) => !placed.has(work.id) && work.kind === "short"),
   );
 
   add(
     "ephemera",
     "Ephemera",
     "Industrial films, adverts and instructional reels. Stranger than the features.",
-    take((work) => work.kind === "ephemeral"),
+    works.filter((work) => !placed.has(work.id) && work.kind === "ephemeral"),
   );
 
   return shelves;

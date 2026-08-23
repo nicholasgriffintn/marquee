@@ -7519,6 +7519,26 @@ a.showtime:hover small {
 .revival-screen .detail-synopsis {
   max-width: 68ch;
 }
+.revival-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 18px 0 4px;
+}
+.revival-tag {
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font: 400 10px var(--mono);
+  letter-spacing: 0.04em;
+  padding: 5px 9px;
+}
+.revival-tag.tag-genre {
+  border-color: var(--acid);
+  color: var(--acid);
+}
+.revival-tag.tag-person {
+  color: var(--paper);
+}
 .revival-provenance {
   border-top: 1px solid var(--line);
   display: grid;
