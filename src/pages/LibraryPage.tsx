@@ -194,10 +194,22 @@ export function LibraryPage({
                   </button>
                   <strong>{item.title}</strong>
                   <div className="lost-buttons">
-                    <button type="button" onClick={() => onClaim(entry)}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        shelf.note(item.id, false);
+                        onClaim(entry);
+                      }}
+                    >
                       Claim it
                     </button>
-                    <button type="button" onClick={() => onDiscard(item.id)}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        shelf.note(item.id, true);
+                        onDiscard(item.id);
+                      }}
+                    >
                       Bin it
                     </button>
                   </div>

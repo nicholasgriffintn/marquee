@@ -5,6 +5,7 @@ import { requestJson } from "../lib/api";
 
 const NO_ITEMS: ShelfItem[] = [];
 const NO_GENRES: string[] = [];
+const EMPTY_SET: ReadonlySet<string> = new Set();
 
 export type ShelfFilters = {
   sort: string;
@@ -39,8 +40,30 @@ export function useShelf(isSignedIn: boolean, filters: ShelfFilters) {
   } | null>(null);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState("");
+  const [settled, setSettled] = useState<{
+    key: string;
+    claimed: ReadonlySet<string>;
+    discarded: ReadonlySet<string>;
+  } | null>(null);
   const live = loaded?.key === key ? loaded : null;
   const first = live?.pages[0] ?? null;
+  const claimed = settled?.key === key ? settled.claimed : EMPTY_SET;
+  const discarded = settled?.key === key ? settled.discarded : EMPTY_SET;
+
+  const note = useCallback(
+    (titleId: string, binned: boolean) =>
+      setSettled((current) => {
+        const base =
+          current?.key === key ? current : { key, claimed: EMPTY_SET, discarded: EMPTY_SET };
+
+        return {
+          key,
+          claimed: new Set([...base.claimed, titleId]),
+          discarded: binned ? new Set([...base.discarded, titleId]) : base.discarded,
+        };
+      }),
+    [key],
+  );
 
   useEffect(() => {
     if (!isSignedIn) {
@@ -93,16 +116,21 @@ export function useShelf(isSignedIn: boolean, filters: ShelfFilters) {
     }
   }, [filters, isLoadingMore, key, last]);
 
+  const items = live
+    ? live.pages.flatMap((page) => page.items).filter((item) => !discarded.has(item.entry.titleId))
+    : NO_ITEMS;
+
   return {
-    items: live ? live.pages.flatMap((page) => page.items) : NO_ITEMS,
-    lost: first?.lost ?? NO_ITEMS,
+    items,
+    lost: (first?.lost ?? NO_ITEMS).filter((item) => !claimed.has(item.entry.titleId)),
     genres: first?.genres ?? NO_GENRES,
-    matched: first?.matched ?? 0,
-    shelved: first?.shelved ?? 0,
+    matched: Math.max(0, (first?.matched ?? 0) - discarded.size),
+    shelved: Math.max(0, (first?.shelved ?? 0) - discarded.size),
     hasMore: last?.hasMore ?? false,
     isLoading: isSignedIn && !live,
     isLoadingMore,
     error,
     loadMore,
+    note,
   };
 }
