@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { clockLabel, type RevivalWork } from "../../domain/revival";
 import { useProgressReporter } from "../../hooks/useRevival";
@@ -6,6 +6,7 @@ import { track } from "../../lib/telemetry";
 
 const FINISHED_RATIO = 0.97;
 const RESUME_FLOOR_SECONDS = 5;
+const RESUME_TAIL_SECONDS = 10;
 
 export function ReelPlayer({
   work,
@@ -17,27 +18,74 @@ export function ReelPlayer({
   canSave: boolean;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const resumeRef = useRef(startAt);
+  const resumedRef = useRef(false);
   const [isPlaying, setPlaying] = useState(false);
   const [error, setError] = useState("");
   const report = useProgressReporter(work.id, canSave);
 
   useEffect(() => {
     const video = videoRef.current;
+    const resumeAt = resumeRef.current;
 
-    if (!video || startAt < RESUME_FLOOR_SECONDS) {
+    if (!video || resumeAt < RESUME_FLOOR_SECONDS) {
       return;
     }
 
     const seek = () => {
-      if (video.duration && startAt < video.duration - 10) {
-        video.currentTime = startAt;
+      if (resumedRef.current) {
+        return;
+      }
+
+      resumedRef.current = true;
+
+      if (video.duration && resumeAt < video.duration - RESUME_TAIL_SECONDS) {
+        video.currentTime = resumeAt;
       }
     };
 
-    video.addEventListener("loadedmetadata", seek, { once: true });
+    if (video.readyState >= HTMLMediaElement.HAVE_METADATA) {
+      seek();
+
+      return;
+    }
+
+    video.addEventListener("loadedmetadata", seek);
 
     return () => video.removeEventListener("loadedmetadata", seek);
-  }, [startAt]);
+  }, []);
+
+  const onPlay = useCallback(() => {
+    setPlaying((playing) => {
+      if (!playing) {
+        track("reel_play", { detail: work.id });
+      }
+
+      return true;
+    });
+  }, [work.id]);
+
+  const onTimeUpdate = useCallback(
+    (event: { currentTarget: HTMLVideoElement }) => report(event.currentTarget.currentTime, false),
+    [report],
+  );
+
+  const onEnded = useCallback(
+    (event: { currentTarget: HTMLVideoElement }) => report(event.currentTarget.duration, true),
+    [report],
+  );
+
+  const onPause = useCallback(
+    (event: { currentTarget: HTMLVideoElement }) => {
+      const video = event.currentTarget;
+
+      report(
+        video.currentTime,
+        video.duration > 0 && video.currentTime / video.duration > FINISHED_RATIO,
+      );
+    },
+    [report],
+  );
 
   return (
     <div className="revival-player">
@@ -47,27 +95,14 @@ export function ReelPlayer({
           controls
           playsInline
           preload="metadata"
+          src={work.reelUrl}
           poster={work.stillUrl ?? undefined}
-          onPlay={() => {
-            if (!isPlaying) {
-              track("reel_play", { detail: work.id });
-              setPlaying(true);
-            }
-          }}
-          onTimeUpdate={(event) => report(event.currentTarget.currentTime, false)}
-          onEnded={(event) => report(event.currentTarget.duration, true)}
-          onPause={(event) => {
-            const video = event.currentTarget;
-
-            report(
-              video.currentTime,
-              video.duration > 0 && video.currentTime / video.duration > FINISHED_RATIO,
-            );
-          }}
+          onPlay={onPlay}
+          onTimeUpdate={onTimeUpdate}
+          onEnded={onEnded}
+          onPause={onPause}
           onError={() => setError("That print will not thread. Try the source record below.")}
-        >
-          <source src={work.reelUrl} type="video/mp4" />
-        </video>
+        />
       </div>
       {startAt >= RESUME_FLOOR_SECONDS && !isPlaying && (
         <p className="revival-resume">You stopped at {clockLabel(startAt)}. Picking up there.</p>
