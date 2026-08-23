@@ -6,6 +6,8 @@ import { recordEvent } from "../lib/events.ts";
 import { logError } from "../lib/logging.ts";
 import { canonicalOrigin } from "../lib/security.ts";
 import { validProviderIds } from "../lib/validation.ts";
+import { readCollectionTitleIds, readItems } from "../repositories/catalog-reader.ts";
+import { readPerson, readPersonShelf, readPersonTitleIds } from "../repositories/people.ts";
 import {
   browseCatalogue,
   getCatalogue,
@@ -198,6 +200,57 @@ catalogRoutes.get("/items", edgeCache(900), async (context) => {
     logError("catalogue_read_failed", error, { area: "items" });
 
     return context.json({ error: "Catalogue items are unavailable" }, 500);
+  }
+});
+
+const PERSON_LIMIT = 48;
+const COLLECTION_LIMIT = 24;
+
+catalogRoutes.get("/people/:name", async (context) => {
+  const name = decodeURIComponent(context.req.param("name")).slice(0, 120);
+
+  try {
+    const person = await readPerson(context.env.DB, name);
+
+    if (!person) {
+      return context.json({ error: "No one here by that name" }, 404);
+    }
+
+    const principal = await sessionPrincipal(context.env, context.req.raw);
+    const [items, shelf] = await Promise.all([
+      readPersonTitleIds(context.env.DB, person.name, PERSON_LIMIT).then((ids) =>
+        readItems(context.env.DB, ids, PERSON_LIMIT),
+      ),
+      principal?.user
+        ? readPersonShelf(context.env.DB, principal.user.id, person.name)
+        : Promise.resolve({ shelved: 0, watched: 0 }),
+    ]);
+
+    return context.json({ person, items, shelf });
+  } catch (error) {
+    logError("catalogue_read_failed", error, { area: "person" });
+
+    return context.json({ error: "That name is out of reach" }, 500);
+  }
+});
+
+catalogRoutes.get("/collections/:id", edgeCache(3_600), async (context) => {
+  const collectionId = Number(context.req.param("id"));
+
+  if (!Number.isInteger(collectionId) || collectionId < 1) {
+    return context.json({ error: "Unknown collection" }, 400);
+  }
+
+  try {
+    const ids = await readCollectionTitleIds(context.env.DB, collectionId, COLLECTION_LIMIT);
+
+    context.header("cache-control", "public, max-age=3600");
+
+    return context.json({ items: await readItems(context.env.DB, ids, COLLECTION_LIMIT) });
+  } catch (error) {
+    logError("catalogue_read_failed", error, { area: "collection" });
+
+    return context.json({ error: "That collection is out of reach" }, 500);
   }
 });
 

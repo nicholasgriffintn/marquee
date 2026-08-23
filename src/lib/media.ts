@@ -53,12 +53,28 @@ export function mediaMeta(item: MediaTitle) {
         ? `${item.runtimeMinutes} min`
         : null
       : item.numberOfSeasons
-        ? `${item.numberOfSeasons} season${item.numberOfSeasons === 1 ? "" : "s"}`
+        ? `${item.numberOfSeasons} season${item.numberOfSeasons === 1 ? "" : "s"}${
+            item.episodeCount ? `, ${item.episodeCount} episodes` : ""
+          }`
         : null,
     item.genres.slice(0, 2).join(" / ") || null,
   ];
 
   return values.filter(Boolean).join(" · ");
+}
+
+export function languageLabel(code: string | null | undefined) {
+  if (!code || code === "en") {
+    return null;
+  }
+
+  try {
+    const names = new Intl.DisplayNames(["en-GB"], { type: "language" });
+
+    return names.of(code) ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export function moneyLabel(value: number) {

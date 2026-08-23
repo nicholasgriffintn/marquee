@@ -162,3 +162,18 @@ async function readSearchResults(db: D1Database, query: string, providerIds: str
     fetchedAt: new Date().toISOString(),
   } satisfies CatalogResponse;
 }
+
+export async function readCollectionTitleIds(db: D1Database, collectionId: number, limit = 24) {
+  const rows = await db
+    .prepare(
+      `SELECT id
+       FROM catalog_titles
+       WHERE json_extract(payload, '$.collection.id') = ?1
+       ORDER BY COALESCE(json_extract(payload, '$.releaseDate'), '9999-12-31'), popularity DESC
+       LIMIT ?2`,
+    )
+    .bind(collectionId, Math.max(1, Math.min(48, limit)))
+    .all<{ id: string }>();
+
+  return rows.results.map((row) => row.id);
+}

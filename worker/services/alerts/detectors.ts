@@ -186,13 +186,11 @@ const people: Detector = {
     try {
       const rows = await env.DB.prepare(
         `SELECT b.viewer_id AS viewerId, t.id AS titleId, t.title AS title,
-                replace(b.key, 'rule:person:', '') AS person
+                p.person AS person
            FROM viewer_beliefs AS b
-           JOIN catalog_titles AS t
-             ON EXISTS (
-                  SELECT 1 FROM json_each(t.payload, '$.people')
-                   WHERE lower(json_each.value) = replace(replace(b.key, 'rule:person:', ''), 'person:', '')
-                )
+           JOIN catalog_person_titles AS p
+             ON p.person = replace(replace(b.key, 'rule:person:', ''), 'person:', '')
+           JOIN catalog_titles AS t ON t.id = p.title_id
           WHERE (b.key LIKE 'rule:person:%' OR b.key LIKE 'person:%')
             AND b.revoked_at IS NULL
             AND (b.suspended_until IS NULL OR julianday(b.suspended_until) < julianday('now'))

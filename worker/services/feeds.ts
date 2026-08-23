@@ -184,8 +184,7 @@ function announcedEvent(episode: UpcomingEpisode, title: MediaTitle, origin: str
   } satisfies CalendarEvent;
 }
 
-export async function buildDiaryCalendar(env: Bindings, viewerId: string, origin: string) {
-  const host = new URL(origin).hostname;
+async function collectDiary(env: Bindings, viewerId: string) {
   const [episodes, releases, announced, watched] = await Promise.all([
     readEpisodes(env, viewerId).catch((error: unknown): EpisodeRow[] => {
       logError("feed_episodes_failed", error, { viewerId });
@@ -209,6 +208,20 @@ export async function buildDiaryCalendar(env: Bindings, viewerId: string, origin
     }),
   ]);
   const timed = new Set(episodes.map((row) => slotKey(row.titleId, row.season, row.episode)));
+  const fresh = announced.filter((episode) => {
+    const key = slotKey(episode.titleId, episode.seasonNumber, episode.episodeNumber);
+
+    return (
+      !timed.has(key) &&
+      !watched.has(key) &&
+      !behind(
+        episode.seasonNumber,
+        episode.episodeNumber,
+        episode.progressSeason,
+        episode.progressEpisode,
+      )
+    );
+  });
   const titles = await readItems(
     env.DB,
     [
@@ -219,34 +232,74 @@ export async function buildDiaryCalendar(env: Bindings, viewerId: string, origin
     EPISODE_LIMIT + RELEASE_LIMIT,
   );
   const byId = new Map(titles.map((title) => [title.id, title]));
+
+  return {
+    episodes: episodes.filter((row) => !watched.has(slotKey(row.titleId, row.season, row.episode))),
+    announced: fresh,
+    releases,
+    byId,
+  };
+}
+
+export async function readWeekAhead(env: Bindings, viewerId: string, days = 7) {
+  const { episodes, announced, releases, byId } = await collectDiary(env, viewerId);
+  const horizon = new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
+  const timed = episodes
+    .filter((row) => row.airsAt.slice(0, 10) <= horizon)
+    .map((row) => ({
+      kind: "episode" as const,
+      titleId: row.titleId,
+      title: row.showName,
+      season: row.season,
+      episode: row.episode,
+      name: row.episodeName,
+      when: databaseDate(row.airsAt).toISOString(),
+      precision: "time" as const,
+      network: row.network,
+    }));
+  const dated = announced
+    .filter((episode) => (episode.airDate ?? "") <= horizon)
+    .map((episode) => ({
+      kind: "episode" as const,
+      titleId: episode.titleId,
+      title: byId.get(episode.titleId)?.title ?? episode.titleId,
+      season: episode.seasonNumber,
+      episode: episode.episodeNumber,
+      name: episode.name,
+      when: episode.airDate ?? "",
+      precision: "day" as const,
+      network: null,
+    }));
+  const out = releases
+    .filter((row) => row.releaseDate <= horizon)
+    .map((row) => ({
+      kind: "release" as const,
+      titleId: row.titleId,
+      title: byId.get(row.titleId)?.title ?? row.titleId,
+      season: null,
+      episode: null,
+      name: null,
+      when: row.releaseDate,
+      precision: "day" as const,
+      network: null,
+    }));
+
+  return [...timed, ...dated, ...out].sort((left, right) => left.when.localeCompare(right.when));
+}
+
+export async function buildDiaryCalendar(env: Bindings, viewerId: string, origin: string) {
+  const host = new URL(origin).hostname;
+  const { episodes, announced, releases, byId } = await collectDiary(env, viewerId);
   const events = [
     ...episodes.flatMap((row) => {
-      if (watched.has(slotKey(row.titleId, row.season, row.episode))) {
-        return [];
-      }
-
       const event = episodeEvent(row, byId.get(row.titleId), origin, host);
 
       return event ? [event] : [];
     }),
     ...announced.flatMap((episode) => {
-      const key = slotKey(episode.titleId, episode.seasonNumber, episode.episodeNumber);
       const title = byId.get(episode.titleId);
 
-      const seen =
-        watched.has(key) ||
-        behind(
-          episode.seasonNumber,
-          episode.episodeNumber,
-          episode.progressSeason,
-          episode.progressEpisode,
-        );
-
-      if (!title || timed.has(key) || seen) {
-        return [];
-      }
-
-      return [announcedEvent(episode, title, origin, host)];
+      return title ? [announcedEvent(episode, title, origin, host)] : [];
     }),
     ...releases.flatMap((row) => {
       const title = byId.get(row.titleId);

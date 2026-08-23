@@ -1,4 +1,5 @@
 import { isRecord, parseJson } from "../lib/values.ts";
+import { rebuildPersonTitles } from "./people.ts";
 
 export type UsherRecord = {
   status: "new" | "in-progress" | "done" | "dismissed";
@@ -217,6 +218,8 @@ export async function rebuildPeopleIndex(db: D1Database) {
   const total = await db
     .prepare(`SELECT count(*) AS people FROM catalog_people`)
     .first<{ people: number }>();
+
+  await rebuildPersonTitles(db);
 
   return total?.people ?? 0;
 }

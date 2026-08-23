@@ -19,6 +19,7 @@ export type AdminAction =
   | "alerts-preview"
   | "alerts-send"
   | "angle-scores"
+  | "people"
   | "cinemas"
   | "showtimes";
 

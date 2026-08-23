@@ -36,6 +36,7 @@ import { BrowsePage, type BrowsePreset } from "./pages/BrowsePage";
 import { DigestPage } from "./pages/DigestPage";
 import { LibraryPage } from "./pages/LibraryPage";
 import { NotebookPage } from "./pages/NotebookPage";
+import { PersonPage } from "./pages/PersonPage";
 import { SearchPage } from "./pages/SearchPage";
 import { SignInPage } from "./pages/SignInPage";
 import { SourcesPage } from "./pages/SourcesPage";
@@ -534,6 +535,11 @@ export function App() {
                 <SignedOutShelf />
               )
             }
+          />
+
+          <Route
+            path="/person/:name"
+            element={<PersonPage isSignedIn={isSignedIn} onOpen={openTitle} />}
           />
 
           <Route path="/sources" element={<SourcesPage stats={catalog.providerStats} />} />

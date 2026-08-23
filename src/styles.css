@@ -1220,6 +1220,19 @@ h2 em {
   box-shadow: 5px 5px 0 var(--blue);
   transform: translate(-2px, -2px);
 }
+.detail-similar-card.current {
+  cursor: default;
+}
+.detail-similar-card.current img,
+.detail-similar-card.current .art-placeholder {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+.detail-similar-card.current strong::after {
+  color: var(--blue);
+  content: " · you are here";
+  font: 9px var(--mono);
+}
 .detail-similar-card strong {
   font-size: 12px;
   letter-spacing: -0.02em;

@@ -192,3 +192,68 @@ export async function editBelief(
 
   return (result.meta.changes ?? 0) > 0;
 }
+
+const FOLLOW_RULE = "manual:follow";
+
+export function personKey(name: string) {
+  return `rule:person:${name.trim().toLowerCase()}`;
+}
+
+export async function readFollowedPeople(db: D1Database, viewerId: string) {
+  if (!viewerId) {
+    return [];
+  }
+
+  try {
+    const rows = await db
+      .prepare(
+        `SELECT key FROM viewer_beliefs
+          WHERE viewer_id = ?1 AND key LIKE 'rule:person:%' AND revoked_at IS NULL`,
+      )
+      .bind(viewerId)
+      .all<{ key: string }>();
+
+    return rows.results.map((row) => row.key.replace("rule:person:", ""));
+  } catch (error) {
+    logError("followed_people_failed", error);
+
+    return [];
+  }
+}
+
+export async function setPersonFollow(
+  db: D1Database,
+  viewerId: string,
+  name: string,
+  follow: boolean,
+) {
+  const key = personKey(name);
+
+  if (!follow) {
+    await db
+      .prepare(
+        `UPDATE viewer_beliefs SET revoked_at = CURRENT_TIMESTAMP, edited = 1,
+                updated_at = CURRENT_TIMESTAMP
+          WHERE viewer_id = ?1 AND key = ?2`,
+      )
+      .bind(viewerId, key)
+      .run();
+
+    return;
+  }
+
+  await db
+    .prepare(
+      `INSERT INTO viewer_beliefs
+         (id, viewer_id, key, value, strength, confidence, source_rule, edited, updated_at)
+       VALUES (?1, ?2, ?3, ?4, 1, 1, ?5, 1, CURRENT_TIMESTAMP)
+       ON CONFLICT (viewer_id, key) DO UPDATE SET
+         value = excluded.value,
+         edited = 1,
+         revoked_at = NULL,
+         suspended_until = NULL,
+         updated_at = CURRENT_TIMESTAMP`,
+    )
+    .bind(crypto.randomUUID(), viewerId, key, `You follow ${name.trim()}.`, FOLLOW_RULE)
+    .run();
+}
