@@ -41,6 +41,13 @@ the service it is on, and two backups in case you are difficult. He has been doi
 since a couple spent eleven minutes reading the board in 1981. Nobody has ever needed a fourth
 question.
 
+Everything he has worked out about you is in the notebook, and so is the map. Every title you have
+marked is placed by what it is rather than what it is called, so the things that are alike sit
+together. The two directions are the first two components of the embeddings rather than anyone's
+genre list, and where one end of one has a character to it he writes it in the margin. Hover a mark
+— or tab to it — and he tells you what it is and the nearest thing to it on your shelf. If he has
+not read something on your shelf yet he says so, and goes and reads it.
+
 He is also on the door. Most of the job is letting people in; the rest of it is not, and the API's
 rate limits and bot checks speak in his voice rather than a status code's. Ask too fast and you get
 _"Steady on. One at a time."_ Arrive as something that is not a person and you get told that he has

@@ -192,7 +192,7 @@ export function NotebookPage({
             id="shape"
             number={2}
             title={DIVIDERS[1].label}
-            lede="Everything you have marked, placed by what it is rather than what it is called. Close together means alike."
+            lede="Everything you have marked, placed by what it is rather than what it is called. Close together means alike. The two directions are mine rather than the industry's — where one end has a character to it, I have written it in the margin."
           >
             <ErrorBoundary label="This map">
               <TasteMap isSignedIn={isSignedIn} />
