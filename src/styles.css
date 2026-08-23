@@ -7495,6 +7495,9 @@ a.showtime:hover small {
   letter-spacing: 0.07em;
   text-transform: uppercase;
 }
+.revival-actions {
+  margin-bottom: 26px;
+}
 .revival-actions .watch-button {
   background: var(--ink-soft);
   border: 1px solid var(--acid);

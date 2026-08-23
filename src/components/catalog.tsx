@@ -14,6 +14,7 @@ import { blendedRating, ratingSources } from "../domain/ratings";
 import { useAvailability } from "../hooks/useAvailability";
 import { useCollection } from "../hooks/usePerson";
 import { useRecommendations } from "../hooks/useRecommendations";
+import { useTitleReels } from "../hooks/useRevival";
 import { useEpisodeEntries } from "../hooks/useSeasons";
 import { useShowings } from "../hooks/useShowings";
 import { useTitleInsight } from "../hooks/useTitleInsight";
@@ -436,6 +437,7 @@ export function DetailPanel({
   const { insight, pairs, isLoading: isInsightLoading } = useTitleInsight(item.id);
   const similar = useRecommendations(item.id, item.recommendationIds, SIMILAR_LIMIT);
   const showings = useShowings(item, canSave);
+  const reels = useTitleReels(item.id, item.mediaType, item.tmdbId);
   const collection = useCollection(item.collection?.id);
   const spokenIn = languageLabel(item.originalLanguage);
   const upcomingAir =
@@ -654,6 +656,7 @@ export function DetailPanel({
                 providers={providers}
                 fallbackHref={item.watchLink}
                 selectedProviderIds={selectedProviderIds}
+                hideIfEmpty={reels.length > 0}
                 onLeave={leaveVia}
               />
             </ErrorBoundary>
@@ -666,7 +669,7 @@ export function DetailPanel({
               </button>
             )}
             <ErrorBoundary label="The revival house">
-              <RevivalBlock item={item} />
+              <RevivalBlock works={reels} />
             </ErrorBoundary>
             <ErrorBoundary label="Local showings">
               <ShowingsBlock

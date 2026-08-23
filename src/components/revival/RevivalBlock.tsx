@@ -1,12 +1,8 @@
 import { Link } from "react-router-dom";
 
-import type { MediaTitle } from "../../domain/catalog";
-import { revivalPath, runtimeLabel, SOURCE_LABELS } from "../../domain/revival";
-import { useTitleReels } from "../../hooks/useRevival";
+import { revivalPath, runtimeLabel, SOURCE_LABELS, type RevivalWork } from "../../domain/revival";
 
-export function RevivalBlock({ item }: { item: MediaTitle }) {
-  const works = useTitleReels(item.id, item.mediaType, item.tmdbId);
-
+export function RevivalBlock({ works }: { works: RevivalWork[] }) {
   if (works.length === 0) {
     return null;
   }

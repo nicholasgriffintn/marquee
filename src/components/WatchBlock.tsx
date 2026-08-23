@@ -42,11 +42,13 @@ export function WatchBlock({
   providers,
   fallbackHref,
   selectedProviderIds,
+  hideIfEmpty,
   onLeave,
 }: {
   providers: ProviderAvailability[];
   fallbackHref: string | null;
   selectedProviderIds: string[];
+  hideIfEmpty?: boolean;
   onLeave: (exit: Exit) => (event: MouseEvent<HTMLAnchorElement>) => void;
 }) {
   const [showAll, setShowAll] = useState(false);
@@ -54,6 +56,10 @@ export function WatchBlock({
   const { primary, rest, paid } = watchOptions(providers, fallbackHref, selectedProviderIds);
 
   if (!primary && paid.length === 0) {
+    if (hideIfEmpty) {
+      return null;
+    }
+
     return (
       <div className="watch-actions">
         <span>Watch now</span>
