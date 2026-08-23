@@ -84,10 +84,10 @@ export function RevivalPage({ isReady }: { isReady: boolean }) {
           Everything on these shelves is out of copyright in the UK. For a film that means 70 years
           from the death of the last of its principal director, screenwriters and composer, which is
           measured from people rather than from a release date — so a film can be free in America
-          and still in copyright here, and those ones are not shown. Prints come from European
-          archives, the Internet Archive and the Library of Congress; where we hold our own copy it
-          says so on the card. If you believe something here is still in copyright, tell us and it
-          comes off.
+          and still in copyright here, and those ones are not shown. Where we cannot work out who
+          the authors were, the print waits rather than plays. Prints come from European archives,
+          the Internet Archive and the Library of Congress; where we hold our own copy it says so on
+          the card. If you believe something here is still in copyright, tell us and it comes off.
         </p>
       )}
     </section>

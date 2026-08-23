@@ -6,13 +6,19 @@ import type { Bindings } from "../types.ts";
 
 const UK_FILM_TERM_YEARS = 70;
 const UK_ANONYMOUS_TERM_YEARS = 70;
-const CROWN_TERM_YEARS = 50;
 
 export type UkVerdict = {
   clear: boolean;
   expiresYear: number | null;
   basis: RevivalRightsBasis;
   note: string;
+};
+
+export type RightsSubject = {
+  year: number | null;
+  director: string | null;
+  rightsBasis: RevivalRightsBasis;
+  imdbId: string | null;
 };
 
 export function currentUkYear(now = new Date()) {
@@ -27,69 +33,65 @@ export function ukExpiryFromRelease(releaseYear: number) {
   return releaseYear + UK_ANONYMOUS_TERM_YEARS + 1;
 }
 
-export function crownExpiryFromRelease(releaseYear: number) {
-  return releaseYear + CROWN_TERM_YEARS + 1;
+function releasedByArchive(basis: RevivalRightsBasis) {
+  return basis === "eu-institution" || basis === "cc0";
+}
+
+function unresolvedNote(subject: RightsSubject, authors: FilmAuthors | null) {
+  if (authors && authors.named > 0) {
+    return `${authors.named} named author${authors.named === 1 ? "" : "s"} on Wikidata, ${authors.named - authors.withDeathYear} without a death date, so the UK term cannot be closed`;
+  }
+
+  if (subject.director) {
+    return `Credited to ${subject.director}, whose death date could not be found, so the UK term cannot be closed`;
+  }
+
+  if (!subject.imdbId) {
+    return "Not matched to a catalogue title, so its authors were never looked up and the UK term cannot be closed";
+  }
+
+  return "Wikidata lists no director, writer or composer for this title, so the UK term cannot be closed";
 }
 
 export function assessUk(
+  subject: RightsSubject,
   authors: FilmAuthors | null,
-  year: number | null,
-  basis: RevivalRightsBasis,
   now = new Date(),
 ): UkVerdict {
   const thisYear = currentUkYear(now);
+  const basis = subject.rightsBasis;
 
-  if (basis === "crown-expired" && year !== null) {
-    const expires = crownExpiryFromRelease(year);
-
-    return {
-      clear: expires <= thisYear,
-      expiresYear: expires,
-      basis,
-      note: `Crown copyright, ${CROWN_TERM_YEARS} years from publication in ${year}`,
-    };
-  }
-
-  if (authors && authors.withDeathYear > 0 && authors.latestDeathYear !== null) {
-    const complete = authors.withDeathYear === authors.named;
-    const expires = ukExpiryFromDeath(authors.latestDeathYear);
-    const clear = complete && expires <= thisYear;
+  if (authors && authors.named > 0 && authors.withDeathYear === authors.named) {
+    const latest = authors.latestDeathYear ?? 0;
+    const expires = ukExpiryFromDeath(latest);
+    const clear = expires <= thisYear;
 
     return {
       clear,
       expiresYear: expires,
       basis: clear ? "uk-expired" : basis,
-      note: complete
-        ? `Last of the named authors died ${authors.latestDeathYear}, so UK copyright ran out at the end of ${expires - 1}`
-        : `${authors.named - authors.withDeathYear} of ${authors.named} named authors have no recorded death date, so the UK term cannot be closed`,
+      note: `Last of the ${authors.named} named authors died ${latest}, so UK copyright ran out at the end of ${expires - 1}`,
     };
   }
 
-  if (authors && authors.named > 0) {
+  if (releasedByArchive(basis)) {
     return {
-      clear: false,
+      clear: true,
       expiresYear: null,
       basis,
-      note: `${authors.named} named author${authors.named === 1 ? "" : "s"} with no recorded death date, so the UK term cannot be established`,
+      note: "Released outright by the archive that holds it; the UK term could not be confirmed independently",
     };
   }
 
-  if (year !== null) {
-    const expires = ukExpiryFromRelease(year);
-
-    return {
-      clear: expires <= thisYear,
-      expiresYear: expires,
-      basis,
-      note: `No authors recorded anywhere, treated as anonymous: ${UK_ANONYMOUS_TERM_YEARS} years from first release in ${year}`,
-    };
-  }
+  const anonymous = subject.year === null ? null : ukExpiryFromRelease(subject.year);
 
   return {
     clear: false,
     expiresYear: null,
     basis,
-    note: "No authors and no release year, so nothing to measure a UK term against",
+    note: anonymous
+      ? `${unresolvedNote(subject, authors)}. If it were genuinely anonymous the term would have run out at the end of ${anonymous - 1}`
+      : unresolvedNote(subject, authors),
   };
 }
 
@@ -112,11 +114,7 @@ export async function checkRevivalRights(env: Bindings, limit = 60) {
   let cleared = 0;
 
   for (const row of pending) {
-    const verdict = assessUk(
-      row.imdbId ? (authors.get(row.imdbId) ?? null) : null,
-      row.year,
-      row.rightsBasis,
-    );
+    const verdict = assessUk(row, row.imdbId ? (authors.get(row.imdbId) ?? null) : null);
 
     // oxlint-disable-next-line no-await-in-loop
     await storeUkRights(env.DB, row.id, verdict);

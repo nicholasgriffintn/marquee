@@ -4,6 +4,7 @@ OMDB_API_KEY=your-omdb-api-key
 SIMKL_CLIENT_ID=your-simkl-client-id
 TRAKT_CLIENT_ID=your-trakt-client-id
 TRAKT_CLIENT_SECRET=your-trakt-client-secret
+EUROPEANA_API_KEY=your-europeana-api-key
 
 CLOUDFLARE_ACCOUNT_ID=your-cloudflare-account-id
 CLOUDFLARE_API_TOKEN=your-cloudflare-workers-ai-token
@@ -14,4 +15,3 @@ GITHUB_CLIENT_SECRET=your-github-oauth-app-client-secret
 LOCAL_DEV=true
 # Set to "on" only when you deliberately want the cron sync pipelines to run locally
 LOCAL_SYNC=off
-EUROPEANA_API_KEY=

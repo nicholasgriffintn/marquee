@@ -4,7 +4,6 @@ export type RevivalKind = "feature" | "short" | "episode" | "ephemeral";
 
 export type RevivalRightsBasis =
   | "uk-expired"
-  | "crown-expired"
   | "eu-institution"
   | "cc0"
   | "us-gov"
@@ -62,7 +61,6 @@ export type RevivalScreening = {
 
 export const RIGHTS_LABELS: Record<RevivalRightsBasis, string> = {
   "uk-expired": "UK copyright expired",
-  "crown-expired": "Crown copyright expired",
   "eu-institution": "Released by a European archive",
   cc0: "CC0 dedication",
   "us-gov": "US Government work",
@@ -123,7 +121,7 @@ export function rightsSummary(work: RevivalWork) {
     return `${label} · not free in the UK before ${work.ukExpiresYear}`;
   }
 
-  return work.rightsBasis === "uk-expired" || work.rightsBasis === "crown-expired"
+  return work.rightsBasis === "uk-expired"
     ? `Free in the UK since ${work.ukExpiresYear}`
     : `${label} · free in the UK since ${work.ukExpiresYear}`;
 }

@@ -98,9 +98,10 @@ export function RevivalReview() {
     <section className="panel-block" aria-labelledby="admin-revival-title">
       <h2 id="admin-revival-title">The vault</h2>
       <p className="admin-note">
-        Nothing plays until it is approved. A print clears on its own only when the UK term can be
-        closed from the authors' death dates, or when a European archive has released it outright.
-        Anything free in America but not provably free here waits below for a person.
+        Nothing plays until it is approved. A print clears on its own only when every named author
+        has a death date and the last of them is more than 70 years past, or when a European archive
+        has released it outright. An unknown author is not treated as no author, so anything free in
+        America but not provably free here waits below for a person.
       </p>
 
       {data && (

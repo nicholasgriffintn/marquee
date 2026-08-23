@@ -138,10 +138,15 @@ Britain. _The Lost World_ (1925) is free in America and in copyright here until 
 
 So the gate is the UK term. A work is matched to the catalogue, its authors and their death dates
 are read off Wikidata, and it is cleared only when every named author has a death date and the
-latest of them is more than 70 years ago. Where nobody is named at all the anonymous rule applies
-instead — 70 years from release. Anything that cannot be closed sits in a queue on `/admin` for a
-person, including the large pile that is genuinely free in America and unprovable here. That is the
-right way round to be wrong.
+latest of them is more than 70 years ago. Nothing else clears itself. In particular a work whose
+authors could not be established does **not** fall back to the anonymous rule, because "we could not
+find out" and "there is nobody to find" are not the same claim, and only the second one shortens the
+term. The reviewer is told which of the two it looks like, and what the term would be if the work
+really were anonymous.
+
+Everything unresolved sits in a queue on `/admin` for a person, including the large pile that is
+genuinely free in America and unprovable here. That is the right way round to be wrong, and it does
+mean the shelf fills slowly.
 
 Three places supply it. European archives through **Europeana**, filtered to things they have
 published outright as Public Domain Mark or CC0 and that they serve as an actual file rather than a

@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS revival_works (
   country TEXT,
   rights_basis TEXT NOT NULL CHECK (
     rights_basis IN (
-      'uk-expired', 'crown-expired', 'eu-institution', 'cc0',
+      'uk-expired', 'eu-institution', 'cc0',
       'us-gov', 'pd-mark', 'us-expired', 'curated', 'unclear'
     )
   ),
