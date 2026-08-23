@@ -51,3 +51,15 @@ export function isStringArray(value: unknown): value is string[] {
 export function isNumberArray(value: unknown): value is number[] {
   return Array.isArray(value) && value.every((item) => typeof item === "number");
 }
+
+export function vectorValues(value: unknown): number[] | null {
+  const values = Array.isArray(value)
+    ? value
+    : ArrayBuffer.isView(value) && !(value instanceof DataView)
+      ? [...(value as Float32Array)]
+      : null;
+
+  return values && values.length > 0 && values.every((item) => Number.isFinite(item))
+    ? (values as number[])
+    : null;
+}

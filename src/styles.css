@@ -4418,6 +4418,12 @@ h2 em {
   grid-template-columns: minmax(0, 560px) minmax(0, 1fr);
   margin-bottom: 14px;
 }
+.taste-map-axis {
+  fill: var(--muted);
+  font: 700 10px/1 var(--mono);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
 .taste-map-frame > svg {
   aspect-ratio: 1;
   border: 1px solid var(--panel-line);
@@ -4429,12 +4435,20 @@ h2 em {
 .taste-map-ground {
   fill: var(--panel-tile);
 }
+.taste-point {
+  cursor: pointer;
+  outline: none;
+}
 .taste-point circle {
   stroke: var(--panel-tile);
   stroke-width: 2;
   transition:
     r 0.14s ease,
     fill 0.14s ease;
+}
+.taste-map .taste-point circle.taste-point-hit {
+  fill: transparent;
+  stroke: none;
 }
 .taste-point.liked circle {
   fill: var(--acid);
@@ -4445,6 +4459,10 @@ h2 em {
 }
 .taste-point.active circle {
   stroke: var(--white);
+}
+.taste-point:focus-visible circle {
+  stroke: var(--white);
+  stroke-width: 3;
 }
 .taste-map-readout {
   align-content: start;
@@ -4465,6 +4483,18 @@ h2 em {
   font: 700 10px/1 var(--mono);
   letter-spacing: 1.5px;
   text-transform: uppercase;
+}
+.taste-map-readout .taste-map-nearest {
+  border-top: 1px solid var(--panel-line);
+  margin-top: 6px;
+  padding-top: 8px;
+}
+.taste-map-open {
+  color: var(--white);
+  font: 400 13px/1.4 var(--sans);
+  justify-self: start;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 .taste-map-key {
   display: flex;

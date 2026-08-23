@@ -127,11 +127,19 @@ notebookRoutes.get("/map", async (context) => {
   const user = context.get("authenticatedUser");
 
   try {
-    return jsonResponse({ points: await buildTasteMap(context.env, user.id) });
+    const schedule = (task: Promise<unknown>) => {
+      try {
+        context.executionCtx.waitUntil(task);
+      } catch {
+        void task;
+      }
+    };
+
+    return jsonResponse(await buildTasteMap(context.env, user.id, { schedule }));
   } catch (error) {
     logError("taste_map_route_failed", error);
 
-    return jsonResponse({ points: [] });
+    return jsonResponse({ error: "I cannot lay the map out just now. Try again shortly." }, 503);
   }
 });
 
