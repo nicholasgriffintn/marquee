@@ -313,8 +313,50 @@ function trimWords(value: string, limit: number) {
   return (boundary > limit * 0.6 ? cut.slice(0, boundary) : cut).replace(/[\s,;:.—-]+$/u, "");
 }
 
+const TITLE_ID_PATTERN = /\b(?:movie|tv):[1-9]\d{0,9}\b/gu;
+
+function usableIds(candidates: Iterable<string>, availableIds: Set<string>) {
+  const seen = new Set<string>();
+
+  return [...candidates]
+    .flatMap((titleId): string[] => {
+      if (!availableIds.has(titleId) || seen.has(titleId)) {
+        return [];
+      }
+
+      seen.add(titleId);
+
+      return [titleId];
+    })
+    .slice(0, RAIL_MAX);
+}
+
+function scavengeRail(content: string, availableIds: Set<string>): StoredRail | null {
+  const name = content.match(/"name"\s*:\s*"([^"]{1,60})"/u)?.[1]?.trim() ?? "";
+  const titleIds = usableIds(
+    [...content.matchAll(TITLE_ID_PATTERN)].map((match) => match[0]),
+    availableIds,
+  );
+
+  if (!name || titleIds.length < RAIL_MIN) {
+    return null;
+  }
+
+  const reason = content.match(/"reason"\s*:\s*"([^"]{0,200})"/u)?.[1] ?? "";
+
+  return { name, reason: trimWords(reason, 90), titleIds };
+}
+
 function parseRail(content: string | null, availableIds: Set<string>): StoredRail | null {
-  const json = content?.match(/\{[\s\S]*\}/u)?.[0];
+  if (!content) {
+    return null;
+  }
+
+  return strictRail(content, availableIds) ?? scavengeRail(content, availableIds);
+}
+
+function strictRail(content: string, availableIds: Set<string>): StoredRail | null {
+  const json = content.match(/\{[\s\S]*\}/u)?.[0];
 
   if (!json) {
     return null;
@@ -327,18 +369,7 @@ function parseRail(content: string | null, availableIds: Set<string>): StoredRai
       return null;
     }
 
-    const seen = new Set<string>();
-    const titleIds = parsed.titleIds
-      .flatMap((titleId): string[] => {
-        if (!isKnownTitle(titleId) || !availableIds.has(titleId) || seen.has(titleId)) {
-          return [];
-        }
-
-        seen.add(titleId);
-
-        return [titleId];
-      })
-      .slice(0, RAIL_MAX);
+    const titleIds = usableIds(parsed.titleIds.filter(isKnownTitle), availableIds);
     const name = parsed.name.trim().slice(0, 60);
 
     return titleIds.length >= RAIL_MIN && name

@@ -3567,10 +3567,16 @@ h2 em {
   color: var(--acid);
 }
 .usher-grid {
+  align-content: start;
   display: grid;
   gap: 8px;
   grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  height: clamp(280px, 38vh, 440px);
   margin-bottom: 16px;
+  overflow-y: auto;
+  padding-right: 6px;
+  scrollbar-color: var(--line) transparent;
+  scrollbar-width: thin;
 }
 .usher-grid-card {
   background: none;
@@ -3599,8 +3605,10 @@ h2 em {
   width: 22px;
 }
 .usher-grid-card img {
+  aspect-ratio: 2 / 3;
   display: block;
   height: auto;
+  object-fit: cover;
   width: 100%;
 }
 .usher-grid-card small {
@@ -5458,7 +5466,13 @@ h2 em {
   margin: 20px 0 0;
   max-width: 46ch;
 }
-.box-office-status,
+.box-office-status {
+  background-color: var(--acid);
+  color: var(--blue);
+  padding: 0.5rem;
+  margin-bottom: 15px;
+  width: 100%;
+}
 .box-office-error {
   font: 400 14px/1.5 var(--sans);
   margin: 0;
@@ -5560,7 +5574,6 @@ h2 em {
 .usher-strip,
 .provider-picker,
 .detail-similar-track,
-.usher-grid,
 .digest-episodes {
   scrollbar-width: none;
 }

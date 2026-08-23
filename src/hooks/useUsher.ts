@@ -110,21 +110,28 @@ export function useUsher(isSignedIn: boolean) {
       return () => controller.abort();
     }
 
+    async function readState() {
+      const options = { signal: controller.signal };
+
+      return requestJson<StateResponse>("/api/usher/state", options)
+        .catch(() => requestJson<StateResponse>("/api/usher/state", options))
+        .catch(() => null);
+    }
+
     async function load() {
-      try {
-        const state = await requestJson<StateResponse>("/api/usher/state", {
-          signal: controller.signal,
-        });
-        const pending = state.status === "new" || state.status === "in-progress";
+      const state = await readState();
 
-        awayDays.current = state.awayDays ?? 0;
-        setIsOnboarding(pending);
+      if (!state) {
+        return;
+      }
 
-        if (pending) {
-          await request("first-run");
-        }
-      } catch {
-        setIsOnboarding(false);
+      const pending = state.status === "new" || state.status === "in-progress";
+
+      awayDays.current = state.awayDays ?? 0;
+      setIsOnboarding(pending);
+
+      if (pending) {
+        await request("first-run");
       }
     }
 

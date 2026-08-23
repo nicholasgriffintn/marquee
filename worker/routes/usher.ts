@@ -5,6 +5,7 @@ import { requireAuthentication, type AuthVariables } from "../auth/session.ts";
 import { recordEvent } from "../lib/events.ts";
 import { jsonResponse, readJsonObject } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
+import { retryTransient } from "../lib/retry.ts";
 import { isKnownTitle, validProviderIds } from "../lib/validation.ts";
 import {
   readAnswers,
@@ -48,10 +49,9 @@ usherRoutes.get("/state", async (context) => {
   try {
     context.header("cache-control", "no-store");
 
-    const [record, answers] = await Promise.all([
-      readUsherRecord(context.env.DB, user.id),
-      readAnswers(context.env.DB, user.id),
-    ]);
+    const [record, answers] = await retryTransient(() =>
+      Promise.all([readUsherRecord(context.env.DB, user.id), readAnswers(context.env.DB, user.id)]),
+    );
     const awayDays = record.lastSeenAt
       ? Math.floor((Date.now() - Date.parse(record.lastSeenAt)) / 86_400_000)
       : 0;
@@ -66,7 +66,7 @@ usherRoutes.get("/state", async (context) => {
   } catch (error) {
     logError("usher_state_failed", error);
 
-    return jsonResponse({ status: "dismissed", answered: [], awayDays: 0 });
+    return jsonResponse({ error: "I lost my notes for a second. Try again." }, 503);
   }
 });
 
@@ -81,17 +81,19 @@ usherRoutes.get("/moment", async (context) => {
   try {
     context.header("cache-control", "no-store");
 
-    const moment = await nextMoment(context.env, user.id, surface, {
-      railId: context.req.query("railId")?.slice(0, 80),
-      railName: context.req.query("railName")?.slice(0, 80),
-      titleId: isKnownTitle(context.req.query("titleId"))
-        ? context.req.query("titleId")
-        : undefined,
-      query: context.req.query("query")?.slice(0, 120),
-      savedCount: numberParam(context.req.query("savedCount")),
-      unratedCount: numberParam(context.req.query("unratedCount")),
-      awayDays: numberParam(context.req.query("awayDays")),
-    });
+    const moment = await retryTransient(() =>
+      nextMoment(context.env, user.id, surface, {
+        railId: context.req.query("railId")?.slice(0, 80),
+        railName: context.req.query("railName")?.slice(0, 80),
+        titleId: isKnownTitle(context.req.query("titleId"))
+          ? context.req.query("titleId")
+          : undefined,
+        query: context.req.query("query")?.slice(0, 120),
+        savedCount: numberParam(context.req.query("savedCount")),
+        unratedCount: numberParam(context.req.query("unratedCount")),
+        awayDays: numberParam(context.req.query("awayDays")),
+      }),
+    );
 
     if (moment) {
       await markPrompted(context.env, user.id, moment);
@@ -136,8 +138,12 @@ usherRoutes.post("/answer", async (context) => {
     return jsonResponse({ error: "Invalid answer" }, 400);
   }
 
+  const questionId = body.questionId;
+
   try {
-    const result = await applyAnswer(context.env, user.id, body.questionId, body.answer);
+    const result = await retryTransient(() =>
+      applyAnswer(context.env, user.id, questionId, body.answer),
+    );
 
     if (!result.ok) {
       return jsonResponse({ error: result.error }, 400);
@@ -147,7 +153,7 @@ usherRoutes.post("/answer", async (context) => {
     recordEvent(context.env, {
       name: "usher_answered",
       viewerId: user.id,
-      detail: body.questionId,
+      detail: questionId,
     });
 
     return jsonResponse({ saved: true, answer: result.answer });
