@@ -322,15 +322,15 @@ export function TonightPage({
                   </button>
                 );
               })}
-              {!filterableProviders.length && (
-                <p className="provider-error">
-                  {providerError ||
-                    (providers.length
-                      ? "No live provider feeds are configured."
-                      : "Loading providers…")}
-                </p>
-              )}
             </div>
+            {!filterableProviders.length && (
+              <p className="provider-error" aria-live="polite">
+                {providerError ||
+                  (providers.length
+                    ? "No live provider feeds are configured."
+                    : "Loading providers…")}
+              </p>
+            )}
           </section>
         </ErrorBoundary>
       )}

@@ -172,14 +172,23 @@ Open <http://localhost:8787>
 
 ### Ingesting locally
 
-`pnpm dev` also runs D1 and the ingestion queue locally. Cron triggers don't fire on a
-timer, so hit the scheduled endpoint to queue `sync-providers` and `sync-catalog`:
+`pnpm dev` also runs D1 and the ingestion queue locally. Cron triggers don't fire on a timer,
+and the scheduled handler is a no-op locally on top of that, so nothing syncs by itself and no
+third-party rate limit gets spent while you work. `.dev.vars` sets `LOCAL_DEV=true`, which is
+what the worker checks.
+
+Sync runs are manual. The `/admin` page has a button for every job — light and deep sweeps,
+availability, enrichment, embeddings, discover, showtimes, digest, alerts. Each one is the same
+code path the crons take in production.
+
+If you specifically want to exercise the cron entrypoint itself, set `LOCAL_SYNC=on` in
+`.dev.vars`, restart `pnpm dev`, and hit the scheduled endpoint:
 
 ```bash
 curl http://localhost:8787/cdn-cgi/local/scheduled
 ```
 
-The consumer picks them up within a few seconds. Check what happened:
+The consumer picks the jobs up within a few seconds. Check what happened:
 
 ```bash
 pnpm exec wrangler d1 execute DB --local --command "SELECT job_type, status, error FROM ingestion_runs ORDER BY started_at DESC LIMIT 10"

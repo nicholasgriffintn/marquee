@@ -4,6 +4,7 @@ import { authRoutes } from "./auth/routes.ts";
 import { CuratorSession } from "./durable/curator-session.ts";
 import { consumeDeadLetters, consumeIngestion } from "./jobs/ingestion-consumer.ts";
 import { scheduleIngestion } from "./jobs/ingestion-scheduler.ts";
+import { automatedSyncAllowed } from "./lib/environment.ts";
 import { hasTrustedOrigin } from "./lib/http.ts";
 import { canonicalOrigin } from "./lib/security.ts";
 import { withPageMetadata } from "./lib/share.ts";
@@ -118,6 +119,12 @@ export { CatalogSweep, CuratorSession, DigestWorkflow, RailsWorkflow };
 export default {
   fetch: app.fetch,
   scheduled(controller, env, context) {
+    if (!automatedSyncAllowed(env)) {
+      console.log(JSON.stringify({ event: "scheduled_skipped_local_dev", cron: controller.cron }));
+
+      return;
+    }
+
     context.waitUntil(scheduleIngestion(env, controller.cron));
   },
   queue(batch, env, context) {

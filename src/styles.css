@@ -2323,8 +2323,13 @@ h2 em {
   background: #39201c;
   border-left: 5px solid var(--coral);
   color: var(--white);
-  margin: 20px var(--gutter);
   padding: 14px 18px;
+}
+.catalogue-error {
+  margin: 20px var(--gutter);
+}
+.provider-error {
+  margin: 16px 0 0;
 }
 .curator-error {
   border-left-color: var(--coral);
