@@ -4,7 +4,14 @@ import { ErrorBoundary } from "../components/ErrorBoundary";
 import { ReelCard } from "../components/revival/ReelCard";
 import { ReelPlayer } from "../components/revival/ReelPlayer";
 import { UsherMark } from "../components/usher/UsherMark";
-import { deliveryNote, rightsSummary, SOURCE_LABELS, workMeta } from "../domain/revival";
+import {
+  CONDITION_LABELS,
+  CONDITION_NOTES,
+  deliveryNote,
+  rightsSummary,
+  SOURCE_LABELS,
+  workMeta,
+} from "../domain/revival";
 import { useScreening } from "../hooks/useRevival";
 
 export function RevivalScreenPage({ isSignedIn }: { isSignedIn: boolean }) {
@@ -53,6 +60,11 @@ export function RevivalScreenPage({ isSignedIn }: { isSignedIn: boolean }) {
           canSave={isSignedIn}
         />
       </ErrorBoundary>
+
+      <p className="print-condition" data-condition={work.condition}>
+        <span>{CONDITION_LABELS[work.condition]}</span>
+        <em>{CONDITION_NOTES[work.condition]}</em>
+      </p>
 
       {work.synopsis && <p className="detail-synopsis">{work.synopsis}</p>}
 

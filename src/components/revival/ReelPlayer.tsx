@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { clockLabel, type RevivalWork } from "../../domain/revival";
+import { clockLabel, runtimeLabel, type RevivalWork } from "../../domain/revival";
 import { useProgressReporter } from "../../hooks/useRevival";
 import { track } from "../../lib/telemetry";
+import { ArtPlaceholder } from "../ArtPlaceholder";
 
 const FINISHED_RATIO = 0.97;
 const RESUME_FLOOR_SECONDS = 5;
 const RESUME_TAIL_SECONDS = 10;
+const CURTAIN_MS = 460;
 
 export function ReelPlayer({
   work,
@@ -20,7 +22,11 @@ export function ReelPlayer({
   const videoRef = useRef<HTMLVideoElement>(null);
   const resumeRef = useRef(startAt);
   const resumedRef = useRef(false);
-  const [isPlaying, setPlaying] = useState(false);
+  const [started, setStarted] = useState(false);
+  const [raising, setRaising] = useState(false);
+  const raisingRef = useRef(false);
+  const [ready, setReady] = useState(false);
+  const [stillFailed, setStillFailed] = useState(false);
   const [error, setError] = useState("");
   const report = useProgressReporter(work.id, canSave);
 
@@ -55,15 +61,31 @@ export function ReelPlayer({
     return () => video.removeEventListener("loadedmetadata", seek);
   }, []);
 
-  const onPlay = useCallback(() => {
-    setPlaying((playing) => {
-      if (!playing) {
-        track("reel_play", { detail: work.id });
-      }
+  const raise = useCallback(() => {
+    const video = videoRef.current;
 
-      return true;
-    });
+    if (raisingRef.current) {
+      return;
+    }
+
+    raisingRef.current = true;
+    setRaising(true);
+    track("reel_play", { detail: work.id });
+
+    if (video) {
+      void video.play().catch(() => undefined);
+    }
   }, [work.id]);
+
+  useEffect(() => {
+    if (!raising) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => setStarted(true), CURTAIN_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [raising]);
 
   const onTimeUpdate = useCallback(
     (event: { currentTarget: HTMLVideoElement }) => report(event.currentTarget.currentTime, false),
@@ -87,26 +109,56 @@ export function ReelPlayer({
     [report],
   );
 
+  const still = stillFailed ? null : work.stillUrl;
+  const resuming = startAt >= RESUME_FLOOR_SECONDS;
+
   return (
     <div className="revival-player">
-      <div className="revival-player-frame">
+      <div className={`revival-player-frame${started ? " is-running" : ""}`}>
         <video
           ref={videoRef}
-          controls
+          controls={started}
           playsInline
           preload="metadata"
           src={work.reelUrl}
-          poster={work.stillUrl ?? undefined}
-          onPlay={onPlay}
+          poster={still ?? undefined}
+          onCanPlay={() => setReady(true)}
+          onPlaying={raise}
           onTimeUpdate={onTimeUpdate}
           onEnded={onEnded}
           onPause={onPause}
           onError={() => setError("That print will not thread. Try the source record below.")}
         />
+        {!started && (
+          <button
+            type="button"
+            className={`revival-curtain${raising ? " raising" : ""}`}
+            aria-hidden={raising}
+            tabIndex={raising ? -1 : undefined}
+            onClick={raise}
+          >
+            {still ? (
+              <img src={still} alt="" loading="eager" onError={() => setStillFailed(true)} />
+            ) : (
+              <ArtPlaceholder seed={work.id} label={work.title} wide />
+            )}
+            <span className="revival-curtain-face">
+              <span className="revival-curtain-play" aria-hidden="true">
+                ▶
+              </span>
+              <span className="revival-curtain-copy">
+                <strong>{resuming ? "Back to your seat" : "Start the projector"}</strong>
+                <small>
+                  {resuming
+                    ? `You left it at ${clockLabel(startAt)}`
+                    : (runtimeLabel(work.runtimeSeconds) ?? work.title)}
+                  {ready ? "" : " · threading"}
+                </small>
+              </span>
+            </span>
+          </button>
+        )}
       </div>
-      {startAt >= RESUME_FLOOR_SECONDS && !isPlaying && (
-        <p className="revival-resume">You stopped at {clockLabel(startAt)}. Picking up there.</p>
-      )}
       {error && (
         <p className="revival-error" role="alert">
           {error}

@@ -376,7 +376,7 @@ svg {
   width: 100%;
 }
 .art-placeholder-wide {
-  object-position: center 42%;
+  object-position: center;
 }
 .rail-art > .art-placeholder,
 .poster > .art-placeholder,
@@ -7502,6 +7502,101 @@ a.showtime:hover small {
 .revival-shelves .rail-track {
   scroll-padding-inline: 0;
 }
+.revival-card .art-placeholder,
+.revival-curtain .art-placeholder {
+  filter: grayscale(1) contrast(1.08) brightness(0.82);
+}
+.revival-curtain {
+  background: var(--ink);
+  border: 0;
+  cursor: pointer;
+  display: block;
+  inset: 0;
+  padding: 0;
+  position: absolute;
+  transition: transform 0.46s cubic-bezier(0.4, 0, 0.2, 1);
+  width: 100%;
+  will-change: transform;
+}
+.revival-curtain.raising {
+  pointer-events: none;
+  transform: translateY(-100%);
+}
+.revival-curtain.raising .revival-curtain-face {
+  opacity: 0;
+  transition: opacity 0.16s ease;
+}
+.revival-player-frame.is-running {
+  background: #000;
+}
+.revival-curtain > img {
+  display: block;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.5;
+  width: 100%;
+}
+.revival-curtain::after {
+  background: linear-gradient(0deg, rgba(17, 19, 15, 0.86), rgba(17, 19, 15, 0.28));
+  content: "";
+  inset: 0;
+  position: absolute;
+}
+.revival-curtain-face {
+  align-items: center;
+  bottom: 20px;
+  display: flex;
+  gap: 14px;
+  left: 20px;
+  position: absolute;
+  right: 20px;
+  z-index: 2;
+}
+.revival-curtain-play {
+  align-items: center;
+  background: var(--acid);
+  color: var(--ink);
+  display: flex;
+  flex: 0 0 auto;
+  font-size: 15px;
+  height: 44px;
+  justify-content: center;
+  transition: transform 0.16s ease;
+  width: 44px;
+}
+.revival-curtain:hover .revival-curtain-play {
+  transform: scale(1.06);
+}
+.revival-curtain-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: left;
+}
+.revival-curtain-copy strong {
+  color: var(--paper);
+  font-size: 15px;
+  letter-spacing: -0.01em;
+}
+.revival-curtain-copy small {
+  color: var(--muted);
+  font: 10px var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+@media (prefers-reduced-motion: reduce) {
+  .revival-curtain,
+  .revival-curtain-play {
+    transition: none;
+  }
+  .revival-curtain.raising {
+    opacity: 0;
+    transform: none;
+  }
+  .revival-curtain:hover .revival-curtain-play {
+    transform: none;
+  }
+}
 .revival-actions {
   margin-bottom: 26px;
 }
@@ -7510,6 +7605,84 @@ a.showtime:hover small {
   border: 1px solid var(--acid);
   color: var(--paper);
   grid-template-columns: 30px 1fr;
+}
+.reel-note {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--panel-tile),
+    var(--panel-tile) 8px,
+    #22271e 8px,
+    #22271e 16px
+  );
+  border: 1px solid var(--panel-line);
+  border-left: 3px solid var(--muted);
+  margin: 48px 0 0;
+  max-width: 62ch;
+  padding: 16px 18px;
+}
+.reel-note-head {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0 0 10px;
+}
+.reel-note-head span {
+  color: var(--muted);
+  font: 700 10px/1 var(--mono);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+.reel-note-head em {
+  color: var(--muted);
+  font: italic 400 12px/1 var(--serif);
+}
+.reel-note-body {
+  color: var(--paper);
+  font: 400 14px/1.6 var(--mono);
+  margin: 0 0 12px;
+}
+.reel-note-foot {
+  border-top: 1px solid var(--panel-line);
+  color: var(--muted);
+  font: italic 400 13px/1.5 var(--serif);
+  margin: 0;
+  padding-top: 10px;
+}
+.reel-note-foot strong {
+  color: var(--paper);
+  font-style: normal;
+  font-weight: 500;
+}
+.print-condition {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0 0 18px;
+}
+.print-condition span {
+  color: var(--muted);
+  font: 700 10px/1 var(--mono);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+.print-condition[data-condition="pristine"] span {
+  color: var(--acid);
+}
+.print-condition[data-condition="rough"] span {
+  color: var(--coral);
+}
+.print-condition em {
+  color: var(--paper);
+  font: italic 400 15px/1.5 var(--serif);
+}
+.revival-note-head {
+  color: var(--muted);
+  font: 700 10px/1 var(--mono);
+  letter-spacing: 2px;
+  margin: 0 0 12px;
+  text-transform: uppercase;
 }
 .revival-mark {
   color: var(--acid);
@@ -7568,12 +7741,17 @@ a.showtime:hover small {
 }
 .revival-note {
   border-top: 1px solid var(--line);
-  color: #696b62;
-  font-size: 11px;
-  line-height: 1.6;
-  margin: 30px 0 0;
-  max-width: 74ch;
-  padding-top: 16px;
+  color: var(--muted);
+  margin: 28px 0 0;
+  max-width: 68ch;
+  padding-top: 18px;
+}
+.revival-note p {
+  font: 400 14px/1.65 var(--sans);
+  margin: 0 0 12px;
+}
+.revival-note p:last-child {
+  margin-bottom: 0;
 }
 .revival-review li {
   flex-wrap: wrap;

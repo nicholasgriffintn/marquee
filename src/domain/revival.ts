@@ -46,6 +46,7 @@ export type RevivalWork = {
   delivery: "mirror" | "source";
   reelUrl: string;
   plays: number;
+  condition: PrintCondition;
   tags: RevivalTag[];
 };
 
@@ -84,6 +85,47 @@ export const SOURCE_LABELS: Record<RevivalSource, string> = {
   archive: "Internet Archive",
   loc: "Library of Congress",
   europeana: "Europeana",
+};
+
+export type PrintCondition = "pristine" | "watchable" | "rough" | "unknown";
+
+const ROUGH_BITRATE = 500_000;
+const GOOD_BITRATE = 1_500_000;
+
+export function printCondition(
+  streamBytes: number | null,
+  runtimeSeconds: number | null,
+  height: number | null,
+): PrintCondition {
+  if (height && height >= 700) {
+    return "pristine";
+  }
+
+  if (!streamBytes || !runtimeSeconds || runtimeSeconds < 30) {
+    return "unknown";
+  }
+
+  const bitrate = (streamBytes * 8) / runtimeSeconds;
+
+  if (bitrate >= GOOD_BITRATE) {
+    return "pristine";
+  }
+
+  return bitrate >= ROUGH_BITRATE ? "watchable" : "rough";
+}
+
+export const CONDITION_NOTES: Record<PrintCondition, string> = {
+  pristine: "A clean print. Somebody looked after this one.",
+  watchable: "The print has seen a few decades. It holds up.",
+  rough: "Rough print. Grain, wobble, and a soundtrack doing its best.",
+  unknown: "I have not had a proper look at this print yet.",
+};
+
+export const CONDITION_LABELS: Record<PrintCondition, string> = {
+  pristine: "Clean print",
+  watchable: "Worn print",
+  rough: "Rough print",
+  unknown: "Unseen print",
 };
 
 export function reelPath(workId: string) {
