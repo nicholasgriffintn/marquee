@@ -7506,6 +7506,111 @@ a.showtime:hover small {
 .revival-shelves .rail-track {
   scroll-padding-inline: 0;
 }
+.revival-search {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 0 0 28px;
+  padding: 0 var(--gutter);
+}
+.revival-shelves .revival-search {
+  padding-inline: 0;
+}
+.revival-search input {
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--paper);
+  font: 400 15px var(--sans);
+  min-width: min(320px, 100%);
+  padding: 8px 0;
+}
+.revival-search input::placeholder {
+  color: var(--muted);
+}
+.revival-search input:focus-visible {
+  border-bottom-color: var(--acid);
+  outline: none;
+}
+.revival-search span {
+  color: var(--muted);
+  font: 9px var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.revival-bill {
+  margin-bottom: 54px;
+}
+.revival-bill-list {
+  border-top: 1px solid var(--line);
+  display: grid;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.revival-shelves .revival-bill .rail-heading {
+  padding-inline: 0;
+}
+.revival-bill-list > li {
+  border-bottom: 1px solid var(--line);
+  position: relative;
+}
+.revival-bill-list a {
+  align-items: baseline;
+  display: grid;
+  gap: 4px 20px;
+  grid-template-columns: minmax(170px, 200px) 1fr;
+  padding: 16px 0;
+}
+.revival-bill-slot {
+  color: var(--acid);
+  font: 800 9px var(--mono);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.revival-bill-list strong {
+  font-size: clamp(17px, 1.8vw, 22px);
+  letter-spacing: -0.02em;
+}
+.revival-bill-list small {
+  color: var(--muted);
+  font: 10px var(--mono);
+  grid-column: 2;
+  letter-spacing: 0.05em;
+}
+.revival-bill-list a:hover strong {
+  color: var(--acid);
+}
+@media (max-width: 700px) {
+  .revival-bill-list a {
+    grid-template-columns: 1fr;
+  }
+  .revival-bill-list small {
+    grid-column: 1;
+  }
+}
+.content-notice {
+  background: rgba(255, 110, 86, 0.08);
+  border-left: 3px solid var(--coral);
+  display: grid;
+  gap: 6px;
+  margin: 0 0 18px;
+  padding: 14px 16px;
+}
+.content-notice strong {
+  color: var(--coral);
+  font: 800 9px var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.content-notice p {
+  color: var(--paper);
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0;
+  max-width: 62ch;
+}
 .revival-card .art-placeholder,
 .revival-curtain .art-placeholder {
   filter: grayscale(1) contrast(1.08) brightness(0.82);

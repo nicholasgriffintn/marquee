@@ -11,6 +11,7 @@ import {
   deliveryNote,
   rightsSummary,
   SOURCE_LABELS,
+  ukStanding,
   workMeta,
 } from "../domain/revival";
 import { useScreening } from "../hooks/useRevival";
@@ -50,6 +51,13 @@ export function RevivalScreenPage({ isSignedIn }: { isSignedIn: boolean }) {
         <p>{workMeta(work) || "Public domain in the UK"}</p>
       </PageTitle>
 
+      {work.contentNotice && (
+        <aside className="content-notice" role="note">
+          <strong>Before you start</strong>
+          <p>{work.contentNotice}</p>
+        </aside>
+      )}
+
       <ErrorBoundary label="The projector" resetKey={work.id}>
         <ReelPlayer
           key={work.id}
@@ -80,14 +88,18 @@ export function RevivalScreenPage({ isSignedIn }: { isSignedIn: boolean }) {
 
       <dl className="revival-provenance">
         <div>
-          <dt>Free to show in the UK because</dt>
+          <dt>Rights note</dt>
           <dd>
             {rightsSummary(work)}
             {work.rightsNote ? ` · ${work.rightsNote}` : ""}
           </dd>
         </div>
         <div>
-          <dt>Played from</dt>
+          <dt>UK standing</dt>
+          <dd>{ukStanding(work)}</dd>
+        </div>
+        <div>
+          <dt>Hosted by</dt>
           <dd>{deliveryNote(work)}</dd>
         </div>
         <div>

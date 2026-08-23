@@ -14,6 +14,7 @@ import {
 import { EUROPEANA_COUNTRIES, searchEuropeana } from "../clients/europeana.ts";
 import { searchScreeningRoom } from "../clients/loc.ts";
 import { logError } from "../lib/logging.ts";
+import { billDay, buildBill } from "../lib/revival-bill.ts";
 import { isRecord } from "../lib/values.ts";
 import {
   readApprovedWorks,
@@ -32,7 +33,6 @@ import { findTitleForFilm } from "./cinema-matching.ts";
 
 const US_TERM_YEARS = 96;
 const MIN_RUNTIME_SECONDS = 60;
-const NOW_SHOWING = 12;
 const HOME_NATIONS = new Set(["United Kingdom", "Ireland"]);
 const ARCHIVE_LANES = 5;
 const ARCHIVE_BUDGET_MS = 45_000;
@@ -351,19 +351,6 @@ export function buildShelves(works: RevivalWork[]) {
     }
   };
 
-  const showable = works.filter((work) => work.kind === "feature" || work.kind === "short");
-
-  if (showable.length) {
-    shelves.push(
-      shelf(
-        "now-showing",
-        "On tonight",
-        "Running now, on our own screen. No sign-in, no service, no rental.",
-        showable.slice(0, NOW_SHOWING),
-      ),
-    );
-  }
-
   add(
     "british",
     "Made here",
@@ -443,6 +430,8 @@ export function buildShelves(works: RevivalWork[]) {
 export async function getProgramme(env: Bindings, viewerId: string | null) {
   const works = await readApprovedWorks(env.DB);
   const shelves = buildShelves(works);
+  const day = billDay();
+  const bill = buildBill(works, day);
 
   if (viewerId) {
     const progress = await readViewerProgress(env.DB, viewerId);
@@ -460,7 +449,7 @@ export async function getProgramme(env: Bindings, viewerId: string | null) {
     }
   }
 
-  return { shelves, total: works.length, fetchedAt: new Date().toISOString() };
+  return { bill, billDate: day, shelves, total: works.length, fetchedAt: new Date().toISOString() };
 }
 
 export async function getScreening(env: Bindings, id: string, viewerId: string | null) {

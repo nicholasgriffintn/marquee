@@ -1,5 +1,6 @@
 import type { RevivalKind, RevivalRightsBasis, RevivalTag } from "../../src/domain/revival.ts";
 import { splitSubjects, tagList } from "../lib/revival-tags.ts";
+import { properTitle, tidySynopsis, tidyText } from "../lib/revival-text.ts";
 import { firstString, stripMarkup, yearFrom } from "../lib/text.ts";
 import { isRecord } from "../lib/values.ts";
 import { upstreamFetch } from "./fetch.ts";
@@ -148,10 +149,10 @@ export async function searchEuropeana(apiKey: string, country: string, page: num
       {
         sourceId: recordId(id),
         sourceUrl: `${RECORD_ORIGIN}${id}`,
-        title: title.slice(0, 200),
+        title: properTitle(title).slice(0, 200),
         year: yearFrom(firstString(item.year)),
-        director: firstString(item.dcCreator).slice(0, 120) || null,
-        synopsis: stripMarkup(firstString(item.dcDescription)).slice(0, 1_200),
+        director: tidyText(firstString(item.dcCreator)).slice(0, 120) || null,
+        synopsis: tidySynopsis(stripMarkup(firstString(item.dcDescription))).slice(0, 1_200),
         kind: "ephemeral",
         runtimeSeconds: null,
         stillUrl: firstString(item.edmPreview) || null,

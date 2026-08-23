@@ -5,7 +5,12 @@ import { edgeCache } from "../lib/cache.ts";
 import { readJsonObject } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
 import { isKnownTitle } from "../lib/validation.ts";
-import { isRevivalId, readWorksForTitle, saveProgress } from "../repositories/revival.ts";
+import {
+  isRevivalId,
+  readWorksForTitle,
+  saveProgress,
+  searchApproved,
+} from "../repositories/revival.ts";
 import { getProgramme, getScreening } from "../services/revival.ts";
 import type { Bindings } from "../types.ts";
 
@@ -22,6 +27,24 @@ revivalRoutes.get("/", async (context) => {
     logError("revival_programme_failed", error, { area: "revival" });
 
     return context.json({ shelves: [], total: 0, fetchedAt: "" });
+  }
+});
+
+revivalRoutes.get("/search", async (context) => {
+  const query = (context.req.query("q") ?? "").trim().slice(0, 80);
+
+  if (query.length < 2) {
+    return context.json({ works: [], query });
+  }
+
+  try {
+    context.header("cache-control", "public, max-age=300");
+
+    return context.json({ works: await searchApproved(context.env.DB, query), query });
+  } catch (error) {
+    logError("revival_search_failed", error, { area: "revival" });
+
+    return context.json({ works: [], query });
   }
 });
 

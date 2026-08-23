@@ -1,5 +1,6 @@
 import type { RevivalKind, RevivalRightsBasis, RevivalTag } from "../../src/domain/revival.ts";
 import { personName, splitSubjects, tagList } from "../lib/revival-tags.ts";
+import { properTitle, tidySynopsis, tidyText } from "../lib/revival-text.ts";
 import { firstString, yearFrom } from "../lib/text.ts";
 import { isRecord } from "../lib/values.ts";
 import { upstreamFetch } from "./fetch.ts";
@@ -146,10 +147,10 @@ export async function searchScreeningRoom(page: number) {
       {
         sourceId,
         sourceUrl: `https://www.loc.gov/item/${sourceId}/`,
-        title: title.slice(0, 200),
+        title: properTitle(title).slice(0, 200),
         year: yearFrom(firstString(result.date) || firstString(item.date)),
-        director: directorFrom(item.contributors),
-        synopsis: firstString(result.description) || firstString(item.summary),
+        director: tidyText(directorFrom(item.contributors) ?? "") || null,
+        synopsis: tidySynopsis(firstString(result.description) || firstString(item.summary)),
         kind: runtimeSeconds !== null && runtimeSeconds <= SHORT_MAX_SECONDS ? "short" : "feature",
         runtimeSeconds,
         stillUrl: absoluteUrl(resource.poster ?? firstString(result.image_url)) || null,

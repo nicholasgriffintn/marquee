@@ -49,7 +49,14 @@ export type RevivalWork = {
   reelUrl: string;
   plays: number;
   condition: PrintCondition;
+  contentNotice: string | null;
   tags: RevivalTag[];
+};
+
+export type RevivalBillSlot = {
+  slot: string;
+  note: string;
+  work: RevivalWork;
 };
 
 export type RevivalShelf = {
@@ -60,6 +67,8 @@ export type RevivalShelf = {
 };
 
 export type RevivalProgramme = {
+  bill: RevivalBillSlot[];
+  billDate: string;
   shelves: RevivalShelf[];
   total: number;
   fetchedAt: string;
@@ -136,12 +145,12 @@ export function reelPath(workId: string) {
 
 export function deliveryNote(work: RevivalWork) {
   if (work.delivery === "source") {
-    return `Played from ${SOURCE_LABELS[work.source]}, who hold it`;
+    return `Hosted by ${SOURCE_LABELS[work.source]}`;
   }
 
   return work.mirrored
-    ? `Marquee, copied from ${SOURCE_LABELS[work.source]}`
-    : `${SOURCE_LABELS[work.source]}, streamed through us`;
+    ? `Hosted here, copied from ${SOURCE_LABELS[work.source]}`
+    : `Hosted by ${SOURCE_LABELS[work.source]}, relayed through us`;
 }
 
 export function revivalPath(work: Pick<RevivalWork, "id">) {
@@ -194,19 +203,35 @@ export function workMeta(work: RevivalWork) {
 }
 
 export function rightsSummary(work: RevivalWork) {
-  const label = RIGHTS_LABELS[work.rightsBasis];
-
-  if (!work.ukExpiresYear) {
-    return label;
+  if (work.rightsBasis === "uk-expired" && work.ukExpiresYear) {
+    return `UK copyright expired in ${work.ukExpiresYear}`;
   }
 
-  if (!work.ukClear) {
-    return `${label} · not free in the UK before ${work.ukExpiresYear}`;
+  if (work.rightsBasis === "eu-institution" || work.rightsBasis === "cc0") {
+    return `Released as public domain by ${SOURCE_LABELS[work.source]}`;
   }
 
-  return work.rightsBasis === "uk-expired"
-    ? `Free in the UK since ${work.ukExpiresYear}`
-    : `${label} · free in the UK since ${work.ukExpiresYear}`;
+  if (work.rightsBasis === "us-gov" || work.rightsBasis === "curated") {
+    return `${SOURCE_LABELS[work.source]} offers this as free to use`;
+  }
+
+  if (work.rightsBasis === "unclear") {
+    return "No public domain claim on the source record";
+  }
+
+  return "Source record marks this copy as public domain";
+}
+
+export function ukStanding(work: RevivalWork) {
+  if (work.ukClear && work.ukExpiresYear) {
+    return `Out of UK copyright since ${work.ukExpiresYear}`;
+  }
+
+  if (work.ukExpiresYear) {
+    return `UK term runs to ${work.ukExpiresYear} on the dates we could find`;
+  }
+
+  return "UK term not established";
 }
 
 export function clockLabel(seconds: number) {

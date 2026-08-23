@@ -10,6 +10,7 @@ import {
   type RevivalTagKind,
   type RevivalWork,
 } from "../../src/domain/revival.ts";
+import { contentNoticeFor } from "../lib/revival-notice.ts";
 
 export type RevivalCandidate = {
   sourceId: string;
@@ -57,6 +58,7 @@ type WorkRow = {
   streamBytes: number | null;
   width: number | null;
   height: number | null;
+  contentNotice: string | null;
   posterKey: string | null;
   catalogueBackdrop: string | null;
   cataloguePoster: string | null;
@@ -68,7 +70,7 @@ const WORK_COLUMNS = `w.id, w.source, w.source_url AS sourceUrl, w.title, w.year
    w.rights_basis AS rightsBasis, w.rights_note AS rightsNote, w.rights_url AS rightsUrl,
    w.title_id AS titleId, w.country, w.uk_clear AS ukClear,
    w.uk_expires_year AS ukExpiresYear, w.stream_url AS streamUrl,
-   w.mirror_state AS mirrorState, w.plays,
+   w.mirror_state AS mirrorState, w.plays, w.content_notice AS contentNotice,
    w.stream_bytes AS streamBytes, w.width, w.height,
    t.poster_key AS posterKey,
    json_extract(t.payload, '$.backdropUrl') AS catalogueBackdrop,
@@ -137,6 +139,7 @@ function toWork(row: WorkRow): RevivalWork {
     reelUrl: row.ukClear === 1 ? reelPath(row.id) : row.streamUrl,
     plays: row.plays,
     condition: printCondition(row.streamBytes, row.runtimeSeconds, row.height),
+    contentNotice: row.contentNotice ?? contentNoticeFor(row.title, row.synopsis),
     tags: [],
   };
 }
@@ -326,6 +329,31 @@ export async function readApprovedWorks(db: D1Database, limit = 400) {
        LIMIT ?`,
     )
     .bind(Math.min(limit, 800))
+    .all<WorkRow>();
+
+  return attachTags(db, rows.results.map(toWork));
+}
+
+export async function searchApproved(db: D1Database, query: string, limit = 60) {
+  const like = `%${query.replaceAll(/[%_]/gu, "")}%`;
+  const rows = await db
+    .prepare(
+      `SELECT ${WORK_COLUMNS}
+       ${WORK_FROM}
+       WHERE w.status = 'approved'
+         AND (
+           w.title LIKE ?1
+           OR w.sort_title LIKE ?1
+           OR w.director LIKE ?1
+           OR EXISTS (
+             SELECT 1 FROM revival_tags AS g
+             WHERE g.work_id = w.id AND g.label LIKE ?1
+           )
+         )
+       ORDER BY w.sort_title
+       LIMIT ?2`,
+    )
+    .bind(like, Math.min(limit, 120))
     .all<WorkRow>();
 
   return attachTags(db, rows.results.map(toWork));

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { RevivalProgramme, RevivalScreening, RevivalWork } from "../domain/revival";
 import { jsonRequest, requestJson } from "../lib/api";
 
-const EMPTY: RevivalProgramme = { shelves: [], total: 0, fetchedAt: "" };
+const EMPTY: RevivalProgramme = { bill: [], billDate: "", shelves: [], total: 0, fetchedAt: "" };
 
 type ProgrammeState = { programme: RevivalProgramme; isLoading: boolean; error: string };
 
@@ -95,6 +95,48 @@ export function useTitleReels(titleId: string, mediaType: string, tmdbId: number
   }, [mediaType, titleId, tmdbId]);
 
   return works;
+}
+
+const SEARCH_DEBOUNCE_MS = 250;
+
+export function useVaultSearch(query: string) {
+  const [state, setState] = useState<{ query: string; works: RevivalWork[] }>({
+    query: "",
+    works: [],
+  });
+  const trimmed = query.trim();
+  const isActive = trimmed.length >= 2;
+
+  useEffect(() => {
+    if (!isActive) {
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      requestJson<{ works: RevivalWork[] }>(
+        `/api/revival/search?q=${encodeURIComponent(trimmed)}`,
+        {
+          signal: controller.signal,
+        },
+      )
+        .then((response) => setState({ query: trimmed, works: response.works }))
+        .catch(() => undefined);
+    }, SEARCH_DEBOUNCE_MS);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [isActive, trimmed]);
+
+  const settled = state.query === trimmed;
+
+  return {
+    works: settled ? state.works : [],
+    isSearching: isActive && !settled,
+    isActive,
+  };
 }
 
 const PROGRESS_INTERVAL_SECONDS = 20;

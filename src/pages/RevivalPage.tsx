@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { ErrorBoundary } from "../components/ErrorBoundary";
@@ -5,8 +6,8 @@ import { PageTitle } from "../components/PageTitle";
 import { ProjectionNote } from "../components/revival/ProjectionNote";
 import { ReelCard } from "../components/revival/ReelCard";
 import { UsherMark } from "../components/usher/UsherMark";
-import type { RevivalShelf } from "../domain/revival";
-import { useProgramme } from "../hooks/useRevival";
+import { revivalPath, workMeta, type RevivalBillSlot, type RevivalShelf } from "../domain/revival";
+import { useProgramme, useVaultSearch } from "../hooks/useRevival";
 
 function Shelf({ shelf }: { shelf: RevivalShelf }) {
   if (shelf.works.length === 0) {
@@ -30,8 +31,39 @@ function Shelf({ shelf }: { shelf: RevivalShelf }) {
   );
 }
 
+function Bill({ bill }: { bill: RevivalBillSlot[] }) {
+  if (bill.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="revival-bill" aria-labelledby="revival-bill-title">
+      <div className="rail-heading">
+        <div>
+          <span>Programmed for today, and different tomorrow.</span>
+          <h2 id="revival-bill-title">Tonight&rsquo;s bill</h2>
+        </div>
+      </div>
+      <ol className="revival-bill-list">
+        {bill.map((entry, index) => (
+          <li key={entry.work.id}>
+            <Link to={revivalPath(entry.work)}>
+              <span className="revival-bill-slot">{entry.slot}</span>
+              <strong>{entry.work.title}</strong>
+              <small>{workMeta(entry.work) || entry.note}</small>
+            </Link>
+            {index === 0 && <span className="revival-bill-rule" aria-hidden="true" />}
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
 export function RevivalPage({ isReady }: { isReady: boolean }) {
   const { programme, isLoading, error } = useProgramme(isReady);
+  const [query, setQuery] = useState("");
+  const search = useVaultSearch(query);
 
   return (
     <section className="page-section revival-shelves">
@@ -48,6 +80,52 @@ export function RevivalPage({ isReady }: { isReady: boolean }) {
         <p className="auth-message" role="alert">
           {error}
         </p>
+      )}
+
+      <div className="revival-search">
+        <input
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Search the vault"
+          aria-label="Search the vault"
+        />
+        {search.isActive && (
+          <span>
+            {search.isSearching
+              ? "Looking…"
+              : `${search.works.length} of ${programme.total} in the vault`}
+          </span>
+        )}
+      </div>
+
+      {search.isActive && (
+        <section className="content-rail" aria-busy={search.isSearching}>
+          <div className="rail-heading">
+            <div>
+              <span>
+                {search.isSearching ? "Going through the shelves." : "What the vault turned up."}
+              </span>
+              <h2>Search results</h2>
+            </div>
+          </div>
+          {search.isSearching ? (
+            <div className="rail-track">
+              <span className="skeleton skeleton-reel" />
+              <span className="skeleton skeleton-reel" />
+              <span className="skeleton skeleton-reel" />
+              <span className="skeleton skeleton-reel" />
+            </div>
+          ) : search.works.length ? (
+            <div className="rail-track">
+              {search.works.map((work) => (
+                <ReelCard key={`search-${work.id}`} work={work} />
+              ))}
+            </div>
+          ) : (
+            <p className="rail-empty">Nothing under that name.</p>
+          )}
+        </section>
       )}
 
       {isLoading && !programme.shelves.length && (
@@ -74,11 +152,14 @@ export function RevivalPage({ isReady }: { isReady: boolean }) {
         </div>
       )}
 
-      {programme.shelves.map((shelf) => (
-        <ErrorBoundary key={shelf.id} label="This shelf">
-          <Shelf shelf={shelf} />
-        </ErrorBoundary>
-      ))}
+      {!search.isActive && <Bill bill={programme.bill} />}
+
+      {!search.isActive &&
+        programme.shelves.map((shelf) => (
+          <ErrorBoundary key={shelf.id} label="This shelf">
+            <Shelf shelf={shelf} />
+          </ErrorBoundary>
+        ))}
 
       {programme.shelves.length > 0 && <ProjectionNote seed={programme.total} />}
 

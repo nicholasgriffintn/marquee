@@ -1,5 +1,12 @@
 import type { RevivalKind, RevivalRightsBasis, RevivalTag } from "../../src/domain/revival.ts";
+import { isUnsuitable } from "../lib/revival-safety.ts";
 import { personName, splitSubjects, tagList } from "../lib/revival-tags.ts";
+import {
+  archiveCollectionLabel,
+  properTitle,
+  tidySynopsis,
+  tidyText,
+} from "../lib/revival-text.ts";
 import { firstString, stripMarkup } from "../lib/text.ts";
 import { isRecord } from "../lib/values.ts";
 import { upstreamFetch } from "./fetch.ts";
@@ -189,9 +196,22 @@ export async function readArchiveItem(identifier: string): Promise<ArchiveCandid
     return null;
   }
 
-  const collections = Array.isArray(metadata.collection)
+  const collectionList = Array.isArray(metadata.collection)
     ? metadata.collection.filter((entry): entry is string => typeof entry === "string")
     : [firstString(metadata.collection)].filter(Boolean);
+
+  if (
+    isUnsuitable({
+      title,
+      subjects: splitSubjects(metadata.subject),
+      synopsis: stripMarkup(firstString(metadata.description)),
+      collections: collectionList,
+    })
+  ) {
+    return null;
+  }
+
+  const collections = collectionList;
   const licenseUrl = firstString(metadata.licenseurl);
   const basis = licenseBasis(licenseUrl);
   const year = numberOrNull(metadata.year) ?? yearFromDate(firstString(metadata.date));
@@ -200,10 +220,10 @@ export async function readArchiveItem(identifier: string): Promise<ArchiveCandid
   return {
     sourceId: identifier,
     sourceUrl: `https://archive.org/details/${identifier}`,
-    title: title.slice(0, 200),
+    title: properTitle(title).slice(0, 200),
     year,
-    director: firstString(metadata.director || metadata.creator).slice(0, 120) || null,
-    synopsis: stripMarkup(firstString(metadata.description)).slice(0, 1_200),
+    director: tidyText(firstString(metadata.director || metadata.creator)).slice(0, 120) || null,
+    synopsis: tidySynopsis(stripMarkup(firstString(metadata.description))).slice(0, 1_200),
     kind: kindFor(collections, runtimeSeconds),
     runtimeSeconds,
     stillUrl: `https://archive.org/services/img/${encodeURIComponent(identifier)}`,
@@ -224,7 +244,8 @@ export async function readArchiveItem(identifier: string): Promise<ArchiveCandid
         [firstString(metadata.director), firstString(metadata.creator)].map(personName),
       ),
       ...tagList("language", splitSubjects(metadata.language)),
-      ...tagList("holder", collections),
+      ...tagList("genre", collections.map(archiveCollectionLabel)),
+      ...tagList("holder", ["Internet Archive"]),
     ],
   };
 }

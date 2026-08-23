@@ -31,7 +31,7 @@
 			"binding": "DB",
 			"database_name": "marquee",
 			"database_id": "4bdf8e03-0ac3-496c-8e69-c8dedd116976",
-			"migrations_dir": "../../migrations",
+			"migrations_dir": "./migrations",
 			"remote": false
 		}
 	],
