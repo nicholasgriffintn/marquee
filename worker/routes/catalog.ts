@@ -1,11 +1,14 @@
 import { Hono } from "hono";
 
-import { sessionPrincipal } from "../auth/session.ts";
+import { requireAuthentication, sessionPrincipal, type AuthVariables } from "../auth/session.ts";
 import { edgeCache } from "../lib/cache.ts";
 import { recordEvent } from "../lib/events.ts";
+import { edgeOrigin } from "../lib/geo.ts";
 import { logError } from "../lib/logging.ts";
 import { canonicalOrigin } from "../lib/security.ts";
 import { validProviderIds } from "../lib/validation.ts";
+import { readCollectionTitleIds, readItems } from "../repositories/catalog-reader.ts";
+import { readPerson, readPersonShelf, readPersonTitleIds } from "../repositories/people.ts";
 import {
   browseCatalogue,
   getCatalogue,
@@ -18,13 +21,16 @@ import {
   getProviderCatalogue,
   getTitleAvailability,
 } from "../services/catalog.ts";
+import { getPersonalRails } from "../services/personal-rails.ts";
+import { getSeason, getSeasonIndex } from "../services/seasons.ts";
 import type { Bindings } from "../types.ts";
 
 const TONIGHT_DEFAULT_LIMIT = 12;
 const KEYWORDS_DEFAULT_LIMIT = 120;
 const GENRES_DEFAULT_LIMIT = 40;
+const SEASON_LIMIT = 100;
 
-export const catalogRoutes = new Hono<{ Bindings: Bindings }>();
+export const catalogRoutes = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
 
 catalogRoutes.get("/", edgeCache(900), async (context) => {
   const query = (context.req.query("query") ?? "").trim().slice(0, 120);
@@ -44,6 +50,22 @@ catalogRoutes.get("/", edgeCache(900), async (context) => {
     logError("catalogue_read_failed", error, { area: "catalogue" });
 
     return context.json({ error: "Catalogue is unavailable" }, 500);
+  }
+});
+
+catalogRoutes.get("/rails", requireAuthentication, async (context) => {
+  const user = context.get("authenticatedUser");
+
+  try {
+    const sections = await getPersonalRails(context.env, user.id, edgeOrigin(context.req.raw));
+
+    context.header("cache-control", "private, max-age=120");
+
+    return context.json({ sections });
+  } catch (error) {
+    logError("personal_rails_failed", error, { area: "catalogue" });
+
+    return context.json({ sections: [] });
   }
 });
 
@@ -199,6 +221,57 @@ catalogRoutes.get("/items", edgeCache(900), async (context) => {
   }
 });
 
+const PERSON_LIMIT = 48;
+const COLLECTION_LIMIT = 24;
+
+catalogRoutes.get("/people/:name", async (context) => {
+  const name = decodeURIComponent(context.req.param("name")).slice(0, 120);
+
+  try {
+    const person = await readPerson(context.env.DB, name);
+
+    if (!person) {
+      return context.json({ error: "No one here by that name" }, 404);
+    }
+
+    const principal = await sessionPrincipal(context.env, context.req.raw);
+    const [items, shelf] = await Promise.all([
+      readPersonTitleIds(context.env.DB, person.name, PERSON_LIMIT).then((ids) =>
+        readItems(context.env.DB, ids, PERSON_LIMIT),
+      ),
+      principal?.user
+        ? readPersonShelf(context.env.DB, principal.user.id, person.name)
+        : Promise.resolve({ shelved: 0, watched: 0 }),
+    ]);
+
+    return context.json({ person, items, shelf });
+  } catch (error) {
+    logError("catalogue_read_failed", error, { area: "person" });
+
+    return context.json({ error: "That name is out of reach" }, 500);
+  }
+});
+
+catalogRoutes.get("/collections/:id", edgeCache(3_600), async (context) => {
+  const collectionId = Number(context.req.param("id"));
+
+  if (!Number.isInteger(collectionId) || collectionId < 1) {
+    return context.json({ error: "Unknown collection" }, 400);
+  }
+
+  try {
+    const ids = await readCollectionTitleIds(context.env.DB, collectionId, COLLECTION_LIMIT);
+
+    context.header("cache-control", "public, max-age=3600");
+
+    return context.json({ items: await readItems(context.env.DB, ids, COLLECTION_LIMIT) });
+  } catch (error) {
+    logError("catalogue_read_failed", error, { area: "collection" });
+
+    return context.json({ error: "That collection is out of reach" }, 500);
+  }
+});
+
 catalogRoutes.get("/providers", edgeCache(300), async (context) => {
   try {
     const providers = await getProviderCatalogue(context.env.DB);
@@ -214,6 +287,55 @@ catalogRoutes.get("/providers", edgeCache(300), async (context) => {
     logError("catalogue_read_failed", error, { area: "providers" });
 
     return context.json({ error: "Provider catalogue is unavailable" }, 500);
+  }
+});
+
+catalogRoutes.get("/tv/:tmdbId/seasons", edgeCache(3_600), async (context) => {
+  const tmdbId = Number(context.req.param("tmdbId"));
+
+  if (!Number.isInteger(tmdbId) || tmdbId < 1) {
+    return context.json({ error: "Unknown series" }, 404);
+  }
+
+  try {
+    const index = await getSeasonIndex(context.env, `tv:${tmdbId}`);
+
+    context.header("cache-control", "public, max-age=3600");
+
+    return context.json({ ...index, fetchedAt: new Date().toISOString() });
+  } catch (error) {
+    logError("season_index_read_failed", error, { area: "seasons" });
+
+    return context.json({ error: "The series listing is unavailable" }, 500);
+  }
+});
+
+catalogRoutes.get("/tv/:tmdbId/seasons/:seasonNumber", edgeCache(3_600), async (context) => {
+  const tmdbId = Number(context.req.param("tmdbId"));
+  const seasonNumber = Number(context.req.param("seasonNumber"));
+
+  if (!Number.isInteger(tmdbId) || tmdbId < 1 || !Number.isInteger(seasonNumber)) {
+    return context.json({ error: "Unknown season" }, 404);
+  }
+
+  if (seasonNumber < 0 || seasonNumber > SEASON_LIMIT) {
+    return context.json({ error: "Unknown season" }, 404);
+  }
+
+  try {
+    const season = await getSeason(context.env, `tv:${tmdbId}`, seasonNumber);
+
+    if (!season) {
+      return context.json({ error: "Unknown season" }, 404);
+    }
+
+    context.header("cache-control", "public, max-age=3600");
+
+    return context.json(season);
+  } catch (error) {
+    logError("season_read_failed", error, { area: "seasons" });
+
+    return context.json({ error: "That season is unavailable" }, 500);
   }
 });
 

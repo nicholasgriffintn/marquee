@@ -1,5 +1,10 @@
 import type { CatalogResponse, CatalogSection, MediaTitle } from "../../src/domain/catalog.ts";
-import { parseStoredTitle, parseStoredTitleIds } from "../lib/catalog-payload.ts";
+import {
+  parseSectionAudience,
+  parseStoredTitle,
+  parseStoredTitleIds,
+} from "../lib/catalog-payload.ts";
+import { logError } from "../lib/logging.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { searchTitlesFirst } from "./catalog-search.ts";
 
@@ -15,16 +20,78 @@ type SectionRow = {
   description: string;
   titleIds: string;
   sourceUpdatedAt: string;
+  audience: string | null;
 };
+
+function reaches(audience: string | null, mine: ReadonlySet<string>) {
+  const gate = parseSectionAudience(audience);
+
+  if (!gate.providerIds?.length) {
+    return true;
+  }
+
+  return gate.providerIds.some((id) => mine.has(id));
+}
 
 function includesProvider(title: MediaTitle, providerIds: string[]) {
   return (
     providerIds.length === 0 ||
+    title.providers.length === 0 ||
     title.providers.some((provider) => providerIds.includes(provider.id))
   );
 }
 
 const READ_CHUNK = 80;
+const MIN_VISIBLE_ITEMS = 3;
+const SECTION_ITEMS = 14;
+const MAX_VISIBLE_SECTIONS = 18;
+const BOUND_PARAM_BUDGET = 90;
+const PROVIDER_CHUNK = 30;
+
+async function matchingTitleIds(db: D1Database, ids: string[], providerIds: string[]) {
+  const uniqueIds = [...new Set(ids.filter(isKnownTitle))];
+
+  if (providerIds.length === 0 || uniqueIds.length === 0) {
+    return new Set(uniqueIds);
+  }
+
+  const keep = new Set<string>();
+
+  for (
+    let offset = 0;
+    offset < providerIds.length && keep.size < uniqueIds.length;
+    offset += PROVIDER_CHUNK
+  ) {
+    const providers = providerIds.slice(offset, offset + PROVIDER_CHUNK);
+    const pending = uniqueIds.filter((id) => !keep.has(id));
+    const idChunk = Math.max(1, BOUND_PARAM_BUDGET - providers.length);
+
+    for (let index = 0; index < pending.length; index += idChunk) {
+      const wave = pending.slice(index, index + idChunk);
+      // oxlint-disable-next-line no-await-in-loop
+      const rows = await db
+        .prepare(
+          `SELECT id FROM catalog_titles
+            WHERE id IN (${wave.map(() => "?").join(",")})
+              AND (
+                json_array_length(provider_ids) = 0
+                OR EXISTS (
+                  SELECT 1 FROM json_each(provider_ids)
+                   WHERE json_each.value IN (${providers.map(() => "?").join(",")})
+                )
+              )`,
+        )
+        .bind(...wave, ...providers)
+        .all<{ id: string }>();
+
+      for (const row of rows.results) {
+        keep.add(row.id);
+      }
+    }
+  }
+
+  return keep;
+}
 
 export async function readRawItems(db: D1Database, ids: string[]) {
   const uniqueIds = [...new Set(ids.filter(isKnownTitle))];
@@ -99,7 +166,8 @@ export async function readCatalog(db: D1Database, query: string, providerIds: st
          title,
          description,
          title_ids AS titleIds,
-         source_updated_at AS sourceUpdatedAt
+         source_updated_at AS sourceUpdatedAt,
+         audience
        FROM catalog_sections
        ORDER BY rowid`,
     )
@@ -109,21 +177,44 @@ export async function readCatalog(db: D1Database, query: string, providerIds: st
     return null;
   }
 
-  const titleIds = rows.results.flatMap((section) => parseStoredTitleIds(section.titleIds));
-  const titles = await readItems(db, titleIds, titleIds.length);
+  const mine = new Set(providerIds);
+  const eligible = rows.results.filter((section) => reaches(section.audience, mine));
+  const watchable = await matchingTitleIds(
+    db,
+    eligible.flatMap((section) => parseStoredTitleIds(section.titleIds)),
+    providerIds,
+  );
+
+  const shortlist = eligible
+    .map((section) => ({
+      row: section,
+      ids: parseStoredTitleIds(section.titleIds)
+        .filter((id) => watchable.has(id))
+        .slice(0, SECTION_ITEMS),
+    }))
+    .filter((section) => section.ids.length >= MIN_VISIBLE_ITEMS)
+    .slice(0, MAX_VISIBLE_SECTIONS);
+
+  const wanted = shortlist.flatMap((section) => section.ids);
+  const titles = await readItems(db, wanted, wanted.length);
   const titlesById = new Map(titles.map((title) => [title.id, title]));
-  const sections: CatalogSection[] = rows.results.map((section) => ({
-    id: section.id,
-    title: section.title,
-    description: section.description,
-    items: parseStoredTitleIds(section.titleIds)
-      .flatMap((id) => {
+  const sections: CatalogSection[] = shortlist
+    .map(({ row, ids }) => {
+      const items = ids.flatMap((id) => {
         const title = titlesById.get(id);
 
         return title ? [title] : [];
-      })
-      .filter((title) => includesProvider(title, providerIds)),
-  }));
+      });
+
+      if (items.length === 0) {
+        logError("section_titles_unreadable", new Error(`${row.id} lost every stored title`), {
+          area: "catalogue",
+        });
+      }
+
+      return { id: row.id, title: row.title, description: row.description, items };
+    })
+    .filter((section) => section.items.length >= MIN_VISIBLE_ITEMS);
   const fetchedAt = rows.results.reduce(
     (latest, section) => (section.sourceUpdatedAt > latest ? section.sourceUpdatedAt : latest),
     "",
@@ -161,4 +252,19 @@ async function readSearchResults(db: D1Database, query: string, providerIds: str
     availabilitySource: "JustWatch via TMDB",
     fetchedAt: new Date().toISOString(),
   } satisfies CatalogResponse;
+}
+
+export async function readCollectionTitleIds(db: D1Database, collectionId: number, limit = 24) {
+  const rows = await db
+    .prepare(
+      `SELECT id
+       FROM catalog_titles
+       WHERE json_extract(payload, '$.collection.id') = ?1
+       ORDER BY COALESCE(json_extract(payload, '$.releaseDate'), '9999-12-31'), popularity DESC
+       LIMIT ?2`,
+    )
+    .bind(collectionId, Math.max(1, Math.min(48, limit)))
+    .all<{ id: string }>();
+
+  return rows.results.map((row) => row.id);
 }

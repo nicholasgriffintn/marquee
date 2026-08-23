@@ -16,7 +16,7 @@ export function jobSubject(job: IngestionJob) {
     return job.imdbId;
   }
 
-  if (job.type === "import-trakt-history") {
+  if (job.type === "import-trakt-history" || job.type === "push-trakt-shelf") {
     return job.viewerId;
   }
 

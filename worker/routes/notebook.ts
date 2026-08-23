@@ -13,7 +13,19 @@ import {
   setAlertSetting,
   stageAlertEmail,
 } from "../repositories/alerts.ts";
-import { editBelief, readBeliefs } from "../repositories/beliefs.ts";
+import {
+  editBelief,
+  readBeliefs,
+  readFollowedPeople,
+  setPersonFollow,
+} from "../repositories/beliefs.ts";
+import type { FeedKey } from "../repositories/feeds.ts";
+import {
+  mintFeedToken,
+  readFeedKey,
+  revokeFeedToken,
+  storeFeedToken,
+} from "../repositories/feeds.ts";
 import {
   GUEST_LIMIT,
   guestCount,
@@ -123,15 +135,98 @@ notebookRoutes.post("/alerts/settings", async (context) => {
   });
 });
 
+function feedPayload(origin: string, token: string | null, key: FeedKey | null) {
+  return {
+    subscribed: Boolean(key),
+    createdAt: key?.createdAt ?? null,
+    lastUsedAt: key?.lastUsedAt ?? null,
+    calendarUrl: token ? `${origin}/feeds/${token}/diary.ics` : null,
+    alertsUrl: token ? `${origin}/feeds/${token}/alerts.atom` : null,
+  };
+}
+
+notebookRoutes.get("/feeds", async (context) => {
+  const user = context.get("authenticatedUser");
+  const origin = canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN);
+
+  return jsonResponse(feedPayload(origin, null, await readFeedKey(context.env.DB, user.id)));
+});
+
+notebookRoutes.post("/feeds", async (context) => {
+  const user = context.get("authenticatedUser");
+  const origin = canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN);
+  const token = mintFeedToken();
+
+  try {
+    await storeFeedToken(context.env.DB, user.id, token);
+
+    return jsonResponse(feedPayload(origin, token, await readFeedKey(context.env.DB, user.id)));
+  } catch (error) {
+    logError("feed_token_mint_failed", error);
+
+    return jsonResponse({ error: "I could not cut you a key just now." }, 500);
+  }
+});
+
+notebookRoutes.delete("/feeds", async (context) => {
+  const user = context.get("authenticatedUser");
+
+  try {
+    await revokeFeedToken(context.env.DB, user.id);
+
+    return jsonResponse(
+      feedPayload(canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN), null, null),
+    );
+  } catch (error) {
+    logError("feed_token_revoke_failed", error);
+
+    return jsonResponse({ error: "That key would not come off the ring." }, 500);
+  }
+});
+
+notebookRoutes.get("/people", async (context) => {
+  const user = context.get("authenticatedUser");
+
+  return jsonResponse({ following: await readFollowedPeople(context.env.DB, user.id) });
+});
+
+notebookRoutes.post("/people", async (context) => {
+  const user = context.get("authenticatedUser");
+  const body = await readJsonObject(context.req.raw);
+  const name = typeof body?.name === "string" ? body.name.trim().slice(0, 120) : "";
+
+  if (name.length < 2) {
+    return jsonResponse({ error: "Give me a name to watch for." }, 400);
+  }
+
+  try {
+    await setPersonFollow(context.env.DB, user.id, name, body?.follow !== false);
+
+    return jsonResponse({ following: await readFollowedPeople(context.env.DB, user.id) });
+  } catch (error) {
+    logError("person_follow_failed", error);
+
+    return jsonResponse({ error: "I could not write that down." }, 500);
+  }
+});
+
 notebookRoutes.get("/map", async (context) => {
   const user = context.get("authenticatedUser");
 
   try {
-    return jsonResponse({ points: await buildTasteMap(context.env, user.id) });
+    const schedule = (task: Promise<unknown>) => {
+      try {
+        context.executionCtx.waitUntil(task);
+      } catch {
+        void task;
+      }
+    };
+
+    return jsonResponse(await buildTasteMap(context.env, user.id, { schedule }));
   } catch (error) {
     logError("taste_map_route_failed", error);
 
-    return jsonResponse({ points: [] });
+    return jsonResponse({ error: "I cannot lay the map out just now. Try again shortly." }, 503);
   }
 });
 

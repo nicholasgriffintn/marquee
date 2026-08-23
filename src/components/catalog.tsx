@@ -12,7 +12,9 @@ import { Link } from "react-router-dom";
 import type { CatalogSection, MediaTitle } from "../domain/catalog";
 import { blendedRating, ratingSources } from "../domain/ratings";
 import { useAvailability } from "../hooks/useAvailability";
+import { useCollection } from "../hooks/usePerson";
 import { useRecommendations } from "../hooks/useRecommendations";
+import { useEpisodeEntries } from "../hooks/useSeasons";
 import { useShowings } from "../hooks/useShowings";
 import { useTitleInsight } from "../hooks/useTitleInsight";
 import { startJourney } from "../lib/journey";
@@ -21,6 +23,8 @@ import {
   artworkSrcSet,
   changeLabel,
   compactCount,
+  detailMeta,
+  languageLabel,
   mediaMeta,
   moneyLabel,
   scoreLabel,
@@ -32,15 +36,26 @@ import { ArtPlaceholder } from "./ArtPlaceholder";
 import { ShowingsBlock } from "./cinema/ShowingsBlock";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { RevivalBlock } from "./revival/RevivalBlock";
+import { SeasonsBlock } from "./seasons";
 import { ShelfForm } from "./ShelfForm";
 import { TrailerBlock } from "./TrailerBlock";
 import { ArrowIcon, ChevronIcon, PlusIcon, Poster, ProviderBadge } from "./ui";
 import { ExitDoor, shouldWarnOnExit, type Exit } from "./usher/ExitDoor";
 import { UsherMark } from "./usher/UsherMark";
+import { WatchBlock } from "./WatchBlock";
 
 const RAIL_PROVIDER_LIMIT = 3;
 const SIMILAR_LIMIT = 12;
 const RAIL_RATING_LIMIT = 3;
+const DETAIL_TABS = ["overview", "episodes"] as const;
+
+type DetailTab = (typeof DETAIL_TABS)[number];
+
+type DetailView = {
+  titleId: string;
+  tab: DetailTab;
+  jump: { season: number; nonce: number } | null;
+};
 
 function measuredOn(value: string) {
   const date = new Date(value.includes("T") ? value : `${value.replace(" ", "T")}Z`);
@@ -300,6 +315,11 @@ export function ContentRail({
               <b>The Usher</b>
               {section.description && <em>· {section.description}</em>}
             </span>
+          ) : section.reason ? (
+            <span className="rail-eyebrow rail-because">
+              <b>{section.reason}</b>
+              {section.description && <em>· {section.description}</em>}
+            </span>
           ) : (
             <span>{section.description}</span>
           )}
@@ -366,16 +386,20 @@ export function DetailPanel({
   onSave,
   onSaveEntry,
   entry,
+  selectedProviderIds,
   usherSlot,
   onRemove,
   onStatus,
+  onTracked,
   onUpdateDraft,
 }: {
   item: MediaTitle;
   entry?: ViewingEntry;
+  selectedProviderIds: string[];
   usherSlot?: ReactNode;
   onRemove: (titleId: string) => void;
   onStatus: (titleId: string, status: EntryStatus) => void;
+  onTracked?: () => void;
   onUpdateDraft: (titleId: string, patch: Partial<ViewingEntry>) => void;
   availabilityEnabled: boolean;
   canSave: boolean;
@@ -384,12 +408,40 @@ export function DetailPanel({
   onSave: (item: MediaTitle) => void;
   onSaveEntry: (entry: ViewingEntry) => void;
 }) {
+  const isSeries = item.mediaType === "tv";
+  const [view, setView] = useState<DetailView>({ titleId: item.id, tab: "overview", jump: null });
+  const live = view.titleId === item.id ? view : null;
+  const tab = live?.tab ?? "overview";
+  const jump = live?.jump ?? null;
+  const setTab = (next: DetailTab) => setView({ titleId: item.id, tab: next, jump });
   const closeRef = useRef<HTMLButtonElement>(null);
   const consensus = blendedRating(item);
+  const tracker = useEpisodeEntries(item.id, canSave);
+  const progress = tracker.progress;
+  const continueAt = isSeries && progress && progress.watched > 0 ? progress.upNext : null;
+
+  const resumeWatching = () => {
+    if (!continueAt) {
+      return;
+    }
+
+    setView({
+      titleId: item.id,
+      tab: "episodes",
+      jump: { season: continueAt.season, nonce: (jump?.nonce ?? 0) + 1 },
+    });
+  };
+
   const { providers, nextEpisode } = useAvailability(item, availabilityEnabled);
   const { insight, pairs, isLoading: isInsightLoading } = useTitleInsight(item.id);
   const similar = useRecommendations(item.id, item.recommendationIds, SIMILAR_LIMIT);
   const showings = useShowings(item, canSave);
+  const collection = useCollection(item.collection?.id);
+  const spokenIn = languageLabel(item.originalLanguage);
+  const upcomingAir =
+    item.nextAirDate && item.nextAirDate >= new Date().toISOString().slice(0, 10)
+      ? item.nextAirDate
+      : null;
   const [exit, setExit] = useState<Exit | null>(null);
   const panelRef = useRef<HTMLDialogElement>(null);
 
@@ -436,12 +488,6 @@ export function DetailPanel({
     setExit(next);
   };
 
-  const watchDestinations = providers.flatMap((provider) => {
-    const href = provider.webUrl ?? item.watchLink;
-
-    return href ? [{ provider, href }] : [];
-  });
-
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
     const onKeyDown = (event: KeyboardEvent) => event.key === "Escape" && onClose();
@@ -482,340 +528,431 @@ export function DetailPanel({
         <div className="detail-copy">
           <h2 id="detail-title">{item.title}</h2>
           <p className="detail-meta">
-            {item.mediaType === "movie" ? "Film" : "Television"} · {mediaMeta(item)}
+            {item.mediaType === "movie" ? "Film" : "Television"} · {detailMeta(item)}
           </p>
           {item.originalTitle && item.originalTitle !== item.title && (
             <p className="detail-original">Original title · {item.originalTitle}</p>
           )}
-          {item.tagline && <p className="detail-tagline">{item.tagline}</p>}
-          {(insight || isInsightLoading) && (
-            <div className="detail-insight">
-              <span>
-                <i>AI</i> Marquee read
-              </span>
-              {insight ? (
-                <>
-                  <p>{insight.hook}</p>
-                  {insight.moods.length > 0 && (
-                    <div className="detail-moods">
-                      {insight.moods.map((mood) => (
-                        <em key={mood}>{mood}</em>
-                      ))}
-                    </div>
-                  )}
-                </>
-              ) : (
-                <>
-                  <span className="skeleton skeleton-line" />
-                  <span className="skeleton skeleton-line short" />
-                </>
-              )}
-            </div>
-          )}
-          {nextEpisode && (
-            <p className="detail-next">
-              <span>Next episode</span>
-              {nextEpisode.season && nextEpisode.episode
-                ? ` S${nextEpisode.season}E${nextEpisode.episode}`
-                : ""}
-              {nextEpisode.episodeName ? ` · ${nextEpisode.episodeName}` : ""} ·{" "}
-              {new Date(nextEpisode.airsAt).toLocaleString(undefined, {
-                weekday: "short",
-                day: "numeric",
-                month: "short",
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-              {nextEpisode.network ? ` · ${nextEpisode.network}` : ""}
-            </p>
-          )}
-          <div className="watch-actions">
-            <span>Watch now</span>
-            {watchDestinations.map(({ provider, href }) => (
-              <a
-                href={href}
-                target="_blank"
-                rel="noreferrer"
-                className="watch-button"
-                key={provider.id}
-                onClick={leaveVia({
-                  href,
-                  label: provider.name,
-                  kind: "provider",
-                  providerId: provider.id,
-                  monetization: provider.offerTypes.join(","),
-                })}
-              >
-                <ProviderBadge provider={provider} compact />
-                <span>
-                  {provider.name}
-                  <small>{provider.offerTypes.join(" · ")}</small>
-                </span>
-                <ArrowIcon />
-              </a>
-            ))}
-            {!watchDestinations.length && (
-              <p className="availability-empty">No streaming options found.</p>
-            )}
-          </div>
-          <ErrorBoundary label="The revival house">
-            <RevivalBlock item={item} />
-          </ErrorBoundary>
-          <ErrorBoundary label="Local showings">
-            <ShowingsBlock
-              listings={showings.listings}
-              isLoading={showings.isLoading}
-              placeLabel={showings.origin?.label ?? null}
-              onLeave={leaveVia}
-            />
-          </ErrorBoundary>
-          {canSave && !entry && (
-            <button type="button" className="save-button" onClick={() => onSave(item)}>
-              <PlusIcon /> Save to my shelf
-            </button>
-          )}
-          {canSave && entry && (
-            <ErrorBoundary label="The shelf card">
-              <ShelfForm
-                entry={entry}
-                title={item.title}
-                isSeries={item.mediaType === "tv"}
-                seasons={item.numberOfSeasons}
-                onRemove={onRemove}
-                onSave={onSaveEntry}
-                onStatus={onStatus}
-                onUpdateDraft={onUpdateDraft}
-              />
-            </ErrorBoundary>
-          )}
-          {usherSlot}
-          <ErrorBoundary label="The trailer">
-            <TrailerBlock item={item} />
-          </ErrorBoundary>
-          <p className="detail-synopsis">{item.overview || "No synopsis available."}</p>
-          <div className="score-row">
-            {consensus && consensus.sources.length > 1 && (
-              <div>
-                <strong>{consensus.score.toFixed(1)}</strong>
-                <span>
-                  Marquee consensus · {consensus.sources.length} source
-                  {consensus.sources.length === 1 ? "" : "s"}
-                </span>
-              </div>
-            )}
-            <div>
-              <strong>{scoreLabel(item)}</strong>
-              <span>TMDB user score</span>
-            </div>
-            <div>
-              <strong>{item.tmdbVoteCount.toLocaleString()}</strong>
-              <span>TMDB votes</span>
-            </div>
-            {item.ratings?.imdbScore != null && (
-              <div>
-                <strong>{item.ratings.imdbScore.toFixed(1)}</strong>
-                <span>
-                  IMDb
-                  {item.ratings.imdbVotes
-                    ? ` · ${voteLabel({ ...item, tmdbScore: 1, tmdbVoteCount: item.ratings.imdbVotes })}`
-                    : ""}
-                </span>
-              </div>
-            )}
-            {item.ratings?.rottenTomatoes && (
-              <div>
-                <strong>{item.ratings.rottenTomatoes}</strong>
-                <span>Rotten Tomatoes</span>
-              </div>
-            )}
-            {item.ratings?.metascore != null && (
-              <div>
-                <strong>{item.ratings.metascore}</strong>
-                <span>Metascore</span>
-              </div>
-            )}
-            {item.ratings?.anilistScore != null && (
-              <div>
-                <strong>{item.ratings.anilistScore}%</strong>
-                <span>AniList</span>
-              </div>
-            )}
-            {item.ratings?.boxOffice != null && item.ratings.boxOffice > 0 && (
-              <div>
-                <strong>{moneyLabel(item.ratings.boxOffice)}</strong>
-                <span>Box office</span>
-              </div>
-            )}
-            {item.revenue != null && item.revenue > 0 && !item.ratings?.boxOffice && (
-              <div>
-                <strong>{moneyLabel(item.revenue)}</strong>
-                <span>Worldwide gross</span>
-              </div>
-            )}
-          </div>
-          {item.ratings?.awards && <p className="detail-awards">{item.ratings.awards}</p>}
-          {item.people?.length ? (
-            <div className="detail-chips">
-              {item.people.slice(0, 5).map((person) => (
-                <Link
-                  key={person}
-                  to={`/listings?type=${item.mediaType}&q=${encodeURIComponent(person)}`}
-                  className="detail-chip detail-chip-person"
-                >
-                  {person}
-                </Link>
-              ))}
-            </div>
-          ) : null}
-          {item.keywords?.length ? (
-            <div className="detail-chips">
-              {item.keywords.slice(0, 8).map((keyword) => (
-                <Link
-                  key={keyword}
-                  to={`/listings?type=${item.mediaType}&keywords=${encodeURIComponent(keyword)}`}
-                  className="detail-chip"
-                >
-                  {keyword}
-                </Link>
-              ))}
-            </div>
-          ) : null}
-          {item.buzz && (
-            <div className="detail-buzz">
-              <span>Trending signal</span>
-              <p>
-                <strong>{item.buzz.views.toLocaleString()}</strong> Wikipedia readers in the last 7
-                days, {changeLabel(item.buzz.delta)} on the{" "}
-                {item.buzz.previousViews.toLocaleString()} the week before.
-              </p>
-              <small>
-                Article{" "}
-                <a href={item.buzz.articleUrl} target="_blank" rel="noreferrer">
-                  {item.buzz.article}
-                </a>{" "}
-                · matched by{" "}
-                {item.buzz.match === "wikidata" ? "Wikidata IMDb link" : "title search"} · measured{" "}
-                {measuredOn(item.buzz.measuredAt)}
-              </small>
-            </div>
-          )}
-          {(item.studios?.length || item.collection) && (
+          {(item.studios?.length || spokenIn) && (
             <p className="detail-original">
-              {[item.collection?.name, item.studios?.slice(0, 2).join(", ")]
+              {[item.studios?.slice(0, 2).join(", "), spokenIn ? `In ${spokenIn}` : null]
                 .filter(Boolean)
                 .join(" · ")}
             </p>
           )}
-          {pairs.length > 0 && (
-            <div className="detail-pairs">
-              <span>
-                <i>AI</i> Watch next
-              </span>
-              {pairs.map((pair) => (
+          {item.tagline && <p className="detail-tagline">{item.tagline}</p>}
+          {isSeries && (
+            <div className="detail-tabs" role="tablist" aria-label="Overview or episodes">
+              {DETAIL_TABS.map((name) => (
                 <button
                   type="button"
-                  key={pair.item.id}
-                  className="detail-pair"
-                  onClick={() => onOpen(pair.item)}
+                  key={name}
+                  role="tab"
+                  id={`detail-tab-${name}`}
+                  aria-selected={tab === name}
+                  aria-controls={`detail-panel-${name}`}
+                  className={`detail-tab${tab === name ? " selected" : ""}`}
+                  onClick={() => setTab(name)}
                 >
-                  {pair.item.posterUrl ? (
-                    <img
-                      src={artwork(pair.item.posterUrl, 160) ?? pair.item.posterUrl}
-                      srcSet={artworkSrcSet(pair.item.posterUrl, 160)}
-                      alt=""
-                      loading="lazy"
-                      decoding="async"
-                    />
-                  ) : (
-                    <ArtPlaceholder seed={pair.item.id} label={pair.item.title} />
-                  )}
-                  <span>
-                    <strong>{pair.item.title}</strong>
-                    <small>{pair.reason}</small>
-                  </span>
-                  <ArrowIcon />
+                  {name === "overview" ? "Overview" : "Episodes"}
+                  {name === "episodes" && item.episodeCount ? <em>{item.episodeCount}</em> : null}
                 </button>
               ))}
             </div>
           )}
-          {similar.length > 0 && (
-            <div className="detail-similar">
-              <span>More like this</span>
-              <div className="detail-similar-track">
-                {similar.map((title) => (
+          <div
+            className="detail-tab-panel"
+            id="detail-panel-overview"
+            role={isSeries ? "tabpanel" : undefined}
+            aria-labelledby={isSeries ? "detail-tab-overview" : undefined}
+            hidden={isSeries && tab !== "overview"}
+          >
+            <p className="detail-synopsis">{item.overview || "No synopsis available."}</p>
+            {(insight || isInsightLoading) && (
+              <div className="detail-insight">
+                <span>
+                  <i>AI</i> Marquee read
+                </span>
+                {insight ? (
+                  <>
+                    <p>{insight.hook}</p>
+                    {insight.moods.length > 0 && (
+                      <div className="detail-moods">
+                        {insight.moods.map((mood) => (
+                          <em key={mood}>{mood}</em>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <span className="skeleton skeleton-line" />
+                    <span className="skeleton skeleton-line short" />
+                  </>
+                )}
+              </div>
+            )}
+            {canSave && (
+              <ErrorBoundary label="The shelf card">
+                {entry ? (
+                  <ShelfForm
+                    entry={entry}
+                    title={item.title}
+                    onRemove={onRemove}
+                    onSave={onSaveEntry}
+                    onStatus={onStatus}
+                    onUpdateDraft={onUpdateDraft}
+                  />
+                ) : (
+                  <button type="button" className="save-button" onClick={() => onSave(item)}>
+                    <PlusIcon /> Save to my shelf
+                  </button>
+                )}
+              </ErrorBoundary>
+            )}
+            {nextEpisode && (
+              <p className="detail-next">
+                <span>Next episode</span>
+                {nextEpisode.season && nextEpisode.episode
+                  ? ` S${nextEpisode.season}E${nextEpisode.episode}`
+                  : ""}
+                {nextEpisode.episodeName ? ` · ${nextEpisode.episodeName}` : ""} ·{" "}
+                {new Date(nextEpisode.airsAt).toLocaleString(undefined, {
+                  weekday: "short",
+                  day: "numeric",
+                  month: "short",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+                {nextEpisode.network ? ` · ${nextEpisode.network}` : ""}
+              </p>
+            )}
+            {!nextEpisode && upcomingAir && (
+              <p className="detail-next">
+                <span>Next episode</span>{" "}
+                {new Date(upcomingAir).toLocaleDateString(undefined, {
+                  weekday: "long",
+                  day: "numeric",
+                  month: "long",
+                })}
+                , date only
+              </p>
+            )}
+            {!nextEpisode && !upcomingAir && item.mediaType === "tv" && item.lastAirDate && (
+              <p className="detail-next">
+                <span>Last shown</span>{" "}
+                {new Date(item.lastAirDate).toLocaleDateString(undefined, {
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                })}
+                {item.status ? ` · ${item.status}` : ""}
+              </p>
+            )}
+            <ErrorBoundary label="Where to watch">
+              <WatchBlock
+                providers={providers}
+                fallbackHref={item.watchLink}
+                selectedProviderIds={selectedProviderIds}
+                onLeave={leaveVia}
+              />
+            </ErrorBoundary>
+            {continueAt && (
+              <button type="button" className="detail-continue" onClick={resumeWatching}>
+                <span>
+                  Continue S{continueAt.season} E{continueAt.episode}
+                </span>
+                <ArrowIcon />
+              </button>
+            )}
+            <ErrorBoundary label="The revival house">
+              <RevivalBlock item={item} />
+            </ErrorBoundary>
+            <ErrorBoundary label="Local showings">
+              <ShowingsBlock
+                listings={showings.listings}
+                isLoading={showings.isLoading}
+                placeLabel={showings.origin?.label ?? null}
+                onLeave={leaveVia}
+              />
+            </ErrorBoundary>
+            <ErrorBoundary label="The trailer">
+              <TrailerBlock item={item} />
+            </ErrorBoundary>
+            {usherSlot}
+            <div className="score-row">
+              {consensus && consensus.sources.length > 1 && (
+                <div>
+                  <strong>{consensus.score.toFixed(1)}</strong>
+                  <span>
+                    Marquee consensus · {consensus.sources.length} source
+                    {consensus.sources.length === 1 ? "" : "s"}
+                  </span>
+                </div>
+              )}
+              <div>
+                <strong>{scoreLabel(item)}</strong>
+                <span>TMDB user score</span>
+              </div>
+              <div>
+                <strong>{item.tmdbVoteCount.toLocaleString()}</strong>
+                <span>TMDB votes</span>
+              </div>
+              {item.ratings?.imdbScore != null && (
+                <div>
+                  <strong>{item.ratings.imdbScore.toFixed(1)}</strong>
+                  <span>
+                    IMDb
+                    {item.ratings.imdbVotes
+                      ? ` · ${voteLabel({ ...item, tmdbScore: 1, tmdbVoteCount: item.ratings.imdbVotes })}`
+                      : ""}
+                  </span>
+                </div>
+              )}
+              {item.ratings?.rottenTomatoes && (
+                <div>
+                  <strong>{item.ratings.rottenTomatoes}</strong>
+                  <span>Rotten Tomatoes</span>
+                </div>
+              )}
+              {item.ratings?.metascore != null && (
+                <div>
+                  <strong>{item.ratings.metascore}</strong>
+                  <span>Metascore</span>
+                </div>
+              )}
+              {item.ratings?.anilistScore != null && (
+                <div>
+                  <strong>{item.ratings.anilistScore}%</strong>
+                  <span>AniList</span>
+                </div>
+              )}
+              {item.ratings?.boxOffice != null && item.ratings.boxOffice > 0 && (
+                <div>
+                  <strong>{moneyLabel(item.ratings.boxOffice)}</strong>
+                  <span>Box office</span>
+                </div>
+              )}
+              {item.revenue != null && item.revenue > 0 && !item.ratings?.boxOffice && (
+                <div>
+                  <strong>{moneyLabel(item.revenue)}</strong>
+                  <span>Worldwide gross</span>
+                </div>
+              )}
+            </div>
+            {item.ratings?.awards && (
+              <p className="detail-awards">
+                {item.ratings.awards}
+                {item.ratings.awardWins
+                  ? ` · ${item.ratings.awardWins} win${item.ratings.awardWins === 1 ? "" : "s"}`
+                  : ""}
+              </p>
+            )}
+            {item.buzz && (
+              <div className="detail-buzz">
+                <span>Trending signal</span>
+                <p>
+                  <strong>{item.buzz.views.toLocaleString()}</strong> Wikipedia readers in the last
+                  7 days, {changeLabel(item.buzz.delta)} on the{" "}
+                  {item.buzz.previousViews.toLocaleString()} the week before.
+                </p>
+                <small>
+                  Article{" "}
+                  <a href={item.buzz.articleUrl} target="_blank" rel="noreferrer">
+                    {item.buzz.article}
+                  </a>{" "}
+                  · matched by{" "}
+                  {item.buzz.match === "wikidata" ? "Wikidata IMDb link" : "title search"} ·
+                  measured {measuredOn(item.buzz.measuredAt)}
+                </small>
+              </div>
+            )}
+            {item.people?.length ? (
+              <div className="detail-chips">
+                {item.people.slice(0, 5).map((person) => (
+                  <Link
+                    key={person}
+                    to={`/person/${encodeURIComponent(person)}`}
+                    className="detail-chip detail-chip-person"
+                  >
+                    {person}
+                  </Link>
+                ))}
+              </div>
+            ) : null}
+            {item.keywords?.length ? (
+              <div className="detail-chips">
+                {item.keywords.slice(0, 8).map((keyword) => (
+                  <Link
+                    key={keyword}
+                    to={`/listings?type=${item.mediaType}&keywords=${encodeURIComponent(keyword)}`}
+                    className="detail-chip"
+                  >
+                    {keyword}
+                  </Link>
+                ))}
+              </div>
+            ) : null}
+            {pairs.length > 0 && (
+              <div className="detail-pairs">
+                <span>
+                  <i>AI</i> Watch next
+                </span>
+                {pairs.map((pair) => (
                   <button
                     type="button"
-                    key={title.id}
-                    className="detail-similar-card"
-                    onClick={() => onOpen(title)}
+                    key={pair.item.id}
+                    className="detail-pair"
+                    onClick={() => onOpen(pair.item)}
                   >
-                    {title.posterUrl ? (
+                    {pair.item.posterUrl ? (
                       <img
-                        src={artwork(title.posterUrl, 160) ?? title.posterUrl}
-                        srcSet={artworkSrcSet(title.posterUrl, 160)}
+                        src={artwork(pair.item.posterUrl, 160) ?? pair.item.posterUrl}
+                        srcSet={artworkSrcSet(pair.item.posterUrl, 160)}
                         alt=""
                         loading="lazy"
                         decoding="async"
                       />
                     ) : (
-                      <ArtPlaceholder seed={title.id} label={title.title} />
+                      <ArtPlaceholder seed={pair.item.id} label={pair.item.title} />
                     )}
-                    <strong>{title.title}</strong>
-                    <small>{mediaMeta(title)}</small>
+                    <span>
+                      <strong>{pair.item.title}</strong>
+                      <small>{pair.reason}</small>
+                    </span>
+                    <ArrowIcon />
                   </button>
                 ))}
               </div>
+            )}
+            {item.collection && collection.length > 1 && (
+              <div className="detail-similar">
+                <span>{item.collection.name}</span>
+                <div className="detail-similar-track">
+                  {collection.map((title) => (
+                    <button
+                      type="button"
+                      key={title.id}
+                      className={`detail-similar-card${title.id === item.id ? " current" : ""}`}
+                      onClick={() => onOpen(title)}
+                    >
+                      {title.posterUrl ? (
+                        <img
+                          src={artwork(title.posterUrl, 160) ?? title.posterUrl}
+                          srcSet={artworkSrcSet(title.posterUrl, 160)}
+                          alt=""
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      ) : (
+                        <ArtPlaceholder seed={title.id} label={title.title} />
+                      )}
+                      <strong>{title.title}</strong>
+                      <small>{title.year ?? "—"}</small>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {similar.length > 0 && (
+              <div className="detail-similar">
+                <span>More like this</span>
+                <div className="detail-similar-track">
+                  {similar.map((title) => (
+                    <button
+                      type="button"
+                      key={title.id}
+                      className="detail-similar-card"
+                      onClick={() => onOpen(title)}
+                    >
+                      {title.posterUrl ? (
+                        <img
+                          src={artwork(title.posterUrl, 160) ?? title.posterUrl}
+                          srcSet={artworkSrcSet(title.posterUrl, 160)}
+                          alt=""
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      ) : (
+                        <ArtPlaceholder seed={title.id} label={title.title} />
+                      )}
+                      <strong>{title.title}</strong>
+                      <small>{mediaMeta(title)}</small>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="resource-links">
+              <span>SOURCE LINKS</span>
+              {item.trailerKey && (
+                <a
+                  href={`https://www.youtube.com/watch?v=${item.trailerKey}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={leaveVia({
+                    href: `https://www.youtube.com/watch?v=${item.trailerKey}`,
+                    label: "Trailer",
+                    kind: "trailer",
+                  })}
+                >
+                  Trailer <ArrowIcon />
+                </a>
+              )}
+              <a
+                href={item.tmdbUrl}
+                target="_blank"
+                rel="noreferrer"
+                onClick={leaveVia({ href: item.tmdbUrl, label: "TMDB", kind: "tmdb" })}
+              >
+                TMDB <ArrowIcon />
+              </a>
+              {item.buzz && (
+                <a
+                  href={item.buzz.articleUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={leaveVia({
+                    href: item.buzz.articleUrl,
+                    label: "Wikipedia",
+                    kind: "wikipedia",
+                  })}
+                >
+                  Wikipedia <ArrowIcon />
+                </a>
+              )}
+              {item.imdbUrl && (
+                <a
+                  href={item.imdbUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={leaveVia({ href: item.imdbUrl, label: "IMDb", kind: "imdb" })}
+                >
+                  IMDb <ArrowIcon />
+                </a>
+              )}
+            </div>
+          </div>
+          {isSeries && (
+            <div
+              className="detail-tab-panel"
+              id="detail-panel-episodes"
+              role="tabpanel"
+              aria-labelledby="detail-tab-episodes"
+              hidden={tab !== "episodes"}
+            >
+              <ErrorBoundary label="The episode guide">
+                <SeasonsBlock
+                  item={item}
+                  canTrack={canSave}
+                  shelved={Boolean(entry)}
+                  tracker={tracker}
+                  jumpTo={jump}
+                  onTracked={entry ? undefined : onTracked}
+                />
+              </ErrorBoundary>
             </div>
           )}
-          <div className="resource-links">
-            <span>SOURCE LINKS</span>
-            {item.trailerKey && (
-              <a
-                href={`https://www.youtube.com/watch?v=${item.trailerKey}`}
-                target="_blank"
-                rel="noreferrer"
-                onClick={leaveVia({
-                  href: `https://www.youtube.com/watch?v=${item.trailerKey}`,
-                  label: "Trailer",
-                  kind: "trailer",
-                })}
-              >
-                Trailer <ArrowIcon />
-              </a>
-            )}
-            <a
-              href={item.tmdbUrl}
-              target="_blank"
-              rel="noreferrer"
-              onClick={leaveVia({ href: item.tmdbUrl, label: "TMDB", kind: "tmdb" })}
-            >
-              TMDB <ArrowIcon />
-            </a>
-            {item.buzz && (
-              <a
-                href={item.buzz.articleUrl}
-                target="_blank"
-                rel="noreferrer"
-                onClick={leaveVia({
-                  href: item.buzz.articleUrl,
-                  label: "Wikipedia",
-                  kind: "wikipedia",
-                })}
-              >
-                Wikipedia <ArrowIcon />
-              </a>
-            )}
-            {item.imdbUrl && (
-              <a
-                href={item.imdbUrl}
-                target="_blank"
-                rel="noreferrer"
-                onClick={leaveVia({ href: item.imdbUrl, label: "IMDb", kind: "imdb" })}
-              >
-                IMDb <ArrowIcon />
-              </a>
-            )}
-          </div>
         </div>
         {exit && (
           <ExitDoor exit={exit} onLeave={() => reportExit(exit)} onClose={() => setExit(null)} />

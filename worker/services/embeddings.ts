@@ -1,6 +1,6 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
 import { logError } from "../lib/logging.ts";
-import { isRecord } from "../lib/values.ts";
+import { isRecord, vectorValues } from "../lib/values.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
 import type { Bindings } from "../types.ts";
 
@@ -87,7 +87,11 @@ async function storedHashes(env: Bindings, titleIds: string[]) {
   return new Map(rows.results.map((row) => [row.titleId, row.contentHash]));
 }
 
-export async function embedTitles(env: Bindings, titleIds: string[]) {
+export async function embedTitles(
+  env: Bindings,
+  titleIds: string[],
+  options: { force?: boolean } = {},
+) {
   const titles = await readItems(env.DB, titleIds, titleIds.length);
 
   if (titles.length === 0) {
@@ -99,8 +103,10 @@ export async function embedTitles(env: Bindings, titleIds: string[]) {
     env,
     titles.map((title) => title.id),
   );
-  const pending = titles.filter((title, index) => known.get(title.id) !== hashes[index]);
-  const unchanged = titles.filter((title, index) => known.get(title.id) === hashes[index]);
+  const stale = (title: MediaTitle, index: number) =>
+    options.force === true || known.get(title.id) !== hashes[index];
+  const pending = titles.filter(stale);
+  const unchanged = titles.filter((title, index) => !stale(title, index));
   const hashById = new Map(titles.map((title, index) => [title.id, hashes[index]]));
   let stored = 0;
 
@@ -149,6 +155,29 @@ export async function embedTitles(env: Bindings, titleIds: string[]) {
   );
 
   return stored;
+}
+
+const VECTOR_READ_BATCH = 20;
+
+export async function readVectors(env: Bindings, titleIds: string[]) {
+  const unique = [...new Set(titleIds)];
+  const byId = new Map<string, number[]>();
+
+  for (let index = 0; index < unique.length; index += VECTOR_READ_BATCH) {
+    const wave = unique.slice(index, index + VECTOR_READ_BATCH);
+    // oxlint-disable-next-line no-await-in-loop
+    const vectors = await env.VECTORS.getByIds(wave);
+
+    for (const vector of vectors) {
+      const values = vectorValues(vector.values);
+
+      if (values) {
+        byId.set(vector.id, values);
+      }
+    }
+  }
+
+  return byId;
 }
 
 export async function selectUnembedded(env: Bindings, limit: number) {

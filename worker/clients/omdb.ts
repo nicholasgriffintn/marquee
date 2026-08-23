@@ -142,6 +142,7 @@ export type OmdbSearchResult = {
   title: string;
   year: number | null;
   mediaType: MediaType;
+  omdbType: string;
   posterUrl: string | null;
 };
 
@@ -193,6 +194,7 @@ export async function searchOmdb(env: Bindings, query: string, page = 1) {
         title: entry.Title,
         year: Number.isInteger(year) ? year : null,
         mediaType: entry.Type === "series" ? "tv" : "movie",
+        omdbType: typeof entry.Type === "string" ? entry.Type : "",
         posterUrl: poster,
       },
     ];

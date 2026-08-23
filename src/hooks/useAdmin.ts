@@ -19,6 +19,7 @@ export type AdminAction =
   | "alerts-preview"
   | "alerts-send"
   | "angle-scores"
+  | "people"
   | "cinemas"
   | "showtimes"
   | "revival-sweep"
@@ -42,7 +43,14 @@ export type AdminOverview = {
     error: string | null;
     startedAt: string;
   }[];
-  lastRuns: { jobType: string; status: string; lastRunAt: string; runs: number }[];
+  lastRuns: {
+    jobType: string;
+    status: string;
+    lastRunAt: string;
+    runs: number;
+    subjects: number;
+  }[];
+  runWindowHours: number;
   budgets: {
     source: string;
     callLimit: number;

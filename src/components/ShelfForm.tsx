@@ -11,7 +11,6 @@ export function ShelfForm({
   entry,
   title,
   isSeries = false,
-  seasons,
   onRemove,
   onSave,
   onStatus,
@@ -20,7 +19,6 @@ export function ShelfForm({
   entry: ViewingEntry;
   title: string;
   isSeries?: boolean;
-  seasons?: number | null;
   onRemove: (titleId: string) => void;
   onSave: (entry: ViewingEntry) => void;
   onStatus: (titleId: string, status: EntryStatus) => void;
@@ -29,6 +27,11 @@ export function ShelfForm({
   return (
     <div className="shelf-form">
       <span className="shelf-form-label">On your shelf</span>
+      {isSeries && (
+        <p className="shelf-form-scope">
+          The whole show. Individual episodes and runs keep their own marks above.
+        </p>
+      )}
 
       <label className="status-input">
         Watch status
@@ -68,41 +71,6 @@ export function ShelfForm({
           </button>
         ))}
       </div>
-
-      {isSeries && (
-        <div className="progress-input">
-          <span>Where you are</span>
-          <label>
-            Series
-            <input
-              type="number"
-              min={1}
-              max={seasons ?? 100}
-              value={entry.season ?? ""}
-              onChange={(event) =>
-                onUpdateDraft(entry.titleId, {
-                  season: event.target.value ? Number(event.target.value) : null,
-                })
-              }
-            />
-          </label>
-          <label>
-            Episode
-            <input
-              type="number"
-              min={1}
-              max={500}
-              value={entry.episode ?? ""}
-              onChange={(event) =>
-                onUpdateDraft(entry.titleId, {
-                  episode: event.target.value ? Number(event.target.value) : null,
-                })
-              }
-            />
-          </label>
-          {seasons ? <small>of {seasons} so far</small> : null}
-        </div>
-      )}
 
       <textarea
         maxLength={2_000}

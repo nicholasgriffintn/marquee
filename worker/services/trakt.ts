@@ -4,17 +4,30 @@ import {
   getTraktRatings,
   getTraktWatched,
   getTraktWatchlist,
+  pushTraktHistory,
+  pushTraktRatings,
+  pushTraktWatchlist,
   refreshTraktTokens,
   TraktError,
   type TraktEntry,
+  type TraktPushItem,
 } from "../clients/trakt.ts";
 import { logError } from "../lib/logging.ts";
 import { isKnownTitle } from "../lib/validation.ts";
+import { databaseDate } from "../lib/values.ts";
 import { storeItems } from "../repositories/catalog-writer.ts";
-import { markLinkSynced, readLink, saveLink } from "../repositories/links.ts";
+import {
+  markLinkPushed,
+  markLinkSynced,
+  readLink,
+  readPushedAt,
+  saveLink,
+} from "../repositories/links.ts";
 import type { Bindings, EntryStatus } from "../types.ts";
 
 const IMPORT_LIMIT = 400;
+const PUSH_LIMIT = 400;
+const PUSH_CHUNK = 100;
 const HYDRATE_LIMIT = 120;
 
 export function traktRedirectUri(origin: string) {
@@ -186,4 +199,115 @@ export async function traktUpcoming(env: Bindings, viewerId: string, origin: str
 
     return [];
   }
+}
+
+type ShelfRow = {
+  titleId: string;
+  status: EntryStatus;
+  rating: number | null;
+  updatedAt: string;
+};
+
+function pushItem(row: ShelfRow): TraktPushItem | null {
+  const [mediaType, tmdbId] = row.titleId.split(":");
+  const numeric = Number(tmdbId);
+
+  if ((mediaType !== "movie" && mediaType !== "tv") || !Number.isInteger(numeric)) {
+    return null;
+  }
+
+  return { tmdbId: numeric, mediaType };
+}
+
+function chunked<T>(items: T[], size = PUSH_CHUNK) {
+  const waves: T[][] = [];
+
+  for (let index = 0; index < items.length; index += size) {
+    waves.push(items.slice(index, index + size));
+  }
+
+  return waves;
+}
+
+async function pushWaves(items: TraktPushItem[], send: (wave: TraktPushItem[]) => Promise<number>) {
+  let total = 0;
+
+  for (const wave of chunked(items)) {
+    // oxlint-disable-next-line no-await-in-loop
+    total += await send(wave);
+  }
+
+  return total;
+}
+
+export async function exportTraktShelf(env: Bindings, viewerId: string, origin: string) {
+  const accessToken = await traktAccessToken(env, viewerId, origin);
+
+  if (!accessToken) {
+    throw new TraktError("Trakt is not linked for this viewer", 400);
+  }
+
+  const pushedAt = await readPushedAt(env, viewerId, "trakt");
+  const rows = await env.DB.prepare(
+    `SELECT title_id AS titleId, status, rating, updated_at AS updatedAt
+       FROM viewing_entries
+      WHERE viewer_id = ?1
+        AND (?2 IS NULL OR updated_at > ?2)
+      ORDER BY updated_at
+      LIMIT ${PUSH_LIMIT}`,
+  )
+    .bind(viewerId, pushedAt)
+    .all<ShelfRow>();
+  const history: TraktPushItem[] = [];
+  const ratings: TraktPushItem[] = [];
+  const watchlist: TraktPushItem[] = [];
+
+  for (const row of rows.results) {
+    const item = pushItem(row);
+
+    if (!item) {
+      continue;
+    }
+
+    if (row.status === "watched") {
+      history.push({ ...item, watchedAt: databaseDate(row.updatedAt).toISOString() });
+    } else if (row.status === "watchlist" || row.status === "watching") {
+      watchlist.push(item);
+    }
+
+    if (row.rating) {
+      ratings.push({ ...item, rating: Math.max(1, Math.min(10, row.rating * 2)) });
+    }
+  }
+
+  const watched = await pushWaves(history, (wave) => pushTraktHistory(env, accessToken, wave));
+  const rated = await pushWaves(ratings, (wave) => pushTraktRatings(env, accessToken, wave));
+  const listed = await pushWaves(watchlist, (wave) => pushTraktWatchlist(env, accessToken, wave));
+
+  await markLinkPushed(env, viewerId, "trakt");
+
+  console.log(JSON.stringify({ event: "trakt_shelf_pushed", watched, rated, listed }));
+
+  return { watched, rated, listed, considered: rows.results.length };
+}
+
+export async function traktPushPreview(env: Bindings, viewerId: string) {
+  const pushedAt = await readPushedAt(env, viewerId, "trakt");
+  const row = await env.DB.prepare(
+    `SELECT
+       sum(CASE WHEN status = 'watched' THEN 1 ELSE 0 END) AS watched,
+       sum(CASE WHEN status IN ('watchlist', 'watching') THEN 1 ELSE 0 END) AS listed,
+       sum(CASE WHEN rating IS NOT NULL THEN 1 ELSE 0 END) AS rated
+     FROM viewing_entries
+     WHERE viewer_id = ?1 AND (?2 IS NULL OR updated_at > ?2)`,
+  )
+    .bind(viewerId, pushedAt)
+    .first<{ watched: number | null; listed: number | null; rated: number | null }>();
+
+  return {
+    pushedAt,
+    watched: row?.watched ?? 0,
+    listed: row?.listed ?? 0,
+    rated: row?.rated ?? 0,
+  };
 }

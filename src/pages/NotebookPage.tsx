@@ -5,6 +5,7 @@ import { ErrorBoundary } from "../components/ErrorBoundary";
 import { AlertSettings } from "../components/notebook/AlertSettings";
 import { BeliefList } from "../components/notebook/BeliefList";
 import { ConnectionsPanel } from "../components/notebook/ConnectionsPanel";
+import { FeedPanel } from "../components/notebook/FeedPanel";
 import { GuestList } from "../components/notebook/GuestList";
 import { ImportPanel } from "../components/notebook/ImportPanel";
 import { NotebookIndex, type Divider } from "../components/notebook/NotebookIndex";
@@ -192,7 +193,7 @@ export function NotebookPage({
             id="shape"
             number={2}
             title={DIVIDERS[1].label}
-            lede="Everything you have marked, placed by what it is rather than what it is called. Close together means alike."
+            lede="Everything you have marked, placed by what it is rather than what it is called. Close together means alike. The two directions are mine rather than the industry's — where one end has a character to it, I have written it in the margin."
           >
             <ErrorBoundary label="This map">
               <TasteMap isSignedIn={isSignedIn} />
@@ -260,6 +261,16 @@ export function NotebookPage({
             <h3>Accounts and keys</h3>
             <ErrorBoundary label="These connections">
               <ConnectionsPanel isSignedIn={isSignedIn} />
+            </ErrorBoundary>
+
+            <h3>Somewhere other than here</h3>
+            <p className="notebook-aside">
+              What is coming goes in your calendar, and what I would have written to you about goes
+              in your reader. Both are yours alone, both are links rather than accounts, and either
+              can be taken back.
+            </p>
+            <ErrorBoundary label="These subscriptions">
+              <FeedPanel isSignedIn={isSignedIn} />
             </ErrorBoundary>
           </NotebookSection>
         </div>

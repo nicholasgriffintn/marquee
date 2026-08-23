@@ -9,6 +9,7 @@ import {
   syncCatalogHead,
 } from "../jobs/ingestion.ts";
 import { getProviderLedger } from "../jobs/provider-ledger.ts";
+import { ensureBudgets } from "../repositories/budgets.ts";
 import { pruneScreenings } from "../repositories/cinemas.ts";
 import { storeProviders } from "../repositories/providers.ts";
 import { rebuildPeopleIndex } from "../repositories/usher.ts";
@@ -37,6 +38,8 @@ export class CatalogSweep extends WorkflowEntrypoint<Bindings, CatalogSweepParam
         return providers.providers.length;
       });
     }
+
+    await step.do("reconcile budgets", { retries: RETRIES }, async () => ensureBudgets(this.env));
 
     const titleIds = await step.do("sync catalogue head", { retries: RETRIES }, async () =>
       syncCatalogHead(this.env),
@@ -89,7 +92,7 @@ export class CatalogSweep extends WorkflowEntrypoint<Bindings, CatalogSweepParam
     );
 
     await step.do("queue stale availability", { retries: RETRIES }, async () =>
-      queueStaleAvailability(this.env),
+      queueStaleAvailability(this.env, titleIds),
     );
 
     await step.do("index people", { retries: RETRIES }, async () =>

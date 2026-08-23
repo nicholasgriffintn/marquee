@@ -1,6 +1,6 @@
 import { logError } from "../lib/logging.ts";
 import type { Bindings, ViewerContext, ViewingContext } from "../types.ts";
-import { embedQuery } from "./embeddings.ts";
+import { embedQuery, readVectors } from "./embeddings.ts";
 import { preferenceSummary, type ViewerPreferences } from "./usher.ts";
 
 const TASTE_SAMPLE = 24;
@@ -61,7 +61,11 @@ function recencyWeight(updatedAt: string) {
   return Math.max(RECENCY_FLOOR, 0.5 ** (ageDays / HALF_LIFE_DAYS));
 }
 
-export function weighTitles(viewer: ViewerContext, never: string[] = []): WeightedTitle[] {
+export function weighTitles(
+  viewer: ViewerContext,
+  never: string[] = [],
+  sample = TASTE_SAMPLE,
+): WeightedTitle[] {
   const weighted = viewer.entries.map((entry): WeightedTitle => {
     const base = statusWeight(entry.status) * ratingWeight(entry.rating);
 
@@ -77,7 +81,7 @@ export function weighTitles(viewer: ViewerContext, never: string[] = []): Weight
       .filter((entry) => entry.weight !== 0)
       // oxlint-disable-next-line no-array-sort
       .sort((left, right) => Math.abs(right.weight) - Math.abs(left.weight))
-      .slice(0, TASTE_SAMPLE)
+      .slice(0, sample)
   );
 }
 
@@ -129,11 +133,9 @@ export async function behaviourVector(env: Bindings, weighted: WeightedTitle[]) 
   }
 
   try {
-    const vectors = await env.VECTORS.getByIds(weighted.map((entry) => entry.titleId));
-    const byId = new Map(
-      vectors.flatMap((vector) =>
-        Array.isArray(vector.values) ? [[vector.id, vector.values as number[]] as const] : [],
-      ),
+    const byId = await readVectors(
+      env,
+      weighted.map((entry) => entry.titleId),
     );
     const found = weighted.flatMap((entry) => {
       const values = byId.get(entry.titleId);

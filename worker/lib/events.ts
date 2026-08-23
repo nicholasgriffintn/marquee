@@ -9,6 +9,8 @@ export type MarqueeEvent = {
     | "title_watched"
     | "shelf_save"
     | "shelf_remove"
+    | "episode_save"
+    | "episode_mark"
     | "curator_ask"
     | "rails_served"
     | "rails_built"

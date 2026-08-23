@@ -4,6 +4,7 @@ import { authRoutes } from "./auth/routes.ts";
 import { CuratorSession } from "./durable/curator-session.ts";
 import { consumeDeadLetters, consumeIngestion } from "./jobs/ingestion-consumer.ts";
 import { scheduleIngestion } from "./jobs/ingestion-scheduler.ts";
+import { automatedSyncAllowed } from "./lib/environment.ts";
 import { hasTrustedOrigin } from "./lib/http.ts";
 import { canonicalOrigin } from "./lib/security.ts";
 import { withPageMetadata } from "./lib/share.ts";
@@ -11,7 +12,9 @@ import { adminRoutes } from "./routes/admin.ts";
 import { catalogRoutes } from "./routes/catalog.ts";
 import { cinemaRoutes } from "./routes/cinema.ts";
 import { curatorRoutes } from "./routes/curator.ts";
+import { episodeRoutes } from "./routes/episodes.ts";
 import { eventRoutes } from "./routes/events.ts";
+import { feedRoutes } from "./routes/feeds.ts";
 import { linkRoutes } from "./routes/links.ts";
 import { mcpRoutes } from "./routes/mcp.ts";
 import { mediaRoutes } from "./routes/media.ts";
@@ -63,6 +66,8 @@ app.route("/api/auth", authRoutes);
 
 app.route("/api/profile", profileRoutes);
 
+app.route("/api/episodes", episodeRoutes);
+
 app.route("/api/curator", curatorRoutes);
 
 app.route("/api/usher", usherRoutes);
@@ -74,6 +79,8 @@ app.route("/api/notebook", notebookRoutes);
 app.route("/api/links", linkRoutes);
 
 app.route("/api/events", eventRoutes);
+
+app.route("/feeds", feedRoutes);
 
 app.route("/mcp", mcpRoutes);
 
@@ -121,6 +128,12 @@ export { CatalogSweep, CuratorSession, DigestWorkflow, RailsWorkflow };
 export default {
   fetch: app.fetch,
   scheduled(controller, env, context) {
+    if (!automatedSyncAllowed(env)) {
+      console.log(JSON.stringify({ event: "scheduled_skipped_local_dev", cron: controller.cron }));
+
+      return;
+    }
+
     context.waitUntil(scheduleIngestion(env, controller.cron));
   },
   queue(batch, env, context) {

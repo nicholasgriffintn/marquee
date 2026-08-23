@@ -81,6 +81,11 @@ export const POLICIES = {
     member: { limiter: "MEDIA_RATE_LIMITER", message: STEADY_ON },
     bots: "crawlers",
   },
+  feed: {
+    anonymous: { limiter: "PUBLIC_RATE_LIMITER", message: STEADY_ON },
+    member: { limiter: "MEMBER_RATE_LIMITER", message: STEADY_ON },
+    bots: "open",
+  },
   machine: {
     anonymous: { limiter: "WRITE_RATE_LIMITER", message: STEADY_ON },
     member: { limiter: "MEMBER_RATE_LIMITER", message: STEADY_ON },
@@ -110,6 +115,7 @@ export const RULES: readonly Rule[] = [
   { path: "/api/profile/import/*", methods: ["POST"], policy: "curator" },
   { path: "/api/links/trakt/start", policy: "auth" },
   { path: "/api/links/trakt/callback", policy: "auth" },
+  { path: "/feeds/*", policy: "feed" },
   { path: "/mcp", policy: "machine" },
   { path: "/mcp/*", policy: "machine" },
   { path: "/media/*", policy: "media" },

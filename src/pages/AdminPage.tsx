@@ -46,6 +46,7 @@ const ACTION_GROUPS: {
       { id: "alerts-preview", label: "Preview the post" },
       { id: "alerts-send", label: "Send the post" },
       { id: "angle-scores", label: "Rescore shelves" },
+      { id: "people", label: "Reindex credits" },
     ],
   },
   {
@@ -356,12 +357,14 @@ export function AdminPage({ user }: { user: User }) {
         {overview && overview.lastRuns.length > 0 && (
           <section className="panel-block" aria-labelledby="admin-runs-title">
             <h2 id="admin-runs-title">Recent jobs</h2>
+            <p className="admin-note">Last {overview.runWindowHours} hours</p>
             <ul className="admin-list">
               {overview.lastRuns.map((run) => (
                 <li key={`${run.jobType}-${run.status}`}>
                   <strong>{run.jobType}</strong>
                   <small className={`run-status run-status-${run.status}`}>
                     {run.status} · {run.runs.toLocaleString()}
+                    {run.subjects < run.runs ? ` · ${run.subjects.toLocaleString()} unique` : ""}
                   </small>
                   <span className="spacer" />
                   <time dateTime={run.lastRunAt}>{stamp(run.lastRunAt)}</time>

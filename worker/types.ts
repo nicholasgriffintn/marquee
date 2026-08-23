@@ -13,6 +13,8 @@ export type Bindings = {
   TELEMETRY_RATE_LIMITER: RateLimit;
   MEDIA_RATE_LIMITER: RateLimit;
   BOT_PROTECTION?: string;
+  LOCAL_DEV?: string;
+  LOCAL_SYNC?: string;
   CLOUDFLARE_ACCOUNT_ID: string;
   CLOUDFLARE_API_TOKEN?: string;
   WATCHMODE_API_KEY?: string;
@@ -98,6 +100,7 @@ export type IngestionJob =
     }
   | { type: "embed-titles"; titleIds: string[] }
   | { type: "import-trakt-history"; viewerId: string; origin: string }
+  | { type: "push-trakt-shelf"; viewerId: string; origin: string }
   | { type: "sync-schedule" }
   | { type: "sync-buzz" }
   | { type: "sync-cinemas"; source: string }

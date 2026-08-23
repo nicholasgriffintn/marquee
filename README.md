@@ -1,8 +1,6 @@
 # Marquee
 
-Marquee is a cinema without a building. Live title search, discovery that knows which services you
-actually pay for, what's on tonight, Cloudflare AI recommendations, and a shelf you keep yourself
-with ratings and notes on it.
+Marquee is a cinema without a building.
 
 The Usher works here. He is the letter M off the sign out front, who climbed down one evening and
 never went back up. Bow tie, torch, thirty years on the door. He has seen everything in the
@@ -12,22 +10,16 @@ building and most of it twice, and he will tell you when something is long.
 
 > Evening. Seat yourself.
 
-Title metadata and images come from TMDB. Streaming, rental and purchase availability comes from
-JustWatch, both through TMDB's watch-provider API and directly for per-service deep links.
-Watchmode supplies the service directory and fills the gaps on saved titles. Sign-in is GitHub
-OAuth.
+## Front of house
 
-Air dates come from TVmaze, broadcast and streaming both; anime tags and scores from AniList;
-awards and box office from OMDb. The trending rail is ranked by how much Wikipedia has been read
-about a title this week, which is a better measure of a fuss than any press release. Link Trakt and
-your watch history, ratings and watchlist come with you.
+Search the whole catalogue and get an answer while you are still typing — keyword and meaning both,
+so a half-remembered plot finds the film as readily as its title does. Tell him which services you
+pay for and everything narrows to what you can actually press play on. What's on tonight is on the
+front page; your own shelf, with ratings and notes on it, is one click away.
 
-A cinema without a building still knows the ones that have them. Sign in and a film's panel carries
-what is on at the cinemas near you, under the streaming options.
-
-<img src="https://marquee.pashi.app/usher-unimpressed.png" width="200" height="200" alt="The Usher is Unimpressed"/>
-
-> Everyone's watching that one. Doesn't mean it's good.
+He builds more shelves than will fit and puts out the ones that are yours: a service you pay for, a
+name you follow, what is on at the cinemas near you. A shelf with nothing on it for you never goes
+up at all.
 
 He does the asking. On your first visit he works out what you pay for, what you reach for and why
 you pick what you pick, one question at a time, and after that he stays quiet — one uninvited word
@@ -35,39 +27,91 @@ per session, and he takes a hint after three. He turns up where he is relevant: 
 shelf to ask whether it landed, on a title that has sat unwatched since spring, on a search that
 found nothing. And if you cannot decide, he will simply pick something and tell you why.
 
+<img src="https://marquee.pashi.app/usher-unimpressed.png" width="200" height="200" alt="The Usher is Unimpressed"/>
+
+> Everyone's watching that one. Doesn't mean it's good.
+
 When even that is too much, he takes your order. Three questions — who is in the room, how long you
 have, what you are in the mood for — and he comes back with one title he will stake his name on,
 the service it is on, and two backups in case you are difficult. He has been doing it that way
 since a couple spent eleven minutes reading the board in 1981. Nobody has ever needed a fourth
 question.
 
-He is also on the door. Most of the job is letting people in; the rest of it is not, and the API's
-rate limits and bot checks speak in his voice rather than a status code's. Ask too fast and you get
-_"Steady on. One at a time."_ Arrive as something that is not a person and you get told that he has
-seen a lot of faces and not one of them was yours. Try a door that is not yours and you meet the
-manager's office instead: frosted glass, a name painted on it, a note that has said _back in ten
-minutes_ since 1974. The manager is canon and has never been drawn. He is not in. He is never in. Nor is the
-projectionist, who runs the sweeps and the re-hydration and the long nights of ingestion, and who
-gets a note of his own on the admin page. Two colleagues, both unseen, is the correct number: it
-makes the building feel staffed without giving the Usher anyone to compete with.
+Monday mornings he writes up the week: fresh releases near your taste, what is stirring, and the
+episodes coming. It waits for you at `/this-week`.
 
-He has five faces — attentive, thinking, pleased, unimpressed, asleep — and gets by on about two of
-them. The artwork is in `public/`, all of it cut from `usher.svg`, in ink, paper, acid and coral and
-nothing else. He is drawn to survive on his own dark background, so anything you add to him wants a
-paper core and an ink keyline or it will disappear into the page.
+## The notebook
+
+Everything he has worked out about you is in the notebook, and so is the map. Every title you have
+marked is placed by what it is rather than what it is called, so the things that are alike sit
+together. The two directions are the first two components of the embeddings rather than anyone's
+genre list, and where one end of one has a character to it he writes it in the margin. Hover a mark
+— or tab to it — and he tells you what it is and the nearest thing to it on your shelf. If he has
+not read something on your shelf yet he says so, and goes and reads it.
+
+Bring a history with you if you have one: link Trakt and your watch history, ratings and watchlist
+come across, and a Letterboxd export can be walked in through the door. It goes back the other way
+too — _send it there_ puts what you have marked here onto your Trakt account, watched as history,
+stars as ratings out of ten, the rest as watchlist. It asks first, tells you what it is about to
+send, and only sends what has changed since the last time, so nothing is counted twice.
 
 <img src="https://marquee.pashi.app/usher-thinking.png" width="200" height="200" alt="The Usher Has Some Advice" />
 
-> If I've nothing worth saying, I say nothing. Try it.
+> I have seen a lot of things. Not one of them was yours.
+
+## One episode at a time
+
+A television title's panel carries its own episode guide. Tick episodes off, rate them out of five,
+keep a note against any of them or against the season as a whole. _I am up to here_ marks
+everything aired before it in one go, for the sensible people who do not tick as they watch.
+
+Every write rolls up into the shelf: the pointer moves to the furthest episode watched, a
+watchlisted series becomes one you are watching, and when the last aired episode is ticked the
+whole thing goes down as watched. Your episode notes are read alongside your title notes when the
+Usher works out what he thinks of you.
+
+## Names on the credits
+
+Every credited name has a page — everything of theirs in the catalogue, newest first, and how much
+of it is already on your shelf. The names on a panel go there rather than into a search box.
+
+There is one button on it that matters. Following someone writes a note in the notebook in your own
+hand, and that note is what the `person` alert detector has always been reading; until now the only
+way to get one was to have the Usher notice a name recurring in what you saved. Unfollow and he
+crosses it out without arguing. Behind both is a name-to-title index rebuilt with the rest of the
+people index, which the detector now reads instead of scanning every payload for a matching name.
+
+A film that belongs to a collection carries the rest of it under the panel, in release order, with
+the one you are looking at marked.
+
+## Take it with you
+
+Marquee knows when things happen — the next episode of something on your shelf, the release of a
+film you are waiting for — and that only ever showed up while you had the site open. Cut a key on
+the Notebook page and it goes where you already look: an iCalendar feed at `/feeds/<key>/diary.ics`
+for your calendar, an Atom feed at `/feeds/<key>/alerts.atom` for your reader.
+
+The calendar carries episodes of anything you are watching or have on the watchlist, from both
+places dates are kept — TVmaze for the week ahead, which knows the clock time, and TMDB's season
+records for everything announced after that, which only knows the day. Anything you have already
+ticked off is left out, and unreleased watchlist titles arrive as all-day entries on their release
+date. The reader carries the notes the Usher would have posted and the Monday digest — a second
+channel alongside email, on the same pipeline and under the same weekly cap, and one that does not
+need a confirmed address.
+
+Cinema showings are deliberately absent. A calendar client reads from wherever it happens to live,
+so placing them would mean keeping a location against an account, and Marquee does not.
 
 ## What's on locally
 
-A film's panel carries the cinemas near you that are showing it, under where you can stream it. It
-is members only, and the position comes from Cloudflare's edge — roughly a town, never a street.
-Nothing is asked of the viewer, no permission prompt is raised, and no location is stored against
-an account.
+A cinema without a building still knows the ones that have them. Sign in and a film's panel carries
+what is on at the cinemas near you, under the streaming options. The position comes from
+Cloudflare's edge — roughly a town, never a street. Nothing is asked of you, no permission prompt
+is raised, and no location is stored against an account.
 
-Listings come from whichever chains publish them, one `CinemaSource` adapter each:
+Each chain answers with whatever precision it can manage on the day, and the panel renders
+honestly: times where there are times, days where there are only days, and a link to their board
+where there is neither.
 
 | Chain        | What they publish                                                           |
 | ------------ | --------------------------------------------------------------------------- |
@@ -75,238 +119,149 @@ Listings come from whichever chains publish them, one `CinemaSource` adapter eac
 | Picturehouse | Exact showtimes; venues are read off the site and placed from OpenStreetMap |
 | Vue          | Which days a film is on at a site, but not the clock times                  |
 
-A source answers with whatever precision it can manage on the day, and the panel renders honestly:
-times where there are times, days where there are only days, and a link to their board where there
-is neither. Vue's date endpoint is tightly rate limited and stands us down often, so its adapter
-degrades a step rather than dropping the chain.
-
-Adding a chain is one adapter file and one line in `worker/clients/cinema/index.ts`. Nothing above
-that module knows which chain it is talking to, or which country it is in.
-
-Listings are only pulled for cinemas near somewhere a member has actually looked from, so the work
-grows with the audience rather than with the country. Chain film ids are matched to catalogue
-titles on title, year and runtime — listings carry showmanship the catalogue does not, so the
-format and event decoration is stripped first — and every decision is cached, making the cost
-one-off per film rather than per screening. Coverage and match rates are on the `/admin` page.
-
-Odeon and Curzon publish nothing readable: both sit behind a bot challenge that a Worker, being a
-datacenter client like any other, does not get through. They are absent rather than approximated.
+Odeon and Curzon publish nothing readable — both sit behind a bot challenge a Worker does not get
+through. They are absent rather than approximated.
 
 ## The revival house
 
-There is a small screen at the back of the building where the ticket is nothing, because the prints
-are out of copyright. `/revival` is a repertory programme of public domain film that plays inside
-Marquee rather than sending anyone out to a service.
+There is a small screen at the back where the ticket is nothing, because the prints are out of
+copyright. `/revival` is a repertory programme that plays here rather than sending you somewhere
+else, on our own player, with no account and no service in the way.
 
-Two sources feed it. The Library of Congress's National Screening Room, which is a US institution
-saying in its own words that it is not aware of any copyright restriction and offering the file for
-download. And the Internet Archive, which is an open upload platform and therefore is not taken at
-its word: an Archive item only clears on its own when the uploader marked it public domain **and**
-it was published before the US term could still be running, which as of 2026 means 1930 or earlier.
-Everything else lands in a review queue on `/admin` and waits for a person. A title carries its own
-provenance on its page — which basis it is free under, who holds the print, and a link back to the
-source record — so a viewer can check the reasoning rather than take our word for it either.
+Two places supply it, and they are not trusted equally. The Library of Congress National Screening
+Room is an institution saying in its own words that it is not aware of any restriction, and handing
+you the file — so what it will let you download is taken as its own rights signal. The Internet
+Archive is an open upload platform and is not taken at its word: a print clears on its own only when
+the uploader marked it public domain **and** it was published before the US term could still be
+running, which as of 2026 means 1930 or earlier. Everything else waits in a queue on `/admin` for
+someone to look at it. In practice that holds back a good deal that really is free — a film out of
+copyright because nobody renewed it looks identical to one that is not — which is the right way
+round to be wrong.
 
-An approved print is mirrored into R2 and served from `/media/reel/:id`, a byte-range route that
-answers 206s so the scrubber works. The copy is done by the `marquee-revival` queue in 32 MB parts
-against an R2 multipart upload, re-queueing itself between runs, so a two-hour feature crosses
-several invocations without a Worker ever holding the whole file. Until the copy lands the same
-route proxies the source, so a print is watchable the moment it is approved and quietly becomes ours
-later. Nothing is transcoded; both sources already publish an H.264 MP4 derivative.
+Every print carries its provenance on its own page: which basis it is free under, who holds the
+copy, and a link back to the source record. A viewer can check the reasoning rather than take our
+word for it either.
 
-Works are matched to catalogue titles on title, year and runtime using the same matcher the cinema
-listings use, so a film's normal panel grows a "Playing here, free" row when we hold a print of it.
+Prints are matched to catalogue titles the same way cinema listings are, so a film's ordinary panel
+grows a _playing here, free_ row when we have one.
 
-## How search works
+## The door
 
-Search is hybrid. An FTS5 index over titles, synopses, TMDB keywords and credited names supplies keyword precision; a Vectorize index of bge-m3 embeddings supplies meaning. The two result sets are interleaved and scored by `@cf/baai/bge-reranker-base`, with a small additive boost from a title's Wikipedia pageview trend.
+Most of the job is letting people in; the rest of it is not, and the API's rate limits and bot
+checks speak in his voice rather than a status code's. Ask too fast and you get _"Steady on. One at
+a time."_ Arrive as something that is not a person and you get told that he has seen a lot of faces
+and not one of them was yours. Try a door that is not yours and you meet the manager's office
+instead: frosted glass, a name painted on it, a note that has said _back in ten minutes_ since 1974.
 
-The AI shelves and the curator sit on top of that rather than driving it. A viewer's taste vector is
-the mean of the embeddings of what they save, blended with an embedding of what they have told the
-Usher — all stated taste on day one, mostly behaviour by the time a dozen things are on the shelf.
-Each shelf is a different slice of that neighbourhood, and which slices get built depends on why
-they said they watch: follow the cast and one shelf is built from their people, watch to switch off
-and the acclaimed shelf becomes a comfortable one. The model only names the shelf and picks from a
-shortlist it can see.
+He is not in. He is never in. Nor is the projectionist, who runs the sweeps and the long nights of
+ingestion, and who gets a note of his own on the admin page.
 
-## Local development
+---
 
-Copy `.dev.vars.example` and replace with your env variables:
+## What it runs on
 
-```dotenv
+Cloudflare Workers throughout — D1, R2, Queues, Workflows, Vectorize, Workers AI, Images and Email
+Service. `wrangler.json` declares all of it, and `wrangler` creates most of it for you on first
+deploy.
+
+Outside data needs keys. Every client checks for its own and stands down quietly without it, so a
+partial setup runs; it just knows less.
+
+| Key                                    | Gives you                                          |
+| -------------------------------------- | -------------------------------------------------- |
+| `TMDB_API_TOKEN`                       | Titles, images, credits, providers — the catalogue |
+| `GITHUB_CLIENT_ID` / `_SECRET`         | Sign-in                                            |
+| `WATCHMODE_API_KEY`                    | Service directory, gap-filling on saved titles     |
+| `OMDB_API_KEY`                         | Awards, box office, search beyond the catalogue    |
+| `SIMKL_CLIENT_ID`                      | Anime tags and scores                              |
+| `TRAKT_CLIENT_ID` / `_SECRET`          | Importing a viewer's history                       |
+| `CLOUDFLARE_ACCOUNT_ID` / `_API_TOKEN` | AI Gateway                                         |
+
+TMDB is the one you cannot really run without. Air dates come from TVmaze and the trending rail
+from Wikipedia pageviews; neither needs a key.
+
+## Running it locally
+
+```bash
 cp .dev.vars.example .dev.vars
-```
-
-Create a GitHub OAuth app with `http://localhost:8787/api/auth/callback/github` as its local
-authorisation callback URL and `https://<your-domain>/api/auth/callback/github` for your deployed
-domain, then put its client ID and client secret in `.dev.vars`.
-
-Magic-link sign-in rides on [Cloudflare Email Service][email-service] through the `send_email`
-binding, so no third party ever sees who is asking for a ticket. Onboard a sending domain in the
-Cloudflare dashboard (Email Service, Workers Paid plan) and point `MAIL_FROM` in `wrangler.json` at
-an address on it. Until a domain is onboarded, sending only works to destination addresses you have
-verified in your account, which is enough for local testing. Unset `MAIL_FROM` and the box office
-quietly drops the option. The binding is set to `remote: true`, so `wrangler dev` posts real tickets
-instead of logging them to the console. Sign-in methods are advertised by `/api/auth/methods`, which
-only lists what the deployment can actually do.
-
-[email-service]: https://developers.cloudflare.com/email-service/
-
-Trakt is optional. Create an application at <https://trakt.tv/oauth/applications> with
-`http://localhost:8787/api/links/trakt/callback` as a redirect URI, then set `TRAKT_CLIENT_ID` and
-`TRAKT_CLIENT_SECRET`. Without them the Trakt panel on the Sources page reports itself as
-unconfigured and everything else carries on.
-
-Create the Vectorize index once per account:
-
-```bash
+pnpm install
 pnpm exec wrangler vectorize create marquee-titles --dimensions=1024 --metric=cosine
-```
-
-Create the revival house's queue once per account:
-
-```bash
 pnpm exec wrangler queues create marquee-revival
-```
-
-Then start:
-
-```bash
 pnpm db:migrate:local
 pnpm dev
 ```
 
-Open <http://localhost:8787>
+Open <http://localhost:8787>.
 
-### Ingesting locally
+Fill in `.dev.vars` from the table above. For sign-in, create a GitHub OAuth app with
+`http://localhost:8787/api/auth/callback/github` as its callback URL. For Trakt, an application at
+<https://trakt.tv/oauth/applications> with `http://localhost:8787/api/links/trakt/callback`.
 
-`pnpm dev` also runs D1 and the ingestion queue locally. Cron triggers don't fire on a
-timer, so hit the scheduled endpoint to queue `sync-providers` and `sync-catalog`:
+D1 and the queues run locally. Nothing syncs on its own — crons do not fire on a timer, and the
+scheduled handler is a no-op while `LOCAL_DEV=true`, so no third-party rate limit is spent while you
+work. Run jobs by hand from `/admin`, which has a button for each one and takes the same code path
+the crons take in production. To exercise the cron entrypoint itself, set `LOCAL_SYNC=on` and hit
+`/cdn-cgi/local/scheduled`.
 
-```bash
-curl http://localhost:8787/cdn-cgi/local/scheduled
-```
+## Deploying
 
-The consumer picks them up within a few seconds. Check what happened:
-
-```bash
-pnpm exec wrangler d1 execute DB --local --command "SELECT job_type, status, error FROM ingestion_runs ORDER BY started_at DESC LIMIT 10"
-```
-
-## Deployment
-
-Install dependencies, authenticate Wrangler, and create the D1 database:
+Set the secrets listed under `secrets.required` in `wrangler.json`, then:
 
 ```bash
-pnpm install
-```
-
-Put your secrets:
-
-```bash
-pnpm exec wrangler secret put TMDB_API_TOKEN
-pnpm exec wrangler secret put WATCHMODE_API_KEY
-pnpm exec wrangler secret put OMDB_API_KEY
-pnpm exec wrangler secret put SIMKL_CLIENT_ID
-pnpm exec wrangler secret put TRAKT_CLIENT_ID
-pnpm exec wrangler secret put TRAKT_CLIENT_SECRET
-pnpm exec wrangler secret put CLOUDFLARE_ACCOUNT_ID
-pnpm exec wrangler secret put CLOUDFLARE_API_TOKEN
-pnpm exec wrangler secret put GITHUB_CLIENT_ID
-pnpm exec wrangler secret put GITHUB_CLIENT_SECRET
-pnpm exec wrangler secret put TRAKT_CLIENT_ID
-pnpm exec wrangler secret put TRAKT_CLIENT_SECRET
-```
-
-If the
-Worker is served behind a different canonical domain, set `SITE_ORIGIN` to that HTTPS origin in
-`wrangler.json`.
-
-Deploy the application and apply its remote D1 migration:
-
-```bash
+pnpm db:migrate:remote
 pnpm deploy
 ```
 
-## Backfills
+Migrations are a separate step — `pnpm deploy` only type-checks, builds and ships. Point the
+`routes` entry in `wrangler.json` at your own domain, set `SITE_ORIGIN` if the Worker is served
+behind a different canonical one, and add the deployed callback URL to the GitHub OAuth app.
 
-The catalogue sweep is a Workflow on two crons. A light sweep every three hours refreshes the
-homepage head, the TVmaze schedule and the Wikipedia buzz sample, and queues availability,
-enrichment, embeddings and the homepage sections. A deep sweep once a night additionally syncs the
-provider ledger and fans all of TMDB's discover pages out over the ingestion queue.
+Magic-link sign-in rides on [Cloudflare Email Service][email-service] through the `send_email`
+binding, so no third party sees who is asking for a ticket. Onboard a sending domain and point
+`MAIL_FROM` at an address on it; leave `MAIL_FROM` unset and the box office quietly drops the
+option. `/api/auth/methods` only advertises what the deployment can actually do.
 
-Keywords, credits and embeddings arrive as titles are re-hydrated from TMDB, so a fresh deployment
-fills in over the first few sweeps rather than all at once. A sweep merges rather than replaces:
-ratings, external ids and fetched availability survive a re-hydration, and a title whose TMDB
-record has not moved is not rewritten at all. Embeddings are queued 2,000 at a time and keyed on a
-hash of the text they are built from, so a title is only re-embedded when that text changes.
+[email-service]: https://developers.cloudflare.com/email-service/
 
-Availability is refreshed on a rolling seven-day window, 400 titles a sweep, oldest first. A source
-that answers 429 is stood down for a while rather than retried, and the pause shows on the Sources
-page next to its call budget.
-
-A second cron on Monday mornings runs the digest workflow, which writes a per-viewer digest of
-fresh releases near their taste, what is trending, and the week's episodes, readable at `/this-week`.
-
-The deep sweep also walks the public domain sources a page at a time per collection, keeping a
-cursor so each run picks up where the last one stopped, then matches new works to catalogue titles
-and queues the next few prints for mirroring. Discovery, matching and mirroring can each be started
-by hand from `/admin` under "The revival house".
-
-## Admin
-
-Accounts carry a role, `viewer` or `admin`. The first account to sign in on a fresh deployment
-becomes the administrator; everyone after that is a viewer. Admins get an `/admin` page in the
-navigation with the pipeline's call budgets, enrichment coverage, recent jobs, failures and the
-homepage rails, plus buttons to start a sweep, rebuild the digests, queue a backfill, or resume a
-source that has been stood down after a rate limit. Roles are granted and revoked from the same
-page, and the last remaining administrator cannot be demoted.
-
-Everything under `/api/admin` requires an administrator session. If you ever lock yourself out,
-promote an account directly:
+The first account to sign in becomes the administrator; everyone after that is a viewer. If you
+lock yourself out:
 
 ```bash
 pnpm exec wrangler d1 execute DB --remote --command "UPDATE users SET role = 'admin' WHERE github_login = 'your-login'"
 ```
 
-## API protection
+A fresh deployment fills in over the first few sweeps rather than all at once. Watch it on `/admin`.
 
-Every request to `/api`, `/mcp` and `/media` passes through one guard in
-`worker/security/guard.ts` before it reaches a handler. The guard resolves the caller, applies a bot
-check to anyone who is not signed in, then spends a rate limit token on their behalf.
+## Notes for the curious
 
-Two tables in `worker/security/policies.ts` drive it, and they are the only place to change when a
-route needs different treatment. `POLICIES` names a bot stance and one rate limiter per tier, so a
-signed-in caller and an anonymous caller can sit on different budgets with different messages.
-`RULES` maps request paths to a policy, first match wins, ending in a catch-all that puts every
-write on `write` and every read on `read`. New endpoints are covered by that catch-all the moment
-they are mounted; give one its own entry only when it deserves a tighter or looser budget.
+**Search** is hybrid: an FTS5 index over titles, synopses, keywords and credits for precision, a
+Vectorize index of bge-m3 embeddings for meaning, the two interleaved and reranked by
+`@cf/baai/bge-reranker-base`. The AI shelves sit on top of that rather than driving it — a viewer's
+taste vector is the mean of what they save, blended with what they have told the Usher, and the
+model only names a shelf and picks from a shortlist it can see.
 
-Callers are identified by session cookie or `Bearer` API token, and anonymous callers are keyed by
-`cf-connecting-ip`, falling back to the guest cookie when the header is absent. The lookup is
-memoised per request, so the guard costs nothing beyond what the routes already do.
+**The sweeps** are a Workflow on two crons: a light one every three hours, a deep one nightly that
+fans TMDB's discover pages out over the ingestion queue. Sweeps merge rather than replace,
+embeddings are keyed on a hash of their source text so nothing is re-embedded for the sake of it,
+and a source that answers 429 is stood down rather than retried.
 
-The bot check in `worker/security/bots.ts` reads Cloudflare's `botManagement` verdict when the zone
-provides one and falls back to user agent heuristics when it does not. Three stances:
+**The door** is one guard in `worker/security/guard.ts`, driven by two tables in
+`worker/security/policies.ts` — `POLICIES` for stances and budgets, `RULES` for path matching, first
+match wins, ending in a catch-all. New endpoints are covered the moment they are mounted. Set
+`BOT_PROTECTION=off` to keep rate limits but drop the bot check when debugging a client that trips
+the heuristics.
 
-| Stance     | Allows                         | Used for                                    |
-| ---------- | ------------------------------ | ------------------------------------------- |
-| `strict`   | browsers only                  | search, curator, insights, sign-in, writes  |
-| `crawlers` | browsers and verified crawlers | public reads, posters and Open Graph images |
-| `open`     | everything                     | `/mcp`, which is meant for programmatic use |
+**Feed keys** are hashed at rest, so the links are shown once when you cut one and a new key
+retires the old one. Nothing under `/feeds` needs a cookie, which is what lets a calendar client
+read it at all — the guard covers the path with a `feed` policy that lets machines through and rate
+limits them like any public read, and responses carry `x-robots-tag: noindex`.
 
-Signed-in callers skip the bot check entirely, which is what keeps API tokens and MCP clients
-working. Blocks answer `403`; exhausted budgets answer `429` with `retry-after`. Both are recorded
-to Analytics Engine as `guard_blocked` and `guard_throttled`, with the policy name and the reason in
-the detail blob.
+**Cinema chains** are one `CinemaSource` adapter each, plus a line in
+`worker/clients/cinema/index.ts`. Nothing above that module knows which chain or which country it
+is talking to. Listings are only pulled near somewhere a member has actually looked from, so the
+work grows with the audience rather than with the map.
 
-Set the `BOT_PROTECTION` var to `off` to disable the bot check while keeping rate limits, which is
-occasionally useful when debugging a client that trips the heuristics.
-
-## Connecting an agent
-
-Marquee speaks MCP at `/mcp` over JSON-RPC. Mint a token from the Sources page, then point a client
-at it:
+**Agents** — Marquee speaks MCP at `/mcp`. Mint a token on the Sources page:
 
 ```json
 {
@@ -319,21 +274,24 @@ at it:
 }
 ```
 
-It exposes `search_catalogue`, `find_similar`, `get_title`, `get_shelf`, `save_to_shelf` and
-`whats_on_tonight`. Tokens are hashed at rest and can be revoked from the same page.
+It exposes `search_catalogue`, `find_similar`, `get_title`, `get_shelf`, `save_to_shelf`,
+`whats_on_tonight`, `whats_on_this_week`, `titles_by_person` and `follow_person`. The week tool
+answers from the same shelf-aware diary the calendar feed is built from, so an agent sees exactly
+what the subscription would show.
 
-## Posters
+**Posters** are cached in R2 and served from the app's own hostname through Cloudflare Images. Keep
+the four widths in `src/lib/media.ts` and `worker/routes/media.ts` aligned, or the number of
+billable unique transformations stops being bounded.
 
-Posters are cached in R2. Images transformations are enabled on the `pashi.app` zone, so the
-production client requests four fixed widths from the app's own `marquee.pashi.app` hostname:
+**Prints** are mirrored into R2 and served from `/media/reel/:id`, a byte-range route that answers
+206s so the scrubber works. The copy runs on the `marquee-revival` queue in 32 MB parts against an
+R2 multipart upload, persisting the upload id and the parts between runs and re-queueing itself, so
+a two-hour feature crosses several invocations without a Worker ever holding the whole file. Until
+the copy lands the same route proxies the source, which is what keeps a print watchable the moment
+it is approved and `media-src` at `'self'`. Nothing is transcoded — both sources already publish an
+H.264 MP4 derivative. The deep sweep walks each source a page at a time behind a cursor; discovery,
+matching and mirroring each have a button on `/admin`.
 
-```text
-https://marquee.pashi.app/cdn-cgi/image/width=320,fit=scale-down,format=auto/media/posters/...
-```
-
-The URL is emitted as a same-origin relative path; no separate image hostname or CSP exception is
-needed. Local and preview deployments keep using `/media/posters/...?w=320`, which resizes through
-the Worker's Images binding. Both paths negotiate AVIF or WebP from the request's `Accept` header.
-Keep the four widths in `src/lib/media.ts` and `worker/routes/media.ts` aligned so the number of
-billable unique transformations stays bounded. Transformations are counted per account, not per
-hostname.
+**The artwork** is in `public/`, all of it cut from `usher.svg`, in ink, paper, acid and coral and
+nothing else. He is drawn to survive on his own dark background, so anything you add to him wants a
+paper core and an ink keyline or it will disappear into the page.

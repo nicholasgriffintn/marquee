@@ -1,26 +1,119 @@
-import { useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 
+import type { MapNeighbour, MapPoint, TasteMapResponse } from "../../domain/notebook";
 import { requestJson } from "../../lib/api";
-
-type MapPoint = {
-  titleId: string;
-  title: string;
-  genre: string;
-  weight: number;
-  x: number;
-  y: number;
-};
+import { TasteMapCard } from "./TasteMapCard";
 
 const SIZE = 560;
-const PAD = 26;
+const PAD = 34;
+const ART_SETTLE = 130;
 
 function radius(weight: number) {
   return 5 + Math.min(7, Math.abs(weight) * 5);
 }
 
+function pointLabel(point: MapPoint) {
+  const landed = point.weight >= 0 ? "landed with you" : "did not land";
+
+  return `${point.title}${point.year ? ` (${point.year})` : ""} — ${point.genre} — ${landed}`;
+}
+
+type PointHandlers = {
+  onEnter: (point: MapPoint) => void;
+  onLeave: () => void;
+  onPick: (point: MapPoint) => void;
+  onClear: () => void;
+};
+
+const TastePoint = memo(function TastePoint({
+  point,
+  cx,
+  cy,
+  active,
+  pinned,
+  handlers,
+}: {
+  point: MapPoint;
+  cx: number;
+  cy: number;
+  active: boolean;
+  pinned: boolean;
+  handlers: PointHandlers;
+}) {
+  const size = radius(point.weight);
+
+  return (
+    <g
+      className={`taste-point${point.weight >= 0 ? " liked" : " cooled"}${active ? " active" : ""}`}
+      tabIndex={0}
+      role="button"
+      aria-label={pointLabel(point)}
+      aria-pressed={pinned}
+      onMouseEnter={() => handlers.onEnter(point)}
+      onMouseLeave={handlers.onLeave}
+      onFocus={() => handlers.onEnter(point)}
+      onBlur={handlers.onLeave}
+      onClick={() => handlers.onPick(point)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          handlers.onPick(point);
+        }
+
+        if (event.key === "Escape") {
+          handlers.onClear();
+        }
+      }}
+    >
+      <circle cx={cx} cy={cy} r={size + 8} className="taste-point-hit" />
+      <circle cx={cx} cy={cy} r={size} />
+    </g>
+  );
+});
+
+function MapSummary({ map, landed }: { map: TasteMapResponse; landed: number }) {
+  const axes = map.axes;
+
+  return (
+    <div className="taste-card taste-card-blank">
+      <p className="taste-card-hint">
+        Hover a mark, or tab to one, and I will tell you what it is.
+      </p>
+
+      <dl className="taste-card-facts">
+        <div>
+          <dt>On this table</dt>
+          <dd>
+            {landed} landed with you, {map.mappedCount - landed} did not
+          </dd>
+        </div>
+        {axes.x && (
+          <div>
+            <dt>Left to right</dt>
+            <dd>
+              {axes.x.low} → {axes.x.high}
+            </dd>
+          </div>
+        )}
+        {axes.y && (
+          <div>
+            <dt>Bottom to top</dt>
+            <dd>
+              {axes.y.low} → {axes.y.high}
+            </dd>
+          </div>
+        )}
+      </dl>
+    </div>
+  );
+}
+
 export function TasteMap({ isSignedIn }: { isSignedIn: boolean }) {
-  const [points, setPoints] = useState<MapPoint[] | null>(null);
+  const [map, setMap] = useState<TasteMapResponse | null>(null);
+  const [error, setError] = useState("");
   const [hovered, setHovered] = useState<MapPoint | null>(null);
+  const [pinned, setPinned] = useState<MapPoint | null>(null);
+  const [artId, setArtId] = useState("");
 
   useEffect(() => {
     if (!isSignedIn) {
@@ -29,75 +122,224 @@ export function TasteMap({ isSignedIn }: { isSignedIn: boolean }) {
 
     const controller = new AbortController();
 
-    void requestJson<{ points: MapPoint[] }>("/api/notebook/map", { signal: controller.signal })
-      .then((response) => setPoints(response.points))
-      .catch(() => setPoints([]));
+    async function load() {
+      try {
+        const response = await requestJson<TasteMapResponse>("/api/notebook/map", {
+          signal: controller.signal,
+        });
+
+        setMap(response);
+        setError("");
+      } catch (caught) {
+        if (caught instanceof DOMException && caught.name === "AbortError") {
+          return;
+        }
+
+        setError("I cannot lay the map out just now. Try again shortly.");
+      }
+    }
+
+    void load();
 
     return () => controller.abort();
   }, [isSignedIn]);
 
-  if (!isSignedIn || points === null) {
+  const active = hovered ?? pinned;
+  const activeId = active?.titleId ?? "";
+
+  useEffect(() => {
+    if (!activeId || activeId === artId) {
+      return;
+    }
+
+    const timer = setTimeout(() => setArtId(activeId), ART_SETTLE);
+
+    return () => clearTimeout(timer);
+  }, [activeId, artId]);
+
+  const points = map?.points;
+
+  const byTitleId = useMemo(
+    () => new Map((points ?? []).map((point) => [point.titleId, point])),
+    [points],
+  );
+
+  const landed = useMemo(
+    () => (points ?? []).filter((point) => point.weight >= 0).length,
+    [points],
+  );
+
+  const placed = useMemo(() => {
+    const plot = SIZE - PAD * 2;
+
+    return new Map(
+      (points ?? []).map((point) => [
+        point.titleId,
+        { cx: PAD + point.x * plot, cy: SIZE - PAD - point.y * plot },
+      ]),
+    );
+  }, [points]);
+
+  const threads = useMemo(() => {
+    const from = activeId ? placed.get(activeId) : undefined;
+    const point = activeId ? byTitleId.get(activeId) : undefined;
+
+    if (!from || !point) {
+      return [];
+    }
+
+    return point.neighbours.flatMap((neighbour) => {
+      const to = placed.get(neighbour.titleId);
+
+      return to ? [{ titleId: neighbour.titleId, from, to }] : [];
+    });
+  }, [activeId, byTitleId, placed]);
+
+  const handlers = useMemo<PointHandlers>(
+    () => ({
+      onEnter: (point) => setHovered(point),
+      onLeave: () => setHovered(null),
+      onPick: (point) => setPinned(point),
+      onClear: () => setPinned(null),
+    }),
+    [],
+  );
+
+  const pickNeighbour = useCallback(
+    (neighbour: MapNeighbour) => {
+      const point = byTitleId.get(neighbour.titleId);
+
+      if (point) {
+        setHovered(null);
+        setPinned(point);
+      }
+    },
+    [byTitleId],
+  );
+
+  if (!isSignedIn) {
     return null;
   }
 
-  if (points.length < 4) {
+  if (error) {
     return (
-      <div className="notebook-group">
-        <h2>The shape of your taste</h2>
-        <p className="notebook-lede">
-          Not enough on the shelf to draw it yet. Rate a few more and I will map them.
-        </p>
-      </div>
+      <p className="notebook-empty" role="alert">
+        {error}
+      </p>
     );
   }
 
-  const plot = SIZE - PAD * 2;
+  if (map === null) {
+    return <p className="notebook-empty">Finding a flat enough table…</p>;
+  }
+
+  if (map.status === "sparse") {
+    return (
+      <p className="notebook-empty">
+        Not enough on the shelf to draw it yet — I need four things you have marked, and I have{" "}
+        {map.shelfCount}. Rate a few more and I will map them.
+      </p>
+    );
+  }
+
+  if (map.status === "pending") {
+    return (
+      <p className="notebook-empty">
+        I have {map.shelfCount} on your shelf but I have only read {map.mappedCount} of them
+        properly. I am reading the rest now — come back in a minute and the map will be here.
+      </p>
+    );
+  }
+
+  const axes = map.axes;
 
   return (
-    <div className="notebook-group taste-map">
-      <h2>The shape of your taste</h2>
-      <p className="notebook-lede">
-        Every title you have marked, placed by what it is rather than what it is called. Close
-        together means alike. The two directions have no names — I worked them out myself.
-      </p>
-
+    <div className="taste-map">
       <div className="taste-map-frame">
-        <svg viewBox={`0 0 ${SIZE} ${SIZE}`} role="img" aria-label="A map of your shelf">
-          <rect x="0" y="0" width={SIZE} height={SIZE} className="taste-map-ground" />
-          {points.map((point) => {
-            const cx = PAD + point.x * plot;
-            const cy = SIZE - PAD - point.y * plot;
-            const liked = point.weight >= 0;
+        <svg
+          viewBox={`0 0 ${SIZE} ${SIZE}`}
+          role="group"
+          aria-label="Your shelf, laid out so that alike things sit together"
+        >
+          <rect
+            x="0"
+            y="0"
+            width={SIZE}
+            height={SIZE}
+            className="taste-map-ground"
+            onClick={() => setPinned(null)}
+          />
 
-            return (
-              <g
-                key={point.titleId}
-                className={`taste-point${liked ? " liked" : " cooled"}${
-                  hovered?.titleId === point.titleId ? " active" : ""
-                }`}
-                onMouseEnter={() => setHovered(point)}
-                onMouseLeave={() => setHovered(null)}
+          {axes.x && (
+            <>
+              <text className="taste-map-axis" x={PAD} y={SIZE - 10} textAnchor="start">
+                ← {axes.x.low}
+              </text>
+              <text className="taste-map-axis" x={SIZE - PAD} y={SIZE - 10} textAnchor="end">
+                {axes.x.high} →
+              </text>
+            </>
+          )}
+
+          {axes.y && (
+            <>
+              <text
+                className="taste-map-axis"
+                x={14}
+                y={SIZE - PAD}
+                textAnchor="start"
+                transform={`rotate(-90 14 ${SIZE - PAD})`}
               >
-                <title>
-                  {point.title} — {point.genre} — {liked ? "you liked it" : "it did not land"}
-                </title>
-                <circle cx={cx} cy={cy} r={radius(point.weight)} />
-              </g>
-            );
-          })}
+                ← {axes.y.low}
+              </text>
+              <text
+                className="taste-map-axis"
+                x={14}
+                y={PAD}
+                textAnchor="end"
+                transform={`rotate(-90 14 ${PAD})`}
+              >
+                {axes.y.high} →
+              </text>
+            </>
+          )}
+
+          {threads.map((thread) => (
+            <line
+              key={thread.titleId}
+              className="taste-thread"
+              x1={thread.from.cx}
+              y1={thread.from.cy}
+              x2={thread.to.cx}
+              y2={thread.to.cy}
+            />
+          ))}
+
+          {map.points.map((point) => (
+            <TastePoint
+              key={point.titleId}
+              point={point}
+              cx={placed.get(point.titleId)?.cx ?? 0}
+              cy={placed.get(point.titleId)?.cy ?? 0}
+              active={activeId === point.titleId}
+              pinned={pinned?.titleId === point.titleId}
+              handlers={handlers}
+            />
+          ))}
         </svg>
 
-        <p className="taste-map-readout" aria-live="polite">
-          {hovered ? (
-            <>
-              <strong>{hovered.title}</strong>
-              <span>{hovered.genre}</span>
-              <em>{hovered.weight >= 0 ? "landed" : "did not land"}</em>
-            </>
+        <div className="taste-map-readout">
+          {active ? (
+            <TasteMapCard
+              point={active}
+              axes={axes}
+              artReady={artId === active.titleId}
+              onPick={pickNeighbour}
+            />
           ) : (
-            <span>Hover a mark to see what it is.</span>
+            <MapSummary map={map} landed={landed} />
           )}
-        </p>
+        </div>
       </div>
 
       <ul className="taste-map-key">
@@ -114,6 +356,9 @@ export function TasteMap({ isSignedIn }: { isSignedIn: boolean }) {
           Did not
         </li>
         <li className="sized">Bigger means stronger feelings either way</li>
+        <li className="sized">
+          {map.mappedCount} of {map.shelfCount} marks placed
+        </li>
       </ul>
     </div>
   );

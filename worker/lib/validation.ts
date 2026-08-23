@@ -89,7 +89,7 @@ export function isIngestionJob(value: unknown): value is IngestionJob {
     );
   }
 
-  if (value.type === "import-trakt-history") {
+  if (value.type === "import-trakt-history" || value.type === "push-trakt-shelf") {
     return (
       typeof value.viewerId === "string" &&
       value.viewerId.length > 0 &&

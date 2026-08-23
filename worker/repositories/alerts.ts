@@ -7,6 +7,7 @@ export type AlertRecord = {
   key: string;
   titleId: string;
   detail: string;
+  channel: "email" | "feed";
 };
 
 export async function alreadySent(db: D1Database, viewerId: string, kind: AlertKind) {
@@ -63,10 +64,17 @@ export async function recordSent(db: D1Database, records: AlertRecord[]) {
       records.map((record) =>
         db
           .prepare(
-            `INSERT OR IGNORE INTO viewer_alerts (viewer_id, kind, alert_key, title_id, detail)
-             VALUES (?1, ?2, ?3, ?4, ?5)`,
+            `INSERT OR IGNORE INTO viewer_alerts (viewer_id, kind, alert_key, title_id, detail, channel)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
           )
-          .bind(record.viewerId, record.kind, record.key, record.titleId, record.detail),
+          .bind(
+            record.viewerId,
+            record.kind,
+            record.key,
+            record.titleId,
+            record.detail,
+            record.channel,
+          ),
       ),
     );
   } catch (error) {
@@ -191,4 +199,33 @@ export async function setAlertSetting(
     )
     .bind(viewerId, kind, enabled ? 1 : 0)
     .run();
+}
+
+export type SentAlert = {
+  kind: string;
+  key: string;
+  titleId: string | null;
+  detail: string;
+  sentAt: string;
+};
+
+export async function recentAlerts(db: D1Database, viewerId: string, limit = 40) {
+  try {
+    const rows = await db
+      .prepare(
+        `SELECT kind, alert_key AS key, title_id AS titleId, detail, sent_at AS sentAt
+           FROM viewer_alerts
+          WHERE viewer_id = ?1
+          ORDER BY sent_at DESC
+          LIMIT ?2`,
+      )
+      .bind(viewerId, Math.max(1, Math.min(100, limit)))
+      .all<SentAlert>();
+
+    return rows.results;
+  } catch (error) {
+    logError("alerts_recent_failed", error);
+
+    return [];
+  }
 }

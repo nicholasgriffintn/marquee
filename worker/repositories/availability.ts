@@ -2,12 +2,29 @@ import type { MediaTitle, ProviderAvailability } from "../../src/domain/catalog.
 import { recordProviderState } from "./arrivals.ts";
 import { readRawItems } from "./catalog-reader.ts";
 
+export async function markAvailabilityChecked(db: D1Database, titleId: string) {
+  await db
+    .prepare(
+      `UPDATE catalog_titles
+       SET enriched_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+    )
+    .bind(titleId)
+    .run();
+}
+
 export async function enrichAvailability(
   db: D1Database,
   titleId: string,
   availability: ProviderAvailability[],
 ) {
-  const title = (await readRawItems(db, [titleId])).get(titleId);
+  const [title, previous] = await Promise.all([
+    readRawItems(db, [titleId]).then((titles) => titles.get(titleId)),
+    db
+      .prepare(`SELECT enriched_at AS enrichedAt FROM catalog_titles WHERE id = ?`)
+      .bind(titleId)
+      .first<{ enrichedAt: string | null }>(),
+  ]);
 
   if (!title) {
     return false;
@@ -51,7 +68,7 @@ export async function enrichAvailability(
     )
     .run();
 
-  await recordProviderState(db, titleId, enrichedTitle.providers);
+  await recordProviderState(db, titleId, enrichedTitle.providers, !previous?.enrichedAt);
 
   return true;
 }
