@@ -162,5 +162,5 @@ export function progressLabel(progress: ShowProgress | null) {
     ? `${episodeLabel(progress.furthest.season, progress.furthest.episode)} · `
     : "";
 
-  return `${place}${progress.watched} of ${progress.aired} aired episodes`;
+  return `${place}${progress.watched} of ${progress.aired} episodes so far`;
 }

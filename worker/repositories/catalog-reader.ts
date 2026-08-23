@@ -1,5 +1,9 @@
 import type { CatalogResponse, CatalogSection, MediaTitle } from "../../src/domain/catalog.ts";
-import { parseStoredTitle, parseStoredTitleIds } from "../lib/catalog-payload.ts";
+import {
+  parseSectionAudience,
+  parseStoredTitle,
+  parseStoredTitleIds,
+} from "../lib/catalog-payload.ts";
 import { logError } from "../lib/logging.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { searchTitlesFirst } from "./catalog-search.ts";
@@ -16,17 +20,66 @@ type SectionRow = {
   description: string;
   titleIds: string;
   sourceUpdatedAt: string;
+  audience: string | null;
 };
+
+function reaches(audience: string | null, mine: ReadonlySet<string>) {
+  const gate = parseSectionAudience(audience);
+
+  if (!gate.providerIds?.length) {
+    return true;
+  }
+
+  return gate.providerIds.some((id) => mine.has(id));
+}
 
 function includesProvider(title: MediaTitle, providerIds: string[]) {
   return (
     providerIds.length === 0 ||
+    title.providers.length === 0 ||
     title.providers.some((provider) => providerIds.includes(provider.id))
   );
 }
 
 const READ_CHUNK = 80;
 const MIN_VISIBLE_ITEMS = 3;
+const SECTION_ITEMS = 14;
+const MAX_VISIBLE_SECTIONS = 18;
+
+async function matchingTitleIds(db: D1Database, ids: string[], providerIds: string[]) {
+  const uniqueIds = [...new Set(ids.filter(isKnownTitle))];
+
+  if (providerIds.length === 0 || uniqueIds.length === 0) {
+    return new Set(uniqueIds);
+  }
+
+  const keep = new Set<string>();
+
+  for (let index = 0; index < uniqueIds.length; index += READ_CHUNK) {
+    const wave = uniqueIds.slice(index, index + READ_CHUNK);
+    // oxlint-disable-next-line no-await-in-loop
+    const rows = await db
+      .prepare(
+        `SELECT id FROM catalog_titles
+          WHERE id IN (${wave.map(() => "?").join(",")})
+            AND (
+              json_array_length(provider_ids) = 0
+              OR EXISTS (
+                SELECT 1 FROM json_each(provider_ids)
+                 WHERE json_each.value IN (${providerIds.map(() => "?").join(",")})
+              )
+            )`,
+      )
+      .bind(...wave, ...providerIds)
+      .all<{ id: string }>();
+
+    for (const row of rows.results) {
+      keep.add(row.id);
+    }
+  }
+
+  return keep;
+}
 
 export async function readRawItems(db: D1Database, ids: string[]) {
   const uniqueIds = [...new Set(ids.filter(isKnownTitle))];
@@ -101,7 +154,8 @@ export async function readCatalog(db: D1Database, query: string, providerIds: st
          title,
          description,
          title_ids AS titleIds,
-         source_updated_at AS sourceUpdatedAt
+         source_updated_at AS sourceUpdatedAt,
+         audience
        FROM catalog_sections
        ORDER BY rowid`,
     )
@@ -111,30 +165,42 @@ export async function readCatalog(db: D1Database, query: string, providerIds: st
     return null;
   }
 
-  const titleIds = rows.results.flatMap((section) => parseStoredTitleIds(section.titleIds));
-  const titles = await readItems(db, titleIds, titleIds.length);
+  const mine = new Set(providerIds);
+  const eligible = rows.results.filter((section) => reaches(section.audience, mine));
+  const watchable = await matchingTitleIds(
+    db,
+    eligible.flatMap((section) => parseStoredTitleIds(section.titleIds)),
+    providerIds,
+  );
+
+  const shortlist = eligible
+    .map((section) => ({
+      row: section,
+      ids: parseStoredTitleIds(section.titleIds)
+        .filter((id) => watchable.has(id))
+        .slice(0, SECTION_ITEMS),
+    }))
+    .filter((section) => section.ids.length >= MIN_VISIBLE_ITEMS)
+    .slice(0, MAX_VISIBLE_SECTIONS);
+
+  const wanted = shortlist.flatMap((section) => section.ids);
+  const titles = await readItems(db, wanted, wanted.length);
   const titlesById = new Map(titles.map((title) => [title.id, title]));
-  const sections: CatalogSection[] = rows.results
-    .map((section) => {
-      const listed = parseStoredTitleIds(section.titleIds);
-      const hydrated = listed.flatMap((id) => {
+  const sections: CatalogSection[] = shortlist
+    .map(({ row, ids }) => {
+      const items = ids.flatMap((id) => {
         const title = titlesById.get(id);
 
         return title ? [title] : [];
       });
 
-      if (hydrated.length === 0 && listed.length > 0) {
-        logError("section_titles_unreadable", new Error(`${section.id} lost every stored title`), {
+      if (items.length === 0) {
+        logError("section_titles_unreadable", new Error(`${row.id} lost every stored title`), {
           area: "catalogue",
         });
       }
 
-      return {
-        id: section.id,
-        title: section.title,
-        description: section.description,
-        items: hydrated.filter((title) => includesProvider(title, providerIds)),
-      };
+      return { id: row.id, title: row.title, description: row.description, items };
     })
     .filter((section) => section.items.length >= MIN_VISIBLE_ITEMS);
   const fetchedAt = rows.results.reduce(

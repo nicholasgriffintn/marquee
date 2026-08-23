@@ -86,7 +86,7 @@ const TOOLS = [
   },
   {
     name: "whats_on_tonight",
-    description: "Episodes airing in the next day and a half, from the viewer's own shows first.",
+    description: "Episodes landing in the next day and a half, from the viewer's own shows first.",
     inputSchema: { type: "object", properties: {} },
   },
   {

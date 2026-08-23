@@ -67,7 +67,7 @@ export function SourcesPage({ stats }: { stats: ProvidersResponse["stats"] }) {
           </a>
           <a href="https://anilist.co" target="_blank" rel="noreferrer">
             <strong>AniList</strong>
-            <span>Anime tags and airing episodes</span>
+            <span>Anime tags and episode schedules</span>
           </a>
           <a href="https://wikimediafoundation.org" target="_blank" rel="noreferrer">
             <strong>Wikimedia</strong>

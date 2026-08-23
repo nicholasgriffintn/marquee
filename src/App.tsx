@@ -16,11 +16,12 @@ import { MarqueeLogo, TicketIcon } from "./components/ui";
 import { ManagersDoor } from "./components/usher/ManagersDoor";
 import { UsherCard } from "./components/usher/UsherCard";
 import { UsherMark } from "./components/usher/UsherMark";
-import { titlePath, type CatalogSection, type MediaTitle } from "./domain/catalog";
+import { titlePath, weaveSections, type CatalogSection, type MediaTitle } from "./domain/catalog";
 import { asideFor, type UsherMoment } from "./domain/usher";
 import { useAiRails } from "./hooks/useAiRails";
 import { useCatalog } from "./hooks/useCatalog";
 import { useCurator } from "./hooks/useCurator";
+import { usePersonalRails } from "./hooks/usePersonalRails";
 import { usePinned } from "./hooks/usePinned";
 import { useProfile } from "./hooks/useProfile";
 import { useProviderPreferences } from "./hooks/useProviderPreferences";
@@ -103,6 +104,10 @@ export function App() {
   const usher = useUsher(isSignedIn);
   const pinned = usePinned(isSignedIn);
   const aiRails = useAiRails(isSignedIn && isViewerReady && isHome, profile.savedIds.join(","));
+  const personalRails = usePersonalRails(
+    isSignedIn && isViewerReady && isHome,
+    profile.savedIds.join(","),
+  );
   const episodes = useTonight(isViewerReady, TONIGHT_EPISODES);
   const trending = useTrending(isViewerReady && isHome);
   const movieMatch = useMatch("/movie/:tmdbId/*");
@@ -190,15 +195,31 @@ export function App() {
     void navigate("/");
   }, [background, navigate]);
   const sections = useMemo(
-    () => [...pinned.sections, ...aiRails.sections, ...catalog.catalogue.sections],
-    [aiRails.sections, catalog.catalogue, pinned.sections],
+    () =>
+      weaveSections(
+        pinned.sections,
+        aiRails.sections,
+        personalRails.sections,
+        catalog.catalogue.sections,
+      ),
+    [aiRails.sections, catalog.catalogue, personalRails.sections, pinned.sections],
   );
   const heroSections = useMemo(
-    () => [...pinned.sections, ...aiRails.heroSections, ...catalog.catalogue.sections],
-    [aiRails.heroSections, catalog.catalogue, pinned.sections],
+    () =>
+      weaveSections(
+        pinned.sections,
+        aiRails.heroSections,
+        personalRails.sections,
+        catalog.catalogue.sections,
+      ),
+    [aiRails.heroSections, catalog.catalogue, personalRails.sections, pinned.sections],
   );
   const isHeroReady =
-    isViewerReady && !catalog.isLoading && aiRails.isResolved && pinned.isResolved;
+    isViewerReady &&
+    !catalog.isLoading &&
+    aiRails.isResolved &&
+    pinned.isResolved &&
+    personalRails.isResolved;
   const isPinned = Boolean(curator.state.prompt && pinned.pinnedPrompt === curator.state.prompt);
 
   const pinCurrentShelf = useCallback(() => {

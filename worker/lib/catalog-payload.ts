@@ -3,6 +3,7 @@ import type {
   Provider,
   ProviderAvailability,
   ProvidersResponse,
+  SectionAudience,
 } from "../../src/domain/catalog.ts";
 import { isKnownTitle } from "./validation.ts";
 import {
@@ -119,6 +120,16 @@ export function parseStoredTitle(value: string) {
   }
 
   return { ...parsed, providers: dedupeProviders(parsed.providers) };
+}
+
+export function parseSectionAudience(value: string | null): SectionAudience {
+  const parsed = value ? parseJson(value) : null;
+
+  if (!isRecord(parsed)) {
+    return {};
+  }
+
+  return isStringArray(parsed.providerIds) ? { providerIds: parsed.providerIds } : {};
 }
 
 export function parseStoredTitleIds(value: string) {

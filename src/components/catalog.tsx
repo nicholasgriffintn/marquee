@@ -314,6 +314,11 @@ export function ContentRail({
               <b>The Usher</b>
               {section.description && <em>· {section.description}</em>}
             </span>
+          ) : section.reason ? (
+            <span className="rail-eyebrow rail-because">
+              <b>{section.reason}</b>
+              {section.description && <em>· {section.description}</em>}
+            </span>
           ) : (
             <span>{section.description}</span>
           )}
@@ -634,7 +639,7 @@ export function DetailPanel({
             )}
             {!nextEpisode && !upcomingAir && item.mediaType === "tv" && item.lastAirDate && (
               <p className="detail-next">
-                <span>Last aired</span>{" "}
+                <span>Last shown</span>{" "}
                 {new Date(item.lastAirDate).toLocaleDateString(undefined, {
                   day: "numeric",
                   month: "long",

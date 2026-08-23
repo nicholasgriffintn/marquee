@@ -1,8 +1,9 @@
 import { Hono } from "hono";
 
-import { sessionPrincipal } from "../auth/session.ts";
+import { requireAuthentication, sessionPrincipal, type AuthVariables } from "../auth/session.ts";
 import { edgeCache } from "../lib/cache.ts";
 import { recordEvent } from "../lib/events.ts";
+import { edgeOrigin } from "../lib/geo.ts";
 import { logError } from "../lib/logging.ts";
 import { canonicalOrigin } from "../lib/security.ts";
 import { validProviderIds } from "../lib/validation.ts";
@@ -20,6 +21,7 @@ import {
   getProviderCatalogue,
   getTitleAvailability,
 } from "../services/catalog.ts";
+import { getPersonalRails } from "../services/personal-rails.ts";
 import { getSeason, getSeasonIndex } from "../services/seasons.ts";
 import type { Bindings } from "../types.ts";
 
@@ -28,7 +30,7 @@ const KEYWORDS_DEFAULT_LIMIT = 120;
 const GENRES_DEFAULT_LIMIT = 40;
 const SEASON_LIMIT = 100;
 
-export const catalogRoutes = new Hono<{ Bindings: Bindings }>();
+export const catalogRoutes = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
 
 catalogRoutes.get("/", edgeCache(900), async (context) => {
   const query = (context.req.query("query") ?? "").trim().slice(0, 120);
@@ -48,6 +50,22 @@ catalogRoutes.get("/", edgeCache(900), async (context) => {
     logError("catalogue_read_failed", error, { area: "catalogue" });
 
     return context.json({ error: "Catalogue is unavailable" }, 500);
+  }
+});
+
+catalogRoutes.get("/rails", requireAuthentication, async (context) => {
+  const user = context.get("authenticatedUser");
+
+  try {
+    const sections = await getPersonalRails(context.env, user.id, edgeOrigin(context.req.raw));
+
+    context.header("cache-control", "private, max-age=120");
+
+    return context.json({ sections });
+  } catch (error) {
+    logError("personal_rails_failed", error, { area: "catalogue" });
+
+    return context.json({ sections: [] });
   }
 });
 

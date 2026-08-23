@@ -17,6 +17,10 @@ so a half-remembered plot finds the film as readily as its title does. Tell him 
 pay for and everything narrows to what you can actually press play on. What's on tonight is on the
 front page; your own shelf, with ratings and notes on it, is one click away.
 
+He builds more shelves than will fit and puts out the ones that are yours: a service you pay for, a
+name you follow, what is on at the cinemas near you. A shelf with nothing on it for you never goes
+up at all.
+
 He does the asking. On your first visit he works out what you pay for, what you reach for and why
 you pick what you pick, one question at a time, and after that he stays quiet — one uninvited word
 per session, and he takes a hint after three. He turns up where he is relevant: at the end of a

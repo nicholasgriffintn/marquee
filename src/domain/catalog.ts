@@ -94,12 +94,17 @@ export type MediaTitle = {
   };
 };
 
+export type SectionAudience = {
+  providerIds?: string[];
+};
+
 export type CatalogSection = {
   id: string;
   title: string;
   description: string;
   items: MediaTitle[];
   angle?: string;
+  reason?: string;
 };
 
 export type CatalogResponse = {
@@ -149,4 +154,44 @@ export function titleSlug(title: string) {
 
 export function titlePath(item: Pick<MediaTitle, "mediaType" | "tmdbId" | "title">) {
   return `/${item.mediaType}/${item.tmdbId}/${titleSlug(item.title)}`;
+}
+
+const PERSONAL_SPACING = 3;
+
+export function weaveSections(
+  pinned: CatalogSection[],
+  curated: CatalogSection[],
+  personal: CatalogSection[],
+  general: CatalogSection[],
+) {
+  const seen = new Set<string>();
+  const woven: CatalogSection[] = [];
+  const queue = [...personal];
+
+  const push = (section: CatalogSection) => {
+    if (!seen.has(section.id) && section.items.length > 0) {
+      seen.add(section.id);
+      woven.push(section);
+    }
+  };
+
+  for (const section of [...pinned, ...curated]) {
+    push(section);
+  }
+
+  for (const [index, section] of general.entries()) {
+    push(section);
+
+    const next = (index + 1) % PERSONAL_SPACING === 0 ? queue.shift() : undefined;
+
+    if (next) {
+      push(next);
+    }
+  }
+
+  for (const section of queue) {
+    push(section);
+  }
+
+  return woven;
 }

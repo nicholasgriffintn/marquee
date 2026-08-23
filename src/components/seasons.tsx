@@ -237,7 +237,7 @@ function SeasonHeader({
         <p>
           {total ? `${total} episode${total === 1 ? "" : "s"}` : "Episode count unknown"}
           {summary.airDate ? ` · first shown ${airLabel(summary.airDate)}` : ""}
-          {aired > 0 && canTrack ? ` · ${watched} of ${aired} aired watched` : ""}
+          {aired > 0 && canTrack ? ` · ${watched} of ${aired} watched so far` : ""}
         </p>
         {overview && <p className="season-overview">{overview}</p>}
       </div>
@@ -342,7 +342,7 @@ export function SeasonsBlock({
         <span className="seasons-label">Series and episodes</span>
         {canTrack && progress && progress.aired > 0 && (
           <p className="seasons-progress">
-            {progress.watched} of {progress.aired} aired episodes watched
+            {progress.watched} of {progress.aired} episodes watched so far
             {progress.upNext
               ? ` · up next ${episodeLabel(progress.upNext.season, progress.upNext.episode)}`
               : " · you are all caught up"}

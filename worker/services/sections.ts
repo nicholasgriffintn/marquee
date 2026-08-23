@@ -1,20 +1,29 @@
+import type { SectionAudience } from "../../src/domain/catalog.ts";
+import { providerRegistryIds } from "../../src/domain/providers.ts";
 import { logError } from "../lib/logging.ts";
 import { blendedRatingSql } from "../lib/ratings.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import type { Bindings } from "../types.ts";
 
-const SECTION_SIZE = 14;
-const OVERFETCH = 60;
+const POOL_SIZE = 40;
+const OVERFETCH = 140;
 const MIN_SECTION = 6;
-const MAX_SECTIONS = 20;
+const MAX_SECTIONS = 32;
+const REPEAT_WINDOW = 4;
 const ROTATING_GENRES = 3;
 const ROTATING_MOODS = 2;
 const ROTATING_STUDIOS = 2;
-const ROTATING_SERVICES = 2;
+const SERVICE_ROWS = 10;
 
 const JUNK_KEYWORDS = ["duringcreditsstinger", "aftercreditsstinger", "woman director"];
 
-type Section = { id: string; title: string; description: string; titleIds: string[] };
+type Section = {
+  id: string;
+  title: string;
+  description: string;
+  titleIds: string[];
+  audience?: SectionAudience;
+};
 
 const SCORE = blendedRatingSql("payload");
 const VOTES = `COALESCE(json_extract(payload, '$.tmdbVoteCount'), 0)`;
@@ -61,7 +70,7 @@ async function pick(
   return rows.results
     .map((row) => row.id)
     .filter((id) => isKnownTitle(id) && !used.has(id))
-    .slice(0, SECTION_SIZE);
+    .slice(0, POOL_SIZE);
 }
 
 async function scheduled(env: Bindings, used: Set<string>) {
@@ -77,7 +86,7 @@ async function scheduled(env: Bindings, used: Set<string>) {
   return rows.results
     .map((row) => row.id)
     .filter((id) => isKnownTitle(id) && !used.has(id))
-    .slice(0, SECTION_SIZE);
+    .slice(0, POOL_SIZE);
 }
 
 async function topValues(env: Bindings, path: string, minimum: number, limit: number) {
@@ -129,28 +138,40 @@ async function topServices(env: Bindings, limit: number) {
     .all<{ providerId: string; providerName: string }>();
 
   return rows.results
-    .filter((row) => Boolean(row.providerId) && Boolean(row.providerName))
+    .filter((row) => providerRegistryIds.has(String(row.providerId)) && Boolean(row.providerName))
     .map((row) => ({ id: String(row.providerId), name: String(row.providerName) }));
 }
 
 export async function buildSections(env: Bindings) {
+  const recent: Set<string>[] = [];
   const used = new Set<string>();
   const sections: Section[] = [];
   const seed = dailySeed();
   const year = new Date().getUTCFullYear();
 
   const add = (section: Section) => {
-    if (section.titleIds.length >= MIN_SECTION) {
-      sections.push(section);
+    if (section.titleIds.length < MIN_SECTION) {
+      return;
+    }
 
-      for (const id of section.titleIds) {
+    sections.push(section);
+    recent.push(new Set(section.titleIds));
+
+    while (recent.length > REPEAT_WINDOW) {
+      recent.shift();
+    }
+
+    used.clear();
+
+    for (const window of recent) {
+      for (const id of window) {
         used.add(id);
       }
     }
   };
 
   add({
-    id: "airing",
+    id: "on-this-week",
     title: "On this week",
     description: "Episodes landing over the next seven days",
     titleIds: await scheduled(env, used),
@@ -270,9 +291,34 @@ export async function buildSections(env: Bindings) {
     ),
   });
 
-  for (const service of await topServices(env, 8).then((services) =>
-    rotate(services, ROTATING_SERVICES, seed * 3),
-  )) {
+  for (const service of await topServices(env, SERVICE_ROWS)) {
+    const audience = { providerIds: [service.id] };
+    const slug = service.id.replaceAll(/\W+/gu, "-");
+
+    // oxlint-disable-next-line no-await-in-loop
+    const landed = await pick(
+      env,
+      used,
+      `${SCORE} >= 6.2
+       AND EXISTS (
+         SELECT 1 FROM title_provider_state AS state
+          WHERE state.title_id = catalog_titles.id
+            AND state.provider_id = ?
+            AND state.offer_kind = 'streaming'
+            AND julianday(state.first_seen_at) > julianday('now', '-45 days')
+       )`,
+      "popularity DESC",
+      [service.id],
+    );
+
+    add({
+      id: `service-new-${slug}`,
+      title: `Just landed on ${service.name}`,
+      description: `Turned up on ${service.name} in the last few weeks`,
+      titleIds: landed,
+      audience,
+    });
+
     // oxlint-disable-next-line no-await-in-loop
     const titleIds = await pick(
       env,
@@ -284,10 +330,11 @@ export async function buildSections(env: Bindings) {
     );
 
     add({
-      id: `service-${service.id.replaceAll(/\W+/gu, "-")}`,
+      id: `service-${slug}`,
       title: `Sitting on ${service.name}`,
       description: `Well reviewed titles you can already stream on ${service.name}`,
       titleIds,
+      audience,
     });
   }
 
@@ -369,14 +416,16 @@ export async function buildSections(env: Bindings) {
     env.DB.prepare(`DELETE FROM catalog_sections`),
     ...chosen.map((section) =>
       env.DB.prepare(
-        `INSERT INTO catalog_sections (id, title, description, title_ids, source_updated_at)
-         VALUES (?, ?, ?, ?, ?)`,
+        `INSERT INTO catalog_sections
+           (id, title, description, title_ids, source_updated_at, audience)
+         VALUES (?, ?, ?, ?, ?, ?)`,
       ).bind(
         section.id,
         section.title,
         section.description,
         JSON.stringify(section.titleIds),
         fetchedAt,
+        JSON.stringify(section.audience ?? {}),
       ),
     ),
   ]);
@@ -385,6 +434,7 @@ export async function buildSections(env: Bindings) {
     JSON.stringify({
       event: "sections_built",
       sections: chosen.length,
+      gated: chosen.filter((section) => section.audience?.providerIds?.length).length,
       titles: chosen.reduce((total, section) => total + section.titleIds.length, 0),
     }),
   );
