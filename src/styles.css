@@ -5048,6 +5048,7 @@ h2 em {
 
 .exit-shade {
   align-items: center;
+  z-index: 90;
   animation: exit-in 0.16s ease;
   background: rgba(6, 7, 5, 0.72);
   display: flex;
@@ -5055,7 +5056,6 @@ h2 em {
   justify-content: center;
   padding: 24px;
   position: fixed;
-  z-index: 60;
 }
 @keyframes exit-in {
   from {
@@ -5171,4 +5171,15 @@ h2 em {
   .exit-shade {
     animation: none;
   }
+}
+
+.footer-link {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: rgba(17, 19, 15, 0.25);
+  text-underline-offset: 3px;
+}
+.footer-link:hover {
+  color: var(--blue);
+  text-decoration-color: currentcolor;
 }

@@ -15,6 +15,12 @@ export type BrowsePreset = {
 const BROWSE_GENRES = 18;
 const BROWSE_KEYWORDS = 28;
 
+const KINDS: { value: "" | "movie" | "tv"; label: string }[] = [
+  { value: "", label: "Everything" },
+  { value: "movie", label: "Films" },
+  { value: "tv", label: "Series" },
+];
+
 const SORTS: { value: BrowsePreset["sort"]; label: string }[] = [
   { value: "trending", label: "Trending" },
   { value: "popularity", label: "Popular" },
@@ -37,6 +43,9 @@ export function BrowsePage({
 }) {
   const [params, setParams] = useSearchParams();
   const genres = useGenres(BROWSE_GENRES);
+  const typeParam = params.get("type");
+  const mediaType: "" | "movie" | "tv" =
+    typeParam === "movie" || typeParam === "tv" ? typeParam : (preset.mediaType ?? "");
   const keywords = useKeywords(BROWSE_KEYWORDS);
   const selectedGenres = (params.get("genres") ?? "").split(",").filter(Boolean);
   const selectedKeywords = (params.get("keywords") ?? "").split(",").filter(Boolean);
@@ -60,7 +69,7 @@ export function BrowsePage({
     ...keywords.filter((keyword) => !selectedKeywords.includes(keyword)),
   ];
   const browse = useBrowse({
-    mediaType: preset.mediaType,
+    mediaType: mediaType || undefined,
     sort,
     genres: selectedGenres,
     keywords: selectedKeywords,
@@ -84,6 +93,7 @@ export function BrowsePage({
 
   const hasFilters =
     selectedKeywords.length > 0 ||
+    mediaType !== (preset.mediaType ?? "") ||
     selectedGenres.length > 0 ||
     selectedProviders.length > 0 ||
     Boolean(query) ||
@@ -108,6 +118,23 @@ export function BrowsePage({
             aria-label={`Search ${preset.title}`}
           />
         </label>
+
+        <div className="browse-facet">
+          <span>Kind</span>
+          <div className="browse-chips">
+            {KINDS.map((option) => (
+              <button
+                type="button"
+                key={option.value || "all"}
+                className={mediaType === option.value ? "selected" : ""}
+                aria-pressed={mediaType === option.value}
+                onClick={() => update({ type: option.value })}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         <div className="browse-facet">
           <span>Sort</span>

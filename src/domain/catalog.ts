@@ -135,3 +135,17 @@ export type CuratorCandidate = Pick<
   | "tmdbVoteCount"
   | "overview"
 >;
+
+export function titleSlug(title: string) {
+  return (
+    title
+      .toLowerCase()
+      .replaceAll(/[^a-z0-9]+/gu, "-")
+      .replaceAll(/^-|-$/gu, "")
+      .slice(0, 60) || "title"
+  );
+}
+
+export function titlePath(item: Pick<MediaTitle, "mediaType" | "tmdbId" | "title">) {
+  return `/${item.mediaType}/${item.tmdbId}/${titleSlug(item.title)}`;
+}

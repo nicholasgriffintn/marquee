@@ -1,3 +1,4 @@
+import { titlePath } from "../../src/domain/catalog.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
 import type { Bindings } from "../types.ts";
 import { isKnownTitle } from "./validation.ts";
@@ -18,13 +19,14 @@ function escapeAttribute(value: string) {
 }
 
 async function cardFor(env: Bindings, path: string, origin: string): Promise<ShareCard | null> {
-  const match = /^\/title\/([^/?#]+)/u.exec(path);
+  const routed = /^\/(movie|tv)\/([1-9][0-9]*)(?:\/|$)/u.exec(path);
+  const legacy = /^\/title\/([^/?#]+)/u.exec(path);
 
-  if (!match) {
+  if (!routed && !legacy) {
     return null;
   }
 
-  const titleId = decodeURIComponent(match[1]);
+  const titleId = routed ? `${routed[1]}:${routed[2]}` : decodeURIComponent(legacy?.[1] ?? "");
 
   if (!isKnownTitle(titleId)) {
     return null;
@@ -44,7 +46,7 @@ async function cardFor(env: Bindings, path: string, origin: string): Promise<Sha
       title.overview.slice(0, 200) ||
       `${title.genres.join(", ")}${services.length ? ` · on ${services.join(", ")}` : ""}`,
     image: `${origin}/media/og/${encodeURIComponent(titleId)}.png`,
-    url: `${origin}/title/${encodeURIComponent(titleId)}`,
+    url: `${origin}${titlePath(title)}`,
   };
 }
 

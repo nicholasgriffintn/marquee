@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 
 import { UsherMark } from "./UsherMark";
 
@@ -48,27 +49,12 @@ export function ExitDoor({ exit, onClose }: { exit: Exit; onClose: () => void })
   const shadeRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const locked: { element: HTMLElement; overflow: string }[] = [];
-
-    for (let node = shadeRef.current?.parentElement ?? null; node; node = node.parentElement) {
-      const style = window.getComputedStyle(node);
-
-      if (/(auto|scroll)/u.test(`${style.overflowY}${style.overflow}`)) {
-        locked.push({ element: node, overflow: node.style.overflow });
-        node.style.overflow = "hidden";
-      }
-    }
-
     const bodyOverflow = document.body.style.overflow;
 
     document.body.style.overflow = "hidden";
 
     return () => {
       document.body.style.overflow = bodyOverflow;
-
-      for (const entry of locked) {
-        entry.element.style.overflow = entry.overflow;
-      }
     };
   }, []);
 
@@ -96,7 +82,7 @@ export function ExitDoor({ exit, onClose }: { exit: Exit; onClose: () => void })
     onClose();
   }
 
-  return (
+  return createPortal(
     <div className="exit-shade" ref={shadeRef}>
       <button type="button" className="exit-backdrop" aria-label="Stay here" onClick={onClose} />
       <div className="exit-door" role="alertdialog" aria-modal="true" aria-labelledby="exit-title">
@@ -129,6 +115,7 @@ export function ExitDoor({ exit, onClose }: { exit: Exit; onClose: () => void })
           Stop telling me. I know where the door is.
         </label>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

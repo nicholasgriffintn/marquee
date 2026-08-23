@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, Route, Routes, useLocation, useMatch, useNavigate } from "react-router-dom";
+import {
+  Link,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useMatch,
+  useNavigate,
+} from "react-router-dom";
 
 import { DetailPanel } from "./components/catalog";
 import { SearchBox } from "./components/SearchBox";
@@ -7,7 +15,7 @@ import { GitHubIcon, MarqueeLogo } from "./components/ui";
 import { ManagersDoor } from "./components/usher/ManagersDoor";
 import { UsherCard } from "./components/usher/UsherCard";
 import { UsherMark } from "./components/usher/UsherMark";
-import type { CatalogSection, MediaTitle } from "./domain/catalog";
+import { titlePath, type CatalogSection, type MediaTitle } from "./domain/catalog";
 import { asideFor, type UsherMoment } from "./domain/usher";
 import { useAiRails } from "./hooks/useAiRails";
 import { useCatalog } from "./hooks/useCatalog";
@@ -36,39 +44,23 @@ const HOME_DRIP_DELAY_MS = 45_000;
 
 const NAV: { to: string; label: string; private: boolean; admin?: boolean }[] = [
   { to: "/", label: "Tonight", private: false },
-  { to: "/films", label: "Films", private: false },
-  { to: "/series", label: "Series", private: false },
-  { to: "/new", label: "New", private: false },
-  { to: "/popular", label: "Popular", private: false },
+  { to: "/listings", label: "Listings", private: false },
   { to: "/shelf", label: "My shelf", private: true },
   { to: "/this-week", label: "This week", private: true },
-  { to: "/sources", label: "Sources", private: false },
   { to: "/admin", label: "Admin", private: true, admin: true },
 ];
 
-const BROWSE_PRESETS: Record<string, BrowsePreset> = {
-  "/films": {
-    title: "Films",
-    description: "Every film in the Marquee catalogue.",
-    mediaType: "movie",
-    sort: "popularity",
-  },
-  "/series": {
-    title: "Series",
-    description: "Every series in the Marquee catalogue.",
-    mediaType: "tv",
-    sort: "popularity",
-  },
-  "/new": {
-    title: "New",
-    description: "The most recent additions, newest first.",
-    sort: "recent",
-  },
-  "/popular": {
-    title: "Popular",
-    description: "What people are watching right now.",
-    sort: "popularity",
-  },
+const LEGACY_BROWSE: Record<string, string> = {
+  "/films": "/listings?type=movie",
+  "/series": "/listings?type=tv",
+  "/new": "/listings?sort=recent",
+  "/popular": "/listings?sort=popularity",
+};
+
+const LISTINGS: BrowsePreset = {
+  title: "Listings",
+  description: "Everything in the building. Narrow it down and I will get out of your way.",
+  sort: "popularity",
 };
 
 export function App() {
@@ -96,11 +88,18 @@ export function App() {
   const aiRails = useAiRails(isSignedIn && isViewerReady && isHome, profile.savedIds.join(","));
   const episodes = useTonight(isViewerReady, TONIGHT_EPISODES);
   const trending = useTrending(isViewerReady && isHome);
-  const titleMatch = useMatch("/title/:titleId");
+  const movieMatch = useMatch("/movie/:tmdbId/*");
+  const seriesMatch = useMatch("/tv/:tmdbId/*");
+  const legacyMatch = useMatch("/title/:titleId");
+  const openMediaType = movieMatch ? "movie" : seriesMatch ? "tv" : null;
+  const openTmdbId = (movieMatch ?? seriesMatch)?.params.tmdbId ?? "";
+  const routedTitleId = openMediaType && openTmdbId ? `${openMediaType}:${openTmdbId}` : "";
+  const titleMatch = Boolean(routedTitleId || legacyMatch);
   const storedBackground = (location.state as { background?: typeof location } | null)?.background;
-  const background = storedBackground?.pathname.startsWith("/title/")
-    ? undefined
-    : storedBackground;
+  const isTitlePath = (pathname: string) =>
+    pathname.startsWith("/title/") || pathname.startsWith("/movie/") || pathname.startsWith("/tv/");
+  const background =
+    storedBackground && isTitlePath(storedBackground.pathname) ? undefined : storedBackground;
   const pageLocation =
     background ?? (titleMatch ? { ...location, pathname: "/", search: "" } : location);
   const pagePath = pageLocation.pathname;
@@ -134,7 +133,7 @@ export function App() {
 
   const openTitle = useCallback(
     (item: MediaTitle) => {
-      void navigate(`/title/${encodeURIComponent(item.id)}`, {
+      void navigate(titlePath(item), {
         state: { background: background ?? (titleMatch ? undefined : location) },
       });
     },
@@ -472,22 +471,23 @@ export function App() {
           }
         />
 
-        {Object.entries(BROWSE_PRESETS).map(([path, preset]) => (
-          <Route
-            key={path}
-            path={path}
-            element={
-              <BrowsePage preset={preset} providers={catalog.providers} onOpen={openTitle} />
-            }
-          />
+        <Route
+          path="/listings"
+          element={
+            <BrowsePage preset={LISTINGS} providers={catalog.providers} onOpen={openTitle} />
+          }
+        />
+
+        {Object.entries(LEGACY_BROWSE).map(([path, target]) => (
+          <Route key={path} path={path} element={<Navigate to={target} replace />} />
         ))}
 
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
 
-      {titleMatch?.params.titleId && (
+      {(routedTitleId || legacyMatch?.params.titleId) && (
         <TitleOverlay
-          titleId={titleMatch.params.titleId}
+          titleId={routedTitleId || (legacyMatch?.params.titleId ?? "")}
           usherMoment={usher.moment?.surface === "title" ? usher.moment : null}
           onUsherRequest={onTitleMoment}
           onUsherAction={onUsherAction}
@@ -512,7 +512,12 @@ export function App() {
           <MarqueeLogo />
           <span>Marquee</span>
         </div>
-        <p>Data by TMDB · Availability by Watchmode and JustWatch</p>
+        <p>
+          Data by TMDB · Availability by Watchmode and JustWatch ·{" "}
+          <Link className="footer-link" to="/sources">
+            Services and sources
+          </Link>
+        </p>
         <Link className="footer-egg" to="/usher">
           Made for movie night
         </Link>

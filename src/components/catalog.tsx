@@ -384,6 +384,23 @@ export function DetailPanel({
   const { insight, pairs, isLoading: isInsightLoading } = useTitleInsight(item.id);
   const similar = useRecommendations(item.id, item.recommendationIds, SIMILAR_LIMIT);
   const [exit, setExit] = useState<Exit | null>(null);
+  const panelRef = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    const panel = panelRef.current;
+
+    if (!panel) {
+      return;
+    }
+
+    const previous = panel.style.overflow;
+
+    panel.style.overflow = exit ? "hidden" : previous;
+
+    return () => {
+      panel.style.overflow = previous;
+    };
+  }, [exit]);
   const leaveVia = (next: Exit) => (event: MouseEvent<HTMLAnchorElement>) => {
     if (!shouldWarnOnExit()) {
       return;
@@ -419,7 +436,13 @@ export function DetailPanel({
       role="presentation"
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
-      <dialog open className="detail-panel" aria-modal="true" aria-labelledby="detail-title">
+      <dialog
+        open
+        ref={panelRef}
+        className="detail-panel"
+        aria-modal="true"
+        aria-labelledby="detail-title"
+      >
         <button
           ref={closeRef}
           type="button"
