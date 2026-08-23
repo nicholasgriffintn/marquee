@@ -157,7 +157,7 @@ export async function embedTitles(
   return stored;
 }
 
-const VECTOR_READ_BATCH = 60;
+const VECTOR_READ_BATCH = 20;
 
 export async function readVectors(env: Bindings, titleIds: string[]) {
   const unique = [...new Set(titleIds)];
