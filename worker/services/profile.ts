@@ -1,4 +1,5 @@
 import { isEntryStatus, isKnownTitle } from "../lib/validation.ts";
+import { deleteEpisodeEntries } from "../repositories/episode-entries.ts";
 import { deleteViewingEntry, readProfile, saveViewingEntry } from "../repositories/profile.ts";
 
 const MAX_THOUGHTS_LENGTH = 2_000;
@@ -54,6 +55,7 @@ export async function removeFromProfile(db: D1Database, viewerId: string, titleI
   }
 
   await deleteViewingEntry(db, viewerId, titleId);
+  await deleteEpisodeEntries(db, viewerId, titleId);
 
   return true;
 }

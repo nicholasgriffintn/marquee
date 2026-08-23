@@ -3,6 +3,7 @@ import {
   findRegistryProviderForOffer,
   type ProviderOfferKind,
 } from "../../src/domain/providers.ts";
+import type { Episode, SeasonDetail, SeasonSummary } from "../../src/domain/seasons.ts";
 import { httpsUrl } from "./urls.ts";
 import { isRecord, numberAt, recordAt, records, stringAt } from "./values.ts";
 
@@ -323,6 +324,84 @@ export function parseTmdbTitle(mediaType: MediaType, value: unknown): MediaTitle
         ? cleanDate(stringAt(recordAt(value, "next_episode_to_air") ?? {}, "air_date"))
         : null,
     recommendationIds: parseRecommendations(value),
+  };
+}
+
+const EPISODE_OVERVIEW_LIMIT = 1_200;
+const SEASON_OVERVIEW_LIMIT = 1_200;
+
+export function parseTmdbSeasonSummaries(value: unknown): SeasonSummary[] {
+  if (!isRecord(value)) {
+    return [];
+  }
+
+  return records(value.seasons).flatMap((season): SeasonSummary[] => {
+    const seasonNumber = numberAt(season, "season_number");
+
+    if (seasonNumber === null || seasonNumber < 0) {
+      return [];
+    }
+
+    return [
+      {
+        seasonNumber,
+        name: stringAt(season, "name") ?? `Season ${seasonNumber}`,
+        overview: (stringAt(season, "overview") ?? "").slice(0, SEASON_OVERVIEW_LIMIT),
+        airDate: cleanDate(stringAt(season, "air_date")),
+        episodeCount: Math.max(0, numberAt(season, "episode_count") ?? 0),
+        posterUrl: imageUrl(stringAt(season, "poster_path"), "w342"),
+      },
+    ];
+  });
+}
+
+function parseTmdbEpisode(seasonNumber: number, value: Record<string, unknown>): Episode[] {
+  const episodeNumber = numberAt(value, "episode_number");
+  const name = stringAt(value, "name");
+
+  if (episodeNumber === null || episodeNumber < 0) {
+    return [];
+  }
+
+  const voteCount = Math.max(0, numberAt(value, "vote_count") ?? 0);
+  const voteAverage = numberAt(value, "vote_average");
+  const runtime = numberAt(value, "runtime");
+
+  return [
+    {
+      seasonNumber: numberAt(value, "season_number") ?? seasonNumber,
+      episodeNumber,
+      name: name?.trim() || `Episode ${episodeNumber}`,
+      overview: (stringAt(value, "overview") ?? "").slice(0, EPISODE_OVERVIEW_LIMIT),
+      airDate: cleanDate(stringAt(value, "air_date")),
+      runtimeMinutes: runtime !== null && runtime > 0 ? runtime : null,
+      stillUrl: imageUrl(stringAt(value, "still_path"), "w300"),
+      tmdbScore: voteCount > 0 && voteAverage ? Math.round(voteAverage * 10) / 10 : null,
+      tmdbVoteCount: voteCount,
+    },
+  ];
+}
+
+export function parseTmdbSeason(
+  seasonNumber: number,
+  value: unknown,
+): Omit<SeasonDetail, "source" | "fetchedAt"> | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const episodes = records(value.episodes)
+    .flatMap((episode) => parseTmdbEpisode(seasonNumber, episode))
+    .sort((left, right) => left.episodeNumber - right.episodeNumber);
+
+  return {
+    seasonNumber: numberAt(value, "season_number") ?? seasonNumber,
+    name: stringAt(value, "name") ?? `Season ${seasonNumber}`,
+    overview: (stringAt(value, "overview") ?? "").slice(0, SEASON_OVERVIEW_LIMIT),
+    airDate: cleanDate(stringAt(value, "air_date")),
+    episodeCount: episodes.length,
+    posterUrl: imageUrl(stringAt(value, "poster_path"), "w342"),
+    episodes,
   };
 }
 

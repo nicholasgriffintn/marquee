@@ -18,11 +18,13 @@ import {
   getProviderCatalogue,
   getTitleAvailability,
 } from "../services/catalog.ts";
+import { getSeason, getSeasonIndex } from "../services/seasons.ts";
 import type { Bindings } from "../types.ts";
 
 const TONIGHT_DEFAULT_LIMIT = 12;
 const KEYWORDS_DEFAULT_LIMIT = 120;
 const GENRES_DEFAULT_LIMIT = 40;
+const SEASON_LIMIT = 100;
 
 export const catalogRoutes = new Hono<{ Bindings: Bindings }>();
 
@@ -214,6 +216,55 @@ catalogRoutes.get("/providers", edgeCache(300), async (context) => {
     logError("catalogue_read_failed", error, { area: "providers" });
 
     return context.json({ error: "Provider catalogue is unavailable" }, 500);
+  }
+});
+
+catalogRoutes.get("/tv/:tmdbId/seasons", edgeCache(3_600), async (context) => {
+  const tmdbId = Number(context.req.param("tmdbId"));
+
+  if (!Number.isInteger(tmdbId) || tmdbId < 1) {
+    return context.json({ error: "Unknown series" }, 404);
+  }
+
+  try {
+    const index = await getSeasonIndex(context.env, `tv:${tmdbId}`);
+
+    context.header("cache-control", "public, max-age=3600");
+
+    return context.json({ ...index, fetchedAt: new Date().toISOString() });
+  } catch (error) {
+    logError("season_index_read_failed", error, { area: "seasons" });
+
+    return context.json({ error: "The series listing is unavailable" }, 500);
+  }
+});
+
+catalogRoutes.get("/tv/:tmdbId/seasons/:seasonNumber", edgeCache(3_600), async (context) => {
+  const tmdbId = Number(context.req.param("tmdbId"));
+  const seasonNumber = Number(context.req.param("seasonNumber"));
+
+  if (!Number.isInteger(tmdbId) || tmdbId < 1 || !Number.isInteger(seasonNumber)) {
+    return context.json({ error: "Unknown season" }, 404);
+  }
+
+  if (seasonNumber < 0 || seasonNumber > SEASON_LIMIT) {
+    return context.json({ error: "Unknown season" }, 404);
+  }
+
+  try {
+    const season = await getSeason(context.env, `tv:${tmdbId}`, seasonNumber);
+
+    if (!season) {
+      return context.json({ error: "Unknown season" }, 404);
+    }
+
+    context.header("cache-control", "public, max-age=3600");
+
+    return context.json(season);
+  } catch (error) {
+    logError("season_read_failed", error, { area: "seasons" });
+
+    return context.json({ error: "That season is unavailable" }, 500);
   }
 });
 

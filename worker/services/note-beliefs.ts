@@ -34,12 +34,22 @@ function slugify(value: string) {
 export async function noteHunches(env: Bindings, viewerId: string): Promise<BeliefDraft[]> {
   try {
     const rows = await env.DB.prepare(
-      `SELECT t.title AS title, v.rating AS rating, v.thoughts AS thoughts
-         FROM viewing_entries AS v
-         JOIN catalog_titles AS t ON t.id = v.title_id
-        WHERE v.viewer_id = ?1 AND length(trim(v.thoughts)) > 20
-        ORDER BY v.updated_at DESC
-        LIMIT ?2`,
+      `SELECT title, rating, thoughts FROM (
+         SELECT t.title AS title, v.rating AS rating, v.thoughts AS thoughts,
+                v.updated_at AS updatedAt
+           FROM viewing_entries AS v
+           JOIN catalog_titles AS t ON t.id = v.title_id
+          WHERE v.viewer_id = ?1 AND length(trim(v.thoughts)) > 20
+         UNION ALL
+         SELECT t.title || ' S' || e.season_number ||
+                CASE WHEN e.scope = 'episode' THEN 'E' || e.episode_number ELSE '' END AS title,
+                e.rating AS rating, e.notes AS thoughts, e.updated_at AS updatedAt
+           FROM viewing_episode_entries AS e
+           JOIN catalog_titles AS t ON t.id = e.title_id
+          WHERE e.viewer_id = ?1 AND length(trim(e.notes)) > 20
+       )
+       ORDER BY updatedAt DESC
+       LIMIT ?2`,
     )
       .bind(viewerId, MAX_NOTES)
       .all<NoteRow>();

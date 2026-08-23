@@ -6,6 +6,8 @@ import type {
 } from "../../src/domain/catalog.ts";
 import {
   parseTmdbProviders,
+  parseTmdbSeason,
+  parseTmdbSeasonSummaries,
   parseTmdbSummaries,
   parseTmdbTitle,
   type TmdbSummary,
@@ -296,6 +298,21 @@ export async function getCatalog(
     availabilitySource: "JustWatch via TMDB",
     fetchedAt,
   };
+}
+
+export async function getTmdbSeasonSummaries(env: Bindings, tmdbId: number) {
+  return parseTmdbSeasonSummaries(await requestTmdb(env, `/tv/${tmdbId}`));
+}
+
+export async function getTmdbSeason(env: Bindings, tmdbId: number, seasonNumber: number) {
+  const payload = await requestTmdb(env, `/tv/${tmdbId}/season/${seasonNumber}`);
+  const season = parseTmdbSeason(seasonNumber, payload);
+
+  if (!season) {
+    throw new TmdbError("TMDB returned an incomplete season");
+  }
+
+  return season;
 }
 
 export async function findByTitle(env: Bindings, name: string, year: number | null) {

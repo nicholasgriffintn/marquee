@@ -31,6 +31,7 @@ import type { EntryStatus, ViewingEntry } from "../types";
 import { ArtPlaceholder } from "./ArtPlaceholder";
 import { ShowingsBlock } from "./cinema/ShowingsBlock";
 import { ErrorBoundary } from "./ErrorBoundary";
+import { SeasonsBlock } from "./seasons";
 import { ShelfForm } from "./ShelfForm";
 import { TrailerBlock } from "./TrailerBlock";
 import { ArrowIcon, ChevronIcon, PlusIcon, Poster, ProviderBadge } from "./ui";
@@ -575,13 +576,16 @@ export function DetailPanel({
               <ShelfForm
                 entry={entry}
                 title={item.title}
-                isSeries={item.mediaType === "tv"}
-                seasons={item.numberOfSeasons}
                 onRemove={onRemove}
                 onSave={onSaveEntry}
                 onStatus={onStatus}
                 onUpdateDraft={onUpdateDraft}
               />
+            </ErrorBoundary>
+          )}
+          {item.mediaType === "tv" && (
+            <ErrorBoundary label="The episode guide">
+              <SeasonsBlock item={item} canTrack={canSave} />
             </ErrorBoundary>
           )}
           {usherSlot}
