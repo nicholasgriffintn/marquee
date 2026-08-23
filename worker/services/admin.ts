@@ -154,7 +154,7 @@ export async function runAdminAction(env: Bindings, action: AdminAction) {
       ...result,
       detail:
         action === "alerts-send"
-          ? `Sent ${result.emails} email${result.emails === 1 ? "" : "s"}`
+          ? `Sent ${result.emails} email${result.emails === 1 ? "" : "s"}, ${result.feeds} to feeds`
           : `${result.candidates} candidate${result.candidates === 1 ? "" : "s"} waiting, nothing sent`,
     };
   }

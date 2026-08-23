@@ -309,6 +309,30 @@ at it:
 It exposes `search_catalogue`, `find_similar`, `get_title`, `get_shelf`, `save_to_shelf` and
 `whats_on_tonight`. Tokens are hashed at rest and can be revoked from the same page.
 
+## Subscriptions
+
+Marquee already knows when things happen — the next episode of something on your shelf, the release
+of a film you are waiting for — and that only ever showed up while you had the site open. Cut a key
+on the Notebook page and it goes where you already look. You get two links: an iCalendar feed at
+`/feeds/<key>/diary.ics` for Apple Calendar, Google Calendar or Outlook, and an Atom feed at
+`/feeds/<key>/alerts.atom` for a reader.
+
+The calendar carries episodes of anything you are watching or have on the watchlist, skipping what
+sits behind the progress you have recorded, with the running time taken from the catalogue rather
+than guessed. Unreleased watchlist titles arrive as all-day entries on their release date. Cinema
+showings are deliberately absent: a calendar client reads from wherever it happens to live, so
+placing them would mean keeping a location against an account, and Marquee does not.
+
+The reader carries the notes the Usher would have posted — an arrival, a series coming back, a
+cinema run, someone you follow — and the Monday digest. Those alerts previously needed a confirmed
+email address, and were computed and dropped for everyone without one; a feed key is now a second
+channel on the same pipeline, under the same weekly cap.
+
+Keys are hashed at rest, so the links are shown once when you cut one and a new key retires the old
+one. Nothing under `/feeds` needs a cookie, which is what lets a calendar client read it at all; the
+guard covers the path with a `feed` policy that lets machines through and rate limits them like any
+public read, and the responses carry `x-robots-tag: noindex`.
+
 ## Posters
 
 Posters are cached in R2. Images transformations are enabled on the `pashi.app` zone, so the
