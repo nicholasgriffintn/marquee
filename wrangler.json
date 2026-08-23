@@ -201,7 +201,7 @@
         "max_batch_timeout": 5,
         "max_retries": 5,
         "dead_letter_queue": "marquee-ingestion-dead-letter",
-        "max_concurrency": 1,
+        "max_concurrency": 3,
         "retry_delay": 60
       },
       {

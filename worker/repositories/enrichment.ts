@@ -112,6 +112,19 @@ export async function selectUnenriched(
   return rows.results.map((row) => row.titleId);
 }
 
+export async function storeImdbId(db: D1Database, titleId: string, imdbId: string) {
+  await db
+    .prepare(
+      `UPDATE catalog_titles
+       SET payload = json_set(payload, '$.imdbUrl', ?),
+           imdb_id = ?,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+    )
+    .bind(`https://www.imdb.com/title/${imdbId}/`, imdbId, titleId)
+    .run();
+}
+
 export function posterKey(titleId: string) {
   return `posters/${titleId.replace(":", "-")}`;
 }

@@ -1,7 +1,7 @@
-import type { MediaType } from "../../src/domain/catalog.ts";
+import type { MediaTitle, MediaType } from "../../src/domain/catalog.ts";
 import { getAnilistDetails } from "../clients/anilist.ts";
 import { getJustwatchAvailability } from "../clients/justwatch.ts";
-import { getOmdbPoster, getOmdbRatings } from "../clients/omdb.ts";
+import { getOmdbPoster, getOmdbRatings, searchOmdb } from "../clients/omdb.ts";
 import { getSimklIds } from "../clients/simkl.ts";
 import {
   findByImdbId,
@@ -28,6 +28,7 @@ import {
   selectUnenriched,
   storeEnrichment,
   storeEnrichmentMiss,
+  storeImdbId,
   storePoster,
 } from "../repositories/enrichment.ts";
 import { storeProviders } from "../repositories/providers.ts";
@@ -60,7 +61,7 @@ const RATE_LIMIT_PAUSE_MINUTES: Partial<Record<EnrichmentSource, number>> = {
 };
 
 const ENRICHERS = [
-  { source: "omdb", job: "enrich-ratings", maxAgeDays: 30, perRun: 900, budgetGated: true },
+  { source: "omdb", job: "enrich-ratings", maxAgeDays: 30, perRun: 3_000, budgetGated: true },
   { source: "simkl", job: "enrich-simkl", maxAgeDays: 90, perRun: 120, budgetGated: true },
   { source: "poster", job: "cache-poster", maxAgeDays: 365, perRun: 2_000, budgetGated: false },
   { source: "anilist", job: "enrich-anilist", maxAgeDays: 14, perRun: 400, budgetGated: true },
@@ -403,16 +404,65 @@ function imdbIdOf(title: { imdbUrl?: string | null } | undefined) {
   return title?.imdbUrl ? (/\/(tt\d+)/u.exec(title.imdbUrl)?.[1] ?? null) : null;
 }
 
+function comparableTitle(value: string) {
+  return value
+    .normalize("NFKD")
+    .replaceAll(/[\u0300-\u036F]/gu, "")
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9]+/gu, " ")
+    .trim();
+}
+
+async function recoverImdbId(env: Bindings, title: MediaTitle) {
+  if (!title.year || !(await claimBudget(env, "omdb"))) {
+    return null;
+  }
+
+  const attempt = await withRateLimitPause(env, "omdb", () => searchOmdb(env, title.title));
+
+  if (attempt.limited) {
+    return null;
+  }
+
+  const wanted = comparableTitle(title.title);
+  const expected = title.mediaType === "tv" ? "series" : "movie";
+  const match = attempt.value.find(
+    (result) =>
+      result.omdbType === expected &&
+      result.year === title.year &&
+      comparableTitle(result.title) === wanted,
+  );
+
+  if (!match) {
+    return null;
+  }
+
+  await storeImdbId(env.DB, title.id, match.imdbId);
+
+  console.log(
+    JSON.stringify({ event: "imdb_id_recovered", titleId: title.id, imdbId: match.imdbId }),
+  );
+
+  return match.imdbId;
+}
+
 async function enrichRatings(env: Bindings, titleId: string) {
   if (!env.OMDB_API_KEY) {
     return;
   }
 
   const [title] = await readItems(env.DB, [titleId]);
-  const imdbId = imdbIdOf(title);
+
+  if (!title) {
+    await storeEnrichmentMiss(env, titleId, "omdb", "no-title-row");
+
+    return;
+  }
+
+  const imdbId = imdbIdOf(title) ?? (await recoverImdbId(env, title));
 
   if (!imdbId) {
-    await storeEnrichmentMiss(env, titleId, "omdb", title ? "no-imdb-id" : "no-title-row");
+    await storeEnrichmentMiss(env, titleId, "omdb", "no-imdb-id");
 
     return;
   }
