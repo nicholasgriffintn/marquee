@@ -497,7 +497,15 @@ export function DetailPanel({
           {item.originalTitle && item.originalTitle !== item.title && (
             <p className="detail-original">Original title · {item.originalTitle}</p>
           )}
+          {(item.studios?.length || spokenIn) && (
+            <p className="detail-original">
+              {[item.studios?.slice(0, 2).join(", "), spokenIn ? `In ${spokenIn}` : null]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          )}
           {item.tagline && <p className="detail-tagline">{item.tagline}</p>}
+          <p className="detail-synopsis">{item.overview || "No synopsis available."}</p>
           {(insight || isInsightLoading) && (
             <div className="detail-insight">
               <span>
@@ -522,6 +530,23 @@ export function DetailPanel({
               )}
             </div>
           )}
+          {nextEpisode && (
+            <p className="detail-next">
+              <span>Next episode</span>
+              {nextEpisode.season && nextEpisode.episode
+                ? ` S${nextEpisode.season}E${nextEpisode.episode}`
+                : ""}
+              {nextEpisode.episodeName ? ` · ${nextEpisode.episodeName}` : ""} ·{" "}
+              {new Date(nextEpisode.airsAt).toLocaleString(undefined, {
+                weekday: "short",
+                day: "numeric",
+                month: "short",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+              {nextEpisode.network ? ` · ${nextEpisode.network}` : ""}
+            </p>
+          )}
           {!nextEpisode && upcomingAir && (
             <p className="detail-next">
               <span>Next episode</span>{" "}
@@ -544,22 +569,23 @@ export function DetailPanel({
               {item.status ? ` · ${item.status}` : ""}
             </p>
           )}
-          {nextEpisode && (
-            <p className="detail-next">
-              <span>Next episode</span>
-              {nextEpisode.season && nextEpisode.episode
-                ? ` S${nextEpisode.season}E${nextEpisode.episode}`
-                : ""}
-              {nextEpisode.episodeName ? ` · ${nextEpisode.episodeName}` : ""} ·{" "}
-              {new Date(nextEpisode.airsAt).toLocaleString(undefined, {
-                weekday: "short",
-                day: "numeric",
-                month: "short",
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-              {nextEpisode.network ? ` · ${nextEpisode.network}` : ""}
-            </p>
+          {canSave && item.mediaType === "movie" && (
+            <ErrorBoundary label="The shelf card">
+              {entry ? (
+                <ShelfForm
+                  entry={entry}
+                  title={item.title}
+                  onRemove={onRemove}
+                  onSave={onSaveEntry}
+                  onStatus={onStatus}
+                  onUpdateDraft={onUpdateDraft}
+                />
+              ) : (
+                <button type="button" className="save-button" onClick={() => onSave(item)}>
+                  <PlusIcon /> Save to my shelf
+                </button>
+              )}
+            </ErrorBoundary>
           )}
           <div className="watch-actions">
             <span>Watch now</span>
@@ -601,29 +627,16 @@ export function DetailPanel({
           <ErrorBoundary label="The trailer">
             <TrailerBlock item={item} />
           </ErrorBoundary>
-          <p className="detail-synopsis">{item.overview || "No synopsis available."}</p>
           {item.mediaType === "tv" && (
             <ErrorBoundary label="The episode guide">
               <SeasonsBlock
                 item={item}
                 canTrack={canSave}
-                onTracked={entry ? undefined : onTracked}
-              />
-            </ErrorBoundary>
-          )}
-          {canSave && !entry && (
-            <button type="button" className="save-button" onClick={() => onSave(item)}>
-              <PlusIcon /> Save to my shelf
-            </button>
-          )}
-          {canSave && entry && (
-            <ErrorBoundary label="The shelf card">
-              <ShelfForm
                 entry={entry}
-                title={item.title}
-                isSeries={item.mediaType === "tv"}
+                onTracked={entry ? undefined : onTracked}
+                onAdd={onSave}
                 onRemove={onRemove}
-                onSave={onSaveEntry}
+                onSaveEntry={onSaveEntry}
                 onStatus={onStatus}
                 onUpdateDraft={onUpdateDraft}
               />
@@ -698,6 +711,25 @@ export function DetailPanel({
                 : ""}
             </p>
           )}
+          {item.buzz && (
+            <div className="detail-buzz">
+              <span>Trending signal</span>
+              <p>
+                <strong>{item.buzz.views.toLocaleString()}</strong> Wikipedia readers in the last 7
+                days, {changeLabel(item.buzz.delta)} on the{" "}
+                {item.buzz.previousViews.toLocaleString()} the week before.
+              </p>
+              <small>
+                Article{" "}
+                <a href={item.buzz.articleUrl} target="_blank" rel="noreferrer">
+                  {item.buzz.article}
+                </a>{" "}
+                · matched by{" "}
+                {item.buzz.match === "wikidata" ? "Wikidata IMDb link" : "title search"} · measured{" "}
+                {measuredOn(item.buzz.measuredAt)}
+              </small>
+            </div>
+          )}
           {item.people?.length ? (
             <div className="detail-chips">
               {item.people.slice(0, 5).map((person) => (
@@ -724,32 +756,6 @@ export function DetailPanel({
               ))}
             </div>
           ) : null}
-          {item.buzz && (
-            <div className="detail-buzz">
-              <span>Trending signal</span>
-              <p>
-                <strong>{item.buzz.views.toLocaleString()}</strong> Wikipedia readers in the last 7
-                days, {changeLabel(item.buzz.delta)} on the{" "}
-                {item.buzz.previousViews.toLocaleString()} the week before.
-              </p>
-              <small>
-                Article{" "}
-                <a href={item.buzz.articleUrl} target="_blank" rel="noreferrer">
-                  {item.buzz.article}
-                </a>{" "}
-                · matched by{" "}
-                {item.buzz.match === "wikidata" ? "Wikidata IMDb link" : "title search"} · measured{" "}
-                {measuredOn(item.buzz.measuredAt)}
-              </small>
-            </div>
-          )}
-          {(item.studios?.length || spokenIn) && (
-            <p className="detail-original">
-              {[item.studios?.slice(0, 2).join(", "), spokenIn ? `In ${spokenIn}` : null]
-                .filter(Boolean)
-                .join(" · ")}
-            </p>
-          )}
           {item.collection && collection.length > 1 && (
             <div className="detail-similar">
               <span>{item.collection.name}</span>

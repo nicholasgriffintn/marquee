@@ -16,6 +16,8 @@ import {
 } from "../domain/seasons";
 import { useEpisodeEntries, useSeasons, type EpisodePatch } from "../hooks/useSeasons";
 import { artwork, artworkSrcSet } from "../lib/media";
+import type { EntryStatus, ViewingEntry } from "../types";
+import { ShelfForm } from "./ShelfForm";
 import { ArrowIcon } from "./ui";
 
 const STARS = [1, 2, 3, 4, 5];
@@ -248,11 +250,23 @@ function SeasonHeader({
 export function SeasonsBlock({
   item,
   canTrack,
+  entry,
   onTracked,
+  onAdd,
+  onRemove,
+  onSaveEntry,
+  onStatus,
+  onUpdateDraft,
 }: {
   item: MediaTitle;
   canTrack: boolean;
+  entry?: ViewingEntry;
   onTracked?: () => void;
+  onAdd: (item: MediaTitle) => void;
+  onRemove: (titleId: string) => void;
+  onSaveEntry: (entry: ViewingEntry) => void;
+  onStatus: (titleId: string, status: EntryStatus) => void;
+  onUpdateDraft: (titleId: string, patch: Partial<ViewingEntry>) => void;
 }) {
   const tracker = useEpisodeEntries(item.id, canTrack);
   const save = (patch: EpisodePatch) =>
@@ -264,7 +278,29 @@ export function SeasonsBlock({
     true,
     tracker.progress,
   );
-  const summary = seasons.find((entry) => entry.seasonNumber === selected) ?? null;
+  const summary = seasons.find((candidate) => candidate.seasonNumber === selected) ?? null;
+  const shelf =
+    canTrack && entry ? (
+      <ShelfForm
+        entry={entry}
+        title={item.title}
+        isSeries
+        onRemove={onRemove}
+        onSave={onSaveEntry}
+        onStatus={onStatus}
+        onUpdateDraft={onUpdateDraft}
+      />
+    ) : null;
+  const invite =
+    canTrack && !entry ? (
+      <p className="seasons-invite">
+        Tick an episode, rate one or keep a note and the show goes on your shelf by itself —{" "}
+        <button type="button" onClick={() => onAdd(item)}>
+          or put it on the watchlist now
+        </button>
+        .
+      </p>
+    ) : null;
 
   if (isLoading && seasons.length === 0) {
     return (
@@ -277,11 +313,13 @@ export function SeasonsBlock({
   }
 
   if (seasons.length === 0) {
-    return null;
+    const alone = shelf ?? invite;
+
+    return alone && <section className="seasons-block">{alone}</section>;
   }
 
   const progress = tracker.progress;
-  const seasonStats = progress?.seasons.find((entry) => entry.season === selected) ?? null;
+  const seasonStats = progress?.seasons.find((row) => row.season === selected) ?? null;
   const aired =
     seasonStats?.aired ??
     season?.episodes.filter((episode) => hasAired(episode.airDate)).length ??
@@ -309,22 +347,23 @@ export function SeasonsBlock({
             ) : null}
           </p>
         )}
+        {invite}
       </div>
 
       <div className="season-tabs">
-        {seasons.map((entry) => {
-          const stats = progress?.seasons.find((row) => row.season === entry.seasonNumber) ?? null;
+        {seasons.map((tab) => {
+          const stats = progress?.seasons.find((row) => row.season === tab.seasonNumber) ?? null;
           const done = stats && stats.aired > 0 && stats.watched >= stats.aired;
 
           return (
             <button
               type="button"
-              key={entry.seasonNumber}
-              className={`season-tab${entry.seasonNumber === selected ? " selected" : ""}${done ? " done" : ""}`}
-              aria-pressed={entry.seasonNumber === selected}
-              onClick={() => selectSeason(entry.seasonNumber)}
+              key={tab.seasonNumber}
+              className={`season-tab${tab.seasonNumber === selected ? " selected" : ""}${done ? " done" : ""}`}
+              aria-pressed={tab.seasonNumber === selected}
+              onClick={() => selectSeason(tab.seasonNumber)}
             >
-              {entry.seasonNumber === 0 ? "Specials" : `Series ${entry.seasonNumber}`}
+              {tab.seasonNumber === 0 ? "Specials" : `Series ${tab.seasonNumber}`}
               {stats && stats.watched > 0 ? <em>{done ? "✓" : stats.watched}</em> : null}
             </button>
           );
@@ -378,6 +417,8 @@ export function SeasonsBlock({
           Sign in and you can tick these off, rate them and keep notes against each one.
         </p>
       )}
+
+      {shelf}
     </section>
   );
 }

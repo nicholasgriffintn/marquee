@@ -221,7 +221,7 @@ async function syncShelfProgress(db: D1Database, viewerId: string, titleId: stri
     .filter((season) => season.seasonNumber > 0)
     .reduce((total, season) => total + airedCount(season), 0);
   const isComplete = aired > 0 && counted.length >= aired;
-  const status = isComplete ? "watched" : "watching";
+  const status = counted.length === 0 ? "watchlist" : isComplete ? "watched" : "watching";
 
   await db
     .prepare(

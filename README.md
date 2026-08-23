@@ -51,6 +51,10 @@ too — _send it there_ puts what you have marked here onto your Trakt account, 
 stars as ratings out of ten, the rest as watchlist. It asks first, tells you what it is about to
 send, and only sends what has changed since the last time, so nothing is counted twice.
 
+<img src="https://marquee.pashi.app/usher-thinking.png" width="200" height="200" alt="The Usher Has Some Advice" />
+
+> I have seen a lot of things. Not one of them was yours.
+
 ## One episode at a time
 
 A television title's panel carries its own episode guide. Tick episodes off, rate them out of five,
@@ -124,10 +128,6 @@ instead: frosted glass, a name painted on it, a note that has said _back in ten 
 
 He is not in. He is never in. Nor is the projectionist, who runs the sweeps and the long nights of
 ingestion, and who gets a note of his own on the admin page.
-
-<img src="https://marquee.pashi.app/usher-thinking.png" width="200" height="200" alt="The Usher Has Some Advice" />
-
-> If I've nothing worth saying, I say nothing. Try it.
 
 ---
 

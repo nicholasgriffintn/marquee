@@ -3161,8 +3161,7 @@ h2 em {
 .detail-chips + .detail-chips {
   margin-top: 10px;
 }
-.detail-chips:last-of-type,
-.detail-chips + .score-row {
+.detail-chips:last-of-type {
   margin-bottom: 0;
 }
 .detail-chips + *:not(.detail-chips) {
@@ -3191,9 +3190,6 @@ h2 em {
   letter-spacing: 0.1em;
   margin: 6px 0 0;
   text-transform: uppercase;
-}
-.detail-buzz + .detail-original {
-  margin-top: 20px;
 }
 .detail-tagline {
   color: var(--ink);
@@ -7002,6 +6998,21 @@ a.showtime:hover small {
   font-size: 13px;
   font-style: italic;
   margin: 0;
+}
+.seasons-invite {
+  color: #4d5148;
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0;
+}
+.seasons-invite button {
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--blue);
+  color: var(--blue);
+  font: inherit;
+  font-weight: 700;
+  padding: 0;
 }
 .season-tabs {
   display: flex;
