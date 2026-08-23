@@ -128,19 +128,31 @@ There is a small screen at the back where the ticket is nothing, because the pri
 copyright. `/revival` is a repertory programme that plays here rather than sending you somewhere
 else, on our own player, with no account and no service in the way.
 
-Two places supply it, and they are not trusted equally. The Library of Congress National Screening
-Room is an institution saying in its own words that it is not aware of any restriction, and handing
-you the file — so what it will let you download is taken as its own rights signal. The Internet
-Archive is an open upload platform and is not taken at its word: a print clears on its own only when
-the uploader marked it public domain **and** it was published before the US term could still be
-running, which as of 2026 means 1930 or earlier. Everything else waits in a queue on `/admin` for
-someone to look at it. In practice that holds back a good deal that really is free — a film out of
-copyright because nobody renewed it looks identical to one that is not — which is the right way
-round to be wrong.
+This is a British building, so the question is whether a print is free **here**, and that is not the
+question most public domain collections answer. Under section 13B of the CDPA a film's copyright
+runs for 70 years from the death of the last of its principal director, its screenplay and dialogue
+authors, and the composer of any music written for it. It is measured from people, not from a
+release date, so the American rule of thumb — published long enough ago — tells you nothing about
+Britain. _The Lost World_ (1925) is free in America and in copyright here until 2043. _Metropolis_
+(1927) until 2047. _Nosferatu_ (1922) came free in 2020, because Henrik Galeen died in 1949.
 
-Every print carries its provenance on its own page: which basis it is free under, who holds the
-copy, and a link back to the source record. A viewer can check the reasoning rather than take our
-word for it either.
+So the gate is the UK term. A work is matched to the catalogue, its authors and their death dates
+are read off Wikidata, and it is cleared only when every named author has a death date and the
+latest of them is more than 70 years ago. Where nobody is named at all the anonymous rule applies
+instead — 70 years from release. Anything that cannot be closed sits in a queue on `/admin` for a
+person, including the large pile that is genuinely free in America and unprovable here. That is the
+right way round to be wrong.
+
+Three places supply it. European archives through **Europeana**, filtered to things they have
+published outright as Public Domain Mark or CC0 and that they serve as an actual file rather than a
+landing page — a European institution releasing its own holding is the strongest signal available
+for European material. The **Library of Congress** National Screening Room, which offers the file
+for download when it is not aware of a restriction. And the **Internet Archive**, which is an open
+upload platform and is never taken at its word.
+
+Every print carries its provenance on its own page: which basis it is free under, when the UK term
+ran out, who holds the copy, and a link back to the source record. A viewer can check the reasoning
+rather than take our word for it either.
 
 Prints are matched to catalogue titles the same way cinema listings are, so a film's ordinary panel
 grows a _playing here, free_ row when we have one.

@@ -19,7 +19,7 @@ export function RevivalBlock({ works }: { works: RevivalWork[] }) {
               {[
                 work.mirrored ? "Our print" : SOURCE_LABELS[work.source],
                 runtimeLabel(work.runtimeSeconds),
-                "Public domain",
+                "Public domain in the UK",
               ]
                 .filter(Boolean)
                 .join(" · ")}

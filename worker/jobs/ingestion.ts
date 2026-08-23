@@ -42,9 +42,11 @@ import { syncCinemaDirectory, syncCinemaScreenings } from "../services/cinema-sy
 import { advanceDiscoverFrontier, measureDiscoverPartition } from "../services/discover.ts";
 import { embedTitles, selectUnembedded } from "../services/embeddings.ts";
 import { mirrorWork } from "../services/revival-mirror.ts";
+import { checkRevivalRights } from "../services/revival-rights.ts";
 import {
   matchRevivalWorks,
   syncArchiveCollection,
+  syncEuropeanaCountry,
   syncScreeningRoom,
 } from "../services/revival.ts";
 import { syncSchedule } from "../services/schedule.ts";
@@ -813,15 +815,25 @@ export async function executeIngestionJob(env: Bindings, job: IngestionJob) {
   }
 
   if (job.type === "sync-revival-source") {
-    await (job.source === "loc"
-      ? syncScreeningRoom(env)
-      : syncArchiveCollection(env, job.collection ?? "feature_films"));
+    if (job.source === "loc") {
+      await syncScreeningRoom(env);
+    } else if (job.source === "europeana") {
+      await syncEuropeanaCountry(env, job.collection ?? "United Kingdom");
+    } else {
+      await syncArchiveCollection(env, job.collection ?? "feature_films");
+    }
 
     return;
   }
 
   if (job.type === "match-revival-works") {
     await matchRevivalWorks(env);
+
+    return;
+  }
+
+  if (job.type === "check-revival-rights") {
+    await checkRevivalRights(env);
 
     return;
   }

@@ -4,7 +4,7 @@ import { ErrorBoundary } from "../components/ErrorBoundary";
 import { ReelCard } from "../components/revival/ReelCard";
 import { ReelPlayer } from "../components/revival/ReelPlayer";
 import { UsherMark } from "../components/usher/UsherMark";
-import { RIGHTS_LABELS, SOURCE_LABELS, workMeta } from "../domain/revival";
+import { rightsSummary, SOURCE_LABELS, workMeta } from "../domain/revival";
 import { useScreening } from "../hooks/useRevival";
 
 export function RevivalScreenPage({ isSignedIn }: { isSignedIn: boolean }) {
@@ -37,12 +37,12 @@ export function RevivalScreenPage({ isSignedIn }: { isSignedIn: boolean }) {
   const { work } = screening;
 
   return (
-    <section className="page-section revival-screen">
+    <section className="page-section revival-screen revival-shelves">
       <div className="page-title-row">
         <div>
           <h1>{work.title}</h1>
         </div>
-        <p>{workMeta(work) || "Public domain"}</p>
+        <p>{workMeta(work) || "Public domain in the UK"}</p>
       </div>
 
       <ErrorBoundary label="The projector" resetKey={work.id}>
@@ -58,9 +58,9 @@ export function RevivalScreenPage({ isSignedIn }: { isSignedIn: boolean }) {
 
       <dl className="revival-provenance">
         <div>
-          <dt>Why it is free</dt>
+          <dt>Free to show in the UK because</dt>
           <dd>
-            {RIGHTS_LABELS[work.rightsBasis]}
+            {rightsSummary(work)}
             {work.rightsNote ? ` · ${work.rightsNote}` : ""}
           </dd>
         </div>

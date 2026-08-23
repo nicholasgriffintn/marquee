@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import {
-  RIGHTS_LABELS,
+  rightsSummary,
   SOURCE_LABELS,
   workMeta,
   type RevivalStatus,
@@ -38,6 +38,8 @@ const STAT_LABELS: { key: string; label: string }[] = [
   { key: "copying", label: "copying" },
   { key: "mirrorFailed", label: "mirror failed" },
   { key: "matched", label: "matched to a title" },
+  { key: "ukClear", label: "clear in the UK" },
+  { key: "ukUnknown", label: "UK term unknown" },
 ];
 
 function sizeLabel(bytes: number | null) {
@@ -96,9 +98,9 @@ export function RevivalReview() {
     <section className="panel-block" aria-labelledby="admin-revival-title">
       <h2 id="admin-revival-title">The vault</h2>
       <p className="admin-note">
-        Nothing plays until it is approved. A print auto-clears only when the source asserts public
-        domain and the work predates the US term, so the queue below is where the judgement calls
-        land.
+        Nothing plays until it is approved. A print clears on its own only when the UK term can be
+        closed from the authors' death dates, or when a European archive has released it outright.
+        Anything free in America but not provably free here waits below for a person.
       </p>
 
       {data && (
@@ -137,7 +139,7 @@ export function RevivalReview() {
             <strong>{work.title}</strong>
             <small>
               {workMeta(work) || "No metadata"} · {SOURCE_LABELS[work.source]} ·{" "}
-              {RIGHTS_LABELS[work.rightsBasis]}
+              {rightsSummary(work)}
               {sizeLabel(work.streamBytes) ? ` · ${sizeLabel(work.streamBytes)}` : ""}
               {work.mirrorState === "mirrored" ? " · mirrored" : ""}
               {work.mirrorError ? ` · ${work.mirrorError}` : ""}

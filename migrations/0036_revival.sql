@@ -17,11 +17,18 @@ CREATE TABLE IF NOT EXISTS revival_works (
   stream_type TEXT NOT NULL DEFAULT 'video/mp4',
   width INTEGER,
   height INTEGER,
+  country TEXT,
   rights_basis TEXT NOT NULL CHECK (
-    rights_basis IN ('us-gov', 'pd-mark', 'cc0', 'copyright-expired', 'curated', 'unclear')
+    rights_basis IN (
+      'uk-expired', 'crown-expired', 'eu-institution', 'cc0',
+      'us-gov', 'pd-mark', 'us-expired', 'curated', 'unclear'
+    )
   ),
   rights_note TEXT NOT NULL DEFAULT '',
   rights_url TEXT,
+  uk_expires_year INTEGER,
+  uk_clear INTEGER NOT NULL DEFAULT 0,
+  rights_checked_at TEXT,
   status TEXT NOT NULL DEFAULT 'candidate' CHECK (
     status IN ('candidate', 'approved', 'rejected')
   ),
@@ -50,6 +57,8 @@ CREATE INDEX IF NOT EXISTS revival_works_title_idx ON revival_works (title_id);
 CREATE INDEX IF NOT EXISTS revival_works_mirror_idx ON revival_works (mirror_state, status);
 CREATE INDEX IF NOT EXISTS revival_works_kind_idx ON revival_works (status, kind, plays DESC);
 CREATE INDEX IF NOT EXISTS revival_works_sort_idx ON revival_works (status, sort_title);
+CREATE INDEX IF NOT EXISTS revival_works_uk_idx ON revival_works (uk_clear, status);
+CREATE INDEX IF NOT EXISTS revival_works_rights_idx ON revival_works (rights_checked_at);
 
 CREATE TABLE IF NOT EXISTS revival_progress (
   viewer_id TEXT NOT NULL,

@@ -24,6 +24,7 @@ export type AdminAction =
   | "showtimes"
   | "revival-sweep"
   | "revival-match"
+  | "revival-rights"
   | "revival-mirror";
 
 export type AdminOverview = {

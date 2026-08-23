@@ -7495,6 +7495,13 @@ a.showtime:hover small {
   letter-spacing: 0.07em;
   text-transform: uppercase;
 }
+.revival-shelves .rail-heading,
+.revival-shelves .rail-track {
+  padding-inline: 0;
+}
+.revival-shelves .rail-track {
+  scroll-padding-inline: 0;
+}
 .revival-actions {
   margin-bottom: 26px;
 }

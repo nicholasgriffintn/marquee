@@ -5,6 +5,7 @@ import {
   searchArchiveCollection,
   type ArchiveCandidate,
 } from "../clients/archive.ts";
+import { EUROPEANA_COUNTRIES, searchEuropeana } from "../clients/europeana.ts";
 import { searchScreeningRoom } from "../clients/loc.ts";
 import { logError } from "../lib/logging.ts";
 import { isRecord } from "../lib/values.ts";
@@ -23,44 +24,37 @@ import {
 import type { Bindings } from "../types.ts";
 import { findTitleForFilm } from "./cinema-matching.ts";
 
-const COPYRIGHT_TERM_YEARS = 96;
+const US_TERM_YEARS = 96;
 const MIN_RUNTIME_SECONDS = 60;
 const NOW_SHOWING = 12;
 const DECADE_MIN = 3;
+const HOME_NATIONS = new Set(["United Kingdom", "Ireland"]);
 
-export function publicDomainCutoff(now = new Date()) {
-  return now.getUTCFullYear() - COPYRIGHT_TERM_YEARS;
+export function usPublicDomainCutoff(now = new Date()) {
+  return now.getUTCFullYear() - US_TERM_YEARS;
 }
 
-export function decideStatus(candidate: RevivalCandidate, cutoff: number): RevivalStatus {
+export function decideStatus(candidate: RevivalCandidate): RevivalStatus {
   if (!candidate.streamUrl || (candidate.runtimeSeconds ?? 0) < MIN_RUNTIME_SECONDS) {
     return "rejected";
   }
 
-  if (candidate.rightsBasis === "us-gov" || candidate.rightsBasis === "curated") {
+  if (candidate.rightsBasis === "cc0" || candidate.rightsBasis === "eu-institution") {
     return "approved";
-  }
-
-  if (candidate.rightsBasis === "cc0") {
-    return "approved";
-  }
-
-  if (candidate.rightsBasis === "pd-mark") {
-    return candidate.year !== null && candidate.year <= cutoff ? "approved" : "candidate";
   }
 
   return "candidate";
 }
 
-function withExpiredBasis(candidate: ArchiveCandidate, cutoff: number): RevivalCandidate {
+function withUsExpiredBasis(candidate: ArchiveCandidate, cutoff: number): RevivalCandidate {
   if (candidate.rightsBasis !== "unclear" || candidate.year === null || candidate.year > cutoff) {
     return candidate;
   }
 
   return {
     ...candidate,
-    rightsBasis: "copyright-expired",
-    rightsNote: `Published ${candidate.year}, outside the ${COPYRIGHT_TERM_YEARS} year US term`,
+    rightsBasis: "us-expired",
+    rightsNote: `Published ${candidate.year}, outside the ${US_TERM_YEARS} year US term. The UK term is measured from the authors' deaths and still has to be checked.`,
   };
 }
 
@@ -83,7 +77,7 @@ function parseCursor(raw: string): Record<string, number> {
 }
 
 export async function syncArchiveCollection(env: Bindings, collection: string) {
-  const cutoff = publicDomainCutoff();
+  const cutoff = usPublicDomainCutoff();
   const cursor = parseCursor(await readSourceCursor(env.DB, "archive"));
   const page = cursor[collection] ?? 1;
   const { identifiers, total } = await searchArchiveCollection(collection, page, cutoff);
@@ -102,8 +96,8 @@ export async function syncArchiveCollection(env: Bindings, collection: string) {
         continue;
       }
 
-      const candidate = withExpiredBasis(item, cutoff);
-      const status = decideStatus(candidate, cutoff);
+      const candidate = withUsExpiredBasis(item, cutoff);
+      const status = decideStatus(candidate);
 
       // oxlint-disable-next-line no-await-in-loop
       await upsertWork(env.DB, "archive", candidate, status);
@@ -132,14 +126,13 @@ export async function syncArchiveCollection(env: Bindings, collection: string) {
 }
 
 export async function syncScreeningRoom(env: Bindings) {
-  const cutoff = publicDomainCutoff();
   const cursor = parseCursor(await readSourceCursor(env.DB, "loc"));
   const page = cursor.nsr ?? 1;
   const { candidates, hasMore } = await searchScreeningRoom(page);
   const counts = { seen: candidates.length, accepted: 0, rejected: 0 };
 
   for (const candidate of candidates) {
-    const status = decideStatus(candidate, cutoff);
+    const status = decideStatus(candidate);
 
     // oxlint-disable-next-line no-await-in-loop
     await upsertWork(env.DB, "loc", candidate, status);
@@ -156,12 +149,56 @@ export async function syncScreeningRoom(env: Bindings) {
   return { page, ...counts };
 }
 
+export async function syncEuropeanaCountry(env: Bindings, country: string) {
+  if (!env.EUROPEANA_API_KEY) {
+    return { country, seen: 0, accepted: 0, rejected: 0 };
+  }
+
+  const cursor = parseCursor(await readSourceCursor(env.DB, "europeana"));
+  const page = cursor[country] ?? 1;
+  const { candidates, total } = await searchEuropeana(env.EUROPEANA_API_KEY, country, page);
+  const counts = { seen: candidates.length, accepted: 0, rejected: 0 };
+
+  for (const candidate of candidates) {
+    const status = decideStatus({ ...candidate, runtimeSeconds: MIN_RUNTIME_SECONDS });
+
+    // oxlint-disable-next-line no-await-in-loop
+    await upsertWork(env.DB, "europeana", candidate, status);
+
+    if (status === "approved") {
+      counts.accepted += 1;
+    } else {
+      counts.rejected += 1;
+    }
+  }
+
+  const exhausted = candidates.length === 0 || page * 100 >= total;
+
+  await recordSourceRun(
+    env.DB,
+    "europeana",
+    JSON.stringify({ ...cursor, [country]: exhausted ? 1 : page + 1 }),
+    counts,
+  );
+
+  return { country, page, ...counts };
+}
+
 export async function queueRevivalSources(env: Bindings) {
   const jobs = [
     ...ARCHIVE_COLLECTIONS.map((collection) => ({
       body: { type: "sync-revival-source" as const, source: "archive" as const, collection },
     })),
     { body: { type: "sync-revival-source" as const, source: "loc" as const } },
+    ...(env.EUROPEANA_API_KEY
+      ? EUROPEANA_COUNTRIES.map((country) => ({
+          body: {
+            type: "sync-revival-source" as const,
+            source: "europeana" as const,
+            collection: country,
+          },
+        }))
+      : []),
   ];
 
   await env.INGESTION_QUEUE.sendBatch(jobs);
@@ -214,6 +251,29 @@ export function buildShelves(works: RevivalWork[]) {
         "On tonight",
         "Running now, on our own screen. No sign-in, no service, no rental.",
         [...features, ...shorts].slice(0, NOW_SHOWING),
+      ),
+    );
+  }
+
+  const home = works.filter((work) => HOME_NATIONS.has(work.country ?? ""));
+
+  if (home.length >= DECADE_MIN) {
+    shelves.push(
+      shelf("british", "Made here", "British prints, out of copyright and back on a screen.", home),
+    );
+  }
+
+  const european = works.filter(
+    (work) => work.country && !HOME_NATIONS.has(work.country) && work.source === "europeana",
+  );
+
+  if (european.length >= DECADE_MIN) {
+    shelves.push(
+      shelf(
+        "european",
+        "From the continent",
+        "Held by European archives and released by them for anyone to use.",
+        european,
       ),
     );
   }

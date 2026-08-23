@@ -32,14 +32,14 @@ export function RevivalPage({ isReady }: { isReady: boolean }) {
   const { programme, isLoading, error } = useProgramme(isReady);
 
   return (
-    <section className="page-section">
+    <section className="page-section revival-shelves">
       <div className="page-title-row">
         <div>
           <h1>The revival house</h1>
         </div>
         <p>
-          The small screen at the back, where the prints are out of copyright and the ticket is
-          nothing. {programme.total ? `${programme.total} in the vault.` : ""}
+          The small screen at the back, where the prints are out of copyright in the UK and the
+          ticket is nothing. {programme.total ? `${programme.total} in the vault.` : ""}
         </p>
       </div>
 
@@ -81,10 +81,13 @@ export function RevivalPage({ isReady }: { isReady: boolean }) {
 
       {programme.shelves.length > 0 && (
         <p className="revival-note">
-          Everything here is in the public domain in the United States, either because the copyright
-          term has run out or because the rights were never asserted. Prints come from the Internet
-          Archive and the Library of Congress; where we hold our own copy it says so on the card. If
-          you believe something on this shelf is still in copyright, tell us and it comes off.
+          Everything on these shelves is out of copyright in the UK. For a film that means 70 years
+          from the death of the last of its principal director, screenwriters and composer, which is
+          measured from people rather than from a release date — so a film can be free in America
+          and still in copyright here, and those ones are not shown. Prints come from European
+          archives, the Internet Archive and the Library of Congress; where we hold our own copy it
+          says so on the card. If you believe something here is still in copyright, tell us and it
+          comes off.
         </p>
       )}
     </section>

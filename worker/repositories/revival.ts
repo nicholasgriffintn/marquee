@@ -23,6 +23,7 @@ export type RevivalCandidate = {
   streamType: string;
   width: number | null;
   height: number | null;
+  country?: string | null;
   rightsBasis: RevivalRightsBasis;
   rightsNote: string;
   rightsUrl: string | null;
@@ -43,6 +44,9 @@ type WorkRow = {
   rightsNote: string;
   rightsUrl: string | null;
   titleId: string | null;
+  country: string | null;
+  ukClear: number;
+  ukExpiresYear: number | null;
   mirrorState: string;
   plays: number;
 };
@@ -50,16 +54,17 @@ type WorkRow = {
 const WORK_COLUMNS = `id, source, source_url AS sourceUrl, title, year, director, synopsis,
    kind, runtime_seconds AS runtimeSeconds, still_url AS stillUrl,
    rights_basis AS rightsBasis, rights_note AS rightsNote, rights_url AS rightsUrl,
-   title_id AS titleId, mirror_state AS mirrorState, plays`;
+   title_id AS titleId, country, uk_clear AS ukClear, uk_expires_year AS ukExpiresYear,
+   mirror_state AS mirrorState, plays`;
 
-const ID_PATTERN = /^(archive|loc)\.[\w.-]{1,120}$/u;
+const ID_PATTERN = /^(archive|loc|europeana)\.[\w.-]{1,120}$/u;
 
 export function isRevivalId(value: unknown): value is string {
   return typeof value === "string" && ID_PATTERN.test(value);
 }
 
 export function isRevivalSource(value: unknown): value is RevivalSource {
-  return value === "archive" || value === "loc";
+  return value === "archive" || value === "loc" || value === "europeana";
 }
 
 export function revivalId(source: RevivalSource, sourceId: string) {
@@ -91,6 +96,9 @@ function toWork(row: WorkRow): RevivalWork {
     rightsNote: row.rightsNote,
     rightsUrl: row.rightsUrl,
     titleId: row.titleId,
+    country: row.country,
+    ukClear: row.ukClear === 1,
+    ukExpiresYear: row.ukExpiresYear,
     mirrored: row.mirrorState === "mirrored",
     reelUrl: reelPath(row.id),
     plays: row.plays,
@@ -110,9 +118,9 @@ export async function upsertWork(
       `INSERT INTO revival_works (
          id, source, source_id, source_url, title, sort_title, year, director, synopsis,
          kind, runtime_seconds, still_url, stream_url, stream_bytes, stream_type,
-         width, height, rights_basis, rights_note, rights_url, status
+         width, height, country, rights_basis, rights_note, rights_url, status
        )
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(source, source_id) DO UPDATE SET
          source_url = excluded.source_url,
          title = excluded.title,
@@ -128,6 +136,7 @@ export async function upsertWork(
          stream_type = excluded.stream_type,
          width = excluded.width,
          height = excluded.height,
+         country = excluded.country,
          rights_basis = excluded.rights_basis,
          rights_note = excluded.rights_note,
          rights_url = excluded.rights_url,
@@ -155,6 +164,7 @@ export async function upsertWork(
       candidate.streamType,
       candidate.width,
       candidate.height,
+      candidate.country ?? null,
       candidate.rightsBasis,
       candidate.rightsNote,
       candidate.rightsUrl,
@@ -163,6 +173,62 @@ export async function upsertWork(
     .run();
 
   return id;
+}
+
+export type RightsRow = {
+  id: string;
+  year: number | null;
+  rightsBasis: RevivalRightsBasis;
+  imdbId: string | null;
+};
+
+export async function readUncheckedRights(db: D1Database, limit = 60) {
+  const rows = await db
+    .prepare(
+      `SELECT w.id, w.year, w.rights_basis AS rightsBasis, t.imdb_id AS imdbId
+       FROM revival_works AS w
+       LEFT JOIN catalog_titles AS t ON t.id = w.title_id
+       WHERE w.status <> 'rejected'
+         AND (w.rights_checked_at IS NULL OR w.rights_checked_at < datetime('now', '-180 days'))
+       ORDER BY w.rights_checked_at IS NOT NULL, w.discovered_at
+       LIMIT ?`,
+    )
+    .bind(Math.min(limit, 200))
+    .all<RightsRow>();
+
+  return rows.results;
+}
+
+export async function storeUkRights(
+  db: D1Database,
+  id: string,
+  verdict: { clear: boolean; expiresYear: number | null; basis: RevivalRightsBasis; note: string },
+) {
+  await db
+    .prepare(
+      `UPDATE revival_works
+       SET uk_clear = ?,
+           uk_expires_year = ?,
+           rights_basis = ?,
+           rights_note = ?,
+           rights_checked_at = CURRENT_TIMESTAMP,
+           status = CASE
+             WHEN reviewed_at IS NOT NULL THEN status
+             WHEN ? = 1 THEN 'approved'
+             ELSE 'candidate'
+           END,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+    )
+    .bind(
+      verdict.clear ? 1 : 0,
+      verdict.expiresYear,
+      verdict.basis,
+      verdict.note.slice(0, 400),
+      verdict.clear ? 1 : 0,
+      id,
+    )
+    .run();
 }
 
 export async function readApprovedWorks(db: D1Database, limit = 400) {
@@ -506,6 +572,8 @@ export async function readRevivalStats(db: D1Database) {
          (SELECT count(*) FROM revival_works WHERE mirror_state = 'copying') AS copying,
          (SELECT count(*) FROM revival_works WHERE mirror_state = 'failed') AS mirrorFailed,
          (SELECT count(*) FROM revival_works WHERE title_id IS NOT NULL) AS matched,
+         (SELECT count(*) FROM revival_works WHERE uk_clear = 1) AS ukClear,
+         (SELECT count(*) FROM revival_works WHERE uk_clear = 0 AND rights_checked_at IS NOT NULL) AS ukUnknown,
          (SELECT coalesce(sum(mirror_offset), 0) FROM revival_works WHERE mirror_state = 'mirrored') AS mirroredBytes`,
     )
     .first<Record<string, number>>();

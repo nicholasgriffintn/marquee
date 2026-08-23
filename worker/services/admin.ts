@@ -34,6 +34,7 @@ export const ADMIN_ACTIONS = [
   "people",
   "revival-sweep",
   "revival-match",
+  "revival-rights",
   "revival-mirror",
 ] as const;
 
@@ -51,6 +52,7 @@ const QUEUED_JOBS: Partial<Record<AdminAction, IngestionJob>> = {
   providers: { type: "sync-providers" },
   sections: { type: "build-sections" },
   "revival-match": { type: "match-revival-works" },
+  "revival-rights": { type: "check-revival-rights" },
 };
 
 type CountRow = Record<string, number>;

@@ -1,12 +1,15 @@
-export type RevivalSource = "archive" | "loc";
+export type RevivalSource = "archive" | "loc" | "europeana";
 
 export type RevivalKind = "feature" | "short" | "episode" | "ephemeral";
 
 export type RevivalRightsBasis =
+  | "uk-expired"
+  | "crown-expired"
+  | "eu-institution"
+  | "cc0"
   | "us-gov"
   | "pd-mark"
-  | "cc0"
-  | "copyright-expired"
+  | "us-expired"
   | "curated"
   | "unclear";
 
@@ -29,6 +32,9 @@ export type RevivalWork = {
   rightsNote: string;
   rightsUrl: string | null;
   titleId: string | null;
+  country: string | null;
+  ukClear: boolean;
+  ukExpiresYear: number | null;
   mirrored: boolean;
   reelUrl: string;
   plays: number;
@@ -55,10 +61,13 @@ export type RevivalScreening = {
 };
 
 export const RIGHTS_LABELS: Record<RevivalRightsBasis, string> = {
+  "uk-expired": "UK copyright expired",
+  "crown-expired": "Crown copyright expired",
+  "eu-institution": "Released by a European archive",
+  cc0: "CC0 dedication",
   "us-gov": "US Government work",
   "pd-mark": "Public Domain Mark",
-  cc0: "CC0 dedication",
-  "copyright-expired": "Copyright expired",
+  "us-expired": "US copyright expired",
   curated: "Cleared by hand",
   unclear: "Not established",
 };
@@ -66,6 +75,7 @@ export const RIGHTS_LABELS: Record<RevivalRightsBasis, string> = {
 export const SOURCE_LABELS: Record<RevivalSource, string> = {
   archive: "Internet Archive",
   loc: "Library of Congress",
+  europeana: "Europeana",
 };
 
 export function reelPath(workId: string) {
@@ -93,12 +103,29 @@ export function runtimeLabel(seconds: number | null) {
 export function workMeta(work: RevivalWork) {
   return [
     work.year?.toString(),
+    work.country,
     work.kind === "short" ? "Short" : work.kind === "ephemeral" ? "Ephemeral" : null,
     runtimeLabel(work.runtimeSeconds),
     work.director,
   ]
     .filter(Boolean)
     .join(" · ");
+}
+
+export function rightsSummary(work: RevivalWork) {
+  const label = RIGHTS_LABELS[work.rightsBasis];
+
+  if (!work.ukExpiresYear) {
+    return label;
+  }
+
+  if (!work.ukClear) {
+    return `${label} · not free in the UK before ${work.ukExpiresYear}`;
+  }
+
+  return work.rightsBasis === "uk-expired" || work.rightsBasis === "crown-expired"
+    ? `Free in the UK since ${work.ukExpiresYear}`
+    : `${label} · free in the UK since ${work.ukExpiresYear}`;
 }
 
 export function clockLabel(seconds: number) {

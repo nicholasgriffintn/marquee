@@ -21,7 +21,7 @@ export function ReelCard({ work }: { work: RevivalWork }) {
       </Link>
       <div className="rail-meta">
         <span className="revival-free">Free to watch here</span>
-        <span>{workMeta(work) || "Public domain"}</span>
+        <span>{workMeta(work) || "Public domain in the UK"}</span>
       </div>
     </article>
   );

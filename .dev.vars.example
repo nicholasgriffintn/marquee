@@ -14,3 +14,4 @@ GITHUB_CLIENT_SECRET=your-github-oauth-app-client-secret
 LOCAL_DEV=true
 # Set to "on" only when you deliberately want the cron sync pipelines to run locally
 LOCAL_SYNC=off
+EUROPEANA_API_KEY=
