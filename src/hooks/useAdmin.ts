@@ -16,6 +16,9 @@ export type AdminAction =
   | "providers"
   | "sections"
   | "working-set"
+  | "alerts-preview"
+  | "alerts-send"
+  | "angle-scores"
   | "cinemas"
   | "showtimes";
 

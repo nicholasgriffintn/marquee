@@ -1,5 +1,6 @@
 import { ArtPlaceholder } from "../components/ArtPlaceholder";
 import { TitleCard } from "../components/catalog";
+import { ErrorBoundary } from "../components/ErrorBoundary";
 import { UsherMark } from "../components/usher/UsherMark";
 import type { MediaTitle } from "../domain/catalog";
 import { useDigest } from "../hooks/useDigest";
@@ -84,43 +85,45 @@ export function DigestPage({
       )}
 
       {digest?.lead?.item ? (
-        <article className="programme-lead">
-          <button
-            type="button"
-            className="programme-lead-art"
-            onClick={() => digest.lead?.item && onOpen(digest.lead.item)}
-          >
-            {digest.lead.item.backdropUrl || digest.lead.item.posterUrl ? (
-              <img
-                src={
-                  artwork(
-                    digest.lead.item.backdropUrl ?? digest.lead.item.posterUrl,
-                    780,
-                    digest.lead.item.backdropUrl ? "backdrop" : "poster",
-                  ) ?? ""
-                }
-                alt=""
-                loading="lazy"
-                decoding="async"
-              />
-            ) : (
-              <ArtPlaceholder seed={digest.lead.item.id} label={digest.lead.item.title} wide />
-            )}
-          </button>
-          <div className="programme-lead-copy">
-            <span>The pick of the week</span>
-            <h2>{digest.lead.item.title}</h2>
-            <p className="programme-lead-meta">{mediaMeta(digest.lead.item)}</p>
-            <blockquote>{digest.lead.line}</blockquote>
+        <ErrorBoundary label="The pick of the week">
+          <article className="programme-lead">
             <button
               type="button"
-              className="programme-lead-open"
+              className="programme-lead-art"
               onClick={() => digest.lead?.item && onOpen(digest.lead.item)}
             >
-              See where to watch
+              {digest.lead.item.backdropUrl || digest.lead.item.posterUrl ? (
+                <img
+                  src={
+                    artwork(
+                      digest.lead.item.backdropUrl ?? digest.lead.item.posterUrl,
+                      780,
+                      digest.lead.item.backdropUrl ? "backdrop" : "poster",
+                    ) ?? ""
+                  }
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                />
+              ) : (
+                <ArtPlaceholder seed={digest.lead.item.id} label={digest.lead.item.title} wide />
+              )}
             </button>
-          </div>
-        </article>
+            <div className="programme-lead-copy">
+              <span>The pick of the week</span>
+              <h2>{digest.lead.item.title}</h2>
+              <p className="programme-lead-meta">{mediaMeta(digest.lead.item)}</p>
+              <blockquote>{digest.lead.line}</blockquote>
+              <button
+                type="button"
+                className="programme-lead-open"
+                onClick={() => digest.lead?.item && onOpen(digest.lead.item)}
+              >
+                See where to watch
+              </button>
+            </div>
+          </article>
+        </ErrorBoundary>
       ) : null}
 
       {digest && digest.numbers.shelved > 0 ? (
@@ -160,14 +163,14 @@ export function DigestPage({
       ) : null}
 
       {digest?.fresh.length ? (
-        <>
+        <ErrorBoundary label="This week's new titles">
           <h2 className="digest-heading">New, and close to your taste</h2>
           <div className="results-grid">
             {digest.fresh.map((item) => (
               <TitleCard key={item.id} item={item} onOpen={onOpen} />
             ))}
           </div>
-        </>
+        </ErrorBoundary>
       ) : null}
 
       {digest?.episodes.length ? (
@@ -190,14 +193,14 @@ export function DigestPage({
       ) : null}
 
       {digest?.trending.length ? (
-        <>
+        <ErrorBoundary label="What the town is reading about">
           <h2 className="digest-heading">What the town is reading about</h2>
           <div className="results-grid">
             {digest.trending.map((item) => (
               <TitleCard key={item.id} item={item} onOpen={onOpen} />
             ))}
           </div>
-        </>
+        </ErrorBoundary>
       ) : null}
     </section>
   );

@@ -8,7 +8,7 @@ const ROUTE_TITLES: Record<string, string> = {
   "/shelf": "My shelf · Marquee",
   "/this-week": "This week · Marquee",
   "/notebook": "The notebook · Marquee",
-  "/sources": "Sources · Marquee",
+  "/sources": "Where it comes from · Marquee",
   "/admin": "Admin · Marquee",
   "/sign-in": "Box office · Marquee",
   "/usher": "The Usher (1974) — Marquee",

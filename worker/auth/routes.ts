@@ -7,6 +7,8 @@ import { jsonResponse, readJsonObject, withCookies } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
 import { canonicalOrigin, safeReturnPath } from "../lib/security.ts";
 import { isRecord } from "../lib/values.ts";
+import { confirmAlertEmail } from "../repositories/alerts.ts";
+import { hashState } from "../repositories/links.ts";
 import type { Bindings } from "../types.ts";
 import { listApiTokens, mintToken, revokeApiToken, storeApiToken } from "./api-tokens.ts";
 import {
@@ -23,6 +25,7 @@ export const authRoutes = new Hono<{ Bindings: Bindings }>();
 authRoutes.post("/", (context) => runAuthProtocol(context));
 authRoutes.get("/methods", (context) => listMethods(context));
 authRoutes.get("/magic", (context) => completeMagicLink(context));
+authRoutes.get("/alert-email", (context) => confirmAlertAddress(context));
 authRoutes.get("/callback/:provider", (context) => completeOAuth(context));
 authRoutes.get("/session", (context) => getSession(context));
 authRoutes.post("/logout", (context) => logout(context));
@@ -76,6 +79,29 @@ async function completeMagicLink(context: AppContext) {
 
     return failedCallback(context, "invalid_callback");
   }
+}
+
+async function confirmAlertAddress(context: AppContext) {
+  const token = new URL(context.req.url).searchParams.get("token") ?? "";
+  const url = destination(context, "/notebook");
+
+  if (!token) {
+    url.searchParams.set("alertEmail", "invalid");
+
+    return context.redirect(url.href);
+  }
+
+  try {
+    const confirmed = await confirmAlertEmail(context.env.DB, await hashState(token));
+
+    url.searchParams.set("alertEmail", confirmed ? "confirmed" : "expired");
+  } catch (error) {
+    logError("alert_email_confirm_failed", error);
+
+    url.searchParams.set("alertEmail", "invalid");
+  }
+
+  return context.redirect(url.href);
 }
 
 async function runAuthProtocol(context: AppContext) {

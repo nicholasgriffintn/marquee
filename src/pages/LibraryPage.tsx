@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 
+import { ErrorBoundary } from "../components/ErrorBoundary";
 import { ArrowIcon, Poster } from "../components/ui";
 import { UsherCard } from "../components/usher/UsherCard";
 import { UsherMark } from "../components/usher/UsherMark";
@@ -206,36 +207,39 @@ export function LibraryPage({
       )}
 
       {lost.length > 0 && (
-        <section className="lost-property">
-          <div className="lost-head">
-            <UsherMark face="unimpressed" crop="head" />
-            <div>
-              <span>Lost property</span>
-              <p>
-                {lost.length === 1 ? "This has" : `These ${lost.length} have`} been in the box since{" "}
-                {sinceLabel(lost[lost.length - 1].entry)}. Claim them or I am throwing them out.
-              </p>
+        <ErrorBoundary label="Lost property">
+          <section className="lost-property">
+            <div className="lost-head">
+              <UsherMark face="unimpressed" crop="head" />
+              <div>
+                <span>Lost property</span>
+                <p>
+                  {lost.length === 1 ? "This has" : `These ${lost.length} have`} been in the box
+                  since {sinceLabel(lost[lost.length - 1].entry)}. Claim them or I am throwing them
+                  out.
+                </p>
+              </div>
             </div>
-          </div>
-          <ul className="lost-items">
-            {lost.map(({ item, entry }) => (
-              <li key={item.id}>
-                <button type="button" className="lost-poster" onClick={() => onOpen(item)}>
-                  <Poster item={item} />
-                </button>
-                <strong>{item.title}</strong>
-                <div className="lost-buttons">
-                  <button type="button" onClick={() => onClaim(entry)}>
-                    Claim it
+            <ul className="lost-items">
+              {lost.map(({ item, entry }) => (
+                <li key={item.id}>
+                  <button type="button" className="lost-poster" onClick={() => onOpen(item)}>
+                    <Poster item={item} />
                   </button>
-                  <button type="button" onClick={() => onDiscard(item.id)}>
-                    Bin it
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
+                  <strong>{item.title}</strong>
+                  <div className="lost-buttons">
+                    <button type="button" onClick={() => onClaim(entry)}>
+                      Claim it
+                    </button>
+                    <button type="button" onClick={() => onDiscard(item.id)}>
+                      Bin it
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </ErrorBoundary>
       )}
 
       {catalogueError && savedCount > 0 && !titles.length && (
@@ -322,31 +326,33 @@ export function LibraryPage({
       )}
 
       {groupNames.map((name) => (
-        <div className="shelf-group" key={name || "all"}>
-          {name && (
-            <h2>
-              {name} <em>{grouped.get(name)?.length}</em>
-            </h2>
-          )}
-          <div className="shelf-grid">
-            {grouped.get(name)?.map(({ item, entry }) => (
-              <button
-                type="button"
-                className="shelf-item"
-                key={item.id}
-                onClick={() => onOpen(item)}
-                aria-label={`Open ${item.title}`}
-              >
-                <Poster item={item} />
-                <strong>{item.title}</strong>
-                <small>
-                  {STATUS_LABELS[entry.status]}
-                  {entry.rating ? ` · ${"★".repeat(entry.rating)}` : ""}
-                </small>
-              </button>
-            ))}
+        <ErrorBoundary key={name || "all"} label="This shelf">
+          <div className="shelf-group">
+            {name && (
+              <h2>
+                {name} <em>{grouped.get(name)?.length}</em>
+              </h2>
+            )}
+            <div className="shelf-grid">
+              {grouped.get(name)?.map(({ item, entry }) => (
+                <button
+                  type="button"
+                  className="shelf-item"
+                  key={item.id}
+                  onClick={() => onOpen(item)}
+                  aria-label={`Open ${item.title}`}
+                >
+                  <Poster item={item} />
+                  <strong>{item.title}</strong>
+                  <small>
+                    {STATUS_LABELS[entry.status]}
+                    {entry.rating ? ` · ${"★".repeat(entry.rating)}` : ""}
+                  </small>
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        </ErrorBoundary>
       ))}
 
       {savedCount > 0 && visible.length === 0 && (

@@ -145,7 +145,7 @@ export async function writeDerivedBeliefs(db: D1Database, viewerId: string, draf
     }
 
     for (const row of existing.results) {
-      if (!derivedKeys.has(row.key) && row.edited === 0 && row.key.startsWith("rule:")) {
+      if (!derivedKeys.has(row.key) && row.edited === 0 && !row.key.startsWith("hunch:")) {
         statements.push(
           db
             .prepare(`UPDATE viewer_beliefs SET revoked_at = CURRENT_TIMESTAMP WHERE id = ?1`)

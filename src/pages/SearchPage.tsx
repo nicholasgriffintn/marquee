@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 
 import { TitleCard } from "../components/catalog";
+import { ErrorBoundary } from "../components/ErrorBoundary";
 import { UsherCard } from "../components/usher/UsherCard";
 import { UsherMark } from "../components/usher/UsherMark";
 import type { MediaTitle } from "../domain/catalog";
@@ -63,11 +64,13 @@ export function SearchPage({
       )}
 
       {items.length > 0 && (
-        <div className="results-grid">
-          {items.map((item) => (
-            <TitleCard key={item.id} item={item} onOpen={onOpen} />
-          ))}
-        </div>
+        <ErrorBoundary label="These results">
+          <div className="results-grid">
+            {items.map((item) => (
+              <TitleCard key={item.id} item={item} onOpen={onOpen} />
+            ))}
+          </div>
+        </ErrorBoundary>
       )}
 
       {showSkeleton && (

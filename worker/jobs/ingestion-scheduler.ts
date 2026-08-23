@@ -1,5 +1,5 @@
+import { dispatchAlerts } from "../services/alerts/dispatch.ts";
 import { computeAngleScores } from "../services/angle-scores.ts";
-import { announceArrivals } from "../services/arrivals.ts";
 import type { Bindings } from "../types.ts";
 
 const DIGEST_CRON = "0 9 * * 1";
@@ -14,7 +14,7 @@ export async function scheduleIngestion(env: Bindings, cron: string) {
   }
 
   if (cron === DEEP_SWEEP_CRON) {
-    await announceArrivals(env, env.SITE_ORIGIN ?? "https://marquee.pashi.app");
+    await dispatchAlerts(env, env.SITE_ORIGIN ?? "https://marquee.pashi.app");
   }
 
   await env.CATALOG_SWEEP.create({ params: { deep: cron === DEEP_SWEEP_CRON } });

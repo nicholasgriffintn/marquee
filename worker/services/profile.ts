@@ -9,6 +9,12 @@ export async function getProfile(db: D1Database, viewerId: string) {
   return readProfile(db, viewerId);
 }
 
+function countOrNull(value: unknown, limit: number) {
+  const parsed = Number(value);
+
+  return Number.isInteger(parsed) && parsed >= 1 && parsed <= limit ? parsed : null;
+}
+
 export async function updateProfile(
   db: D1Database,
   viewerId: string,
@@ -35,6 +41,8 @@ export async function updateProfile(
     status: input.status,
     rating,
     thoughts,
+    season: countOrNull(input.season, 100),
+    episode: countOrNull(input.episode, 500),
   });
 
   return { ok: true, payload: { entry } };

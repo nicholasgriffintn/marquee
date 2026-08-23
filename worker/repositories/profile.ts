@@ -10,6 +10,8 @@ export async function readProfile(db: D1Database, viewerId: string) {
          status,
          rating,
          thoughts,
+         season,
+         episode,
          updated_at AS updatedAt
        FROM viewing_entries
        WHERE viewer_id = ?
@@ -33,20 +35,33 @@ export async function saveViewingEntry(
     status: EntryStatus;
     rating: number | null;
     thoughts: string;
+    season: number | null;
+    episode: number | null;
   },
 ) {
   await db
     .prepare(
       `INSERT INTO viewing_entries
-         (id, viewer_id, title_id, status, rating, thoughts)
-       VALUES (?, ?, ?, ?, ?, ?)
+         (id, viewer_id, title_id, status, rating, thoughts, season, episode)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(viewer_id, title_id) DO UPDATE SET
          status = excluded.status,
          rating = excluded.rating,
          thoughts = excluded.thoughts,
+         season = excluded.season,
+         episode = excluded.episode,
          updated_at = CURRENT_TIMESTAMP`,
     )
-    .bind(crypto.randomUUID(), viewerId, entry.titleId, entry.status, entry.rating, entry.thoughts)
+    .bind(
+      crypto.randomUUID(),
+      viewerId,
+      entry.titleId,
+      entry.status,
+      entry.rating,
+      entry.thoughts,
+      entry.season,
+      entry.episode,
+    )
     .run();
 
   return db
@@ -57,6 +72,8 @@ export async function saveViewingEntry(
          status,
          rating,
          thoughts,
+         season,
+         episode,
          updated_at AS updatedAt
        FROM viewing_entries
        WHERE viewer_id = ? AND title_id = ?`,

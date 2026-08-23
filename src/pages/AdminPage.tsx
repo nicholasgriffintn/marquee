@@ -1,3 +1,4 @@
+import { ErrorBoundary } from "../components/ErrorBoundary";
 import { UsherMark } from "../components/usher/UsherMark";
 import { useAdmin, type AdminAction } from "../hooks/useAdmin";
 import type { User } from "../types";
@@ -38,6 +39,15 @@ const ACTION_GROUPS: {
     ],
   },
   {
+    title: "The post",
+    note: "Alerts only go to members who have confirmed an address, never more than a handful a week, and never twice about the same thing. Preview runs every detector and reports what would go out without posting anything.",
+    actions: [
+      { id: "alerts-preview", label: "Preview the post" },
+      { id: "alerts-send", label: "Send the post" },
+      { id: "angle-scores", label: "Rescore shelves" },
+    ],
+  },
+  {
     title: "The other houses",
     note: "Cinema listings come from the chains that publish them. The directory is refreshed on a deep sweep; listings are only pulled for cinemas near somewhere a member has actually looked from, so the work grows with the audience rather than with the country.",
     actions: [
@@ -64,6 +74,11 @@ const COUNT_LABELS: { key: string; label: string }[] = [
   { key: "screenings", label: "screenings ahead" },
   { key: "interestCells", label: "places looked from" },
   { key: "users", label: "accounts" },
+  { key: "alertReady", label: "confirmed addresses" },
+  { key: "alertsWeek", label: "alerts this week" },
+  { key: "alertsSent", label: "alerts all time" },
+  { key: "signals", label: "signals recorded" },
+  { key: "beliefs", label: "beliefs held" },
 ];
 
 type BackfillRow = {
@@ -164,249 +179,253 @@ export function AdminPage({ user }: { user: User }) {
         {admin.message}
       </p>
 
-      {overview && (
-        <section className="panel-block" aria-labelledby="admin-counts-title">
-          <h2 id="admin-counts-title">Catalogue</h2>
-          <p className="admin-note">
-            Availability is only kept fresh for the working set — everything on a shelf or a pinned
-            list, everything a rail can surface, anything with an insight or an air date ahead of
-            it, plus the most popular titles. The rest of the catalogue is searchable and fills in
-            its providers when something actually reaches for it.
-          </p>
-          <div className="admin-counts">
-            {COUNT_LABELS.map((count) => (
-              <div key={count.key}>
-                <strong>{(overview.catalogue[count.key] ?? 0).toLocaleString()}</strong>
-                <span>{count.label}</span>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {overview && overview.backfill.length > 0 && (
-        <section className="panel-block" aria-labelledby="admin-backfill-title">
-          <h2 id="admin-backfill-title">Catalogue backfill</h2>
-          <p className="admin-note">
-            TMDB stops paginating any single query at page 500, so the sweep walks it as dated
-            windows and halves any window that overflows that cap. Each window keeps its own cursor,
-            so every sweep resumes the crawl instead of restarting it.
-          </p>
-          <ul className="admin-list">
-            {backfillSummary(overview.backfill).map(([mediaType, row]) => (
-              <li key={mediaType}>
-                <strong>{mediaType === "movie" ? "Films" : "Series"}</strong>
-                <small>
-                  {row.pagesDone.toLocaleString()} / {row.totalPages.toLocaleString()} pages ·{" "}
-                  {row.measured.toLocaleString()} of{" "}
-                  {(row.measured + row.awaiting).toLocaleString()} windows mapped
-                  {row.splitting > 0 ? ` · ${row.splitting.toLocaleString()} split` : ""}
-                </small>
-                <span className="spacer" />
-                <code>
-                  {row.titles.toLocaleString()} titles in range
-                  {row.awaiting > 0 ? " so far" : ""}
-                </code>
-                <div className="budget-bar" aria-hidden="true">
-                  <i
-                    style={{
-                      width: `${Math.min(100, (row.pagesDone / Math.max(1, row.totalPages)) * 100)}%`,
-                    }}
-                  />
+      <ErrorBoundary label="The readouts">
+        {overview && (
+          <section className="panel-block" aria-labelledby="admin-counts-title">
+            <h2 id="admin-counts-title">Catalogue</h2>
+            <p className="admin-note">
+              Availability is only kept fresh for the working set — everything on a shelf or a
+              pinned list, everything a rail can surface, anything with an insight or an air date
+              ahead of it, plus the most popular titles. The rest of the catalogue is searchable and
+              fills in its providers when something actually reaches for it.
+            </p>
+            <div className="admin-counts">
+              {COUNT_LABELS.map((count) => (
+                <div key={count.key}>
+                  <strong>{(overview.catalogue[count.key] ?? 0).toLocaleString()}</strong>
+                  <span>{count.label}</span>
                 </div>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+              ))}
+            </div>
+          </section>
+        )}
 
-      {ACTION_GROUPS.map((group) => (
-        <section className="panel-block" key={group.title} aria-label={group.title}>
-          <h2>{group.title}</h2>
-          <p className="admin-note">{group.note}</p>
-          <div className="admin-actions">
-            {group.actions.map((action) => (
-              <button
-                type="button"
-                key={action.id}
-                className="link-button-primary"
-                disabled={Boolean(admin.pending)}
-                onClick={() => void admin.run(action.id)}
-              >
-                {admin.pending === action.id ? "Starting…" : action.label}
-              </button>
-            ))}
-          </div>
-        </section>
-      ))}
-
-      {overview && overview.budgets.length > 0 && (
-        <section className="panel-block" aria-labelledby="admin-budgets-title">
-          <h2 id="admin-budgets-title">Call budgets</h2>
-          <div className="budget-grid">
-            {overview.budgets.map((budget) => (
-              <div
-                key={budget.source}
-                className={`budget-cell${budget.pausedUntil ? " budget-cell-paused" : ""}`}
-              >
-                <strong>{budget.source}</strong>
-                <span>
-                  {budget.pausedUntil
-                    ? `rate limited until ${stamp(budget.pausedUntil)}`
-                    : `${budget.used.toLocaleString()} / ${budget.callLimit.toLocaleString()} per ${budget.windowKind}`}
-                </span>
-                <div className="budget-bar" aria-hidden="true">
-                  <i
-                    style={{
-                      width: `${Math.min(100, (budget.used / Math.max(1, budget.callLimit)) * 100)}%`,
-                    }}
-                  />
-                </div>
-                {budget.pausedUntil && (
-                  <button type="button" onClick={() => void admin.resume(budget.source)}>
-                    Resume now
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {overview && (
-        <section className="panel-block" aria-labelledby="admin-cinemas-title">
-          <h2 id="admin-cinemas-title">Cinema listings</h2>
-          <p className="admin-note">
-            {cinemaTotals(overview.cinemas)} A cinema without coordinates never shows up in a nearby
-            search, and listings are only pulled for the{" "}
-            {(overview.catalogue.interestCells ?? 0).toLocaleString()} places a member has looked
-            from in the last thirty days — with none of those, Pull local listings has nothing to
-            queue.
-          </p>
-          {overview.cinemas.length > 0 ? (
+        {overview && overview.backfill.length > 0 && (
+          <section className="panel-block" aria-labelledby="admin-backfill-title">
+            <h2 id="admin-backfill-title">Catalogue backfill</h2>
+            <p className="admin-note">
+              TMDB stops paginating any single query at page 500, so the sweep walks it as dated
+              windows and halves any window that overflows that cap. Each window keeps its own
+              cursor, so every sweep resumes the crawl instead of restarting it.
+            </p>
             <ul className="admin-list">
-              {overview.cinemas.map((row) => (
-                <li key={row.source}>
-                  <strong>{row.source}</strong>
+              {backfillSummary(overview.backfill).map(([mediaType, row]) => (
+                <li key={mediaType}>
+                  <strong>{mediaType === "movie" ? "Films" : "Series"}</strong>
                   <small>
-                    {row.located.toLocaleString()} of {row.cinemas.toLocaleString()} placed
-                  </small>
-                  {row.cinemas > row.located && (
-                    <code>{(row.cinemas - row.located).toLocaleString()} unplaced</code>
-                  )}
-                  <small>
-                    {row.matched.toLocaleString()} / {row.films.toLocaleString()} films matched
+                    {row.pagesDone.toLocaleString()} / {row.totalPages.toLocaleString()} pages ·{" "}
+                    {row.measured.toLocaleString()} of{" "}
+                    {(row.measured + row.awaiting).toLocaleString()} windows mapped
+                    {row.splitting > 0 ? ` · ${row.splitting.toLocaleString()} split` : ""}
                   </small>
                   <span className="spacer" />
-                  <small>{row.screenings.toLocaleString()} ahead</small>
+                  <code>
+                    {row.titles.toLocaleString()} titles in range
+                    {row.awaiting > 0 ? " so far" : ""}
+                  </code>
+                  <div className="budget-bar" aria-hidden="true">
+                    <i
+                      style={{
+                        width: `${Math.min(100, (row.pagesDone / Math.max(1, row.totalPages)) * 100)}%`,
+                      }}
+                    />
+                  </div>
                 </li>
               ))}
             </ul>
-          ) : (
+          </section>
+        )}
+
+        {ACTION_GROUPS.map((group) => (
+          <section className="panel-block" key={group.title} aria-label={group.title}>
+            <h2>{group.title}</h2>
+            <p className="admin-note">{group.note}</p>
+            <div className="admin-actions">
+              {group.actions.map((action) => (
+                <button
+                  type="button"
+                  key={action.id}
+                  className="link-button-primary"
+                  disabled={Boolean(admin.pending)}
+                  onClick={() => void admin.run(action.id)}
+                >
+                  {admin.pending === action.id ? "Starting…" : action.label}
+                </button>
+              ))}
+            </div>
+          </section>
+        ))}
+
+        {overview && overview.budgets.length > 0 && (
+          <section className="panel-block" aria-labelledby="admin-budgets-title">
+            <h2 id="admin-budgets-title">Call budgets</h2>
+            <div className="budget-grid">
+              {overview.budgets.map((budget) => (
+                <div
+                  key={budget.source}
+                  className={`budget-cell${budget.pausedUntil ? " budget-cell-paused" : ""}`}
+                >
+                  <strong>{budget.source}</strong>
+                  <span>
+                    {budget.pausedUntil
+                      ? `rate limited until ${stamp(budget.pausedUntil)}`
+                      : `${budget.used.toLocaleString()} / ${budget.callLimit.toLocaleString()} per ${budget.windowKind}`}
+                  </span>
+                  <div className="budget-bar" aria-hidden="true">
+                    <i
+                      style={{
+                        width: `${Math.min(100, (budget.used / Math.max(1, budget.callLimit)) * 100)}%`,
+                      }}
+                    />
+                  </div>
+                  {budget.pausedUntil && (
+                    <button type="button" onClick={() => void admin.resume(budget.source)}>
+                      Resume now
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {overview && (
+          <section className="panel-block" aria-labelledby="admin-cinemas-title">
+            <h2 id="admin-cinemas-title">Cinema listings</h2>
             <p className="admin-note">
-              No directory yet. Run Refresh cinema directory to pull the chains.
+              {cinemaTotals(overview.cinemas)} A cinema without coordinates never shows up in a
+              nearby search, and listings are only pulled for the{" "}
+              {(overview.catalogue.interestCells ?? 0).toLocaleString()} places a member has looked
+              from in the last thirty days — with none of those, Pull local listings has nothing to
+              queue.
             </p>
-          )}
-        </section>
-      )}
+            {overview.cinemas.length > 0 ? (
+              <ul className="admin-list">
+                {overview.cinemas.map((row) => (
+                  <li key={row.source}>
+                    <strong>{row.source}</strong>
+                    <small>
+                      {row.located.toLocaleString()} of {row.cinemas.toLocaleString()} placed
+                    </small>
+                    {row.cinemas > row.located && (
+                      <code>{(row.cinemas - row.located).toLocaleString()} unplaced</code>
+                    )}
+                    <small>
+                      {row.matched.toLocaleString()} / {row.films.toLocaleString()} films matched
+                    </small>
+                    <span className="spacer" />
+                    <small>{row.screenings.toLocaleString()} ahead</small>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="admin-note">
+                No directory yet. Run Refresh cinema directory to pull the chains.
+              </p>
+            )}
+          </section>
+        )}
 
-      {overview && overview.enrichment.length > 0 && (
-        <section className="panel-block" aria-labelledby="admin-enrichment-title">
-          <h2 id="admin-enrichment-title">Enrichment coverage</h2>
+        {overview && overview.enrichment.length > 0 && (
+          <section className="panel-block" aria-labelledby="admin-enrichment-title">
+            <h2 id="admin-enrichment-title">Enrichment coverage</h2>
+            <ul className="admin-list">
+              {overview.enrichment.map((source) => (
+                <li key={source.source}>
+                  <strong>{source.source}</strong>
+                  <small>{source.titles.toLocaleString()} titles</small>
+                  {source.misses > 0 && <code>{source.misses.toLocaleString()} no data</code>}
+                  <span className="spacer" />
+                  <time dateTime={source.newest}>{stamp(source.newest)}</time>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {overview && overview.lastRuns.length > 0 && (
+          <section className="panel-block" aria-labelledby="admin-runs-title">
+            <h2 id="admin-runs-title">Recent jobs</h2>
+            <ul className="admin-list">
+              {overview.lastRuns.map((run) => (
+                <li key={`${run.jobType}-${run.status}`}>
+                  <strong>{run.jobType}</strong>
+                  <small className={`run-status run-status-${run.status}`}>
+                    {run.status} · {run.runs.toLocaleString()}
+                  </small>
+                  <span className="spacer" />
+                  <time dateTime={run.lastRunAt}>{stamp(run.lastRunAt)}</time>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {overview && overview.failures.length > 0 && (
+          <section className="panel-block" aria-labelledby="admin-failures-title">
+            <h2 id="admin-failures-title">Latest failures</h2>
+            <ul className="failure-list">
+              {overview.failures.map((failure) => (
+                <li key={`${failure.jobType}-${failure.startedAt}-${failure.subjectId ?? ""}`}>
+                  <strong>{failure.jobType}</strong>
+                  <small>
+                    {failure.subjectId ? `${failure.subjectId} · ` : ""}
+                    {failure.error ?? "failed"}
+                  </small>
+                  <time dateTime={failure.startedAt}>{stamp(failure.startedAt)}</time>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {overview && overview.sections.length > 0 && (
+          <section className="panel-block" aria-labelledby="admin-sections-title">
+            <h2 id="admin-sections-title">Homepage rails</h2>
+            <ul className="admin-list">
+              {overview.sections.map((section) => (
+                <li key={section.id}>
+                  <strong>{section.title}</strong>
+                  <small>{section.titles} titles</small>
+                  <span className="spacer" />
+                  <code>{section.id}</code>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+      </ErrorBoundary>
+
+      <ErrorBoundary label="The staff list">
+        <section className="panel-block" aria-labelledby="admin-users-title">
+          <h2 id="admin-users-title">People</h2>
           <ul className="admin-list">
-            {overview.enrichment.map((source) => (
-              <li key={source.source}>
-                <strong>{source.source}</strong>
-                <small>{source.titles.toLocaleString()} titles</small>
-                {source.misses > 0 && <code>{source.misses.toLocaleString()} no data</code>}
-                <span className="spacer" />
-                <time dateTime={source.newest}>{stamp(source.newest)}</time>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {overview && overview.lastRuns.length > 0 && (
-        <section className="panel-block" aria-labelledby="admin-runs-title">
-          <h2 id="admin-runs-title">Recent jobs</h2>
-          <ul className="admin-list">
-            {overview.lastRuns.map((run) => (
-              <li key={`${run.jobType}-${run.status}`}>
-                <strong>{run.jobType}</strong>
-                <small className={`run-status run-status-${run.status}`}>
-                  {run.status} · {run.runs.toLocaleString()}
-                </small>
-                <span className="spacer" />
-                <time dateTime={run.lastRunAt}>{stamp(run.lastRunAt)}</time>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {overview && overview.failures.length > 0 && (
-        <section className="panel-block" aria-labelledby="admin-failures-title">
-          <h2 id="admin-failures-title">Latest failures</h2>
-          <ul className="failure-list">
-            {overview.failures.map((failure) => (
-              <li key={`${failure.jobType}-${failure.startedAt}-${failure.subjectId ?? ""}`}>
-                <strong>{failure.jobType}</strong>
+            {admin.users.map((person) => (
+              <li key={person.id}>
+                {person.avatarUrl ? (
+                  <img className="admin-avatar" src={person.avatarUrl} alt="" />
+                ) : (
+                  <span className="avatar-fallback">{person.name.slice(0, 1)}</span>
+                )}
+                <strong>{person.name}</strong>
                 <small>
-                  {failure.subjectId ? `${failure.subjectId} · ` : ""}
-                  {failure.error ?? "failed"}
+                  @{person.login} · {person.shelfEntries} saved
                 </small>
-                <time dateTime={failure.startedAt}>{stamp(failure.startedAt)}</time>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {overview && overview.sections.length > 0 && (
-        <section className="panel-block" aria-labelledby="admin-sections-title">
-          <h2 id="admin-sections-title">Homepage rails</h2>
-          <ul className="admin-list">
-            {overview.sections.map((section) => (
-              <li key={section.id}>
-                <strong>{section.title}</strong>
-                <small>{section.titles} titles</small>
                 <span className="spacer" />
-                <code>{section.id}</code>
+                <span className={`role-badge role-badge-${person.role}`}>{person.role}</span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    void admin.changeRole(person.id, person.role === "admin" ? "viewer" : "admin")
+                  }
+                >
+                  {person.role === "admin" ? "Make viewer" : "Make admin"}
+                </button>
               </li>
             ))}
           </ul>
         </section>
-      )}
-
-      <section className="panel-block" aria-labelledby="admin-users-title">
-        <h2 id="admin-users-title">People</h2>
-        <ul className="admin-list">
-          {admin.users.map((person) => (
-            <li key={person.id}>
-              {person.avatarUrl ? (
-                <img className="admin-avatar" src={person.avatarUrl} alt="" />
-              ) : (
-                <span className="avatar-fallback">{person.name.slice(0, 1)}</span>
-              )}
-              <strong>{person.name}</strong>
-              <small>
-                @{person.login} · {person.shelfEntries} saved
-              </small>
-              <span className="spacer" />
-              <span className={`role-badge role-badge-${person.role}`}>{person.role}</span>
-              <button
-                type="button"
-                onClick={() =>
-                  void admin.changeRole(person.id, person.role === "admin" ? "viewer" : "admin")
-                }
-              >
-                {person.role === "admin" ? "Make viewer" : "Make admin"}
-              </button>
-            </li>
-          ))}
-        </ul>
-      </section>
+      </ErrorBoundary>
 
       {overview && (
         <p className="admin-note">

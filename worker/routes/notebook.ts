@@ -2,9 +2,17 @@ import { Hono } from "hono";
 
 import { isBeliefScope } from "../../src/domain/notebook.ts";
 import { requireAuthentication, type AuthVariables } from "../auth/session.ts";
+import { sendAddressConfirmation } from "../clients/email.ts";
 import { jsonResponse, readJsonObject } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
 import { retryTransient } from "../lib/retry.ts";
+import { canonicalOrigin } from "../lib/security.ts";
+import {
+  readAlertEmail,
+  readAlertSettings,
+  setAlertSetting,
+  stageAlertEmail,
+} from "../repositories/alerts.ts";
 import { editBelief, readBeliefs } from "../repositories/beliefs.ts";
 import {
   GUEST_LIMIT,
@@ -13,8 +21,11 @@ import {
   removeGuest,
   saveGuest,
 } from "../repositories/guests.ts";
+import { hashState } from "../repositories/links.ts";
 import { readViewerContext } from "../repositories/viewer-context.ts";
+import { ALERT_KINDS, isAlertKind } from "../services/alerts/types.ts";
 import { refreshBeliefs } from "../services/beliefs.ts";
+import { buildTasteMap } from "../services/taste-map.ts";
 import type { Bindings } from "../types.ts";
 
 export const notebookRoutes = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
@@ -48,6 +59,79 @@ notebookRoutes.get("/", async (context) => {
     logError("notebook_read_failed", error);
 
     return jsonResponse({ error: "The notebook is out of reach for a moment." }, 503);
+  }
+});
+
+const CONFIRM_MINUTES = 60;
+
+notebookRoutes.get("/alerts", async (context) => {
+  const user = context.get("authenticatedUser");
+  const [address, settings] = await Promise.all([
+    readAlertEmail(context.env.DB, user.id),
+    readAlertSettings(context.env.DB, user.id),
+  ]);
+
+  return jsonResponse({
+    email: address.email,
+    verified: address.verified,
+    kinds: ALERT_KINDS.map((kind) => ({ kind, enabled: settings.get(kind) !== false })),
+  });
+});
+
+notebookRoutes.post("/alerts/email", async (context) => {
+  const user = context.get("authenticatedUser");
+  const body = await readJsonObject(context.req.raw);
+  const email = typeof body?.email === "string" ? body.email.trim().slice(0, 200) : "";
+
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(email)) {
+    return jsonResponse({ error: "That is not an address I can post to." }, 400);
+  }
+
+  try {
+    const token = crypto.randomUUID().replaceAll("-", "");
+    const origin = canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN);
+
+    await stageAlertEmail(context.env.DB, user.id, email, await hashState(token), CONFIRM_MINUTES);
+    await sendAddressConfirmation(
+      context.env,
+      email,
+      `${origin}/api/auth/alert-email?token=${token}`,
+    );
+
+    return jsonResponse({ sent: true, email, verified: false });
+  } catch (error) {
+    logError("alert_email_stage_failed", error);
+
+    return jsonResponse({ error: "I could not get word to that address." }, 502);
+  }
+});
+
+notebookRoutes.post("/alerts/settings", async (context) => {
+  const user = context.get("authenticatedUser");
+  const body = await readJsonObject(context.req.raw);
+
+  if (!isAlertKind(body?.kind)) {
+    return jsonResponse({ error: "I do not send that sort of note." }, 400);
+  }
+
+  await setAlertSetting(context.env.DB, user.id, body.kind, body?.enabled !== false);
+
+  const settings = await readAlertSettings(context.env.DB, user.id);
+
+  return jsonResponse({
+    kinds: ALERT_KINDS.map((kind) => ({ kind, enabled: settings.get(kind) !== false })),
+  });
+});
+
+notebookRoutes.get("/map", async (context) => {
+  const user = context.get("authenticatedUser");
+
+  try {
+    return jsonResponse({ points: await buildTasteMap(context.env, user.id) });
+  } catch (error) {
+    logError("taste_map_route_failed", error);
+
+    return jsonResponse({ points: [] });
   }
 });
 

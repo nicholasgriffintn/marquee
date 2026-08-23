@@ -10,6 +10,7 @@ import {
 } from "react-router-dom";
 
 import { DetailPanel } from "./components/catalog";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { SearchBox } from "./components/SearchBox";
 import { MarqueeLogo, TicketIcon } from "./components/ui";
 import { ManagersDoor } from "./components/usher/ManagersDoor";
@@ -342,19 +343,21 @@ export function App() {
           ))}
         </nav>
         <div className="header-tools">
-          <SearchBox
-            query={query}
-            results={search.items}
-            isSearching={search.isSearching}
-            onQueryChange={setQuery}
-            onOpen={openTitle}
-            onSubmit={() => {
-              if (query.trim()) {
-                curator.clear();
-                void navigate(`/search?q=${encodeURIComponent(query.trim())}`);
-              }
-            }}
-          />
+          <ErrorBoundary label="The search box" resetKey={pagePath}>
+            <SearchBox
+              query={query}
+              results={search.items}
+              isSearching={search.isSearching}
+              onQueryChange={setQuery}
+              onOpen={openTitle}
+              onSubmit={() => {
+                if (query.trim()) {
+                  curator.clear();
+                  void navigate(`/search?q=${encodeURIComponent(query.trim())}`);
+                }
+              }}
+            />
+          </ErrorBoundary>
           {session.isLoading ? (
             <span className="session-loading">Checking session</span>
           ) : session.user ? (
@@ -402,174 +405,182 @@ export function App() {
         {profile.message}
       </p>
 
-      <Routes location={pageLocation}>
-        <Route
-          path="/"
-          element={
-            <TonightPage
-              curator={curator.state}
-              curatorError={curator.error}
-              isAsking={curator.isAsking}
-              isLoading={catalog.isLoading || !isViewerReady}
-              isBuildingRails={aiRails.isGenerating}
-              isSessionLoading={!isViewerReady}
-              error={catalog.error}
-              providerError={catalog.providerError}
-              sections={sections}
-              heroSections={heroSections}
-              isHeroReady={isHeroReady}
-              episodes={episodes}
-              trending={trending}
-              providers={catalog.providers}
-              selectedProviderIds={selectedProviderIds}
-              isPinned={isPinned}
-              usherMoment={usher.moment}
-              pick={usher.pick}
-              order={usher.order}
-              guests={usher.guests}
-              aside={usher.aside}
-              onAsk={askCurator}
-              onClearCurator={clearAll}
-              onOpen={openTitle}
-              onPin={pinCurrentShelf}
-              onPick={() =>
-                isSignedIn ? void usher.askForPick(selectedProviderIds) : askForTicket()
-              }
-              onRejectPick={() => void usher.rejectPick(selectedProviderIds)}
-              onStartOrder={() => (isSignedIn ? usher.openOrder() : askForTicket())}
-              onOrder={(order, guestIds) =>
-                void usher.placeOrder(order, selectedProviderIds, guestIds)
-              }
-              onOrderAnother={() => void usher.reorder(selectedProviderIds)}
-              onOrderEdit={usher.editOrder}
-              onSelectProviders={selectProviders}
-              onShowSources={() => void navigate("/sources")}
-              onUsherAction={onUsherAction}
-              onUsherAnswer={onUsherAnswer}
-              onUsherDismiss={(scope) => void usher.dismiss(scope)}
-              onUsherSkip={(questionId) => void usher.skip(questionId)}
-              onRailSeen={onRailSeen}
-            />
-          }
-        />
+      <ErrorBoundary
+        variant="page"
+        label="this page"
+        resetKey={`${pagePath}${pageLocation.search}`}
+      >
+        <Routes location={pageLocation}>
+          <Route
+            path="/"
+            element={
+              <TonightPage
+                curator={curator.state}
+                curatorError={curator.error}
+                isAsking={curator.isAsking}
+                isLoading={catalog.isLoading || !isViewerReady}
+                isBuildingRails={aiRails.isGenerating}
+                isSessionLoading={!isViewerReady}
+                error={catalog.error}
+                providerError={catalog.providerError}
+                sections={sections}
+                heroSections={heroSections}
+                isHeroReady={isHeroReady}
+                episodes={episodes}
+                trending={trending}
+                providers={catalog.providers}
+                selectedProviderIds={selectedProviderIds}
+                isPinned={isPinned}
+                usherMoment={usher.moment}
+                pick={usher.pick}
+                order={usher.order}
+                guests={usher.guests}
+                aside={usher.aside}
+                onAsk={askCurator}
+                onClearCurator={clearAll}
+                onOpen={openTitle}
+                onPin={pinCurrentShelf}
+                onPick={() =>
+                  isSignedIn ? void usher.askForPick(selectedProviderIds) : askForTicket()
+                }
+                onRejectPick={() => void usher.rejectPick(selectedProviderIds)}
+                onStartOrder={() => (isSignedIn ? usher.openOrder() : askForTicket())}
+                onOrder={(order, guestIds) =>
+                  void usher.placeOrder(order, selectedProviderIds, guestIds)
+                }
+                onOrderAnother={() => void usher.reorder(selectedProviderIds)}
+                onOrderEdit={usher.editOrder}
+                onSelectProviders={selectProviders}
+                onShowSources={() => void navigate("/notebook#services")}
+                onUsherAction={onUsherAction}
+                onUsherAnswer={onUsherAnswer}
+                onUsherDismiss={(scope) => void usher.dismiss(scope)}
+                onUsherSkip={(questionId) => void usher.skip(questionId)}
+                onRailSeen={onRailSeen}
+              />
+            }
+          />
 
-        <Route path="/usher" element={<UsherPage />} />
+          <Route path="/usher" element={<UsherPage />} />
 
-        <Route path="/notebook" element={<NotebookPage isSignedIn={isSignedIn} />} />
+          <Route
+            path="/notebook"
+            element={
+              <NotebookPage
+                isSignedIn={isSignedIn}
+                providers={catalog.providers}
+                providerError={catalog.providerError}
+                providerStats={catalog.providerStats}
+                selectedProviderIds={selectedProviderIds}
+                onSelectProviders={selectProviders}
+              />
+            }
+          />
 
-        <Route
-          path="/sign-in"
-          element={<SignInPage isSignedIn={isSignedIn} isSessionLoading={session.isLoading} />}
-        />
+          <Route
+            path="/sign-in"
+            element={<SignInPage isSignedIn={isSignedIn} isSessionLoading={session.isLoading} />}
+          />
 
-        <Route
-          path="/this-week"
-          element={
-            <DigestPage
-              isSignedIn={isSignedIn}
-              isSessionLoading={session.isLoading}
-              onOpen={openTitle}
-            />
-          }
-        />
+          <Route
+            path="/this-week"
+            element={
+              <DigestPage
+                isSignedIn={isSignedIn}
+                isSessionLoading={session.isLoading}
+                onOpen={openTitle}
+              />
+            }
+          />
 
-        <Route
-          path="/search"
-          element={
-            <SearchPage
-              query={query}
-              items={search.items}
-              error={search.error}
-              isSearching={search.isSearching}
-              usherMoment={usher.moment?.surface === "search-empty" ? usher.moment : null}
-              onUsherAction={onUsherAction}
-              onUsherDismiss={(scope) => void usher.dismiss(scope)}
-              onOpen={openTitle}
-              onShowTonight={() => {
-                setQuery("");
-                void navigate("/");
-              }}
-            />
-          }
-        />
-
-        <Route
-          path="/shelf"
-          element={
-            isSignedIn ? (
-              <LibraryPage
-                entries={profile.entries}
-                titles={catalog.savedTitles}
-                catalogueError={catalog.error}
-                usherMoment={usher.moment?.surface === "shelf" ? usher.moment : null}
-                onClaim={(entry) => void profile.saveEntry(entry)}
-                onDiscard={(titleId) => void profile.removeEntry(titleId)}
-                onUsherRequest={onShelfMoment}
+          <Route
+            path="/search"
+            element={
+              <SearchPage
+                query={query}
+                items={search.items}
+                error={search.error}
+                isSearching={search.isSearching}
+                usherMoment={usher.moment?.surface === "search-empty" ? usher.moment : null}
                 onUsherAction={onUsherAction}
                 onUsherDismiss={(scope) => void usher.dismiss(scope)}
                 onOpen={openTitle}
-                onShowTonight={() => void navigate("/")}
+                onShowTonight={() => {
+                  setQuery("");
+                  void navigate("/");
+                }}
               />
-            ) : (
-              <SignedOutShelf />
-            )
-          }
-        />
+            }
+          />
 
-        <Route
-          path="/sources"
-          element={
-            <SourcesPage
-              providers={catalog.providers}
-              providerError={catalog.providerError}
-              stats={catalog.providerStats}
-              isSignedIn={isSignedIn}
-              selectedProviderIds={selectedProviderIds}
-              onSelectProviders={selectProviders}
-            />
-          }
-        />
+          <Route
+            path="/shelf"
+            element={
+              isSignedIn ? (
+                <LibraryPage
+                  entries={profile.entries}
+                  titles={catalog.savedTitles}
+                  catalogueError={catalog.error}
+                  usherMoment={usher.moment?.surface === "shelf" ? usher.moment : null}
+                  onClaim={(entry) => void profile.saveEntry(entry)}
+                  onDiscard={(titleId) => void profile.removeEntry(titleId)}
+                  onUsherRequest={onShelfMoment}
+                  onUsherAction={onUsherAction}
+                  onUsherDismiss={(scope) => void usher.dismiss(scope)}
+                  onOpen={openTitle}
+                  onShowTonight={() => void navigate("/")}
+                />
+              ) : (
+                <SignedOutShelf />
+              )
+            }
+          />
 
-        <Route
-          path="/admin"
-          element={
-            session.user?.role === "admin" ? <AdminPage user={session.user} /> : <ManagersDoor />
-          }
-        />
+          <Route path="/sources" element={<SourcesPage stats={catalog.providerStats} />} />
 
-        <Route
-          path="/listings"
-          element={
-            <BrowsePage preset={LISTINGS} providers={catalog.providers} onOpen={openTitle} />
-          }
-        />
+          <Route
+            path="/admin"
+            element={
+              session.user?.role === "admin" ? <AdminPage user={session.user} /> : <ManagersDoor />
+            }
+          />
 
-        {Object.entries(LEGACY_BROWSE).map(([path, preset]) => (
-          <Route key={path} path={path} element={<LegacyBrowse preset={preset} />} />
-        ))}
+          <Route
+            path="/listings"
+            element={
+              <BrowsePage preset={LISTINGS} providers={catalog.providers} onOpen={openTitle} />
+            }
+          />
 
-        <Route path="*" element={<NotFoundPage />} />
-      </Routes>
+          {Object.entries(LEGACY_BROWSE).map(([path, preset]) => (
+            <Route key={path} path={path} element={<LegacyBrowse preset={preset} />} />
+          ))}
+
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+      </ErrorBoundary>
 
       {openTitleId && (
-        <TitleOverlay
-          titleId={openTitleId}
-          usherMoment={usher.moment?.surface === "title" ? usher.moment : null}
-          onUsherRequest={onTitleMoment}
-          onUsherAction={onUsherAction}
-          onUsherDismiss={(scope) => void usher.dismiss(scope)}
-          title={openDetails.title}
-          canSave={isSignedIn}
-          entries={profile.entries}
-          availabilityEnabled={catalog.providerSources.length > 0}
-          onClose={closeDetails}
-          onOpen={openTitle}
-          onSave={(item) => void saveTitle(item)}
-          onSaveEntry={(entry) => void profile.saveEntry(entry)}
-          onRemove={(id) => void profile.removeEntry(id)}
-          onStatus={profile.setStatus}
-          onUpdateDraft={profile.updateDraft}
-        />
+        <ErrorBoundary label="The title card" resetKey={openTitleId} onRetry={closeDetails}>
+          <TitleOverlay
+            titleId={openTitleId}
+            usherMoment={usher.moment?.surface === "title" ? usher.moment : null}
+            onUsherRequest={onTitleMoment}
+            onUsherAction={onUsherAction}
+            onUsherDismiss={(scope) => void usher.dismiss(scope)}
+            title={openDetails.title}
+            canSave={isSignedIn}
+            entries={profile.entries}
+            availabilityEnabled={catalog.providerSources.length > 0}
+            onClose={closeDetails}
+            onOpen={openTitle}
+            onSave={(item) => void saveTitle(item)}
+            onSaveEntry={(entry) => void profile.saveEntry(entry)}
+            onRemove={(id) => void profile.removeEntry(id)}
+            onStatus={profile.setStatus}
+            onUpdateDraft={profile.updateDraft}
+          />
+        </ErrorBoundary>
       )}
 
       <footer className="site-footer">

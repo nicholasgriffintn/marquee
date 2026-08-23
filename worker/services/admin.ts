@@ -10,6 +10,8 @@ import { readCinemaCoverage } from "../repositories/cinemas.ts";
 import { readBackfillProgress } from "../repositories/discover.ts";
 import { readWorkingSetStats, rebuildWorkingSet } from "../repositories/working-set.ts";
 import type { Bindings, EnrichmentSource, IngestionJob } from "../types.ts";
+import { dispatchAlerts, previewAlerts } from "./alerts/dispatch.ts";
+import { computeAngleScores } from "./angle-scores.ts";
 import { queueCinemaDirectories, queueCinemaScreenings } from "./cinema-sync.ts";
 import { advanceDiscoverFrontier } from "./discover.ts";
 
@@ -28,6 +30,9 @@ export const ADMIN_ACTIONS = [
   "working-set",
   "cinemas",
   "showtimes",
+  "alerts-preview",
+  "alerts-send",
+  "angle-scores",
 ] as const;
 
 export type AdminAction = (typeof ADMIN_ACTIONS)[number];
@@ -63,7 +68,12 @@ async function catalogueStats(env: Bindings) {
          (SELECT count(*) FROM cinema_screenings WHERE business_day >= date('now')) AS screenings,
          (SELECT count(*) FROM cinema_interest WHERE last_seen_at > datetime('now', '-30 days')) AS interestCells,
          (SELECT count(*) FROM viewing_entries) AS shelfEntries,
-         (SELECT count(*) FROM users) AS users`,
+         (SELECT count(*) FROM users) AS users,
+         (SELECT count(*) FROM users WHERE alert_email_verified_at IS NOT NULL) AS alertReady,
+         (SELECT count(*) FROM viewer_alerts) AS alertsSent,
+         (SELECT count(*) FROM viewer_alerts WHERE julianday(sent_at) > julianday('now', '-7 days')) AS alertsWeek,
+         (SELECT count(*) FROM viewer_signals) AS signals,
+         (SELECT count(*) FROM viewer_beliefs WHERE revoked_at IS NULL) AS beliefs`,
     ).first<CountRow>(),
     readWorkingSetStats(env.DB, AVAILABILITY_MAX_AGE_DAYS),
   ]);
@@ -133,6 +143,28 @@ export async function readAdminOverview(env: Bindings) {
 }
 
 export async function runAdminAction(env: Bindings, action: AdminAction) {
+  if (action === "alerts-preview" || action === "alerts-send") {
+    const origin = env.SITE_ORIGIN ?? "https://marquee.pashi.app";
+    const result =
+      action === "alerts-send"
+        ? await dispatchAlerts(env, origin)
+        : await previewAlerts(env, origin);
+
+    return {
+      ...result,
+      detail:
+        action === "alerts-send"
+          ? `Sent ${result.emails} email${result.emails === 1 ? "" : "s"}`
+          : `${result.candidates} candidate${result.candidates === 1 ? "" : "s"} waiting, nothing sent`,
+    };
+  }
+
+  if (action === "angle-scores") {
+    const scores = await computeAngleScores(env);
+
+    return { angles: scores.length, detail: `Scored ${scores.length} angles` };
+  }
+
   if (action === "sweep-light" || action === "sweep-deep") {
     const instance = await env.CATALOG_SWEEP.create({
       params: { deep: action === "sweep-deep" },

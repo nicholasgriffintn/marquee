@@ -1,47 +1,54 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { ErrorBoundary } from "../components/ErrorBoundary";
+import { AlertSettings } from "../components/notebook/AlertSettings";
+import { BeliefList } from "../components/notebook/BeliefList";
+import { ConnectionsPanel } from "../components/notebook/ConnectionsPanel";
+import { GuestList } from "../components/notebook/GuestList";
+import { ImportPanel } from "../components/notebook/ImportPanel";
+import { NotebookIndex, type Divider } from "../components/notebook/NotebookIndex";
+import { NotebookSection } from "../components/notebook/NotebookSection";
+import { ServicesPanel } from "../components/notebook/ServicesPanel";
+import { TasteMap } from "../components/notebook/TasteMap";
 import { UsherMark } from "../components/usher/UsherMark";
-import {
-  beliefGroup,
-  confidenceLabel,
-  GROUP_TITLES,
-  isSuspended,
-  strengthLabel,
-  type Belief,
-  type Guest,
-} from "../domain/notebook";
+import type { Provider, ProvidersResponse } from "../domain/catalog";
+import type { Belief, Guest } from "../domain/notebook";
 import { jsonRequest, requestJson } from "../lib/api";
-import { dedupeRows, parseLetterboxdCsv } from "../lib/letterboxd";
 
 type NotebookResponse = { beliefs: Belief[] };
 
 type GuestResponse = { guests: Guest[] };
 
-function suspendLabel(belief: Belief) {
-  if (!belief.suspendedUntil) {
-    return "";
-  }
+const DIVIDERS: Divider[] = [
+  { id: "notes", label: "What I have written down", aside: "and what you have crossed out" },
+  { id: "shape", label: "The shape of it", aside: "your shelf, laid out flat" },
+  { id: "services", label: "Where you watch", aside: "and what you are paying for" },
+  { id: "room", label: "Who sits with you", aside: "and what they will not sit through" },
+  { id: "post", label: "When I should write", aside: "sparingly, and never twice" },
+  { id: "elsewhere", label: "Elsewhere you have an account", aside: "keys to other houses" },
+];
 
-  const until = new Date(belief.suspendedUntil);
-  const days = Math.round((until.getTime() - Date.now()) / 86_400_000);
-
-  if (days > 60) {
-    return "Set aside";
-  }
-
-  return days >= 1 ? `Set aside for ${days} day${days === 1 ? "" : "s"}` : "Set aside for tonight";
-}
-
-export function NotebookPage({ isSignedIn }: { isSignedIn: boolean }) {
+export function NotebookPage({
+  isSignedIn,
+  providers,
+  providerError,
+  providerStats,
+  selectedProviderIds,
+  onSelectProviders,
+}: {
+  isSignedIn: boolean;
+  providers: Provider[];
+  providerError: string;
+  providerStats: ProvidersResponse["stats"];
+  selectedProviderIds: string[];
+  onSelectProviders: (ids: string[]) => void;
+}) {
   const [beliefs, setBeliefs] = useState<Belief[] | null>(null);
+  const [guests, setGuests] = useState<Guest[]>([]);
   const [error, setError] = useState("");
-  const [editing, setEditing] = useState<{ id: string; value: string } | null>(null);
   const [busy, setBusy] = useState("");
   const [reloads, setReloads] = useState(0);
-  const [guests, setGuests] = useState<Guest[]>([]);
-  const [draft, setDraft] = useState({ name: "", vetoes: "" });
-  const [importing, setImporting] = useState("");
 
   useEffect(() => {
     if (!isSignedIn) {
@@ -76,9 +83,20 @@ export function NotebookPage({ isSignedIn }: { isSignedIn: boolean }) {
     return () => controller.abort();
   }, [isSignedIn, reloads]);
 
-  async function saveGuest() {
-    const name = draft.name.trim();
+  async function actOnBelief(belief: Belief, body: Record<string, unknown>) {
+    setBusy(belief.id);
 
+    try {
+      await requestJson(`/api/notebook/${belief.id}`, jsonRequest("PATCH", body));
+      setReloads((count) => count + 1);
+    } catch {
+      setError("That did not take. Try again.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function saveGuest(name: string, vetoes: string[]) {
     if (!name) {
       return;
     }
@@ -86,60 +104,13 @@ export function NotebookPage({ isSignedIn }: { isSignedIn: boolean }) {
     try {
       const response = await requestJson<GuestResponse>(
         "/api/notebook/guests",
-        jsonRequest("POST", {
-          name,
-          vetoes: draft.vetoes
-            .split(",")
-            .map((entry) => entry.trim())
-            .filter(Boolean),
-        }),
+        jsonRequest("POST", { name, vetoes }),
       );
 
       setGuests(response.guests);
-      setDraft({ name: "", vetoes: "" });
     } catch {
       setError("Could not note them down.");
     }
-  }
-
-  async function importCsv(files: FileList | null) {
-    const rows = dedupeRows(
-      (await Promise.all([...(files ?? [])].map((file) => file.text()))).flatMap((text) =>
-        parseLetterboxdCsv(text),
-      ),
-    );
-
-    if (rows.length === 0) {
-      setImporting(
-        "Nothing I recognised in that. Letterboxd exports a folder of CSVs — send me diary.csv or ratings.csv.",
-      );
-
-      return;
-    }
-
-    let matched = 0;
-    let queued = 0;
-
-    for (let index = 0; index < rows.length; index += 100) {
-      setImporting(`Reading ${Math.min(index + 100, rows.length)} of ${rows.length}…`);
-
-      try {
-        const outcome = await requestJson<{ matched: number; queued: number }>(
-          "/api/profile/import/letterboxd",
-          jsonRequest("POST", { rows: rows.slice(index, index + 100) }),
-        );
-
-        matched += outcome.matched;
-        queued += outcome.queued;
-      } catch {
-        queued += 0;
-      }
-    }
-
-    setImporting(
-      `${matched} of ${rows.length} seated straight away. ${queued > 0 ? `${queued} I have sent for — they will appear over the next hour.` : ""}`.trim(),
-    );
-    setReloads((count) => count + 1);
   }
 
   async function dropGuest(guest: Guest) {
@@ -155,27 +126,22 @@ export function NotebookPage({ isSignedIn }: { isSignedIn: boolean }) {
     }
   }
 
-  async function act(belief: Belief, body: Record<string, unknown>) {
-    setBusy(belief.id);
-
-    try {
-      await requestJson(`/api/notebook/${belief.id}`, jsonRequest("PATCH", body));
-      setEditing(null);
-      setReloads((count) => count + 1);
-    } catch {
-      setError("That did not take. Try again.");
-    } finally {
-      setBusy("");
-    }
-  }
-
-  const notes = isSignedIn ? beliefs : [];
-  const grouped = new Map<string, Belief[]>();
-
-  for (const belief of notes ?? []) {
-    const group = beliefGroup(belief.key.replace(/^rule:/u, ""));
-
-    grouped.set(group, [...(grouped.get(group) ?? []), belief]);
+  if (!isSignedIn) {
+    return (
+      <section className="page-section notebook">
+        <div className="notebook-head">
+          <UsherMark face="idle" crop="head" className="notebook-mark" />
+          <div>
+            <p className="page-eyebrow">The Usher's notebook</p>
+            <h1>I only keep one of these per ticket.</h1>
+            <p className="notebook-lede">
+              <Link to="/sign-in?returnTo=%2Fnotebook">Come to the box office</Link> and I will
+              start yours. Thirty years of other people's evenings in here already.
+            </p>
+          </div>
+        </div>
+      </section>
+    );
   }
 
   return (
@@ -184,10 +150,11 @@ export function NotebookPage({ isSignedIn }: { isSignedIn: boolean }) {
         <UsherMark face="thinking" crop="head" className="notebook-mark" />
         <div>
           <p className="page-eyebrow">The Usher's notebook</p>
-          <h1>What I have written down about you.</h1>
+          <h1>What I have worked out about you.</h1>
           <p className="notebook-lede">
-            Nothing in here is a secret. Correct it, set it aside for a night, or tear the page out
-            entirely. I will not take it personally.
+            Thirty years of other people's evenings in the front of this book. Your page is at the
+            back. Nothing in it is a secret — correct it, set it aside for a night, or tear it out.
+            I will not take it personally.
           </p>
         </div>
       </div>
@@ -198,193 +165,105 @@ export function NotebookPage({ isSignedIn }: { isSignedIn: boolean }) {
         </p>
       )}
 
-      {!isSignedIn ? (
-        <p className="notebook-empty">
-          I only keep notes on people with a ticket.{" "}
-          <Link to="/sign-in?returnTo=%2Fnotebook">Come to the box office</Link> and I will start
-          one.
-        </p>
-      ) : notes === null ? (
-        <p className="notebook-empty">Finding my glasses…</p>
-      ) : notes.length === 0 ? (
-        <p className="notebook-empty">
-          The page is blank. Watch a few things, rate them honestly, and it will fill itself in.
-        </p>
-      ) : (
-        [...grouped.entries()].map(([group, items]) => (
-          <div className="notebook-group" key={group}>
-            <h2>{GROUP_TITLES[group] ?? "Other observations"}</h2>
-            <ul className="notebook-list">
-              {items.map((belief) => {
-                const suspended = isSuspended(belief);
+      <div className="notebook-body">
+        <NotebookIndex dividers={DIVIDERS} />
 
-                return (
-                  <li
-                    key={belief.id}
-                    className={`notebook-note${suspended ? " suspended" : ""}${
-                      busy === belief.id ? " busy" : ""
-                    }`}
-                  >
-                    {editing?.id === belief.id ? (
-                      <form
-                        className="notebook-edit"
-                        onSubmit={(event) => {
-                          event.preventDefault();
-                          void act(belief, { action: "rewrite", value: editing.value });
-                        }}
-                      >
-                        <input
-                          value={editing.value}
-                          maxLength={160}
-                          aria-label="Rewrite this note"
-                          onChange={(event) =>
-                            setEditing({ id: belief.id, value: event.target.value })
-                          }
-                        />
-                        <button type="submit" className="notebook-primary">
-                          Put that down instead
-                        </button>
-                        <button type="button" onClick={() => setEditing(null)}>
-                          Leave it
-                        </button>
-                      </form>
-                    ) : (
-                      <>
-                        <p className="notebook-value">{belief.value}</p>
-                        <p className="notebook-meta">
-                          <span>{confidenceLabel(belief.confidence)}</span>
-                          <em>{strengthLabel(belief.strength)}</em>
-                          {belief.evidence > 0 && (
-                            <small>
-                              {belief.evidence} thing{belief.evidence === 1 ? "" : "s"} on your
-                              shelf
-                            </small>
-                          )}
-                          {belief.edited && <small>in your words</small>}
-                          {suspended && <strong>{suspendLabel(belief)}</strong>}
-                        </p>
-                        <div className="notebook-actions">
-                          {suspended ? (
-                            <button
-                              type="button"
-                              onClick={() => void act(belief, { action: "restore" })}
-                            >
-                              Put it back
-                            </button>
-                          ) : (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => setEditing({ id: belief.id, value: belief.value })}
-                              >
-                                Rewrite
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  void act(belief, { action: "suspend", scope: "tonight" })
-                                }
-                              >
-                                Not tonight
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  void act(belief, { action: "suspend", scope: "week" })
-                                }
-                              >
-                                Not this week
-                              </button>
-                            </>
-                          )}
-                          <button
-                            type="button"
-                            className="notebook-forget"
-                            onClick={() => void act(belief, { action: "forget" })}
-                          >
-                            Forget it
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))
-      )}
-      {isSignedIn && (
-        <div className="notebook-group">
-          <h2>Bring your history with you</h2>
-          <p className="notebook-lede">
-            Letterboxd will give you your whole account as a folder of CSV files, under Settings,
-            Data, Export. Hand me diary.csv or ratings.csv and I will fill in what I have missed.
-          </p>
-          <label className="notebook-import">
-            <input
-              type="file"
-              accept=".csv,text/csv"
-              multiple
-              onChange={(event) => void importCsv(event.target.files)}
-            />
-            <span>Choose your export</span>
-          </label>
-          {importing && <p className="notebook-import-status">{importing}</p>}
-        </div>
-      )}
-
-      {isSignedIn && (
-        <div className="notebook-group notebook-guests">
-          <h2>Who else sits with you</h2>
-          <p className="notebook-lede">
-            Give me a name and what they will not sit through, and I will keep it in mind when you
-            tell me the room is not just you.
-          </p>
-
-          {guests.length > 0 && (
-            <ul className="notebook-guest-list">
-              {guests.map((guest) => (
-                <li key={guest.id}>
-                  <strong>{guest.name}</strong>
-                  <small>
-                    {guest.vetoes.length ? `No ${guest.vetoes.join(", ")}` : "No hard vetoes"}
-                  </small>
-                  <button type="button" onClick={() => void dropGuest(guest)}>
-                    Show them out
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <form
-            className="notebook-guest-form"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void saveGuest();
-            }}
+        <div className="notebook-pages">
+          <NotebookSection
+            id="notes"
+            number={1}
+            title={DIVIDERS[0].label}
+            lede="Every line here came from something you did, or something you told me. Where I am guessing, I say so."
           >
-            <input
-              value={draft.name}
-              maxLength={40}
-              placeholder="Name"
-              aria-label="Their name"
-              onChange={(event) => setDraft({ ...draft, name: event.target.value })}
-            />
-            <input
-              value={draft.vetoes}
-              maxLength={120}
-              placeholder="Will not sit through… (horror, musicals)"
-              aria-label="What they will not sit through"
-              onChange={(event) => setDraft({ ...draft, vetoes: event.target.value })}
-            />
-            <button type="submit" className="notebook-primary" disabled={!draft.name.trim()}>
-              Save them a seat
-            </button>
-          </form>
+            <ErrorBoundary label="These notes">
+              {beliefs === null ? (
+                <p className="notebook-empty">Finding my glasses…</p>
+              ) : (
+                <BeliefList
+                  beliefs={beliefs}
+                  busy={busy}
+                  onAct={(b, body) => void actOnBelief(b, body)}
+                />
+              )}
+            </ErrorBoundary>
+          </NotebookSection>
+
+          <NotebookSection
+            id="shape"
+            number={2}
+            title={DIVIDERS[1].label}
+            lede="Everything you have marked, placed by what it is rather than what it is called. Close together means alike."
+          >
+            <ErrorBoundary label="This map">
+              <TasteMap isSignedIn={isSignedIn} />
+            </ErrorBoundary>
+          </NotebookSection>
+
+          <NotebookSection
+            id="services"
+            number={3}
+            title={DIVIDERS[2].label}
+            lede="Tick the ones you actually pay for. I will stop offering you things behind doors you cannot open."
+          >
+            <ErrorBoundary label="This list of services">
+              <ServicesPanel
+                providers={providers}
+                providerError={providerError}
+                stats={providerStats}
+                selectedProviderIds={selectedProviderIds}
+                onSelectProviders={onSelectProviders}
+              />
+            </ErrorBoundary>
+          </NotebookSection>
+
+          <NotebookSection
+            id="room"
+            number={4}
+            title={DIVIDERS[3].label}
+            lede="Give me a name and what they will not sit through, and I will keep it in mind when the room is not just you."
+          >
+            <ErrorBoundary label="This guest list">
+              <GuestList
+                guests={guests}
+                onSave={(name, vetoes) => void saveGuest(name, vetoes)}
+                onRemove={(guest) => void dropGuest(guest)}
+              />
+            </ErrorBoundary>
+          </NotebookSection>
+
+          <NotebookSection
+            id="post"
+            number={5}
+            title={DIVIDERS[4].label}
+            lede="Only about things already on your shelf, never more than a handful a week, and never twice about the same thing."
+          >
+            <ErrorBoundary label="These settings">
+              <AlertSettings isSignedIn={isSignedIn} />
+            </ErrorBoundary>
+          </NotebookSection>
+
+          <NotebookSection
+            id="elsewhere"
+            number={6}
+            title={DIVIDERS[5].label}
+            lede="Bring your history in from somewhere else, or hand a key to something that is not a person."
+          >
+            <h3>What you brought with you</h3>
+            <p className="notebook-aside">
+              Letterboxd will give you your whole account under Settings, Data, Export. Hand me
+              diary.csv or ratings.csv and I will fill in what I have missed.
+            </p>
+            <ErrorBoundary label="The import">
+              <ImportPanel onImported={() => setReloads((count) => count + 1)} />
+            </ErrorBoundary>
+
+            <h3>Accounts and keys</h3>
+            <ErrorBoundary label="These connections">
+              <ConnectionsPanel isSignedIn={isSignedIn} />
+            </ErrorBoundary>
+          </NotebookSection>
         </div>
-      )}
+      </div>
     </section>
   );
 }

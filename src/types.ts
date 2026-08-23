@@ -22,5 +22,7 @@ export type ViewingEntry = {
   status: EntryStatus;
   rating: number | null;
   thoughts: string;
+  season?: number | null;
+  episode?: number | null;
   updatedAt?: string;
 };

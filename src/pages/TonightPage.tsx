@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { ArtPlaceholder } from "../components/ArtPlaceholder";
 import { ContentRail } from "../components/catalog";
+import { ErrorBoundary } from "../components/ErrorBoundary";
 import { ArrowIcon, ProviderBadge } from "../components/ui";
 import { UsherBanner } from "../components/usher/UsherBanner";
 import { UsherCard } from "../components/usher/UsherCard";
@@ -151,111 +152,113 @@ export function TonightPage({
   return (
     <>
       <div className="hero-shell">
-        {onboardingMoment ? (
-          <UsherOnboarding
-            moment={onboardingMoment}
-            providers={filterableProviders}
-            onAnswer={onUsherAnswer}
-            onSkip={onUsherSkip}
-            onDismiss={() => onUsherDismiss("all")}
-          />
-        ) : (
-          <>
-            {order.isOpen ? (
-              <UsherOrder
-                state={order}
-                guests={guests}
-                onSubmit={onOrder}
-                onOpen={onOpen}
-                onAnother={onOrderAnother}
-                onEdit={onOrderEdit}
-                onClose={onClearCurator}
-              />
-            ) : isUsherMode ? (
-              <UsherHero
-                curator={curator}
-                error={curatorError}
-                isAsking={isAsking}
-                isPinned={isPinned}
-                pick={pick}
-                aside={aside}
-                onAsk={onAsk}
-                onClear={onClearCurator}
-                onOpen={onOpen}
-                onPin={onPin}
-                onReject={onRejectPick}
-              />
-            ) : (
-              <section
-                className={`hero-section${featured?.backdropUrl ? "" : " hero-empty"}${
-                  featured ? "" : " hero-loading"
-                }`}
-              >
-                {featured && (
-                  <div className="hero-art" aria-hidden="true">
-                    {featured.backdropUrl ? (
-                      <img
-                        src={
-                          artwork(featured.backdropUrl, 1280, "backdrop") ?? featured.backdropUrl
-                        }
-                        srcSet={artworkSrcSet(featured.backdropUrl, 1280, "backdrop")}
-                        alt=""
-                        decoding="async"
-                      />
-                    ) : (
-                      <ArtPlaceholder seed={featured.id} label={featured.title} wide />
-                    )}
-                  </div>
-                )}
-                <div className="hero-gradient" />
-                <div className="hero-copy">
-                  {featured ? (
-                    <>
-                      <h1 className={heroTitleClass(featured.title)}>{featured.title}</h1>
-                      <p className="hero-meta">
-                        {mediaMeta(featured)} · {scoreLabel(featured)}
-                      </p>
-                      <p className="hero-lede">{featured.overview || "No synopsis available."}</p>
-                      <div className="hero-actions">
-                        <button
-                          type="button"
-                          className="hero-play"
-                          onClick={() => onOpen(featured)}
-                        >
-                          <span className="play-icon">↗</span> See where to watch
-                        </button>
-                      </div>
-                    </>
-                  ) : !isHeroReady ? (
-                    <div className="hero-skeleton" aria-hidden="true">
-                      <span className="skeleton skeleton-title" />
-                      <span className="skeleton skeleton-meta" />
-                      <span className="skeleton skeleton-line" />
-                      <span className="skeleton skeleton-line short" />
-                      <span className="skeleton skeleton-button" />
-                    </div>
-                  ) : (
-                    <div className="honest-empty" aria-live="polite">
-                      <h1>Nothing matched.</h1>
-                      <p>{error || "Try another search or change your services."}</p>
+        <ErrorBoundary label="The front of house">
+          {onboardingMoment ? (
+            <UsherOnboarding
+              moment={onboardingMoment}
+              providers={filterableProviders}
+              onAnswer={onUsherAnswer}
+              onSkip={onUsherSkip}
+              onDismiss={() => onUsherDismiss("all")}
+            />
+          ) : (
+            <>
+              {order.isOpen ? (
+                <UsherOrder
+                  state={order}
+                  guests={guests}
+                  onSubmit={onOrder}
+                  onOpen={onOpen}
+                  onAnother={onOrderAnother}
+                  onEdit={onOrderEdit}
+                  onClose={onClearCurator}
+                />
+              ) : isUsherMode ? (
+                <UsherHero
+                  curator={curator}
+                  error={curatorError}
+                  isAsking={isAsking}
+                  isPinned={isPinned}
+                  pick={pick}
+                  aside={aside}
+                  onAsk={onAsk}
+                  onClear={onClearCurator}
+                  onOpen={onOpen}
+                  onPin={onPin}
+                  onReject={onRejectPick}
+                />
+              ) : (
+                <section
+                  className={`hero-section${featured?.backdropUrl ? "" : " hero-empty"}${
+                    featured ? "" : " hero-loading"
+                  }`}
+                >
+                  {featured && (
+                    <div className="hero-art" aria-hidden="true">
+                      {featured.backdropUrl ? (
+                        <img
+                          src={
+                            artwork(featured.backdropUrl, 1280, "backdrop") ?? featured.backdropUrl
+                          }
+                          srcSet={artworkSrcSet(featured.backdropUrl, 1280, "backdrop")}
+                          alt=""
+                          decoding="async"
+                        />
+                      ) : (
+                        <ArtPlaceholder seed={featured.id} label={featured.title} wide />
+                      )}
                     </div>
                   )}
-                </div>
-              </section>
-            )}
-          </>
-        )}
-        {!onboardingMoment && !isUsherMode && (
-          <UsherConsole
-            isAsking={isAsking}
-            isPicking={pick.isPicking}
-            isIdle={isIdle}
-            hasAsked={isUsherMode}
-            onAsk={(value) => void onAsk(value)}
-            onPick={onPick}
-            onOrder={onStartOrder}
-          />
-        )}
+                  <div className="hero-gradient" />
+                  <div className="hero-copy">
+                    {featured ? (
+                      <>
+                        <h1 className={heroTitleClass(featured.title)}>{featured.title}</h1>
+                        <p className="hero-meta">
+                          {mediaMeta(featured)} · {scoreLabel(featured)}
+                        </p>
+                        <p className="hero-lede">{featured.overview || "No synopsis available."}</p>
+                        <div className="hero-actions">
+                          <button
+                            type="button"
+                            className="hero-play"
+                            onClick={() => onOpen(featured)}
+                          >
+                            <span className="play-icon">↗</span> See where to watch
+                          </button>
+                        </div>
+                      </>
+                    ) : !isHeroReady ? (
+                      <div className="hero-skeleton" aria-hidden="true">
+                        <span className="skeleton skeleton-title" />
+                        <span className="skeleton skeleton-meta" />
+                        <span className="skeleton skeleton-line" />
+                        <span className="skeleton skeleton-line short" />
+                        <span className="skeleton skeleton-button" />
+                      </div>
+                    ) : (
+                      <div className="honest-empty" aria-live="polite">
+                        <h1>Nothing matched.</h1>
+                        <p>{error || "Try another search or change your services."}</p>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              )}
+            </>
+          )}
+          {!onboardingMoment && !isUsherMode && (
+            <UsherConsole
+              isAsking={isAsking}
+              isPicking={pick.isPicking}
+              isIdle={isIdle}
+              hasAsked={isUsherMode}
+              onAsk={(value) => void onAsk(value)}
+              onPick={onPick}
+              onOrder={onStartOrder}
+            />
+          )}
+        </ErrorBoundary>
       </div>
 
       {dripMoment && (
@@ -270,64 +273,66 @@ export function TonightPage({
       )}
 
       {!isSessionLoading && (
-        <section className="provider-strip">
-          <div className="provider-strip-heading">
-            <div>
-              <strong>
-                {selectedProviderIds.length
-                  ? `Showing ${selectedProviderIds.length} service${
-                      selectedProviderIds.length === 1 ? "" : "s"
-                    }`
-                  : "Showing everything"}
-              </strong>
+        <ErrorBoundary label="The service filter">
+          <section className="provider-strip">
+            <div className="provider-strip-heading">
+              <div>
+                <strong>
+                  {selectedProviderIds.length
+                    ? `Showing ${selectedProviderIds.length} service${
+                        selectedProviderIds.length === 1 ? "" : "s"
+                      }`
+                    : "Showing everything"}
+                </strong>
+              </div>
+              <button type="button" onClick={onShowSources}>
+                Manage services <ArrowIcon />
+              </button>
             </div>
-            <button type="button" onClick={onShowSources}>
-              Manage services <ArrowIcon />
-            </button>
-          </div>
-          <div className={`provider-picker${selectedProviderIds.length ? " filtering" : ""}`}>
-            <button
-              type="button"
-              className={`provider-filter-all${selectedProviderIds.length ? "" : " active"}`}
-              aria-pressed={selectedProviderIds.length === 0}
-              onClick={() => onSelectProviders([])}
-            >
-              All
-            </button>
-            {filterableProviders.map((provider) => {
-              const isSelected = selectedProviderIds.includes(provider.id);
+            <div className={`provider-picker${selectedProviderIds.length ? " filtering" : ""}`}>
+              <button
+                type="button"
+                className={`provider-filter-all${selectedProviderIds.length ? "" : " active"}`}
+                aria-pressed={selectedProviderIds.length === 0}
+                onClick={() => onSelectProviders([])}
+              >
+                All
+              </button>
+              {filterableProviders.map((provider) => {
+                const isSelected = selectedProviderIds.includes(provider.id);
 
-              return (
-                <button
-                  type="button"
-                  key={provider.id}
-                  className={isSelected ? "selected" : ""}
-                  onClick={() => toggleProvider(provider.id)}
-                  aria-pressed={isSelected}
-                  aria-label={
-                    isSelected
-                      ? `${provider.name}, showing. Select to stop filtering by it.`
-                      : `${provider.name}, not showing. Select to filter by it.`
-                  }
-                  title={provider.name}
-                >
-                  <ProviderBadge provider={provider} />
-                  <small aria-hidden="true">
-                    {selectedProviderIds.length > 0 && isSelected ? "ON" : ""}
-                  </small>
-                </button>
-              );
-            })}
-            {!filterableProviders.length && (
-              <p className="provider-error">
-                {providerError ||
-                  (providers.length
-                    ? "No live provider feeds are configured."
-                    : "Loading providers…")}
-              </p>
-            )}
-          </div>
-        </section>
+                return (
+                  <button
+                    type="button"
+                    key={provider.id}
+                    className={isSelected ? "selected" : ""}
+                    onClick={() => toggleProvider(provider.id)}
+                    aria-pressed={isSelected}
+                    aria-label={
+                      isSelected
+                        ? `${provider.name}, showing. Select to stop filtering by it.`
+                        : `${provider.name}, not showing. Select to filter by it.`
+                    }
+                    title={provider.name}
+                  >
+                    <ProviderBadge provider={provider} />
+                    <small aria-hidden="true">
+                      {selectedProviderIds.length > 0 && isSelected ? "ON" : ""}
+                    </small>
+                  </button>
+                );
+              })}
+              {!filterableProviders.length && (
+                <p className="provider-error">
+                  {providerError ||
+                    (providers.length
+                      ? "No live provider feeds are configured."
+                      : "Loading providers…")}
+                </p>
+              )}
+            </div>
+          </section>
+        </ErrorBoundary>
       )}
 
       {error && featured && (
@@ -343,63 +348,68 @@ export function TonightPage({
       {trending.length > 1 || sections.length > 0 ? (
         <div className="rails-section">
           {trending.length > 1 && (
-            <ContentRail
-              section={{
-                id: "trending",
-                title: "Trending now",
-                description: "Wikipedia readers this week against last",
-                items: trending,
-              }}
-              ranked
-              onOpen={onOpen}
-            />
+            <ErrorBoundary label="The trending shelf">
+              <ContentRail
+                section={{
+                  id: "trending",
+                  title: "Trending now",
+                  description: "Wikipedia readers this week against last",
+                  items: trending,
+                }}
+                ranked
+                onOpen={onOpen}
+              />
+            </ErrorBoundary>
           )}
           {episodes.length > 0 && (
-            <section className="schedule-strip">
-              <div className="schedule-heading">
-                <strong>On tonight</strong>
-                <small>Schedule from TVmaze</small>
-              </div>
-              <div className="schedule-list">
-                {episodes.map((episode) => (
-                  <button
-                    type="button"
-                    key={`${episode.showName}-${episode.airsAt}-${episode.episode ?? 0}`}
-                    className="schedule-item"
-                    disabled={!episode.item}
-                    onClick={() => episode.item && onOpen(episode.item)}
-                  >
-                    <time dateTime={episode.airsAt}>{formatAirTime(episode.airsAt)}</time>
-                    <strong>{episode.showName}</strong>
-                    <small>
-                      {episode.season && episode.episode
-                        ? `S${episode.season}E${episode.episode}`
-                        : "New episode"}
-                      {episode.episodeName ? ` · ${episode.episodeName}` : ""}
-                      {episode.network ? ` · ${episode.network}` : ""}
-                    </small>
-                  </button>
-                ))}
-              </div>
-            </section>
+            <ErrorBoundary label="Tonight's schedule">
+              <section className="schedule-strip">
+                <div className="schedule-heading">
+                  <strong>On tonight</strong>
+                  <small>Schedule from TVmaze</small>
+                </div>
+                <div className="schedule-list">
+                  {episodes.map((episode) => (
+                    <button
+                      type="button"
+                      key={`${episode.showName}-${episode.airsAt}-${episode.episode ?? 0}`}
+                      className="schedule-item"
+                      disabled={!episode.item}
+                      onClick={() => episode.item && onOpen(episode.item)}
+                    >
+                      <time dateTime={episode.airsAt}>{formatAirTime(episode.airsAt)}</time>
+                      <strong>{episode.showName}</strong>
+                      <small>
+                        {episode.season && episode.episode
+                          ? `S${episode.season}E${episode.episode}`
+                          : "New episode"}
+                        {episode.episodeName ? ` · ${episode.episodeName}` : ""}
+                        {episode.network ? ` · ${episode.network}` : ""}
+                      </small>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            </ErrorBoundary>
           )}
           {sections.map((section) => (
-            <ContentRail
-              key={section.id}
-              section={section}
-              byUsher={section.id.startsWith("ai-") || section.id.startsWith("pinned-")}
-              onOpen={onOpen}
-              onSeen={section.id.startsWith("ai-") ? onRailSeen : undefined}
-              trailing={
-                usherMoment?.id === `rail-feedback:${section.id}` ? (
-                  <UsherCard
-                    moment={usherMoment}
-                    onAction={onUsherAction}
-                    onDismiss={onUsherDismiss}
-                  />
-                ) : undefined
-              }
-            />
+            <ErrorBoundary key={section.id} label={`The ${section.title} shelf`}>
+              <ContentRail
+                section={section}
+                byUsher={section.id.startsWith("ai-") || section.id.startsWith("pinned-")}
+                onOpen={onOpen}
+                onSeen={section.id.startsWith("ai-") ? onRailSeen : undefined}
+                trailing={
+                  usherMoment?.id === `rail-feedback:${section.id}` ? (
+                    <UsherCard
+                      moment={usherMoment}
+                      onAction={onUsherAction}
+                      onDismiss={onUsherDismiss}
+                    />
+                  ) : undefined
+                }
+              />
+            </ErrorBoundary>
           ))}
         </div>
       ) : (

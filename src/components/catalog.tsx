@@ -30,6 +30,7 @@ import { track } from "../lib/telemetry";
 import type { EntryStatus, ViewingEntry } from "../types";
 import { ArtPlaceholder } from "./ArtPlaceholder";
 import { ShowingsBlock } from "./cinema/ShowingsBlock";
+import { ErrorBoundary } from "./ErrorBoundary";
 import { ShelfForm } from "./ShelfForm";
 import { TrailerBlock } from "./TrailerBlock";
 import { ArrowIcon, ChevronIcon, PlusIcon, Poster, ProviderBadge } from "./ui";
@@ -556,29 +557,37 @@ export function DetailPanel({
               <p className="availability-empty">No streaming options found.</p>
             )}
           </div>
-          <ShowingsBlock
-            listings={showings.listings}
-            isLoading={showings.isLoading}
-            placeLabel={showings.origin?.label ?? null}
-            onLeave={leaveVia}
-          />
+          <ErrorBoundary label="Local showings">
+            <ShowingsBlock
+              listings={showings.listings}
+              isLoading={showings.isLoading}
+              placeLabel={showings.origin?.label ?? null}
+              onLeave={leaveVia}
+            />
+          </ErrorBoundary>
           {canSave && !entry && (
             <button type="button" className="save-button" onClick={() => onSave(item)}>
               <PlusIcon /> Save to my shelf
             </button>
           )}
           {canSave && entry && (
-            <ShelfForm
-              entry={entry}
-              title={item.title}
-              onRemove={onRemove}
-              onSave={onSaveEntry}
-              onStatus={onStatus}
-              onUpdateDraft={onUpdateDraft}
-            />
+            <ErrorBoundary label="The shelf card">
+              <ShelfForm
+                entry={entry}
+                title={item.title}
+                isSeries={item.mediaType === "tv"}
+                seasons={item.numberOfSeasons}
+                onRemove={onRemove}
+                onSave={onSaveEntry}
+                onStatus={onStatus}
+                onUpdateDraft={onUpdateDraft}
+              />
+            </ErrorBoundary>
           )}
           {usherSlot}
-          <TrailerBlock item={item} />
+          <ErrorBoundary label="The trailer">
+            <TrailerBlock item={item} />
+          </ErrorBoundary>
           <p className="detail-synopsis">{item.overview || "No synopsis available."}</p>
           <div className="score-row">
             {consensus && consensus.sources.length > 1 && (

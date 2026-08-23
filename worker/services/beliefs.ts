@@ -8,10 +8,31 @@ import {
 } from "../repositories/beliefs.ts";
 import { readSignals } from "../repositories/signals.ts";
 import type { Bindings, ViewerContext } from "../types.ts";
+import { noteHunches } from "./note-beliefs.ts";
 import { weighTitles } from "./taste.ts";
 import { preferenceSummary, readViewerPreferences, type ViewerPreferences } from "./usher.ts";
 
 const MIN_EVIDENCE = 3;
+
+const GENRE_ALIASES: Record<string, string[]> = {
+  "action & adventure": ["action", "adventure"],
+  "sci-fi & fantasy": ["science fiction", "fantasy"],
+  "war & politics": ["war"],
+  "science fiction": ["science fiction"],
+};
+
+function canonicalGenres(genres: string[]) {
+  return [
+    ...new Set(
+      genres.flatMap((genre) => {
+        const key = genre.trim().toLowerCase();
+
+        return GENRE_ALIASES[key] ?? [key];
+      }),
+    ),
+  ].filter(Boolean);
+}
+
 const RUNTIME_SHARE = 0.7;
 const SHORT_RUNTIME = 120;
 
@@ -59,7 +80,7 @@ async function factsFor(db: D1Database, titleIds: string[]): Promise<TitleFacts[
 
   return rows.results.map((row) => ({
     titleId: row.id,
-    genres: parseList(row.genres),
+    genres: canonicalGenres(parseList(row.genres)),
     people: parseList(row.people),
     runtimeMinutes: row.runtime,
   }));
@@ -69,53 +90,70 @@ function confidenceFor(count: number) {
   return Math.min(0.8, 0.25 + count * 0.12);
 }
 
+function listPhrase(values: string[]) {
+  if (values.length <= 2) {
+    return values.join(" and ");
+  }
+
+  return `${values.slice(0, -1).join(", ")} and ${values.at(-1)}`;
+}
+
 function statedDrafts(preferences: ViewerPreferences): BeliefDraft[] {
   const drafts: BeliefDraft[] = [];
-  const stated = (key: string, value: string, answer: string, strength = 0.8) =>
+  const genres = canonicalGenres(preferences.genres).slice(0, 8);
+
+  if (genres.length) {
+    drafts.push({
+      key: "genre:stated",
+      value: `You told me you reach for ${listPhrase(genres)}.`,
+      strength: 0.8,
+      confidence: 0.9,
+      sourceRule: "stated:genres",
+      evidence: [{ kind: "answer", id: "genres" }],
+    });
+  }
+
+  const people = [...preferences.directors, ...preferences.actors].slice(0, 6);
+
+  if (people.length) {
+    drafts.push({
+      key: "person:stated",
+      value: `You will watch anything with ${listPhrase(people)}.`,
+      strength: 0.9,
+      confidence: 0.9,
+      sourceRule: "stated:people",
+      evidence: [{ kind: "answer", id: "actors" }],
+    });
+  }
+
+  const single = (key: string, value: string, answer: string) =>
     drafts.push({
       key,
       value,
-      strength,
+      strength: 0.8,
       confidence: 0.9,
       sourceRule: `stated:${answer}`,
       evidence: [{ kind: "answer", id: answer }],
     });
 
-  for (const genre of preferences.genres.slice(0, 6)) {
-    stated(
-      `genre:${genre.toLowerCase()}`,
-      `You told me you reach for ${genre.toLowerCase()}.`,
-      "genres",
-    );
-  }
-
-  for (const person of [...preferences.directors, ...preferences.actors].slice(0, 6)) {
-    stated(
-      `person:${person.toLowerCase()}`,
-      `You will watch anything with ${person}.`,
-      "actors",
-      0.9,
-    );
-  }
-
   if (preferences.runtime === "short") {
-    stated("runtime:short", "You said you would rather stay under a hundred minutes.", "runtime");
+    single("runtime:short", "You said you would rather stay under a hundred minutes.", "runtime");
   }
 
   if (preferences.runtime === "long") {
-    stated("runtime:long", "You said the longer the better.", "runtime");
+    single("runtime:long", "You said the longer the better.", "runtime");
   }
 
   if (preferences.subtitles === "never") {
-    stated("habit:subtitles", "You would rather not read subtitles.", "subtitles");
+    single("habit:subtitles", "You would rather not read subtitles.", "subtitles");
   }
 
   if (preferences.novelty === "rewatch") {
-    stated("habit:novelty", "You rewatch what you love rather than chase the new.", "novelty");
+    single("habit:novelty", "You rewatch what you love rather than chase the new.", "novelty");
   }
 
   if (preferences.novelty === "new") {
-    stated("habit:novelty", "You would always rather try something new.", "novelty");
+    single("habit:novelty", "You would always rather try something new.", "novelty");
   }
 
   return drafts;
@@ -141,7 +179,10 @@ function tally(
   return totals;
 }
 
-function derivedDrafts(entries: { facts: TitleFacts; weight: number }[]): BeliefDraft[] {
+function derivedDrafts(
+  entries: { facts: TitleFacts; weight: number }[],
+  stated: Set<string>,
+): BeliefDraft[] {
   const drafts: BeliefDraft[] = [];
   const liked = entries.filter((entry) => entry.weight > 0);
   const disliked = entries.filter((entry) => entry.weight < 0);
@@ -152,13 +193,13 @@ function derivedDrafts(entries: { facts: TitleFacts; weight: number }[]): Belief
   );
 
   for (const [genre, total] of likedGenres) {
-    if (total.ids.length < MIN_EVIDENCE) {
+    if (total.ids.length < MIN_EVIDENCE || stated.has(genre)) {
       continue;
     }
 
     drafts.push({
       key: `rule:genre:${genre}`,
-      value: `You keep coming back to ${genre}.`,
+      value: `You keep coming back to ${genre}, and you never said so.`,
       strength: strongest > 0 ? Math.min(1, total.weight / strongest) : 0.5,
       confidence: confidenceFor(total.ids.length),
       sourceRule: "rule:liked-genre",
@@ -285,7 +326,12 @@ async function serviceDrafts(db: D1Database, viewerId: string): Promise<BeliefDr
   }));
 }
 
-export async function refreshBeliefs(env: Bindings, viewerId: string, viewer: ViewerContext) {
+export async function refreshBeliefs(
+  env: Bindings,
+  viewerId: string,
+  viewer: ViewerContext,
+  options: { includeHunches?: boolean } = {},
+) {
   try {
     const preferences = await readViewerPreferences(env.DB, viewerId);
     const weighted = weighTitles(viewer);
@@ -299,11 +345,13 @@ export async function refreshBeliefs(env: Bindings, viewerId: string, viewer: Vi
 
       return found ? [{ facts: found, weight: entry.weight }] : [];
     });
+    const stated = new Set(canonicalGenres(preferences.genres));
     const drafts = [
       ...statedDrafts(preferences),
-      ...derivedDrafts(entries),
+      ...derivedDrafts(entries, stated),
       ...(await serviceDrafts(env.DB, viewerId)),
       ...(await moodDrafts(env.DB, viewerId)),
+      ...(options.includeHunches ? await noteHunches(env, viewerId) : []),
     ];
 
     await writeDerivedBeliefs(env.DB, viewerId, drafts);

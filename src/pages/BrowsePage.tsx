@@ -1,6 +1,7 @@
 import { useSearchParams } from "react-router-dom";
 
 import { TitleCard } from "../components/catalog";
+import { ErrorBoundary } from "../components/ErrorBoundary";
 import { ProviderBadge } from "../components/ui";
 import type { MediaTitle, Provider } from "../domain/catalog";
 import { useBrowse, useGenres, useKeywords } from "../hooks/useBrowse";
@@ -224,16 +225,18 @@ export function BrowsePage({
       </div>
 
       {browse.items.length > 0 && (
-        <div className="results-grid">
-          {browse.items.map((item, index) => (
-            <TitleCard
-              key={item.id}
-              item={item}
-              onOpen={onOpen}
-              rank={sort === "popularity" || sort === "trending" ? index + 1 : undefined}
-            />
-          ))}
-        </div>
+        <ErrorBoundary label="These listings">
+          <div className="results-grid">
+            {browse.items.map((item, index) => (
+              <TitleCard
+                key={item.id}
+                item={item}
+                onOpen={onOpen}
+                rank={sort === "popularity" || sort === "trending" ? index + 1 : undefined}
+              />
+            ))}
+          </div>
+        </ErrorBoundary>
       )}
 
       {browse.isLoading && browse.items.length === 0 && (

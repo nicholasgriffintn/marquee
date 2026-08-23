@@ -37,43 +37,64 @@ export async function sendSignInEmail(env: Bindings, to: string, link: string, e
   }
 }
 
-export async function sendArrivalEmail(
+export async function sendAlertEmail(
   env: Bindings,
   to: string,
-  arrivals: { title: string; providerName: string; url: string }[],
+  items: { headline: string; detail: string; url: string }[],
 ) {
-  if (!env.EMAIL || !env.MAIL_FROM || arrivals.length === 0) {
+  if (!env.EMAIL || !env.MAIL_FROM || items.length === 0) {
     return;
   }
 
-  const lines = arrivals.map(
-    (arrival) => `${arrival.title} — ${arrival.providerName}
-${arrival.url}`,
-  );
+  const lines = items.flatMap((item) => [item.headline, item.detail, item.url, ""]);
 
   try {
     await env.EMAIL.send({
       to,
       from: { email: env.MAIL_FROM, name: "The Usher" },
       subject:
-        arrivals.length === 1
-          ? `${arrivals[0].title} has turned up`
-          : `${arrivals.length} things you were waiting for have turned up`,
+        items.length === 1 ? items[0].headline : `${items.length} things worth knowing about`,
       text: [
         "Evening.",
         "",
-        arrivals.length === 1
-          ? "Something you put on your shelf is showing now."
-          : "A few things you put on your shelf are showing now.",
+        items.length === 1 ? "One thing you were waiting on." : "A few things you were waiting on.",
         "",
         ...lines,
-        "",
-        "I will not mention them again.",
+        "I will not mention any of them again.",
         "",
         "The Usher",
       ].join("\n"),
     });
   } catch (error) {
-    logError("arrival_email_failed", error);
+    logError("alert_email_failed", error);
+  }
+}
+
+export async function sendAddressConfirmation(env: Bindings, to: string, link: string) {
+  if (!env.EMAIL || !env.MAIL_FROM) {
+    throw new Error("Email delivery is not configured");
+  }
+
+  try {
+    await env.EMAIL.send({
+      to,
+      from: { email: env.MAIL_FROM, name: "The Usher" },
+      subject: "Is this you?",
+      text: [
+        "Evening.",
+        "",
+        "Somebody asked me to send word here when something they were waiting on turns up.",
+        "If that was you, say so:",
+        link,
+        "",
+        "If it was not, do nothing. I will not write again.",
+        "",
+        "The Usher",
+      ].join("\n"),
+    });
+  } catch (error) {
+    logError("address_confirmation_failed", error);
+
+    throw new Error("Could not send that email", { cause: error });
   }
 }
