@@ -1,5 +1,6 @@
 import type { CatalogResponse, CatalogSection, MediaTitle } from "../../src/domain/catalog.ts";
 import { parseStoredTitle, parseStoredTitleIds } from "../lib/catalog-payload.ts";
+import { logError } from "../lib/logging.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { searchTitlesFirst } from "./catalog-search.ts";
 
@@ -25,6 +26,7 @@ function includesProvider(title: MediaTitle, providerIds: string[]) {
 }
 
 const READ_CHUNK = 80;
+const MIN_VISIBLE_ITEMS = 3;
 
 export async function readRawItems(db: D1Database, ids: string[]) {
   const uniqueIds = [...new Set(ids.filter(isKnownTitle))];
@@ -112,18 +114,29 @@ export async function readCatalog(db: D1Database, query: string, providerIds: st
   const titleIds = rows.results.flatMap((section) => parseStoredTitleIds(section.titleIds));
   const titles = await readItems(db, titleIds, titleIds.length);
   const titlesById = new Map(titles.map((title) => [title.id, title]));
-  const sections: CatalogSection[] = rows.results.map((section) => ({
-    id: section.id,
-    title: section.title,
-    description: section.description,
-    items: parseStoredTitleIds(section.titleIds)
-      .flatMap((id) => {
+  const sections: CatalogSection[] = rows.results
+    .map((section) => {
+      const listed = parseStoredTitleIds(section.titleIds);
+      const hydrated = listed.flatMap((id) => {
         const title = titlesById.get(id);
 
         return title ? [title] : [];
-      })
-      .filter((title) => includesProvider(title, providerIds)),
-  }));
+      });
+
+      if (hydrated.length === 0 && listed.length > 0) {
+        logError("section_titles_unreadable", new Error(`${section.id} lost every stored title`), {
+          area: "catalogue",
+        });
+      }
+
+      return {
+        id: section.id,
+        title: section.title,
+        description: section.description,
+        items: hydrated.filter((title) => includesProvider(title, providerIds)),
+      };
+    })
+    .filter((section) => section.items.length >= MIN_VISIBLE_ITEMS);
   const fetchedAt = rows.results.reduce(
     (latest, section) => (section.sourceUpdatedAt > latest ? section.sourceUpdatedAt : latest),
     "",
