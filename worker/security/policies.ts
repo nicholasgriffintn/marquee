@@ -95,6 +95,8 @@ export type Rule = { path: string; methods?: readonly string[]; policy: PolicyNa
 const WRITE_METHODS = ["POST", "PUT", "PATCH", "DELETE"] as const;
 
 export const RULES: readonly Rule[] = [
+  { path: "/api/auth", methods: ["POST"], policy: "auth" },
+  { path: "/api/auth/methods", policy: "auth" },
   { path: "/api/auth/github", policy: "auth" },
   { path: "/api/auth/github/callback", policy: "auth" },
   { path: "/api/auth/tokens", methods: WRITE_METHODS, policy: "auth" },

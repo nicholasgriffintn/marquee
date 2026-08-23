@@ -5,6 +5,7 @@ import { Hono } from "hono";
 import { jsonResponse, readJsonObject } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
 import { canonicalOrigin, safeReturnPath } from "../lib/security.ts";
+import { isRecord } from "../lib/values.ts";
 import type { Bindings } from "../types.ts";
 import { listApiTokens, mintToken, revokeApiToken, storeApiToken } from "./api-tokens.ts";
 import {
@@ -18,6 +19,8 @@ import {
 
 export const authRoutes = new Hono<{ Bindings: Bindings }>();
 
+authRoutes.post("/", (context) => runAuthProtocol(context));
+authRoutes.get("/methods", (context) => listMethods(context));
 authRoutes.get("/github", (context) => startGitHub(context));
 authRoutes.get("/github/callback", (context) => completeGitHub(context));
 authRoutes.get("/session", (context) => getSession(context));
@@ -25,6 +28,71 @@ authRoutes.post("/logout", (context) => logout(context));
 authRoutes.get("/tokens", (context) => listTokens(context));
 authRoutes.post("/tokens", (context) => createToken(context));
 authRoutes.delete("/tokens/:id", (context) => revokeToken(context));
+
+type ProviderId = "github";
+
+function configuredProviders(env: Bindings) {
+  const providers: { id: ProviderId; label: string }[] = [];
+
+  if (env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET) {
+    providers.push({ id: "github", label: "Continue with GitHub" });
+  }
+
+  return providers;
+}
+
+function listMethods(context: AppContext) {
+  return jsonResponse({ providers: configuredProviders(context.env) });
+}
+
+async function runAuthProtocol(context: AppContext) {
+  const body = await readJsonObject(context.req.raw);
+  const action = typeof body?.action === "string" ? body.action : "";
+
+  if (action === "sign_out") {
+    await logout(context);
+
+    return jsonResponse({ status: "completed" });
+  }
+
+  if (action !== "start_oauth") {
+    return jsonResponse({ error: "That is not a door I can open." }, 400);
+  }
+
+  const provider = typeof body?.provider === "string" ? body.provider : "";
+  const known = configuredProviders(context.env).some((entry) => entry.id === provider);
+
+  if (!known) {
+    return jsonResponse({ error: "We do not take that ticket here." }, 400);
+  }
+
+  const values = isRecord(body?.values) ? body.values : {};
+  const returnTo = safeReturnPath(typeof values.returnTo === "string" ? values.returnTo : "");
+
+  try {
+    const url = await authenticationFor(context.env, context.req.raw).startGitHub();
+    const state = url.searchParams.get("state");
+
+    if (!state) {
+      throw new AuthError("provider_error");
+    }
+
+    context.header("set-cookie", stateCookie(context, state), { append: true });
+    context.header(
+      "set-cookie",
+      returnTo
+        ? temporaryCookie(context, RETURN_COOKIE, returnTo)
+        : expiredCookie(context, RETURN_COOKIE),
+      { append: true },
+    );
+
+    return jsonResponse({ status: "redirect_required", provider, url: url.href });
+  } catch (error) {
+    logError("auth_start_failed", error, { provider });
+
+    return jsonResponse({ error: "The box office is closed for a moment. Try again." }, 502);
+  }
+}
 
 async function startGitHub(context: AppContext) {
   const url = await authenticationFor(context.env, context.req.raw).startGitHub();

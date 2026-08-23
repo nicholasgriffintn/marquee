@@ -34,6 +34,7 @@ import { BrowsePage, type BrowsePreset } from "./pages/BrowsePage";
 import { DigestPage } from "./pages/DigestPage";
 import { LibraryPage } from "./pages/LibraryPage";
 import { SearchPage } from "./pages/SearchPage";
+import { SignInPage } from "./pages/SignInPage";
 import { SourcesPage } from "./pages/SourcesPage";
 import { TonightPage } from "./pages/TonightPage";
 import { UsherPage } from "./pages/UsherPage";
@@ -343,19 +344,19 @@ export function App() {
               </button>
             </div>
           ) : (
-            <a
+            <Link
               className="sign-in-button"
-              href="/api/auth/github?returnTo=%2F"
-              aria-label="Sign in with GitHub"
+              to={`/sign-in?returnTo=${encodeURIComponent(`${pagePath}${location.search}`)}`}
+              aria-label="Sign in"
             >
               <span className="sign-in-icon">
                 <GitHubIcon />
               </span>
               <span className="sign-in-copy">
                 <strong>Sign in</strong>
-                <small>with GitHub</small>
+                <small>get a ticket</small>
               </span>
-            </a>
+            </Link>
           )}
         </div>
       </header>
@@ -412,6 +413,11 @@ export function App() {
         />
 
         <Route path="/usher" element={<UsherPage />} />
+
+        <Route
+          path="/sign-in"
+          element={<SignInPage isSignedIn={isSignedIn} isSessionLoading={session.isLoading} />}
+        />
 
         <Route
           path="/this-week"
@@ -555,9 +561,9 @@ function SignedOutShelf() {
       <div className="search-empty">
         <h2>You are signed out.</h2>
         <p>Your shelf lives with your account, so sign in to see it.</p>
-        <a className="button-link" href="/api/auth/github?returnTo=%2Fshelf">
-          Sign in with GitHub
-        </a>
+        <Link className="button-link" to="/sign-in?returnTo=%2Fshelf">
+          Get a ticket
+        </Link>
       </div>
     </section>
   );

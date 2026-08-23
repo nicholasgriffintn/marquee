@@ -29,6 +29,7 @@
     "@ngriffin_uk/auth-oauth2": "^4.0.1",
     "@ngriffin_uk/auth-protocol": "^0.1.1",
     "@ngriffin_uk/auth-provider-github": "^4.0.0",
+    "@ngriffin_uk/auth-react": "^0.7.1",
     "@ngriffin_uk/auth-request": "^0.2.4",
     "hono": "^4.13.2",
     "react": "^19.2.8",

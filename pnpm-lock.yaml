@@ -32,6 +32,9 @@ importers:
       '@ngriffin_uk/auth-provider-github':
         specifier: ^4.0.0
         version: 4.0.0(@ngriffin_uk/auth-core@0.5.1)(@ngriffin_uk/auth-oauth2@4.0.1(@ngriffin_uk/auth-core@0.5.1)(@ngriffin_uk/auth-crypto@1.1.1)(@ngriffin_uk/auth-encoding@0.2.4)(@ngriffin_uk/auth-jwt@2.0.0(@ngriffin_uk/auth-crypto@1.1.1)(@ngriffin_uk/auth-encoding@0.2.4)(@ngriffin_uk/auth-request@0.2.4))(@ngriffin_uk/auth-request@0.2.4))
+      '@ngriffin_uk/auth-react':
+        specifier: ^0.7.1
+        version: 0.7.1(react@19.2.8)
       '@ngriffin_uk/auth-request':
         specifier: ^0.2.4
         version: 0.2.4
@@ -588,6 +591,11 @@ packages:
     peerDependencies:
       '@ngriffin_uk/auth-core': ^0.5.0
       '@ngriffin_uk/auth-oauth2': ^4.0.0
+
+  '@ngriffin_uk/auth-react@0.7.1':
+    resolution: {integrity: sha512-EJwS/+Sx+FK44nZPn0beXmnBXwPoobRXgvbLAZR5QCJhpXhyagX19kkZegDq+2pR5yI9wJ9YDBVeckUKdHYoPw==}
+    peerDependencies:
+      react: '>=18.2.0'
 
   '@ngriffin_uk/auth-request@0.2.4':
     resolution: {integrity: sha512-Wl1IGye0HN2geFRQ/h3lyyQoPaei+Tx6iuoqMNfBOHT/uhxUTqlYTg2yQDApTNo8bCEFrV4LpBH8kd5qffVZMQ==}
@@ -1407,6 +1415,11 @@ packages:
     resolution: {integrity: sha512-iPZK6eYjbxRu3uB4/WZ3EsEIMJFMqAoopl3R+zuq0UjcAm/MO6KCweDgPfP3elTztoKP3KtnVHxTn2NHBSDVUw==}
     engines: {node: '>=10'}
 
+  lucide-react@1.28.0:
+    resolution: {integrity: sha512-fARAFJULsGuDDydjp6+6blekG/sBIM29TerzLjc9bQUKAcEfrSc4ZQKb25KRz4OMKd87cZTb5dgq0w/T6KufVg==}
+    peerDependencies:
+      react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
   miniflare@5.20260815.0-alpha:
     resolution: {integrity: sha512-YAaGj4Sh5f4fqHKiMQ8zRHDOOM5IGUVtMhnLIeyjuQfU+9P6hcOTrHUVtbfj/ZPay9Kzik4pWELB39pGgefjiQ==}
     engines: {node: '>=22.0.0'}
@@ -1504,6 +1517,11 @@ packages:
   punycode@2.3.1:
     resolution: {integrity: sha512-vYt7UD1U9Wg6138shLtLOvdAu+8DsC/ilFtEVHcH+wydcSpNE20AfSOduf6MkRFahL5FY7X1oU7nKVZFtfq8Fg==}
     engines: {node: '>=6'}
+
+  qrcode.react@4.2.0:
+    resolution: {integrity: sha512-QpgqWi8rD9DsS9EP3z7BT+5lY5SFhsqGjpgW5DY/i3mK4M9DTBNz3ErMi8BWYEfI3L0d8GIbGmcdFAS1uIRGjA==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
   react-dom@19.2.8:
     resolution: {integrity: sha512-rVprimfGBG3DR+Tq0IQG2DT5PxKth1WIGDmj5yPmlzr4YBe7uyE+Du4oVqTDXZSHGGGXRtTJEGSSePyQCMBglQ==}
@@ -2034,6 +2052,13 @@ snapshots:
     dependencies:
       '@ngriffin_uk/auth-core': 0.5.1
       '@ngriffin_uk/auth-oauth2': 4.0.1(@ngriffin_uk/auth-core@0.5.1)(@ngriffin_uk/auth-crypto@1.1.1)(@ngriffin_uk/auth-encoding@0.2.4)(@ngriffin_uk/auth-jwt@2.0.0(@ngriffin_uk/auth-crypto@1.1.1)(@ngriffin_uk/auth-encoding@0.2.4)(@ngriffin_uk/auth-request@0.2.4))(@ngriffin_uk/auth-request@0.2.4)
+
+  '@ngriffin_uk/auth-react@0.7.1(react@19.2.8)':
+    dependencies:
+      '@ngriffin_uk/auth-protocol': 0.1.1
+      lucide-react: 1.28.0(react@19.2.8)
+      qrcode.react: 4.2.0(react@19.2.8)
+      react: 19.2.8
 
   '@ngriffin_uk/auth-request@0.2.4': {}
 
@@ -2583,6 +2608,10 @@ snapshots:
     dependencies:
       p-locate: 5.0.0
 
+  lucide-react@1.28.0(react@19.2.8):
+    dependencies:
+      react: 19.2.8
+
   miniflare@5.20260815.0-alpha:
     dependencies:
       '@cspotcode/source-map-support': 0.8.1
@@ -2711,6 +2740,10 @@ snapshots:
   prelude-ls@1.2.1: {}
 
   punycode@2.3.1: {}
+
+  qrcode.react@4.2.0(react@19.2.8):
+    dependencies:
+      react: 19.2.8
 
   react-dom@19.2.8(react@19.2.8):
     dependencies:
