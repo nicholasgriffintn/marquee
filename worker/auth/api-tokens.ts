@@ -49,7 +49,7 @@ export async function bearerUser(env: Bindings, request: Request): Promise<Marqu
 
   const tokenHash = await hashState(token);
   const row = await env.DB.prepare(
-    `SELECT u.id, u.name, u.github_login AS githubLogin, u.avatar_url AS avatarUrl, u.role
+    `SELECT u.id, u.name, u.github_login AS githubLogin, u.email, u.avatar_url AS avatarUrl, u.role
      FROM api_tokens AS t
      JOIN users AS u ON u.id = t.user_id
      WHERE t.token_hash = ?`,
@@ -59,6 +59,7 @@ export async function bearerUser(env: Bindings, request: Request): Promise<Marqu
       id: string;
       name: string;
       githubLogin: string;
+      email?: string | null;
       avatarUrl: string | null;
       role: string | null;
     }>();
@@ -77,6 +78,7 @@ export async function bearerUser(env: Bindings, request: Request): Promise<Marqu
     id: row.id,
     displayName: row.name,
     githubLogin: row.githubLogin,
+    email: row.email ?? "",
     ...(row.avatarUrl ? { avatarUrl: row.avatarUrl } : {}),
     role: row.role === "admin" ? "admin" : "viewer",
     createdAt: new Date(),

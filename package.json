@@ -26,6 +26,7 @@
     "@ngriffin_uk/auth-crypto": "^1.1.1",
     "@ngriffin_uk/auth-encoding": "^0.2.4",
     "@ngriffin_uk/auth-jwt": "^2.0.0",
+    "@ngriffin_uk/auth-magic-link": "^0.0.6",
     "@ngriffin_uk/auth-oauth2": "^4.0.1",
     "@ngriffin_uk/auth-protocol": "^0.1.1",
     "@ngriffin_uk/auth-provider-github": "^4.0.0",

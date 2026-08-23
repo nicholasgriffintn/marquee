@@ -36,6 +36,15 @@ export function GitHubIcon() {
   );
 }
 
+export function TicketIcon() {
+  return (
+    <svg className="ticket-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M3 8.5V6h18v2.5a2.2 2.2 0 0 0 0 4.4V18H3v-5.1a2.2 2.2 0 0 0 0-4.4Z" />
+      <path d="M14.5 6v1.6M14.5 10.6v2.8M14.5 16.4V18" />
+    </svg>
+  );
+}
+
 export function MarqueeLogo() {
   return (
     <span className="brand-mark" aria-hidden="true">

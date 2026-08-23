@@ -125,6 +125,7 @@
   ],
   "vars": {
     "AI_GATEWAY_ID": "marquee",
+    "MAIL_FROM": "usher@marquee.pashi.app",
     "AI_MODEL": "@cf/moonshotai/kimi-k2.6",
     "AI_FAST_MODEL": "@cf/meta/llama-4-scout-17b-16e-instruct"
   },
@@ -256,6 +257,12 @@
     "binding": "AI",
     "remote": true
   },
+  "send_email": [
+    {
+      "name": "EMAIL",
+      "remote": true
+    }
+  ],
   "analytics_engine_datasets": [
     {
       "binding": "EVENTS",

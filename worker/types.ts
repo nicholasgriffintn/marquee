@@ -21,6 +21,8 @@ export type Bindings = {
   AI_FAST_MODEL?: string;
   GITHUB_CLIENT_ID?: string;
   GITHUB_CLIENT_SECRET?: string;
+  EMAIL?: SendEmail;
+  MAIL_FROM?: string;
   SITE_ORIGIN?: string;
   TMDB_API_TOKEN?: string;
   OMDB_API_KEY?: string;

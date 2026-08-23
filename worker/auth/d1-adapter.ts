@@ -1,7 +1,9 @@
 import {
   AuthError,
   createAuth,
+  type AuthChallengeRecord,
   type AuthSessionRecord,
+  type ChallengeStore,
   type ExternalIdentity,
   type IdentityStore,
   type SessionStore,
@@ -17,7 +19,108 @@ export function createD1Auth(db: D1Database) {
     users: createUserStore(db),
     sessions: createSessionStore(db),
     identities: createIdentityStore(db),
+    challenges: createD1ChallengeStore(db),
   });
+}
+
+export function createD1ChallengeStore(db: D1Database): ChallengeStore {
+  return {
+    async create(challenge) {
+      await db
+        .prepare(
+          `INSERT INTO auth_challenges
+             (token_hash, provider, kind, payload, attempts, created_at, expires_at)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`,
+        )
+        .bind(
+          challenge.tokenHash,
+          challenge.provider,
+          challenge.kind,
+          JSON.stringify(challenge.payload),
+          challenge.attempts,
+          challenge.createdAt.toISOString(),
+          challenge.expiresAt.toISOString(),
+        )
+        .run();
+    },
+    async findByTokenHash(tokenHash) {
+      const row = await db
+        .prepare(`SELECT * FROM auth_challenges WHERE token_hash = ?1`)
+        .bind(tokenHash)
+        .first<ChallengeRow>();
+
+      return row ? mapChallenge(row) : null;
+    },
+    async consumeByTokenHash(tokenHash) {
+      const row = await db
+        .prepare(`DELETE FROM auth_challenges WHERE token_hash = ?1 RETURNING *`)
+        .bind(tokenHash)
+        .first<ChallengeRow>();
+
+      return row ? mapChallenge(row) : null;
+    },
+    async incrementAttempts(tokenHash, expectedAttempts) {
+      const result = await db
+        .prepare(
+          `UPDATE auth_challenges SET attempts = attempts + 1
+           WHERE token_hash = ?1 AND attempts = ?2`,
+        )
+        .bind(tokenHash, expectedAttempts)
+        .run();
+
+      return (result.meta.changes ?? 0) > 0;
+    },
+  };
+}
+
+type ChallengeRow = {
+  token_hash: string;
+  provider: string;
+  kind: string;
+  payload: string;
+  attempts: number;
+  created_at: string;
+  expires_at: string;
+};
+
+function mapChallenge(row: ChallengeRow): AuthChallengeRecord {
+  const payload = parseJson(row.payload);
+
+  return {
+    tokenHash: row.token_hash,
+    provider: row.provider,
+    kind: row.kind as AuthChallengeRecord["kind"],
+    payload: payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {},
+    attempts: row.attempts,
+    createdAt: new Date(row.created_at),
+    expiresAt: new Date(row.expires_at),
+  };
+}
+
+export async function findOrCreateByEmail(db: D1Database, email: string) {
+  const existing = await db
+    .prepare("SELECT * FROM users WHERE email = ?1")
+    .bind(email)
+    .first<UserRow>();
+
+  if (existing) {
+    return mapUser(existing);
+  }
+
+  const id = crypto.randomUUID();
+  const name = email.split("@")[0]?.slice(0, 60) || "Guest";
+
+  await db
+    .prepare(
+      `INSERT INTO users (id, name, github_login, avatar_url, email)
+       VALUES (?1, ?2, '', NULL, ?3)`,
+    )
+    .bind(id, name, email)
+    .run();
+
+  const created = await db.prepare("SELECT * FROM users WHERE id = ?1").bind(id).first<UserRow>();
+
+  return created ? mapUser(created) : null;
 }
 
 export function createD1OAuthStateStore(db: D1Database): OAuthStateStore {

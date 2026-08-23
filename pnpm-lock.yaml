@@ -23,6 +23,9 @@ importers:
       '@ngriffin_uk/auth-jwt':
         specifier: ^2.0.0
         version: 2.0.0(@ngriffin_uk/auth-crypto@1.1.1)(@ngriffin_uk/auth-encoding@0.2.4)(@ngriffin_uk/auth-request@0.2.4)
+      '@ngriffin_uk/auth-magic-link':
+        specifier: ^0.0.6
+        version: 0.0.6
       '@ngriffin_uk/auth-oauth2':
         specifier: ^4.0.1
         version: 4.0.1(@ngriffin_uk/auth-core@0.5.1)(@ngriffin_uk/auth-crypto@1.1.1)(@ngriffin_uk/auth-encoding@0.2.4)(@ngriffin_uk/auth-jwt@2.0.0(@ngriffin_uk/auth-crypto@1.1.1)(@ngriffin_uk/auth-encoding@0.2.4)(@ngriffin_uk/auth-request@0.2.4))(@ngriffin_uk/auth-request@0.2.4)
@@ -573,6 +576,9 @@ packages:
       '@ngriffin_uk/auth-crypto': ^1.1.0
       '@ngriffin_uk/auth-encoding': ^0.2.4
       '@ngriffin_uk/auth-request': ^0.2.4
+
+  '@ngriffin_uk/auth-magic-link@0.0.6':
+    resolution: {integrity: sha512-7ODlsAuzc+Om7ICa+jJUKdCtEqtZAp6OPS+XlRmnVnhBQ7AuAU6HH1+zPLZInVNE//CwXJoVvcVscF488ZugFg==}
 
   '@ngriffin_uk/auth-oauth2@4.0.1':
     resolution: {integrity: sha512-UglRLnc5dlA0Gcp+h5/9PJVvZVRX9u2pM2YjjFIKDGJ01Z5TBUWhHvo7JDZlHmaViS+7rfu75RqRhxTz7uYcbw==}
@@ -2036,6 +2042,12 @@ snapshots:
       '@ngriffin_uk/auth-crypto': 1.1.1
       '@ngriffin_uk/auth-encoding': 0.2.4
       '@ngriffin_uk/auth-request': 0.2.4
+
+  '@ngriffin_uk/auth-magic-link@0.0.6':
+    dependencies:
+      '@ngriffin_uk/auth-core': 0.5.1
+      '@ngriffin_uk/auth-crypto': 1.1.1
+      '@ngriffin_uk/auth-protocol': 0.1.1
 
   '@ngriffin_uk/auth-oauth2@4.0.1(@ngriffin_uk/auth-core@0.5.1)(@ngriffin_uk/auth-crypto@1.1.1)(@ngriffin_uk/auth-encoding@0.2.4)(@ngriffin_uk/auth-jwt@2.0.0(@ngriffin_uk/auth-crypto@1.1.1)(@ngriffin_uk/auth-encoding@0.2.4)(@ngriffin_uk/auth-request@0.2.4))(@ngriffin_uk/auth-request@0.2.4)':
     dependencies:

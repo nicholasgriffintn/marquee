@@ -11,7 +11,7 @@ import {
 
 import { DetailPanel } from "./components/catalog";
 import { SearchBox } from "./components/SearchBox";
-import { GitHubIcon, MarqueeLogo } from "./components/ui";
+import { MarqueeLogo, TicketIcon } from "./components/ui";
 import { ManagersDoor } from "./components/usher/ManagersDoor";
 import { UsherCard } from "./components/usher/UsherCard";
 import { UsherMark } from "./components/usher/UsherMark";
@@ -350,7 +350,7 @@ export function App() {
               aria-label="Sign in"
             >
               <span className="sign-in-icon">
-                <GitHubIcon />
+                <TicketIcon />
               </span>
               <span className="sign-in-copy">
                 <strong>Sign in</strong>

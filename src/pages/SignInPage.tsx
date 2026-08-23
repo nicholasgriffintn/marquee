@@ -14,6 +14,16 @@ const CLASS_NAMES = {
   separator: "box-office-separator",
   error: "box-office-error",
   status: "box-office-status",
+  form: "box-office-form",
+  field: "box-office-field",
+  label: "box-office-label",
+  input: "box-office-input",
+  inputContainer: "box-office-input-wrap",
+  inputIcon: "box-office-input-icon",
+  button: "box-office-provider",
+  magicLinkButton: "box-office-provider",
+  linkButton: "box-office-link",
+  actions: "box-office-actions",
 } as const;
 
 export function SignInPage({
@@ -24,7 +34,10 @@ export function SignInPage({
   isSessionLoading: boolean;
 }) {
   const [params] = useSearchParams();
-  const [providers, setProviders] = useState<ExternalAuthProvider[] | null>(null);
+  const [methods, setMethods] = useState<{
+    providers: ExternalAuthProvider[];
+    magicLink: boolean;
+  } | null>(null);
   const returnTo = params.get("returnTo") ?? "/";
 
   useEffect(() => {
@@ -32,14 +45,14 @@ export function SignInPage({
 
     async function load() {
       try {
-        const response = await requestJson<{ providers: ExternalAuthProvider[] }>(
-          "/api/auth/methods",
-          { signal: controller.signal },
-        );
+        const response = await requestJson<{
+          providers: ExternalAuthProvider[];
+          magicLink: boolean;
+        }>("/api/auth/methods", { signal: controller.signal });
 
-        setProviders(response.providers);
+        setMethods(response);
       } catch {
-        setProviders([]);
+        setMethods({ providers: [], magicLink: false });
       }
     }
 
@@ -83,9 +96,9 @@ export function SignInPage({
                 stop offering you things you have already seen.
               </p>
 
-              {isSessionLoading || providers === null ? (
+              {isSessionLoading || methods === null ? (
                 <p className="box-office-status">Opening the window…</p>
-              ) : providers.length === 0 ? (
+              ) : methods.providers.length === 0 && !methods.magicLink ? (
                 <p className="box-office-error">
                   The window is shut. No sign-in method is configured on this deployment.
                 </p>
@@ -94,14 +107,14 @@ export function SignInPage({
                   config={{
                     endpoint: "/api/auth",
                     capabilities: {
-                      magicLink: false,
+                      magicLink: methods.magicLink,
                       password: false,
                       passkeys: false,
                       signUp: false,
                       recovery: false,
                       signOut: false,
                     },
-                    providers: providers.map((provider) => ({
+                    providers: methods.providers.map((provider) => ({
                       ...provider,
                       values: { returnTo },
                     })),
@@ -110,6 +123,7 @@ export function SignInPage({
                       signInTitle: "",
                       signInDescription: "",
                       signInSeparator: "or",
+                      magicLinkSubmit: "Post me a ticket",
                     },
                     onRedirect: (url) => {
                       window.location.href = url;
@@ -123,7 +137,7 @@ export function SignInPage({
               )}
 
               <p className="box-office-small">
-                We keep your GitHub name and avatar, nothing else. Your shelf stays yours.
+                We keep your name and avatar, nothing else. Your shelf stays yours.
               </p>
             </div>
           )}

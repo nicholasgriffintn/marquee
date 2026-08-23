@@ -71,8 +71,20 @@ Copy `.dev.vars.example` and replace with your env variables:
 cp .dev.vars.example .dev.vars
 ```
 
-Create a GitHub OAuth app with `http://localhost:8787/api/auth/github/callback` as its local
-authorisation callback URL and `https://<your-domain>/api/auth/github/callback` for your deployed domain, then put its client ID and client secret in `.dev.vars`.
+Create a GitHub OAuth app with `http://localhost:8787/api/auth/callback/github` as its local
+authorisation callback URL and `https://<your-domain>/api/auth/callback/github` for your deployed
+domain, then put its client ID and client secret in `.dev.vars`.
+
+Magic-link sign-in rides on [Cloudflare Email Service][email-service] through the `send_email`
+binding, so no third party ever sees who is asking for a ticket. Onboard a sending domain in the
+Cloudflare dashboard (Email Service, Workers Paid plan) and point `MAIL_FROM` in `wrangler.json` at
+an address on it. Until a domain is onboarded, sending only works to destination addresses you have
+verified in your account, which is enough for local testing. Unset `MAIL_FROM` and the box office
+quietly drops the option. The binding is set to `remote: true`, so `wrangler dev` posts real tickets
+instead of logging them to the console. Sign-in methods are advertised by `/api/auth/methods`, which
+only lists what the deployment can actually do.
+
+[email-service]: https://developers.cloudflare.com/email-service/
 
 Trakt is optional. Create an application at <https://trakt.tv/oauth/applications> with
 `http://localhost:8787/api/links/trakt/callback` as a redirect URI, then set `TRAKT_CLIENT_ID` and

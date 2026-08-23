@@ -5435,3 +5435,69 @@ h2 em {
   top: 64px;
   width: clamp(20px, 4vw, 60px);
 }
+
+.ticket-icon {
+  fill: none;
+  height: 22px;
+  stroke: currentcolor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.6;
+  width: 22px;
+}
+
+.box-office-form {
+  display: grid;
+  gap: 12px;
+}
+.box-office-field {
+  display: grid;
+  gap: 6px;
+}
+.box-office-label {
+  font: 700 10px/1 var(--mono);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+.box-office-input-wrap {
+  align-items: center;
+  display: flex;
+  position: relative;
+}
+.box-office-input-icon {
+  color: var(--muted);
+  left: 14px;
+  pointer-events: none;
+  position: absolute;
+}
+.box-office-input {
+  background: var(--white);
+  border: 1px solid var(--paper-line);
+  color: var(--ink);
+  font: 400 15px/1 var(--sans);
+  min-height: 50px;
+  padding: 0 14px;
+  width: 100%;
+}
+.box-office-input-icon ~ .box-office-input {
+  padding-left: 42px;
+}
+.box-office-input:focus-visible {
+  border-color: var(--blue);
+  outline: 2px solid var(--blue);
+  outline-offset: -2px;
+}
+.box-office-actions {
+  display: grid;
+  gap: 10px;
+}
+.box-office-link {
+  background: none;
+  border: 0;
+  color: #2a4bc9;
+  cursor: pointer;
+  font: 600 13px/1 var(--sans);
+  padding: 6px 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

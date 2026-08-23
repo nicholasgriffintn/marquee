@@ -2,6 +2,7 @@ import { parseCookies, serializeCookie, serializeExpiredCookie } from "@ngriffin
 import { AuthError } from "@ngriffin_uk/auth-core";
 import { Hono } from "hono";
 
+import { emailConfigured } from "../clients/email.ts";
 import { jsonResponse, readJsonObject } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
 import { canonicalOrigin, safeReturnPath } from "../lib/security.ts";
@@ -21,8 +22,8 @@ export const authRoutes = new Hono<{ Bindings: Bindings }>();
 
 authRoutes.post("/", (context) => runAuthProtocol(context));
 authRoutes.get("/methods", (context) => listMethods(context));
-authRoutes.get("/github", (context) => startGitHub(context));
-authRoutes.get("/github/callback", (context) => completeGitHub(context));
+authRoutes.get("/magic", (context) => completeMagicLink(context));
+authRoutes.get("/callback/:provider", (context) => completeOAuth(context));
 authRoutes.get("/session", (context) => getSession(context));
 authRoutes.post("/logout", (context) => logout(context));
 authRoutes.get("/tokens", (context) => listTokens(context));
@@ -42,7 +43,42 @@ function configuredProviders(env: Bindings) {
 }
 
 function listMethods(context: AppContext) {
-  return jsonResponse({ providers: configuredProviders(context.env) });
+  return jsonResponse({
+    providers: configuredProviders(context.env),
+    magicLink: emailConfigured(context.env),
+  });
+}
+
+async function completeMagicLink(context: AppContext) {
+  const token = new URL(context.req.url).searchParams.get("token") ?? "";
+  const returnTo = safeReturnPath(
+    parseCookies(context.req.header("cookie") ?? "").get(RETURN_COOKIE),
+  );
+
+  if (!token) {
+    return failedCallback(context, "invalid_callback");
+  }
+
+  try {
+    const result = await authenticationFor(context.env, context.req.raw).completeMagicLink(token);
+
+    if (result.status !== "authenticated") {
+      throw new AuthError("unsupported_operation");
+    }
+
+    context.header(
+      "set-cookie",
+      sessionCookie(context, result.session.token, result.session.expiresAt),
+      { append: true },
+    );
+    context.header("set-cookie", expiredCookie(context, RETURN_COOKIE), { append: true });
+
+    return context.redirect(returnTo || "/");
+  } catch (error) {
+    logError("magic_link_failed", error);
+
+    return failedCallback(context, "invalid_callback");
+  }
 }
 
 async function runAuthProtocol(context: AppContext) {
@@ -53,6 +89,38 @@ async function runAuthProtocol(context: AppContext) {
     await logout(context);
 
     return jsonResponse({ status: "completed" });
+  }
+
+  if (action === "request_magic_link") {
+    const values = isRecord(body?.values) ? body.values : {};
+    const email = typeof values.email === "string" ? values.email.trim().slice(0, 200) : "";
+
+    if (!email || !email.includes("@")) {
+      return jsonResponse({ error: "That is not an address I can post to." }, 400);
+    }
+
+    if (!emailConfigured(context.env)) {
+      return jsonResponse({ error: "The post goes out from a box we have not set up yet." }, 503);
+    }
+
+    const returnTo = safeReturnPath(typeof values.returnTo === "string" ? values.returnTo : "");
+
+    if (returnTo) {
+      context.header("set-cookie", temporaryCookie(context, RETURN_COOKIE, returnTo), {
+        append: true,
+      });
+    }
+
+    try {
+      await authenticationFor(context.env, context.req.raw).requestMagicLink(email);
+    } catch (error) {
+      logError("magic_link_request_failed", error);
+    }
+
+    return jsonResponse({
+      status: "completed",
+      message: "Check your email. The link works once, and not for long.",
+    });
   }
 
   if (action !== "start_oauth") {
@@ -94,26 +162,12 @@ async function runAuthProtocol(context: AppContext) {
   }
 }
 
-async function startGitHub(context: AppContext) {
-  const url = await authenticationFor(context.env, context.req.raw).startGitHub();
-  const state = url.searchParams.get("state");
-
-  if (!state) {
-    throw new AuthError("provider_error");
+async function completeOAuth(context: AppContext) {
+  if (context.req.param("provider") !== "github") {
+    return failedCallback(context, "provider_not_found");
   }
 
-  const returnTo = safeReturnPath(context.req.query("returnTo"));
-
-  context.header("set-cookie", stateCookie(context, state), { append: true });
-  context.header(
-    "set-cookie",
-    returnTo
-      ? temporaryCookie(context, RETURN_COOKIE, returnTo)
-      : expiredCookie(context, RETURN_COOKIE),
-    { append: true },
-  );
-
-  return context.redirect(url.href);
+  return completeGitHub(context);
 }
 
 async function completeGitHub(context: AppContext) {
