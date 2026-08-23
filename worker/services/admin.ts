@@ -1,10 +1,5 @@
 import type { UserRole } from "../auth/model.ts";
-import {
-  AVAILABILITY_MAX_AGE_DAYS,
-  queueEmbeddings,
-  queueEnrichment,
-  queueStaleAvailability,
-} from "../jobs/ingestion.ts";
+import { queueEmbeddings, queueEnrichment, queueStaleAvailability } from "../jobs/ingestion.ts";
 import { readBudgets, resumeSource } from "../repositories/budgets.ts";
 import { readCinemaCoverage } from "../repositories/cinemas.ts";
 import { readBackfillProgress } from "../repositories/discover.ts";
@@ -36,6 +31,8 @@ export const ADMIN_ACTIONS = [
   "angle-scores",
   "people",
 ] as const;
+
+const RUN_WINDOW_HOURS = 24;
 
 export type AdminAction = (typeof ADMIN_ACTIONS)[number];
 
@@ -77,7 +74,7 @@ async function catalogueStats(env: Bindings) {
          (SELECT count(*) FROM viewer_signals) AS signals,
          (SELECT count(*) FROM viewer_beliefs WHERE revoked_at IS NULL) AS beliefs`,
     ).first<CountRow>(),
-    readWorkingSetStats(env.DB, AVAILABILITY_MAX_AGE_DAYS),
+    readWorkingSetStats(env.DB),
   ]);
 
   return { ...row, workingSet: working.titles, availabilityFresh: working.fresh };
@@ -116,12 +113,22 @@ export async function readAdminOverview(env: Bindings) {
         startedAt: string;
       }>(),
       env.DB.prepare(
-        `SELECT job_type AS jobType, status, max(started_at) AS lastRunAt, count(*) AS runs
+        `SELECT job_type AS jobType, status, max(started_at) AS lastRunAt,
+                count(*) AS runs, count(DISTINCT subject_id) AS subjects
          FROM ingestion_runs
+         WHERE started_at > datetime('now', ?)
          GROUP BY job_type, status
          ORDER BY lastRunAt DESC
          LIMIT 20`,
-      ).all<{ jobType: string; status: string; lastRunAt: string; runs: number }>(),
+      )
+        .bind(`-${RUN_WINDOW_HOURS} hours`)
+        .all<{
+          jobType: string;
+          status: string;
+          lastRunAt: string;
+          runs: number;
+          subjects: number;
+        }>(),
       readBudgets(env),
       readCinemaCoverage(env.DB),
       env.DB.prepare(
@@ -137,6 +144,7 @@ export async function readAdminOverview(env: Bindings) {
     backfill,
     failures: failures.results,
     lastRuns: lastRuns.results,
+    runWindowHours: RUN_WINDOW_HOURS,
     budgets,
     cinemas,
     sections: sections.results,

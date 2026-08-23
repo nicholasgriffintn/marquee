@@ -19,6 +19,7 @@ export async function recordProviderState(
   db: D1Database,
   titleId: string,
   providers: ProviderAvailability[],
+  baseline: boolean,
 ) {
   const seen = new Map<string, string>();
 
@@ -39,8 +40,8 @@ export async function recordProviderState(
       [...seen.entries()].map(([providerId, kind]) =>
         db
           .prepare(
-            `INSERT INTO title_provider_state (title_id, provider_id, offer_kind)
-             VALUES (?1, ?2, ?3)
+            `INSERT INTO title_provider_state (title_id, provider_id, offer_kind, announced_at)
+             VALUES (?1, ?2, ?3, ${baseline ? "CURRENT_TIMESTAMP" : "NULL"})
              ON CONFLICT (title_id, provider_id) DO UPDATE SET
                seen_count = seen_count + 1,
                offer_kind = excluded.offer_kind,
@@ -64,7 +65,7 @@ export async function confirmedArrivals(db: D1Database, sinceHours = 72): Promis
           WHERE s.announced_at IS NULL
             AND s.offer_kind = 'streaming'
             AND s.seen_count >= ?1
-            AND julianday(s.first_seen_at) > julianday('now', ?2)
+            AND julianday(s.last_seen_at) > julianday('now', ?2)
           LIMIT 200`,
       )
       .bind(CONFIRMATIONS, `-${Math.max(1, sinceHours)} hours`)

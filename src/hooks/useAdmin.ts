@@ -40,7 +40,14 @@ export type AdminOverview = {
     error: string | null;
     startedAt: string;
   }[];
-  lastRuns: { jobType: string; status: string; lastRunAt: string; runs: number }[];
+  lastRuns: {
+    jobType: string;
+    status: string;
+    lastRunAt: string;
+    runs: number;
+    subjects: number;
+  }[];
+  runWindowHours: number;
   budgets: {
     source: string;
     callLimit: number;

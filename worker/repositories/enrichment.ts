@@ -15,19 +15,22 @@ export async function storeEnrichment<S extends Exclude<EnrichmentSource, "watch
   fields: FieldsFor<S>,
 ) {
   const title = (await readRawItems(env.DB, [titleId])).get(titleId);
+  const enrichedTitle = title ? ({ ...title, ...fields } satisfies MediaTitle) : null;
 
-  if (!title) {
-    return false;
+  if (!enrichedTitle) {
+    console.log(JSON.stringify({ event: "enrichment_title_unreadable", titleId, source }));
   }
 
-  const enrichedTitle = { ...title, ...fields } satisfies MediaTitle;
-
   await env.DB.batch([
-    env.DB.prepare(
-      `UPDATE catalog_titles
-       SET payload = ?, updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?`,
-    ).bind(JSON.stringify(enrichedTitle), titleId),
+    ...(enrichedTitle
+      ? [
+          env.DB.prepare(
+            `UPDATE catalog_titles
+             SET payload = ?, updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?`,
+          ).bind(JSON.stringify(enrichedTitle), titleId),
+        ]
+      : []),
     env.DB.prepare(
       `INSERT INTO title_enrichment (title_id, source, payload, miss, attempts)
        VALUES (?, ?, ?, 0, 0)
@@ -39,7 +42,7 @@ export async function storeEnrichment<S extends Exclude<EnrichmentSource, "watch
     ).bind(titleId, source, JSON.stringify(fields)),
   ]);
 
-  return true;
+  return Boolean(enrichedTitle);
 }
 
 export async function storeEnrichmentMiss(

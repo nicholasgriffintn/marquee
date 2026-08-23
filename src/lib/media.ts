@@ -63,6 +63,43 @@ export function mediaMeta(item: MediaTitle) {
   return values.filter(Boolean).join(" · ");
 }
 
+const RUN_STATUS: Record<string, string> = {
+  "Returning Series": "Returning",
+  "In Production": "In production",
+  Canceled: "Cancelled",
+  Cancelled: "Cancelled",
+  Ended: "Ended",
+  Planned: "Planned",
+  Pilot: "Pilot",
+};
+
+export function runStatusLabel(item: MediaTitle) {
+  if (item.mediaType !== "tv" || !item.status) {
+    return null;
+  }
+
+  return RUN_STATUS[item.status] ?? item.status;
+}
+
+export function detailMeta(item: MediaTitle) {
+  if (item.mediaType === "movie") {
+    return mediaMeta(item);
+  }
+
+  const values = [
+    item.year?.toString(),
+    item.certification,
+    runStatusLabel(item),
+    item.numberOfSeasons
+      ? `${item.numberOfSeasons} season${item.numberOfSeasons === 1 ? "" : "s"}`
+      : null,
+    item.episodeCount ? `${item.episodeCount} episodes` : null,
+    item.genres.slice(0, 2).join(" / ") || null,
+  ];
+
+  return values.filter(Boolean).join(" · ");
+}
+
 export function languageLabel(code: string | null | undefined) {
   if (!code || code === "en") {
     return null;

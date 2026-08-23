@@ -267,3 +267,5 @@ export function useEpisodeEntries(titleId: string, enabled: boolean) {
 
   return { entries: byKey, progress, message, save, mark, isTracking: active };
 }
+
+export type EpisodeTracker = ReturnType<typeof useEpisodeEntries>;

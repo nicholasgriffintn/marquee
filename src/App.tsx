@@ -577,6 +577,7 @@ export function App() {
             title={openDetails.title}
             canSave={isSignedIn}
             entries={profile.entries}
+            selectedProviderIds={selectedProviderIds}
             availabilityEnabled={catalog.providerSources.length > 0}
             onClose={closeDetails}
             onOpen={openTitle}
@@ -673,6 +674,7 @@ function TitleOverlay({
   onStatus,
   onUpdateDraft,
   onTracked,
+  selectedProviderIds,
 }: {
   titleId: string;
   title: MediaTitle | null;
@@ -691,6 +693,7 @@ function TitleOverlay({
   onStatus: (titleId: string, status: EntryStatus) => void;
   onUpdateDraft: (titleId: string, patch: Partial<ViewingEntry>) => void;
   onTracked: () => void;
+  selectedProviderIds: string[];
 }) {
   const isSaved = Boolean(entries[titleId]);
 
@@ -723,6 +726,7 @@ function TitleOverlay({
       onStatus={onStatus}
       onUpdateDraft={onUpdateDraft}
       onTracked={onTracked}
+      selectedProviderIds={selectedProviderIds}
     />
   );
 }

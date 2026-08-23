@@ -13,9 +13,14 @@ import {
 import { getWatchmodeAvailability } from "../clients/watchmode.ts";
 import { enqueue } from "../lib/queue.ts";
 import { isKnownTitle } from "../lib/validation.ts";
-import { enrichAvailability } from "../repositories/availability.ts";
-import { claimBudget, isRateLimited, pauseSource } from "../repositories/budgets.ts";
-import { readItems } from "../repositories/catalog-reader.ts";
+import { enrichAvailability, markAvailabilityChecked } from "../repositories/availability.ts";
+import {
+  claimBudget,
+  isRateLimited,
+  pauseSource,
+  readBudgetRoom,
+} from "../repositories/budgets.ts";
+import { readItems, readRawItems } from "../repositories/catalog-reader.ts";
 import { storeCatalog, storeItems } from "../repositories/catalog-writer.ts";
 import { readPartition, recordPageDrained } from "../repositories/discover.ts";
 import {
@@ -26,7 +31,11 @@ import {
   storePoster,
 } from "../repositories/enrichment.ts";
 import { storeProviders } from "../repositories/providers.ts";
-import { selectStaleWorkingSet } from "../repositories/working-set.ts";
+import {
+  countStaleWorkingSet,
+  DEMAND_MAX_AGE_DAYS,
+  selectStaleWorkingSet,
+} from "../repositories/working-set.ts";
 import { syncBuzz } from "../services/buzz.ts";
 import { syncCinemaDirectory, syncCinemaScreenings } from "../services/cinema-sync.ts";
 import { advanceDiscoverFrontier, measureDiscoverPartition } from "../services/discover.ts";
@@ -39,7 +48,6 @@ import { getProviderLedger } from "./provider-ledger.ts";
 
 type SavedTitleRow = { titleId: string };
 
-export const AVAILABILITY_MAX_AGE_DAYS = 7;
 const AVAILABILITY_PER_RUN = 600;
 const EMBED_JOB_SIZE = 25;
 const EMBED_PER_RUN = 2_000;
@@ -52,15 +60,16 @@ const RATE_LIMIT_PAUSE_MINUTES: Partial<Record<EnrichmentSource, number>> = {
 };
 
 const ENRICHERS = [
-  { source: "omdb", job: "enrich-ratings", maxAgeDays: 30, perRun: 900 },
-  { source: "simkl", job: "enrich-simkl", maxAgeDays: 90, perRun: 120 },
-  { source: "poster", job: "cache-poster", maxAgeDays: 365, perRun: 2_000 },
-  { source: "anilist", job: "enrich-anilist", maxAgeDays: 14, perRun: 400 },
+  { source: "omdb", job: "enrich-ratings", maxAgeDays: 30, perRun: 900, budgetGated: true },
+  { source: "simkl", job: "enrich-simkl", maxAgeDays: 90, perRun: 120, budgetGated: true },
+  { source: "poster", job: "cache-poster", maxAgeDays: 365, perRun: 2_000, budgetGated: false },
+  { source: "anilist", job: "enrich-anilist", maxAgeDays: 14, perRun: 400, budgetGated: true },
 ] as const satisfies readonly {
   source: EnrichmentSource;
   job: IngestionJob["type"];
   maxAgeDays: number;
   perRun: number;
+  budgetGated: boolean;
 }[];
 
 function enrichmentQueue(env: Bindings, source: EnrichmentSource) {
@@ -174,19 +183,41 @@ export async function queueEmbeddings(env: Bindings) {
   await enqueue(env.EMBEDDING_QUEUE, jobs);
 }
 
-export async function queueStaleAvailability(env: Bindings) {
-  const titleIds = (
-    await selectStaleWorkingSet(env.DB, AVAILABILITY_MAX_AGE_DAYS, AVAILABILITY_PER_RUN)
-  ).filter(isKnownTitle);
+export async function queueStaleAvailability(env: Bindings, alreadyQueued: string[] = []) {
+  const room = await readBudgetRoom(env, "justwatch");
 
-  console.log(JSON.stringify({ event: "availability_backfill_queued", count: titleIds.length }));
+  if (room <= 0) {
+    console.log(JSON.stringify({ event: "availability_backfill_skipped", source: "justwatch" }));
+
+    return 0;
+  }
+
+  const skip = new Set(alreadyQueued);
+  const [stale, titleIds] = await Promise.all([
+    countStaleWorkingSet(env.DB),
+    selectStaleWorkingSet(env.DB, Math.min(AVAILABILITY_PER_RUN, room) + skip.size),
+  ]);
+  const queued = titleIds
+    .filter((titleId) => !skip.has(titleId))
+    .filter(isKnownTitle)
+    .slice(0, Math.min(AVAILABILITY_PER_RUN, room));
+
+  console.log(
+    JSON.stringify({ event: "availability_backfill_queued", count: queued.length, stale }),
+  );
 
   await enqueue(
     env.AVAILABILITY_QUEUE,
-    titleIds.map((titleId): IngestionJob => ({ type: "enrich-availability", titleId })),
+    queued.map((titleId): IngestionJob => ({ type: "enrich-availability", titleId })),
   );
 
-  return titleIds.length;
+  return queued.length;
+}
+
+function enrichmentRoom(env: Bindings, enricher: (typeof ENRICHERS)[number]) {
+  return enricher.budgetGated
+    ? readBudgetRoom(env, enricher.source)
+    : Promise.resolve(enricher.perRun);
 }
 
 export async function queueEnrichment(env: Bindings) {
@@ -196,11 +227,20 @@ export async function queueEnrichment(env: Bindings) {
     }
 
     // oxlint-disable-next-line no-await-in-loop
+    const room = await enrichmentRoom(env, enricher);
+
+    if (room <= 0) {
+      console.log(JSON.stringify({ event: "enrichment_skipped", source: enricher.source }));
+
+      continue;
+    }
+
+    // oxlint-disable-next-line no-await-in-loop
     const titleIds = await sourceCandidates(
       env,
       enricher.source,
       enricher.maxAgeDays,
-      enricher.perRun,
+      Math.min(enricher.perRun, room),
     );
 
     console.log(
@@ -208,6 +248,7 @@ export async function queueEnrichment(env: Bindings) {
         event: "enrichment_queued",
         source: enricher.source,
         count: titleIds.length,
+        room,
       }),
     );
 
@@ -282,7 +323,7 @@ export async function queueAvailability(env: Bindings, titleIds: string[]) {
        AND enriched_at IS NOT NULL
        AND enriched_at > datetime('now', ?)`,
   )
-    .bind(JSON.stringify(unique), `-${AVAILABILITY_MAX_AGE_DAYS} days`)
+    .bind(JSON.stringify(unique), `-${DEMAND_MAX_AGE_DAYS} days`)
     .all<SavedTitleRow>();
   const skip = new Set(fresh.results.map((row) => row.titleId));
 
@@ -337,6 +378,9 @@ async function enrichTitleAvailability(env: Bindings, titleId: string) {
   const [title] = await readItems(env.DB, [titleId]);
 
   if (!title) {
+    console.log(JSON.stringify({ event: "availability_title_unreadable", titleId }));
+    await markAvailabilityChecked(env.DB, titleId);
+
     return;
   }
 
@@ -355,23 +399,20 @@ async function enrichTitleAvailability(env: Bindings, titleId: string) {
   );
 }
 
-async function imdbIdFor(env: Bindings, titleId: string) {
-  if (!env.OMDB_API_KEY) {
-    return null;
-  }
-
-  const [title] = await readItems(env.DB, [titleId]);
-
+function imdbIdOf(title: { imdbUrl?: string | null } | undefined) {
   return title?.imdbUrl ? (/\/(tt\d+)/u.exec(title.imdbUrl)?.[1] ?? null) : null;
 }
 
 async function enrichRatings(env: Bindings, titleId: string) {
-  const imdbId = await imdbIdFor(env, titleId);
+  if (!env.OMDB_API_KEY) {
+    return;
+  }
+
+  const [title] = await readItems(env.DB, [titleId]);
+  const imdbId = imdbIdOf(title);
 
   if (!imdbId) {
-    if (env.OMDB_API_KEY) {
-      await storeEnrichmentMiss(env, titleId, "omdb", "no-imdb-id");
-    }
+    await storeEnrichmentMiss(env, titleId, "omdb", title ? "no-imdb-id" : "no-title-row");
 
     return;
   }
@@ -394,10 +435,8 @@ async function enrichRatings(env: Bindings, titleId: string) {
     return;
   }
 
-  const [title] = await readItems(env.DB, [titleId]);
-
   await storeEnrichment(env, titleId, "omdb", {
-    ratings: { ...attempt.value, anilistScore: title?.ratings?.anilistScore ?? null },
+    ratings: { ...attempt.value, anilistScore: title.ratings?.anilistScore ?? null },
   });
 }
 
@@ -466,14 +505,7 @@ async function importDiaryRow(
     .run();
 }
 
-async function originPosterUrl(env: Bindings, titleId: string) {
-  const row = await env.DB.prepare(
-    `SELECT json_extract(payload, '$.posterUrl') AS posterUrl FROM catalog_titles WHERE id = ?`,
-  )
-    .bind(titleId)
-    .first<{ posterUrl: string | null }>();
-  const url = row?.posterUrl ?? null;
-
+function originPosterUrl(url: string | null | undefined) {
   return url?.startsWith("https://image.tmdb.org/")
     ? url.replace(/\/t\/p\/w\d+\//u, "/t/p/w780/")
     : null;
@@ -501,7 +533,8 @@ async function fetchImage(url: string) {
 }
 
 async function cachePoster(env: Bindings, titleId: string) {
-  const imdbId = await imdbIdFor(env, titleId);
+  const title = (await readRawItems(env.DB, [titleId])).get(titleId);
+  const imdbId = env.OMDB_API_KEY ? imdbIdOf(title) : null;
 
   if (imdbId && (await claimBudget(env, "poster"))) {
     const poster = await getOmdbPoster(env, imdbId);
@@ -513,7 +546,7 @@ async function cachePoster(env: Bindings, titleId: string) {
     }
   }
 
-  const tmdbPoster = await originPosterUrl(env, titleId);
+  const tmdbPoster = originPosterUrl(title?.posterUrl);
 
   if (!tmdbPoster) {
     await storeEnrichmentMiss(env, titleId, "poster", "no-poster-source");

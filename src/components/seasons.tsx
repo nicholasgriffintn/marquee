@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { MediaTitle } from "../domain/catalog";
 import {
@@ -14,11 +14,9 @@ import {
   type SeasonDetail,
   type SeasonSummary,
 } from "../domain/seasons";
-import { useEpisodeEntries, useSeasons, type EpisodePatch } from "../hooks/useSeasons";
+import { useSeasons, type EpisodePatch, type EpisodeTracker } from "../hooks/useSeasons";
 import { artwork, artworkSrcSet } from "../lib/media";
-import type { EntryStatus, ViewingEntry } from "../types";
-import { ShelfForm } from "./ShelfForm";
-import { ArrowIcon } from "./ui";
+import { ArrowIcon, ChevronIcon } from "./ui";
 
 const STARS = [1, 2, 3, 4, 5];
 
@@ -104,12 +102,16 @@ function EpisodeRow({
   episode,
   entry,
   canTrack,
+  open,
+  onToggle,
   onSave,
   onMarkThrough,
 }: {
   episode: Episode;
   entry: EpisodeEntry | null;
   canTrack: boolean;
+  open: boolean;
+  onToggle: () => void;
   onSave: (patch: EpisodePatch) => void;
   onMarkThrough: (episodeNumber: number) => void;
 }) {
@@ -121,6 +123,9 @@ function EpisodeRow({
     episode.tmdbScore ? `TMDB ${episode.tmdbScore.toFixed(1)}` : "",
   ].filter(Boolean);
   const patch: EpisodePatch = { season: episode.seasonNumber, episode: episode.episodeNumber };
+  const label = episodeLabel(episode.seasonNumber, episode.episodeNumber);
+  const marked = Boolean(entry?.rating || entry?.notes.trim());
+  const panelId = `episode-${episode.seasonNumber}-${episode.episodeNumber}`;
 
   return (
     <li
@@ -131,55 +136,71 @@ function EpisodeRow({
           type="button"
           className="episode-tick"
           aria-pressed={watched}
-          aria-label={`${watched ? "Unmark" : "Mark"} ${episodeLabel(episode.seasonNumber, episode.episodeNumber)} as watched`}
+          aria-label={`${watched ? "Unmark" : "Mark"} ${label} as watched`}
           onClick={() => onSave({ ...patch, watched: !watched })}
         >
           {watched ? "✓" : ""}
         </button>
       )}
       <div className="episode-body">
-        <div className="episode-head">
-          <strong>
-            <em>{episodeLabel(episode.seasonNumber, episode.episodeNumber)}</em> {episode.name}
-          </strong>
-          <small>{meta.join(" · ")}</small>
-        </div>
-        {episode.stillUrl && (
-          <img
-            className="episode-still"
-            src={artwork(episode.stillUrl, 320, "backdrop") ?? episode.stillUrl}
-            srcSet={artworkSrcSet(episode.stillUrl, 320, "backdrop")}
-            alt=""
-            loading="lazy"
-            decoding="async"
-          />
-        )}
-        {episode.overview && <p className="episode-overview">{episode.overview}</p>}
-        {canTrack && (
-          <div className="episode-actions">
-            <StarRow
-              label={`Rate ${episode.name}`}
-              rating={entry?.rating ?? null}
-              onRate={(rating) => onSave({ ...patch, rating, watched: rating ? true : watched })}
-            />
-            {aired && !watched && (
-              <button
-                type="button"
-                className="episode-through"
-                onClick={() => onMarkThrough(episode.episodeNumber)}
-              >
-                I am up to here
-              </button>
+        <button
+          type="button"
+          className="episode-head"
+          aria-expanded={open}
+          aria-controls={panelId}
+          onClick={onToggle}
+        >
+          <span>
+            <strong>
+              <em>{label}</em> {episode.name}
+            </strong>
+            <small>{meta.join(" · ")}</small>
+          </span>
+          {marked && !open && <i className="episode-marked" aria-hidden="true" />}
+          <ChevronIcon />
+        </button>
+        {open && (
+          <div className="episode-detail" id={panelId}>
+            {episode.stillUrl && (
+              <img
+                className="episode-still"
+                src={artwork(episode.stillUrl, 320, "backdrop") ?? episode.stillUrl}
+                srcSet={artworkSrcSet(episode.stillUrl, 320, "backdrop")}
+                alt=""
+                loading="lazy"
+                decoding="async"
+              />
+            )}
+            {episode.overview && <p className="episode-overview">{episode.overview}</p>}
+            {canTrack && (
+              <div className="episode-actions">
+                <StarRow
+                  label={`Rate ${episode.name}`}
+                  rating={entry?.rating ?? null}
+                  onRate={(rating) =>
+                    onSave({ ...patch, rating, watched: rating ? true : watched })
+                  }
+                />
+                {aired && !watched && (
+                  <button
+                    type="button"
+                    className="episode-through"
+                    onClick={() => onMarkThrough(episode.episodeNumber)}
+                  >
+                    I am up to here
+                  </button>
+                )}
+              </div>
+            )}
+            {canTrack && (
+              <NoteEditor
+                label={`Notes on ${episode.name}`}
+                notes={entry?.notes ?? ""}
+                placeholder="What did you make of it?"
+                onSave={(notes) => onSave({ ...patch, notes })}
+              />
             )}
           </div>
-        )}
-        {canTrack && (
-          <NoteEditor
-            label={`Notes on ${episode.name}`}
-            notes={entry?.notes ?? ""}
-            placeholder="What did you make of it?"
-            onSave={(notes) => onSave({ ...patch, notes })}
-          />
         )}
       </div>
     </li>
@@ -250,25 +271,19 @@ function SeasonHeader({
 export function SeasonsBlock({
   item,
   canTrack,
-  entry,
+  shelved,
+  tracker,
+  jumpTo,
   onTracked,
-  onAdd,
-  onRemove,
-  onSaveEntry,
-  onStatus,
-  onUpdateDraft,
 }: {
   item: MediaTitle;
   canTrack: boolean;
-  entry?: ViewingEntry;
+  shelved: boolean;
+  tracker: EpisodeTracker;
+  jumpTo: { season: number; nonce: number } | null;
   onTracked?: () => void;
-  onAdd: (item: MediaTitle) => void;
-  onRemove: (titleId: string) => void;
-  onSaveEntry: (entry: ViewingEntry) => void;
-  onStatus: (titleId: string, status: EntryStatus) => void;
-  onUpdateDraft: (titleId: string, patch: Partial<ViewingEntry>) => void;
 }) {
-  const tracker = useEpisodeEntries(item.id, canTrack);
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
   const save = (patch: EpisodePatch) =>
     void tracker.save(patch).then((saved) => saved && onTracked?.());
   const mark = (season: number, watched: boolean, through: number | null = null) =>
@@ -279,26 +294,19 @@ export function SeasonsBlock({
     tracker.progress,
   );
   const summary = seasons.find((candidate) => candidate.seasonNumber === selected) ?? null;
-  const shelf =
-    canTrack && entry ? (
-      <ShelfForm
-        entry={entry}
-        title={item.title}
-        isSeries
-        onRemove={onRemove}
-        onSave={onSaveEntry}
-        onStatus={onStatus}
-        onUpdateDraft={onUpdateDraft}
-      />
-    ) : null;
+  const nonce = jumpTo?.nonce ?? null;
+  const jumpSeason = jumpTo?.season ?? null;
+
+  useEffect(() => {
+    if (nonce !== null && jumpSeason !== null) {
+      selectSeason(jumpSeason);
+    }
+  }, [nonce, jumpSeason, selectSeason]);
+
   const invite =
-    canTrack && !entry ? (
+    canTrack && !shelved ? (
       <p className="seasons-invite">
-        Tick an episode, rate one or keep a note and the show goes on your shelf by itself —{" "}
-        <button type="button" onClick={() => onAdd(item)}>
-          or put it on the watchlist now
-        </button>
-        .
+        Tick an episode, rate one or keep a note and the show goes on your shelf by itself.
       </p>
     ) : null;
 
@@ -313,9 +321,11 @@ export function SeasonsBlock({
   }
 
   if (seasons.length === 0) {
-    const alone = shelf ?? invite;
-
-    return alone && <section className="seasons-block">{alone}</section>;
+    return (
+      <section className="seasons-block">
+        <p className="seasons-empty">No episode guide for this one yet.</p>
+      </section>
+    );
   }
 
   const progress = tracker.progress;
@@ -399,16 +409,36 @@ export function SeasonsBlock({
 
       {season && (
         <ol className="episode-list">
-          {season.episodes.map((episode) => (
-            <EpisodeRow
-              key={`${episode.seasonNumber}-${episode.episodeNumber}`}
-              episode={episode}
-              entry={episodeEntryFor(tracker.entries, episode.seasonNumber, episode.episodeNumber)}
-              canTrack={canTrack}
-              onSave={save}
-              onMarkThrough={(episodeNumber) => mark(episode.seasonNumber, true, episodeNumber)}
-            />
-          ))}
+          {season.episodes.map((episode) => {
+            const key = `${episode.seasonNumber}-${episode.episodeNumber}`;
+
+            return (
+              <EpisodeRow
+                key={key}
+                episode={episode}
+                entry={episodeEntryFor(
+                  tracker.entries,
+                  episode.seasonNumber,
+                  episode.episodeNumber,
+                )}
+                canTrack={canTrack}
+                open={expanded.has(key)}
+                onToggle={() =>
+                  setExpanded((current) => {
+                    const next = new Set(current);
+
+                    if (!next.delete(key)) {
+                      next.add(key);
+                    }
+
+                    return next;
+                  })
+                }
+                onSave={save}
+                onMarkThrough={(episodeNumber) => mark(episode.seasonNumber, true, episodeNumber)}
+              />
+            );
+          })}
         </ol>
       )}
 
@@ -417,8 +447,6 @@ export function SeasonsBlock({
           Sign in and you can tick these off, rate them and keep notes against each one.
         </p>
       )}
-
-      {shelf}
     </section>
   );
 }

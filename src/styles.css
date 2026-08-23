@@ -2337,6 +2337,73 @@ h2 em {
   color: #696b62;
   font-size: 11px;
 }
+.watch-grid {
+  display: grid;
+  gap: 8px;
+}
+.watch-option {
+  align-items: center;
+  background: none;
+  border: 1px solid var(--paper-line);
+  color: var(--ink);
+  display: grid;
+  font-size: 12px;
+  font-weight: 700;
+  gap: 10px;
+  grid-template-columns: 22px 1fr 16px;
+  min-width: 0;
+  padding: 10px 12px;
+  transition:
+    border-color 0.16s ease,
+    color 0.16s ease;
+}
+.watch-option:hover {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+.watch-option > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.watch-option > svg {
+  height: 14px;
+  width: 14px;
+}
+.watch-more {
+  align-items: center;
+  background: none;
+  border: 0;
+  color: var(--blue);
+  display: flex;
+  font: 800 10px var(--mono);
+  gap: 7px;
+  letter-spacing: 0.09em;
+  padding: 4px 0;
+  text-transform: uppercase;
+}
+.watch-more > svg {
+  height: 14px;
+  transform: rotate(90deg);
+  transition: transform 0.16s ease;
+  width: 14px;
+}
+.watch-more[aria-expanded="true"] > svg {
+  transform: rotate(-90deg);
+}
+.watch-more:hover {
+  color: var(--ink);
+}
+.watch-paid {
+  display: grid;
+  gap: 8px;
+}
+@media (min-width: 760px) {
+  .watch-grid.expanded {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 .catalogue-error,
 .provider-error {
   background: #39201c;
@@ -6999,20 +7066,71 @@ a.showtime:hover small {
   font-style: italic;
   margin: 0;
 }
+.detail-tabs {
+  border-bottom: 1px solid var(--paper-line);
+  display: flex;
+  gap: 26px;
+  margin: 26px 0 0;
+}
+.detail-tab {
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: #6f7268;
+  display: flex;
+  font: 800 10px var(--mono);
+  gap: 7px;
+  letter-spacing: 0.12em;
+  margin-bottom: -1px;
+  padding: 0 0 11px;
+  text-transform: uppercase;
+}
+.detail-tab:hover {
+  color: var(--ink);
+}
+.detail-tab.selected {
+  border-bottom-color: var(--blue);
+  color: var(--blue);
+}
+.detail-tab em {
+  color: #8b8f85;
+  font-style: normal;
+}
+.detail-tab-panel[hidden] {
+  display: none;
+}
+.detail-tab-panel > .seasons-block {
+  border-top: 0;
+  margin-top: 18px;
+  padding-top: 0;
+}
+.detail-continue {
+  align-items: center;
+  background: var(--ink);
+  border: 0;
+  color: var(--white);
+  display: flex;
+  font: 800 11px var(--mono);
+  justify-content: space-between;
+  letter-spacing: 0.1em;
+  margin-top: 8px;
+  padding: 14px 16px;
+  text-transform: uppercase;
+  transition:
+    transform 0.16s ease,
+    box-shadow 0.16s ease;
+  width: 100%;
+}
+.detail-continue:hover {
+  box-shadow: 5px 5px 0 var(--acid);
+  transform: translate(-2px, -2px);
+}
+
 .seasons-invite {
   color: #4d5148;
   font-size: 13px;
   line-height: 1.5;
   margin: 0;
-}
-.seasons-invite button {
-  background: none;
-  border: 0;
-  border-bottom: 1px solid var(--blue);
-  color: var(--blue);
-  font: inherit;
-  font-weight: 700;
-  padding: 0;
 }
 .season-tabs {
   display: flex;
@@ -7149,9 +7267,49 @@ a.showtime:hover small {
   min-width: 0;
 }
 .episode-head {
+  align-items: center;
+  background: none;
+  border: 0;
+  color: inherit;
   display: flex;
+  gap: 10px;
+  padding: 0;
+  text-align: left;
+  width: 100%;
+}
+.episode-head > span {
+  display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 3px;
+  min-width: 0;
+}
+.episode-head > svg {
+  color: #8b8f85;
+  flex: 0 0 auto;
+  height: 15px;
+  transform: rotate(90deg);
+  transition: transform 0.16s ease;
+  width: 15px;
+}
+.episode-head[aria-expanded="true"] > svg {
+  transform: rotate(-90deg);
+}
+.episode-head:hover strong {
+  color: var(--blue);
+}
+.episode-marked {
+  background: var(--acid);
+  border-radius: 50%;
+  flex: 0 0 auto;
+  height: 7px;
+  width: 7px;
+}
+.episode-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
 }
 .episode-head strong {
   font: 600 15px var(--sans);
