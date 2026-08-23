@@ -450,7 +450,7 @@ svg {
   display: flex;
   flex-direction: column;
   gap: 15px;
-  margin-top: 26px;
+  margin: 26px 0 34px;
   padding-top: 24px;
 }
 .shelf-form-label {
@@ -458,6 +458,12 @@ svg {
   font: 800 9px var(--mono);
   letter-spacing: 0.12em;
   text-transform: uppercase;
+}
+.shelf-form-scope {
+  color: #6f7268;
+  font-size: 12px;
+  font-style: italic;
+  margin: -6px 0 0;
 }
 .shelf-form textarea {
   background: var(--white);

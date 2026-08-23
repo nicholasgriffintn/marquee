@@ -579,6 +579,7 @@ export function App() {
             onRemove={(id) => void profile.removeEntry(id)}
             onStatus={profile.setStatus}
             onUpdateDraft={profile.updateDraft}
+            onTracked={profile.refresh}
           />
         </ErrorBoundary>
       )}
@@ -665,6 +666,7 @@ function TitleOverlay({
   onRemove,
   onStatus,
   onUpdateDraft,
+  onTracked,
 }: {
   titleId: string;
   title: MediaTitle | null;
@@ -682,6 +684,7 @@ function TitleOverlay({
   onRemove: (titleId: string) => void;
   onStatus: (titleId: string, status: EntryStatus) => void;
   onUpdateDraft: (titleId: string, patch: Partial<ViewingEntry>) => void;
+  onTracked: () => void;
 }) {
   const isSaved = Boolean(entries[titleId]);
 
@@ -713,6 +716,7 @@ function TitleOverlay({
       onRemove={onRemove}
       onStatus={onStatus}
       onUpdateDraft={onUpdateDraft}
+      onTracked={onTracked}
     />
   );
 }

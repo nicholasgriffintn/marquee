@@ -369,6 +369,7 @@ export function DetailPanel({
   usherSlot,
   onRemove,
   onStatus,
+  onTracked,
   onUpdateDraft,
 }: {
   item: MediaTitle;
@@ -376,6 +377,7 @@ export function DetailPanel({
   usherSlot?: ReactNode;
   onRemove: (titleId: string) => void;
   onStatus: (titleId: string, status: EntryStatus) => void;
+  onTracked?: () => void;
   onUpdateDraft: (titleId: string, patch: Partial<ViewingEntry>) => void;
   availabilityEnabled: boolean;
   canSave: boolean;
@@ -566,6 +568,19 @@ export function DetailPanel({
               onLeave={leaveVia}
             />
           </ErrorBoundary>
+          <ErrorBoundary label="The trailer">
+            <TrailerBlock item={item} />
+          </ErrorBoundary>
+          <p className="detail-synopsis">{item.overview || "No synopsis available."}</p>
+          {item.mediaType === "tv" && (
+            <ErrorBoundary label="The episode guide">
+              <SeasonsBlock
+                item={item}
+                canTrack={canSave}
+                onTracked={entry ? undefined : onTracked}
+              />
+            </ErrorBoundary>
+          )}
           {canSave && !entry && (
             <button type="button" className="save-button" onClick={() => onSave(item)}>
               <PlusIcon /> Save to my shelf
@@ -576,6 +591,7 @@ export function DetailPanel({
               <ShelfForm
                 entry={entry}
                 title={item.title}
+                isSeries={item.mediaType === "tv"}
                 onRemove={onRemove}
                 onSave={onSaveEntry}
                 onStatus={onStatus}
@@ -583,16 +599,7 @@ export function DetailPanel({
               />
             </ErrorBoundary>
           )}
-          {item.mediaType === "tv" && (
-            <ErrorBoundary label="The episode guide">
-              <SeasonsBlock item={item} canTrack={canSave} />
-            </ErrorBoundary>
-          )}
           {usherSlot}
-          <ErrorBoundary label="The trailer">
-            <TrailerBlock item={item} />
-          </ErrorBoundary>
-          <p className="detail-synopsis">{item.overview || "No synopsis available."}</p>
           <div className="score-row">
             {consensus && consensus.sources.length > 1 && (
               <div>

@@ -10,6 +10,7 @@ const STATUSES: { value: EntryStatus; label: string }[] = [
 export function ShelfForm({
   entry,
   title,
+  isSeries = false,
   onRemove,
   onSave,
   onStatus,
@@ -17,6 +18,7 @@ export function ShelfForm({
 }: {
   entry: ViewingEntry;
   title: string;
+  isSeries?: boolean;
   onRemove: (titleId: string) => void;
   onSave: (entry: ViewingEntry) => void;
   onStatus: (titleId: string, status: EntryStatus) => void;
@@ -25,6 +27,11 @@ export function ShelfForm({
   return (
     <div className="shelf-form">
       <span className="shelf-form-label">On your shelf</span>
+      {isSeries && (
+        <p className="shelf-form-scope">
+          The whole show. Individual episodes and runs keep their own marks above.
+        </p>
+      )}
 
       <label className="status-input">
         Watch status

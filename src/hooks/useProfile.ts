@@ -23,6 +23,7 @@ export function useProfile(isSignedIn: boolean) {
   const [entries, setEntries] = useState<Record<string, ViewingEntry>>({});
   const [message, setMessage] = useState("");
   const [isLoaded, setIsLoaded] = useState(false);
+  const [version, setVersion] = useState(0);
   const messageTimer = useRef(0);
   const announce = useCallback((text: string, holdMs = SUCCESS_HOLD_MS) => {
     window.clearTimeout(messageTimer.current);
@@ -63,7 +64,9 @@ export function useProfile(isSignedIn: boolean) {
     void loadProfile();
 
     return () => controller.abort();
-  }, [isSignedIn]);
+  }, [isSignedIn, version]);
+
+  const refresh = useCallback(() => setVersion((current) => current + 1), []);
 
   async function saveEntry(entry: ViewingEntry) {
     const previous = entries[entry.titleId];
@@ -142,6 +145,7 @@ export function useProfile(isSignedIn: boolean) {
     savedIds: isSignedIn ? savedIds : NO_IDS,
     message: isSignedIn ? message : "",
     isLoaded: isSignedIn ? isLoaded : true,
+    refresh,
     removeEntry,
     saveEntry,
     setStatus,

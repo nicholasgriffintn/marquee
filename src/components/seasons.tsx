@@ -245,8 +245,20 @@ function SeasonHeader({
   );
 }
 
-export function SeasonsBlock({ item, canTrack }: { item: MediaTitle; canTrack: boolean }) {
+export function SeasonsBlock({
+  item,
+  canTrack,
+  onTracked,
+}: {
+  item: MediaTitle;
+  canTrack: boolean;
+  onTracked?: () => void;
+}) {
   const tracker = useEpisodeEntries(item.id, canTrack);
+  const save = (patch: EpisodePatch) =>
+    void tracker.save(patch).then((saved) => saved && onTracked?.());
+  const mark = (season: number, watched: boolean, through: number | null = null) =>
+    void tracker.mark(season, watched, through).then((marked) => marked && onTracked?.());
   const { seasons, season, selected, selectSeason, isLoading, isLoadingSeason, error } = useSeasons(
     item,
     true,
@@ -327,8 +339,8 @@ export function SeasonsBlock({ item, canTrack }: { item: MediaTitle; canTrack: b
           aired={aired}
           entry={seasonEntryFor(tracker.entries, summary.seasonNumber)}
           canTrack={canTrack}
-          onSave={(patch) => void tracker.save(patch)}
-          onMarkSeason={(watched) => void tracker.mark(summary.seasonNumber, watched)}
+          onSave={save}
+          onMarkSeason={(watched) => mark(summary.seasonNumber, watched)}
         />
       )}
 
@@ -354,10 +366,8 @@ export function SeasonsBlock({ item, canTrack }: { item: MediaTitle; canTrack: b
               episode={episode}
               entry={episodeEntryFor(tracker.entries, episode.seasonNumber, episode.episodeNumber)}
               canTrack={canTrack}
-              onSave={(patch) => void tracker.save(patch)}
-              onMarkThrough={(episodeNumber) =>
-                void tracker.mark(episode.seasonNumber, true, episodeNumber)
-              }
+              onSave={save}
+              onMarkThrough={(episodeNumber) => mark(episode.seasonNumber, true, episodeNumber)}
             />
           ))}
         </ol>
