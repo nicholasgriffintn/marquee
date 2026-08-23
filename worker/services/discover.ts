@@ -22,7 +22,7 @@ const EPOCH_YEAR: Record<MediaType, number> = { movie: 1874, tv: 1928 };
 const HORIZON_YEARS = 3;
 const SEED_SPAN_YEARS = 10;
 
-const MEASURE_PER_SWEEP = 24;
+const MEASURE_PER_SWEEP = 80;
 const REOPEN_PER_SWEEP = 12;
 const DRAIN_PARTITIONS_PER_SWEEP = 12;
 const PAGES_PER_PARTITION_PER_SWEEP = 60;

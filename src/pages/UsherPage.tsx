@@ -198,7 +198,7 @@ export function UsherPage() {
           </h2>
           <div className="reel-action reel-action-wide">
             <p>
-              There is no building. There is a catalogue of forty thousand things, a viewer who
+              There is no building. There is a catalogue of very nearly everything, a viewer who
               cannot decide, and a man with a torch who has seen all of it and has opinions about
               most of it.
             </p>

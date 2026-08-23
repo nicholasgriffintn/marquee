@@ -78,12 +78,20 @@ type BackfillRow = {
 function backfillSummary(rows: BackfillRow[]) {
   const byMedia = new Map<
     string,
-    { mapped: number; splitting: number; titles: number; pagesDone: number; totalPages: number }
+    {
+      measured: number;
+      awaiting: number;
+      splitting: number;
+      titles: number;
+      pagesDone: number;
+      totalPages: number;
+    }
   >();
 
   for (const row of rows) {
     const entry = byMedia.get(row.mediaType) ?? {
-      mapped: 0,
+      measured: 0,
+      awaiting: 0,
       splitting: 0,
       titles: 0,
       pagesDone: 0,
@@ -92,8 +100,10 @@ function backfillSummary(rows: BackfillRow[]) {
 
     if (row.status === "split") {
       entry.splitting += row.partitions;
+    } else if (row.status === "pending" || row.status === "measuring") {
+      entry.awaiting += row.partitions;
     } else {
-      entry.mapped += row.partitions;
+      entry.measured += row.partitions;
       entry.titles += row.titles ?? 0;
       entry.pagesDone += row.pagesDone ?? 0;
       entry.totalPages += row.totalPages ?? 0;
@@ -139,7 +149,9 @@ export function AdminPage({ user }: { user: User }) {
         <UsherMark face="thinking" crop="head" />
         <p>
           <strong>The projection box.</strong> He does the reels, the sweeps and the long nights of
-          re-hydrating forty thousand records. I do the door. We have not spoken since 1988.
+          re-hydrating{" "}
+          {overview ? `${(overview.catalogue.titles ?? 0).toLocaleString()} records` : "the lot"}. I
+          do the door. We have not spoken since 1988.
         </p>
       </aside>
 
@@ -186,11 +198,15 @@ export function AdminPage({ user }: { user: User }) {
                 <strong>{mediaType === "movie" ? "Films" : "Series"}</strong>
                 <small>
                   {row.pagesDone.toLocaleString()} / {row.totalPages.toLocaleString()} pages ·{" "}
-                  {row.mapped.toLocaleString()} windows
+                  {row.measured.toLocaleString()} of{" "}
+                  {(row.measured + row.awaiting).toLocaleString()} windows mapped
                   {row.splitting > 0 ? ` · ${row.splitting.toLocaleString()} split` : ""}
                 </small>
                 <span className="spacer" />
-                <code>{row.titles.toLocaleString()} titles in range</code>
+                <code>
+                  {row.titles.toLocaleString()} titles in range
+                  {row.awaiting > 0 ? " so far" : ""}
+                </code>
                 <div className="budget-bar" aria-hidden="true">
                   <i
                     style={{
