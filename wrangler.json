@@ -140,7 +140,8 @@
       "OMDB_API_KEY",
       "SIMKL_CLIENT_ID",
       "TRAKT_CLIENT_ID",
-      "TRAKT_CLIENT_SECRET"
+      "TRAKT_CLIENT_SECRET",
+      "EUROPEANA_API_KEY"
     ]
   },
   "observability": {

@@ -5,7 +5,6 @@ const SEARCH_ENDPOINT = "https://api.europeana.eu/record/v2/search.json";
 const RECORD_ORIGIN = "https://www.europeana.eu/en/item";
 const TIMEOUT_MS = 25_000;
 const PAGE_SIZE = 100;
-const SHORT_MAX_SECONDS = 45 * 60;
 const PLAYABLE = /\.(mp4|m4v|webm|ogv|mov)(\?|$)/iu;
 
 export const EUROPEANA_COUNTRIES = [
@@ -99,6 +98,8 @@ function mimeFor(url: string) {
   return /\.ogv(\?|$)/iu.test(url) ? "video/ogg" : "video/mp4";
 }
 
+const MAX_SOURCE_ID = 120;
+
 function recordId(value: string) {
   return value.replace(/^\//u, "").replaceAll("/", "_");
 }
@@ -106,7 +107,6 @@ function recordId(value: string) {
 export async function searchEuropeana(apiKey: string, country: string, page: number) {
   const url = new URL(SEARCH_ENDPOINT);
 
-  url.searchParams.set("wskey", apiKey);
   url.searchParams.set("query", "*");
   url.searchParams.set("reusability", "open");
   url.searchParams.set("profile", "rich");
@@ -117,7 +117,7 @@ export async function searchEuropeana(apiKey: string, country: string, page: num
   url.searchParams.append("qf", `COUNTRY:"${country}"`);
 
   const response = await fetch(url, {
-    headers: { accept: "application/json" },
+    headers: { accept: "application/json", "x-api-key": apiKey },
     signal: AbortSignal.timeout(TIMEOUT_MS),
     cf: { cacheEverything: true, cacheTtl: 3_600 },
   });
@@ -145,7 +145,7 @@ export async function searchEuropeana(apiKey: string, country: string, page: num
     const rights = firstString(item.rights);
     const basis = basisFor(rights);
 
-    if (!id || !title || !stream || !basis) {
+    if (!id || !title || !stream || !basis || recordId(id).length > MAX_SOURCE_ID) {
       return [];
     }
 
@@ -174,12 +174,4 @@ export async function searchEuropeana(apiKey: string, country: string, page: num
   });
 
   return { candidates, total };
-}
-
-export function kindForDuration(seconds: number | null): RevivalKind {
-  if (seconds === null) {
-    return "ephemeral";
-  }
-
-  return seconds <= SHORT_MAX_SECONDS ? "short" : "feature";
 }

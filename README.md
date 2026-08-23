@@ -187,10 +187,17 @@ partial setup runs; it just knows less.
 | `OMDB_API_KEY`                         | Awards, box office, search beyond the catalogue    |
 | `SIMKL_CLIENT_ID`                      | Anime tags and scores                              |
 | `TRAKT_CLIENT_ID` / `_SECRET`          | Importing a viewer's history                       |
+| `EUROPEANA_API_KEY`                    | British and European prints for the revival house  |
 | `CLOUDFLARE_ACCOUNT_ID` / `_API_TOKEN` | AI Gateway                                         |
 
-TMDB is the one you cannot really run without. Air dates come from TVmaze and the trending rail
-from Wikipedia pageviews; neither needs a key.
+TMDB is the one you cannot really run without. Air dates come from TVmaze, the trending rail from
+Wikipedia pageviews, and the revival house's UK term checks from Wikidata; none of those needs a
+key. A [free Europeana key](https://pro.europeana.eu/page/get-api) is what turns on the British and
+European side of the revival house — without it the other two sources still run.
+
+A name only reaches `env` if it is listed under `secrets.required` in `wrangler.json`. Defining that
+list switches off Wrangler's inference from `.dev.vars`, so anything you add to `.dev.vars` and not
+to the list is silently absent at runtime. Add the name in both places.
 
 ## Running it locally
 
