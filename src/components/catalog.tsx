@@ -31,6 +31,7 @@ import type { EntryStatus, ViewingEntry } from "../types";
 import { ArtPlaceholder } from "./ArtPlaceholder";
 import { ShowingsBlock } from "./cinema/ShowingsBlock";
 import { ErrorBoundary } from "./ErrorBoundary";
+import { RevivalBlock } from "./revival/RevivalBlock";
 import { ShelfForm } from "./ShelfForm";
 import { TrailerBlock } from "./TrailerBlock";
 import { ArrowIcon, ChevronIcon, PlusIcon, Poster, ProviderBadge } from "./ui";
@@ -557,6 +558,9 @@ export function DetailPanel({
               <p className="availability-empty">No streaming options found.</p>
             )}
           </div>
+          <ErrorBoundary label="The revival house">
+            <RevivalBlock item={item} />
+          </ErrorBoundary>
           <ErrorBoundary label="Local showings">
             <ShowingsBlock
               listings={showings.listings}

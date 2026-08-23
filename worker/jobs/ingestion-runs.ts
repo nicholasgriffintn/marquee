@@ -40,6 +40,14 @@ export function jobSubject(job: IngestionJob) {
     return `${job.source}:${job.siteId}`;
   }
 
+  if (job.type === "sync-revival-source") {
+    return job.collection ? `${job.source}:${job.collection}` : job.source;
+  }
+
+  if (job.type === "mirror-revival-work") {
+    return job.workId;
+  }
+
   return null;
 }
 

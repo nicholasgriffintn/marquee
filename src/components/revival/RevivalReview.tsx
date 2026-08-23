@@ -1,0 +1,182 @@
+import { useCallback, useEffect, useState } from "react";
+
+import {
+  RIGHTS_LABELS,
+  SOURCE_LABELS,
+  workMeta,
+  type RevivalStatus,
+  type RevivalWork,
+} from "../../domain/revival";
+import { jsonRequest, requestJson } from "../../lib/api";
+
+type ReviewWork = RevivalWork & {
+  status: RevivalStatus;
+  mirrorState: string;
+  streamUrl: string;
+  streamBytes: number | null;
+  discoveredAt: string;
+  mirrorError: string | null;
+};
+
+type ReviewResponse = {
+  status: RevivalStatus;
+  works: ReviewWork[];
+  stats: Record<string, number>;
+};
+
+const TABS: { id: RevivalStatus; label: string }[] = [
+  { id: "candidate", label: "Waiting" },
+  { id: "approved", label: "Approved" },
+  { id: "rejected", label: "Turned away" },
+];
+
+const STAT_LABELS: { key: string; label: string }[] = [
+  { key: "approved", label: "approved" },
+  { key: "candidates", label: "waiting" },
+  { key: "rejected", label: "turned away" },
+  { key: "mirrored", label: "mirrored" },
+  { key: "copying", label: "copying" },
+  { key: "mirrorFailed", label: "mirror failed" },
+  { key: "matched", label: "matched to a title" },
+];
+
+function sizeLabel(bytes: number | null) {
+  if (!bytes) {
+    return null;
+  }
+
+  return bytes >= 1_073_741_824
+    ? `${(bytes / 1_073_741_824).toFixed(1)} GB`
+    : `${Math.round(bytes / 1_048_576)} MB`;
+}
+
+export function RevivalReview() {
+  const [status, setStatus] = useState<RevivalStatus>("candidate");
+  const [revision, setRevision] = useState(0);
+  const [data, setData] = useState<ReviewResponse | null>(null);
+  const [error, setError] = useState("");
+  const [pending, setPending] = useState("");
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    requestJson<ReviewResponse>(`/api/admin/revival?status=${status}`, {
+      signal: controller.signal,
+    })
+      .then((response) => {
+        setData(response);
+        setError("");
+      })
+      .catch((caught: unknown) => {
+        if (!controller.signal.aborted) {
+          setError(caught instanceof Error ? caught.message : "Could not read the review queue.");
+        }
+      });
+
+    return () => controller.abort();
+  }, [revision, status]);
+
+  const decide = useCallback(async (workId: string, decision: "approve" | "reject" | "mirror") => {
+    setPending(workId);
+
+    try {
+      await requestJson(
+        `/api/admin/revival/${encodeURIComponent(workId)}/${decision}`,
+        jsonRequest("POST"),
+      );
+      setRevision((current) => current + 1);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "That decision did not stick.");
+    } finally {
+      setPending("");
+    }
+  }, []);
+
+  return (
+    <section className="panel-block" aria-labelledby="admin-revival-title">
+      <h2 id="admin-revival-title">The vault</h2>
+      <p className="admin-note">
+        Nothing plays until it is approved. A print auto-clears only when the source asserts public
+        domain and the work predates the US term, so the queue below is where the judgement calls
+        land.
+      </p>
+
+      {data && (
+        <div className="admin-counts">
+          {STAT_LABELS.filter(({ key }) => data.stats[key] !== undefined).map(({ key, label }) => (
+            <div key={key}>
+              <strong>{(data.stats[key] ?? 0).toLocaleString()}</strong>
+              <span>{label}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="admin-actions">
+        {TABS.map((tab) => (
+          <button
+            type="button"
+            key={tab.id}
+            className={status === tab.id ? "link-button-primary" : undefined}
+            onClick={() => setStatus(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {error && (
+        <p className="auth-message" role="alert">
+          {error}
+        </p>
+      )}
+
+      <ul className="admin-list revival-review">
+        {data?.works.map((work) => (
+          <li key={work.id}>
+            <strong>{work.title}</strong>
+            <small>
+              {workMeta(work) || "No metadata"} · {SOURCE_LABELS[work.source]} ·{" "}
+              {RIGHTS_LABELS[work.rightsBasis]}
+              {sizeLabel(work.streamBytes) ? ` · ${sizeLabel(work.streamBytes)}` : ""}
+              {work.mirrorState === "mirrored" ? " · mirrored" : ""}
+              {work.mirrorError ? ` · ${work.mirrorError}` : ""}
+            </small>
+            <span className="spacer" />
+            <a href={work.sourceUrl} target="_blank" rel="noreferrer">
+              Source ↗
+            </a>
+            {work.status !== "approved" && (
+              <button
+                type="button"
+                disabled={pending === work.id}
+                onClick={() => void decide(work.id, "approve")}
+              >
+                Approve
+              </button>
+            )}
+            {work.status === "approved" && (
+              <button
+                type="button"
+                disabled={pending === work.id}
+                onClick={() => void decide(work.id, "mirror")}
+              >
+                Re-mirror
+              </button>
+            )}
+            {work.status !== "rejected" && (
+              <button
+                type="button"
+                disabled={pending === work.id}
+                onClick={() => void decide(work.id, "reject")}
+              >
+                Turn away
+              </button>
+            )}
+          </li>
+        ))}
+        {data && data.works.length === 0 && <li className="rail-empty">Nothing in this pile.</li>}
+      </ul>
+    </section>
+  );
+}

@@ -20,7 +20,10 @@ export type AdminAction =
   | "alerts-send"
   | "angle-scores"
   | "cinemas"
-  | "showtimes";
+  | "showtimes"
+  | "revival-sweep"
+  | "revival-match"
+  | "revival-mirror";
 
 export type AdminOverview = {
   catalogue: Record<string, number>;

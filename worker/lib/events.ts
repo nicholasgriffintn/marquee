@@ -21,6 +21,7 @@ export type MarqueeEvent = {
     | "usher_order"
     | "usher_pick"
     | "shelf_pinned"
+    | "reel_play"
     | "guard_blocked"
     | "guard_throttled";
   viewerId?: string;

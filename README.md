@@ -92,6 +92,31 @@ one-off per film rather than per screening. Coverage and match rates are on the 
 Odeon and Curzon publish nothing readable: both sit behind a bot challenge that a Worker, being a
 datacenter client like any other, does not get through. They are absent rather than approximated.
 
+## The revival house
+
+There is a small screen at the back of the building where the ticket is nothing, because the prints
+are out of copyright. `/revival` is a repertory programme of public domain film that plays inside
+Marquee rather than sending anyone out to a service.
+
+Two sources feed it. The Library of Congress's National Screening Room, which is a US institution
+saying in its own words that it is not aware of any copyright restriction and offering the file for
+download. And the Internet Archive, which is an open upload platform and therefore is not taken at
+its word: an Archive item only clears on its own when the uploader marked it public domain **and**
+it was published before the US term could still be running, which as of 2026 means 1930 or earlier.
+Everything else lands in a review queue on `/admin` and waits for a person. A title carries its own
+provenance on its page — which basis it is free under, who holds the print, and a link back to the
+source record — so a viewer can check the reasoning rather than take our word for it either.
+
+An approved print is mirrored into R2 and served from `/media/reel/:id`, a byte-range route that
+answers 206s so the scrubber works. The copy is done by the `marquee-revival` queue in 32 MB parts
+against an R2 multipart upload, re-queueing itself between runs, so a two-hour feature crosses
+several invocations without a Worker ever holding the whole file. Until the copy lands the same
+route proxies the source, so a print is watchable the moment it is approved and quietly becomes ours
+later. Nothing is transcoded; both sources already publish an H.264 MP4 derivative.
+
+Works are matched to catalogue titles on title, year and runtime using the same matcher the cinema
+listings use, so a film's normal panel grows a "Playing here, free" row when we hold a print of it.
+
 ## How search works
 
 Search is hybrid. An FTS5 index over titles, synopses, TMDB keywords and credited names supplies keyword precision; a Vectorize index of bge-m3 embeddings supplies meaning. The two result sets are interleaved and scored by `@cf/baai/bge-reranker-base`, with a small additive boost from a title's Wikipedia pageview trend.
@@ -136,6 +161,12 @@ Create the Vectorize index once per account:
 
 ```bash
 pnpm exec wrangler vectorize create marquee-titles --dimensions=1024 --metric=cosine
+```
+
+Create the revival house's queue once per account:
+
+```bash
+pnpm exec wrangler queues create marquee-revival
 ```
 
 Then start:
@@ -216,6 +247,11 @@ page next to its call budget.
 
 A second cron on Monday mornings runs the digest workflow, which writes a per-viewer digest of
 fresh releases near their taste, what is trending, and the week's episodes, readable at `/this-week`.
+
+The deep sweep also walks the public domain sources a page at a time per collection, keeping a
+cursor so each run picks up where the last one stopped, then matches new works to catalogue titles
+and queues the next few prints for mirroring. Discovery, matching and mirroring can each be started
+by hand from `/admin` under "The revival house".
 
 ## Admin
 

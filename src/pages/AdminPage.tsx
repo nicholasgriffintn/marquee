@@ -1,4 +1,5 @@
 import { ErrorBoundary } from "../components/ErrorBoundary";
+import { RevivalReview } from "../components/revival/RevivalReview";
 import { UsherMark } from "../components/usher/UsherMark";
 import { useAdmin, type AdminAction } from "../hooks/useAdmin";
 import type { User } from "../types";
@@ -45,6 +46,15 @@ const ACTION_GROUPS: {
       { id: "alerts-preview", label: "Preview the post" },
       { id: "alerts-send", label: "Send the post" },
       { id: "angle-scores", label: "Rescore shelves" },
+    ],
+  },
+  {
+    title: "The revival house",
+    note: "Public domain prints from the Internet Archive and the Library of Congress. A sweep only auto-clears what carries a public domain marker and predates the US copyright term; everything else waits in the review queue below. Mirroring copies an approved print into our own bucket, one chunk per run.",
+    actions: [
+      { id: "revival-sweep", label: "Sweep the sources" },
+      { id: "revival-match", label: "Match to catalogue" },
+      { id: "revival-mirror", label: "Mirror approved prints" },
     ],
   },
   {
@@ -394,6 +404,10 @@ export function AdminPage({ user }: { user: User }) {
             </ul>
           </section>
         )}
+      </ErrorBoundary>
+
+      <ErrorBoundary label="The vault">
+        <RevivalReview />
       </ErrorBoundary>
 
       <ErrorBoundary label="The staff list">

@@ -37,6 +37,7 @@ export type Bindings = {
   SIMKL_QUEUE: Queue<IngestionJob>;
   POSTER_QUEUE: Queue<IngestionJob>;
   EMBEDDING_QUEUE: Queue<IngestionJob>;
+  REVIVAL_QUEUE: Queue<IngestionJob>;
   CATALOG_SWEEP: Workflow<CatalogSweepParameters>;
   RAILS_WORKFLOW: Workflow<{ viewerId: string }>;
   DIGEST_WORKFLOW: Workflow;
@@ -101,6 +102,9 @@ export type IngestionJob =
   | { type: "sync-buzz" }
   | { type: "sync-cinemas"; source: string }
   | { type: "sync-cinema-screenings"; source: string; siteId: string }
+  | { type: "sync-revival-source"; source: "archive" | "loc"; collection?: string }
+  | { type: "match-revival-works" }
+  | { type: "mirror-revival-work"; workId: string }
   | { type: "build-sections" };
 
 export type EntryStatus = "watchlist" | "watching" | "watched" | "dropped";

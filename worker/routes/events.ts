@@ -9,7 +9,13 @@ import type { Bindings } from "../types.ts";
 
 export const eventRoutes = new Hono<{ Bindings: Bindings }>();
 
-const CLIENT_EVENTS = new Set(["rail_impression", "rail_click", "title_view", "provider_exit"]);
+const CLIENT_EVENTS = new Set([
+  "rail_impression",
+  "rail_click",
+  "title_view",
+  "provider_exit",
+  "reel_play",
+]);
 
 const EXIT_SIGNAL_DAYS = 180;
 

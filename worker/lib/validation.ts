@@ -1,7 +1,9 @@
 import type { CuratorCandidate, ProviderAvailability } from "../../src/domain/catalog.ts";
 import { providerRegistryIds } from "../../src/domain/providers.ts";
+import { isArchiveCollection } from "../clients/archive.ts";
 import { isCinemaSourceId } from "../clients/cinema/index.ts";
 import { isPartitionId } from "../repositories/discover.ts";
+import { isRevivalId, isRevivalSource } from "../repositories/revival.ts";
 import type { EntryStatus, IngestionJob, ViewingContext } from "../types.ts";
 import { isRecord } from "./values.ts";
 
@@ -58,9 +60,21 @@ export function isIngestionJob(value: unknown): value is IngestionJob {
   if (
     value.type === "sync-schedule" ||
     value.type === "sync-buzz" ||
+    value.type === "match-revival-works" ||
     value.type === "build-sections"
   ) {
     return true;
+  }
+
+  if (value.type === "sync-revival-source") {
+    return (
+      isRevivalSource(value.source) &&
+      (value.collection === undefined || isArchiveCollection(value.collection))
+    );
+  }
+
+  if (value.type === "mirror-revival-work") {
+    return isRevivalId(value.workId);
   }
 
   if (value.type === "sync-cinemas") {
