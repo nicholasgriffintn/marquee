@@ -4,7 +4,7 @@ import { ErrorBoundary } from "../components/ErrorBoundary";
 import { ReelCard } from "../components/revival/ReelCard";
 import { ReelPlayer } from "../components/revival/ReelPlayer";
 import { UsherMark } from "../components/usher/UsherMark";
-import { rightsSummary, SOURCE_LABELS, workMeta } from "../domain/revival";
+import { deliveryNote, rightsSummary, SOURCE_LABELS, workMeta } from "../domain/revival";
 import { useScreening } from "../hooks/useRevival";
 
 export function RevivalScreenPage({ isSignedIn }: { isSignedIn: boolean }) {
@@ -77,12 +77,8 @@ export function RevivalScreenPage({ isSignedIn }: { isSignedIn: boolean }) {
           </dd>
         </div>
         <div>
-          <dt>Print held by</dt>
-          <dd>
-            {work.mirrored
-              ? `Marquee, copied from ${SOURCE_LABELS[work.source]}`
-              : `${SOURCE_LABELS[work.source]}, streamed through us`}
-          </dd>
+          <dt>Played from</dt>
+          <dd>{deliveryNote(work)}</dd>
         </div>
         <div>
           <dt>Source record</dt>

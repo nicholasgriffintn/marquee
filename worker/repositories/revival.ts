@@ -50,6 +50,7 @@ type WorkRow = {
   country: string | null;
   ukClear: number;
   ukExpiresYear: number | null;
+  streamUrl: string;
   mirrorState: string;
   plays: number;
 };
@@ -58,7 +59,7 @@ const WORK_COLUMNS = `id, source, source_url AS sourceUrl, title, year, director
    kind, runtime_seconds AS runtimeSeconds, still_url AS stillUrl,
    rights_basis AS rightsBasis, rights_note AS rightsNote, rights_url AS rightsUrl,
    title_id AS titleId, country, uk_clear AS ukClear, uk_expires_year AS ukExpiresYear,
-   mirror_state AS mirrorState, plays`;
+   stream_url AS streamUrl, mirror_state AS mirrorState, plays`;
 
 const ID_PATTERN = /^(archive|loc|europeana)\.[\w.-]{1,120}$/u;
 
@@ -103,7 +104,8 @@ function toWork(row: WorkRow): RevivalWork {
     ukClear: row.ukClear === 1,
     ukExpiresYear: row.ukExpiresYear,
     mirrored: row.mirrorState === "mirrored",
-    reelUrl: reelPath(row.id),
+    delivery: row.ukClear === 1 ? "mirror" : "source",
+    reelUrl: row.ukClear === 1 ? reelPath(row.id) : row.streamUrl,
     plays: row.plays,
     tags: [],
   };
@@ -277,22 +279,10 @@ export async function storeUkRights(
            rights_basis = ?,
            rights_note = ?,
            rights_checked_at = CURRENT_TIMESTAMP,
-           status = CASE
-             WHEN reviewed_at IS NOT NULL THEN status
-             WHEN ? = 1 THEN 'approved'
-             ELSE 'candidate'
-           END,
            updated_at = CURRENT_TIMESTAMP
        WHERE id = ?`,
     )
-    .bind(
-      verdict.clear ? 1 : 0,
-      verdict.expiresYear,
-      verdict.basis,
-      verdict.note.slice(0, 400),
-      verdict.clear ? 1 : 0,
-      id,
-    )
+    .bind(verdict.clear ? 1 : 0, verdict.expiresYear, verdict.basis, verdict.note.slice(0, 400), id)
     .run();
 }
 
@@ -355,7 +345,7 @@ export async function readReelTarget(db: D1Database, id: string) {
       `SELECT id, stream_url AS streamUrl, stream_type AS streamType,
               mirror_key AS mirrorKey, mirror_state AS mirrorState
        FROM revival_works
-       WHERE id = ? AND status = 'approved'`,
+       WHERE id = ? AND status = 'approved' AND uk_clear = 1`,
     )
     .bind(id)
     .first<ReelTarget>();
@@ -459,6 +449,7 @@ export async function selectUnmirrored(db: D1Database, limit = 5) {
       `SELECT id
        FROM revival_works
        WHERE status = 'approved'
+         AND uk_clear = 1
          AND mirror_state IN ('remote', 'copying')
        ORDER BY mirror_state = 'copying' DESC, plays DESC, discovered_at
        LIMIT ?`,

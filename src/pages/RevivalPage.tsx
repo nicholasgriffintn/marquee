@@ -38,8 +38,8 @@ export function RevivalPage({ isReady }: { isReady: boolean }) {
           <h1>The revival house</h1>
         </div>
         <p>
-          The small screen at the back, where the prints are out of copyright in the UK and the
-          ticket is nothing. {programme.total ? `${programme.total} in the vault.` : ""}
+          The small screen at the back, where the prints are out of copyright and the ticket is
+          nothing. {programme.total ? `${programme.total} in the vault.` : ""}
         </p>
       </div>
 
@@ -81,13 +81,13 @@ export function RevivalPage({ isReady }: { isReady: boolean }) {
 
       {programme.shelves.length > 0 && (
         <p className="revival-note">
-          Everything on these shelves is out of copyright in the UK. For a film that means 70 years
-          from the death of the last of its principal director, screenwriters and composer, which is
-          measured from people rather than from a release date — so a film can be free in America
-          and still in copyright here, and those ones are not shown. Where we cannot work out who
-          the authors were, the print waits rather than plays. Prints come from European archives,
-          the Internet Archive and the Library of Congress; where we hold our own copy it says so on
-          the card. If you believe something here is still in copyright, tell us and it comes off.
+          Everything here has been published as public domain by the archive that holds it. Where a
+          print is also out of copyright under UK law — 70 years from the death of the last of its
+          principal director, screenwriters and composer — we keep our own copy and serve it
+          ourselves. Where it is free where it was published but the UK term has not run out, we do
+          not re-host it: the play button goes to the archive that holds it, and they serve it, as
+          they would if you went there yourself. Each print says which of the two it is, and why, on
+          its own page. If you believe something here is wrongly listed, tell us and it comes off.
         </p>
       )}
     </section>

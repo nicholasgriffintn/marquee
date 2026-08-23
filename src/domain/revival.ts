@@ -12,6 +12,10 @@ export type RevivalRightsBasis =
   | "curated"
   | "unclear";
 
+export function assertsPublicDomain(basis: RevivalRightsBasis) {
+  return basis !== "unclear";
+}
+
 export type RevivalStatus = "candidate" | "approved" | "rejected";
 
 export type RevivalMirrorState = "remote" | "copying" | "mirrored" | "failed";
@@ -39,6 +43,7 @@ export type RevivalWork = {
   ukClear: boolean;
   ukExpiresYear: number | null;
   mirrored: boolean;
+  delivery: "mirror" | "source";
   reelUrl: string;
   plays: number;
   tags: RevivalTag[];
@@ -83,6 +88,16 @@ export const SOURCE_LABELS: Record<RevivalSource, string> = {
 
 export function reelPath(workId: string) {
   return `/media/reel/${workId}`;
+}
+
+export function deliveryNote(work: RevivalWork) {
+  if (work.delivery === "source") {
+    return `Played from ${SOURCE_LABELS[work.source]}, who hold it`;
+  }
+
+  return work.mirrored
+    ? `Marquee, copied from ${SOURCE_LABELS[work.source]}`
+    : `${SOURCE_LABELS[work.source]}, streamed through us`;
 }
 
 export function revivalPath(work: Pick<RevivalWork, "id">) {

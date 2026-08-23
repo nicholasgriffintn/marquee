@@ -40,6 +40,17 @@ const NOISE = new Set([
   "keywords",
   "untitled",
   "misc",
+  "motion pictures",
+  "moving images",
+  "black-and-white photographs",
+  "black and white",
+  "photographs",
+  "photography",
+  "sound film",
+  "colour film",
+  "color film",
+  "archival material",
+  "audiovisual",
 ]);
 
 const ADULT =

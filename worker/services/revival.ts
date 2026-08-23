@@ -1,7 +1,6 @@
-import { runtimeBand } from "../../src/domain/revival.ts";
+import { assertsPublicDomain, runtimeBand } from "../../src/domain/revival.ts";
 import type {
   RevivalShelf,
-  RevivalSource,
   RevivalStatus,
   RevivalTagKind,
   RevivalWork,
@@ -52,19 +51,12 @@ export function usPublicDomainCutoff(now = new Date()) {
   return now.getUTCFullYear() - US_TERM_YEARS;
 }
 
-export function decideStatus(candidate: RevivalCandidate, source: RevivalSource): RevivalStatus {
+export function decideStatus(candidate: RevivalCandidate): RevivalStatus {
   if (!candidate.streamUrl || (candidate.runtimeSeconds ?? 0) < MIN_RUNTIME_SECONDS) {
     return "rejected";
   }
 
-  if (
-    source === "europeana" &&
-    (candidate.rightsBasis === "cc0" || candidate.rightsBasis === "eu-institution")
-  ) {
-    return "approved";
-  }
-
-  return "candidate";
+  return assertsPublicDomain(candidate.rightsBasis) ? "approved" : "candidate";
 }
 
 function withUsExpiredBasis(candidate: ArchiveCandidate, cutoff: number): RevivalCandidate {
@@ -138,7 +130,7 @@ export async function syncArchiveCollection(env: Bindings, collection: string) {
       }
 
       const candidate = withUsExpiredBasis(item, cutoff);
-      const status = decideStatus(candidate, "archive");
+      const status = decideStatus(candidate);
 
       // oxlint-disable-next-line no-await-in-loop
       await upsertWork(env.DB, "archive", candidate, status);
@@ -171,7 +163,7 @@ export async function syncScreeningRoom(env: Bindings) {
   const counts = { seen: candidates.length, accepted: 0, rejected: 0 };
 
   for (const candidate of candidates) {
-    const status = decideStatus(candidate, "loc");
+    const status = decideStatus(candidate);
 
     // oxlint-disable-next-line no-await-in-loop
     await upsertWork(env.DB, "loc", candidate, status);
@@ -199,7 +191,7 @@ export async function syncEuropeanaCountry(env: Bindings, country: string) {
   const counts = { seen: candidates.length, accepted: 0, rejected: 0 };
 
   for (const candidate of candidates) {
-    const status = decideStatus({ ...candidate, runtimeSeconds: MIN_RUNTIME_SECONDS }, "europeana");
+    const status = decideStatus({ ...candidate, runtimeSeconds: MIN_RUNTIME_SECONDS });
 
     // oxlint-disable-next-line no-await-in-loop
     await upsertWork(env.DB, "europeana", candidate, status);
