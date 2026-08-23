@@ -28,6 +28,14 @@ export function jobSubject(job: IngestionJob) {
     return job.partitionId;
   }
 
+  if (job.type === "sync-cinemas") {
+    return job.source;
+  }
+
+  if (job.type === "sync-cinema-screenings") {
+    return `${job.source}:${job.siteId}`;
+  }
+
   return null;
 }
 

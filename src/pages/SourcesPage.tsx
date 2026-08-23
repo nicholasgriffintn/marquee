@@ -274,7 +274,20 @@ export function SourcesPage({
             <strong>Trakt</strong>
             <span>Your imported watch history</span>
           </a>
+          <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">
+            <strong>OpenStreetMap</strong>
+            <span>Where the cinemas actually are</span>
+          </a>
         </div>
+        <p>
+          Cinema listings are published by the chains themselves — Cineworld, Picturehouse and Vue —
+          and are read as they are given. Where a chain publishes days but not times, you get days.
+          Cinema locations come from OpenStreetMap contributors, licensed under the{" "}
+          <a href="https://opendatacommons.org/licenses/odbl/" target="_blank" rel="noreferrer">
+            ODbL
+          </a>
+          .
+        </p>
         <p>
           This product uses the TMDB API but is not endorsed or certified by TMDB. Listings change,
           so check the service itself before you settle in.

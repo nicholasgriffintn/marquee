@@ -22,6 +22,9 @@ awards and box office from OMDb. The trending rail is ranked by how much Wikiped
 about a title this week, which is a better measure of a fuss than any press release. Link Trakt and
 your watch history, ratings and watchlist come with you.
 
+A cinema without a building still knows the ones that have them. Sign in and a film's panel carries
+what is on at the cinemas near you, under the streaming options.
+
 <img src="https://marquee.pashi.app/usher-unimpressed.png" width="200" height="200" alt="The Usher is Unimpressed"/>
 
 > Everyone's watching that one. Doesn't mean it's good.
@@ -56,6 +59,38 @@ paper core and an ink keyline or it will disappear into the page.
 <img src="https://marquee.pashi.app/usher-thinking.png" width="200" height="200" alt="The Usher Has Some Advice" />
 
 > If I've nothing worth saying, I say nothing. Try it.
+
+## What's on locally
+
+A film's panel carries the cinemas near you that are showing it, under where you can stream it. It
+is members only, and the position comes from Cloudflare's edge — roughly a town, never a street.
+Nothing is asked of the viewer, no permission prompt is raised, and no location is stored against
+an account.
+
+Listings come from whichever chains publish them, one `CinemaSource` adapter each:
+
+| Chain        | What they publish                                                           |
+| ------------ | --------------------------------------------------------------------------- |
+| Cineworld    | Exact showtimes with booking links, and their own coordinates               |
+| Picturehouse | Exact showtimes; venues are read off the site and placed from OpenStreetMap |
+| Vue          | Which days a film is on at a site, but not the clock times                  |
+
+A source answers with whatever precision it can manage on the day, and the panel renders honestly:
+times where there are times, days where there are only days, and a link to their board where there
+is neither. Vue's date endpoint is tightly rate limited and stands us down often, so its adapter
+degrades a step rather than dropping the chain.
+
+Adding a chain is one adapter file and one line in `worker/clients/cinema/index.ts`. Nothing above
+that module knows which chain it is talking to, or which country it is in.
+
+Listings are only pulled for cinemas near somewhere a member has actually looked from, so the work
+grows with the audience rather than with the country. Chain film ids are matched to catalogue
+titles on title, year and runtime — listings carry showmanship the catalogue does not, so the
+format and event decoration is stripped first — and every decision is cached, making the cost
+one-off per film rather than per screening. Coverage and match rates are on the `/admin` page.
+
+Odeon and Curzon publish nothing readable: both sit behind a bot challenge that a Worker, being a
+datacenter client like any other, does not get through. They are absent rather than approximated.
 
 ## How search works
 

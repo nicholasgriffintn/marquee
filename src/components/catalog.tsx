@@ -13,6 +13,7 @@ import type { CatalogSection, MediaTitle } from "../domain/catalog";
 import { blendedRating, ratingSources } from "../domain/ratings";
 import { useAvailability } from "../hooks/useAvailability";
 import { useRecommendations } from "../hooks/useRecommendations";
+import { useShowings } from "../hooks/useShowings";
 import { useTitleInsight } from "../hooks/useTitleInsight";
 import {
   artwork,
@@ -27,6 +28,7 @@ import {
 import { track } from "../lib/telemetry";
 import type { EntryStatus, ViewingEntry } from "../types";
 import { ArtPlaceholder } from "./ArtPlaceholder";
+import { ShowingsBlock } from "./cinema/ShowingsBlock";
 import { ShelfForm } from "./ShelfForm";
 import { TrailerBlock } from "./TrailerBlock";
 import { ArrowIcon, ChevronIcon, PlusIcon, Poster, ProviderBadge } from "./ui";
@@ -383,6 +385,7 @@ export function DetailPanel({
   const { providers, nextEpisode } = useAvailability(item, availabilityEnabled);
   const { insight, pairs, isLoading: isInsightLoading } = useTitleInsight(item.id);
   const similar = useRecommendations(item.id, item.recommendationIds, SIMILAR_LIMIT);
+  const showings = useShowings(item, canSave);
   const [exit, setExit] = useState<Exit | null>(null);
   const panelRef = useRef<HTMLDialogElement>(null);
 
@@ -526,6 +529,12 @@ export function DetailPanel({
               <p className="availability-empty">No streaming options found.</p>
             )}
           </div>
+          <ShowingsBlock
+            listings={showings.listings}
+            isLoading={showings.isLoading}
+            placeLabel={showings.origin?.label ?? null}
+            onLeave={leaveVia}
+          />
           {canSave && !entry && (
             <button type="button" className="save-button" onClick={() => onSave(item)}>
               <PlusIcon /> Save to my shelf

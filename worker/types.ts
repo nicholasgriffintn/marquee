@@ -91,6 +91,8 @@ export type IngestionJob =
   | { type: "import-trakt-history"; viewerId: string; origin: string }
   | { type: "sync-schedule" }
   | { type: "sync-buzz" }
+  | { type: "sync-cinemas"; source: string }
+  | { type: "sync-cinema-screenings"; source: string; siteId: string }
   | { type: "build-sections" };
 
 export type EntryStatus = "watchlist" | "watching" | "watched" | "dropped";

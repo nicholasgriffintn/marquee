@@ -5684,3 +5684,153 @@ h2 em {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+
+/* The other houses in town */
+
+.showings {
+  display: grid;
+  gap: 10px;
+  margin-top: 26px;
+}
+.showings-eyebrow {
+  align-items: baseline;
+  color: #6f7268;
+  display: flex;
+  font: 800 9px var(--mono);
+  gap: 6px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.showings-eyebrow em {
+  color: var(--acid);
+  font-style: normal;
+  letter-spacing: 0.04em;
+}
+.showings-empty {
+  color: #696b62;
+  font-size: 11px;
+  margin: 0;
+}
+.showings-list {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.showings-cinema {
+  background: var(--panel-tile);
+  border-left: 4px solid var(--acid);
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+.showings-cinema-head {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+}
+.showings-cinema-head > span {
+  align-items: baseline;
+  display: flex;
+  gap: 8px;
+}
+.showings-cinema-head b {
+  font-size: 13px;
+  font-weight: 800;
+}
+.showings-cinema-head em {
+  color: var(--acid);
+  font: 400 9px var(--mono);
+  font-style: normal;
+}
+.showings-cinema-head small {
+  color: #6f7268;
+  font: 400 9px var(--mono);
+}
+.showings-days {
+  display: grid;
+  gap: 8px;
+}
+.showings-day {
+  display: grid;
+  gap: 5px;
+}
+.showings-day-label {
+  color: #8f9389;
+  font: 800 8px var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.showings-times {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.showtime {
+  background: var(--panel);
+  border: 1px solid var(--panel-line);
+  display: grid;
+  gap: 1px;
+  justify-items: center;
+  min-width: 52px;
+  padding: 5px 7px;
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease,
+    transform 0.16s ease;
+}
+.showtime b {
+  font: 800 12px var(--mono);
+}
+.showtime small {
+  color: #8f9389;
+  font: 400 7px var(--mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+a.showtime:hover {
+  background: var(--acid);
+  border-color: var(--acid);
+  color: var(--ink);
+  transform: translate(-1px, -1px);
+}
+a.showtime:hover small {
+  color: var(--ink);
+  opacity: 0.7;
+}
+.showtime-flat {
+  opacity: 0.6;
+}
+.showings-coarse {
+  display: grid;
+  gap: 6px;
+}
+.showings-coarse p {
+  color: #b8bbb1;
+  font-size: 12px;
+  margin: 0;
+}
+.showings-link {
+  align-items: center;
+  color: var(--acid);
+  display: inline-flex;
+  font: 800 10px var(--mono);
+  gap: 5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.showings-link > svg {
+  transition: transform 0.16s ease;
+}
+.showings-link:hover > svg {
+  transform: translateX(3px);
+}
+.showings-foot {
+  color: #696b62;
+  font-size: 10px;
+  font-style: italic;
+  margin: 0;
+}

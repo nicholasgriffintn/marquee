@@ -37,6 +37,14 @@ const ACTION_GROUPS: {
       { id: "providers", label: "Refresh providers" },
     ],
   },
+  {
+    title: "The other houses",
+    note: "Cinema listings come from the chains that publish them. The directory is refreshed on a deep sweep; listings are only pulled for cinemas near somewhere a member has actually looked from, so the work grows with the audience rather than with the country.",
+    actions: [
+      { id: "cinemas", label: "Refresh cinema directory" },
+      { id: "showtimes", label: "Pull local listings" },
+    ],
+  },
 ];
 
 const COUNT_LABELS: { key: string; label: string }[] = [
@@ -233,6 +241,30 @@ export function AdminPage({ user }: { user: User }) {
               </div>
             ))}
           </div>
+        </section>
+      )}
+
+      {overview && overview.cinemas.length > 0 && (
+        <section className="panel-block" aria-labelledby="admin-cinemas-title">
+          <h2 id="admin-cinemas-title">Cinema listings</h2>
+          <ul className="admin-list">
+            {overview.cinemas.map((row) => (
+              <li key={row.source}>
+                <strong>{row.source}</strong>
+                <small>
+                  {row.located.toLocaleString()} of {row.cinemas.toLocaleString()} placed
+                </small>
+                {row.cinemas > row.located && (
+                  <code>{(row.cinemas - row.located).toLocaleString()} unplaced</code>
+                )}
+                <small>
+                  {row.matched.toLocaleString()} / {row.films.toLocaleString()} films matched
+                </small>
+                <span className="spacer" />
+                <small>{row.screenings.toLocaleString()} ahead</small>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 

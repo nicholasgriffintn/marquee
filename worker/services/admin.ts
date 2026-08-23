@@ -6,9 +6,11 @@ import {
   queueStaleAvailability,
 } from "../jobs/ingestion.ts";
 import { readBudgets, resumeSource } from "../repositories/budgets.ts";
+import { readCinemaCoverage } from "../repositories/cinemas.ts";
 import { readBackfillProgress } from "../repositories/discover.ts";
 import { readWorkingSetStats, rebuildWorkingSet } from "../repositories/working-set.ts";
 import type { Bindings, EnrichmentSource, IngestionJob } from "../types.ts";
+import { queueCinemaDirectories, queueCinemaScreenings } from "./cinema-sync.ts";
 import { advanceDiscoverFrontier } from "./discover.ts";
 
 export const ADMIN_ACTIONS = [
@@ -24,6 +26,8 @@ export const ADMIN_ACTIONS = [
   "providers",
   "sections",
   "working-set",
+  "cinemas",
+  "showtimes",
 ] as const;
 
 export type AdminAction = (typeof ADMIN_ACTIONS)[number];
@@ -77,7 +81,7 @@ async function enrichmentStats(env: Bindings) {
 }
 
 export async function readAdminOverview(env: Bindings) {
-  const [catalogue, enrichment, backfill, failures, lastRuns, budgets, sections] =
+  const [catalogue, enrichment, backfill, failures, lastRuns, budgets, cinemas, sections] =
     await Promise.all([
       catalogueStats(env),
       enrichmentStats(env),
@@ -102,6 +106,7 @@ export async function readAdminOverview(env: Bindings) {
          LIMIT 20`,
       ).all<{ jobType: string; status: string; lastRunAt: string; runs: number }>(),
       readBudgets(env),
+      readCinemaCoverage(env.DB),
       env.DB.prepare(
         `SELECT id, title, json_array_length(title_ids) AS titles, source_updated_at AS builtAt
          FROM catalog_sections
@@ -116,6 +121,7 @@ export async function readAdminOverview(env: Bindings) {
     failures: failures.results,
     lastRuns: lastRuns.results,
     budgets,
+    cinemas,
     sections: sections.results,
     fetchedAt: new Date().toISOString(),
   };
@@ -158,6 +164,23 @@ export async function runAdminAction(env: Bindings, action: AdminAction) {
     const titles = await rebuildWorkingSet(env.DB);
 
     return { queued: titles, detail: `Working set now tracks ${titles} titles` };
+  }
+
+  if (action === "cinemas") {
+    const sources = await queueCinemaDirectories(env);
+
+    return { queued: sources, detail: `Queued ${sources} cinema directories` };
+  }
+
+  if (action === "showtimes") {
+    const queued = await queueCinemaScreenings(env);
+
+    return {
+      queued,
+      detail: queued
+        ? `Queued ${queued} cinemas for listings`
+        : "No viewer has looked for local listings yet",
+    };
   }
 
   if (action === "discover") {

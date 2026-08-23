@@ -9,10 +9,12 @@ import {
   syncCatalogHead,
 } from "../jobs/ingestion.ts";
 import { getProviderLedger } from "../jobs/provider-ledger.ts";
+import { pruneScreenings } from "../repositories/cinemas.ts";
 import { storeProviders } from "../repositories/providers.ts";
 import { rebuildPeopleIndex } from "../repositories/usher.ts";
 import { rebuildWorkingSet } from "../repositories/working-set.ts";
 import { syncBuzz } from "../services/buzz.ts";
+import { queueCinemaDirectories, queueCinemaScreenings } from "../services/cinema-sync.ts";
 import { advanceDiscoverFrontier } from "../services/discover.ts";
 import { syncSchedule } from "../services/schedule.ts";
 import { buildSections } from "../services/sections.ts";
@@ -53,6 +55,20 @@ export class CatalogSweep extends WorkflowEntrypoint<Bindings, CatalogSweepParam
 
       return true;
     });
+
+    if (deep) {
+      await step.do("sync cinema directories", { retries: RETRIES }, async () =>
+        queueCinemaDirectories(this.env),
+      );
+    }
+
+    await step.do("queue cinema screenings", { retries: RETRIES }, async () =>
+      queueCinemaScreenings(this.env),
+    );
+
+    await step.do("prune past screenings", { retries: RETRIES }, async () =>
+      pruneScreenings(this.env.DB),
+    );
 
     await step.do("sync schedule", { retries: RETRIES }, async () => syncSchedule(this.env));
 

@@ -1,5 +1,6 @@
 import type { CuratorCandidate, ProviderAvailability } from "../../src/domain/catalog.ts";
 import { providerRegistryIds } from "../../src/domain/providers.ts";
+import { isCinemaSourceId } from "../clients/cinema/index.ts";
 import { isPartitionId } from "../repositories/discover.ts";
 import type { EntryStatus, IngestionJob, ViewingContext } from "../types.ts";
 import { isRecord } from "./values.ts";
@@ -60,6 +61,18 @@ export function isIngestionJob(value: unknown): value is IngestionJob {
     value.type === "build-sections"
   ) {
     return true;
+  }
+
+  if (value.type === "sync-cinemas") {
+    return isCinemaSourceId(value.source);
+  }
+
+  if (value.type === "sync-cinema-screenings") {
+    return (
+      isCinemaSourceId(value.source) &&
+      typeof value.siteId === "string" &&
+      /^[\w-]{1,32}$/u.test(value.siteId)
+    );
   }
 
   if (value.type === "import-trakt-history") {
