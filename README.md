@@ -92,6 +92,22 @@ one-off per film rather than per screening. Coverage and match rates are on the 
 Odeon and Curzon publish nothing readable: both sit behind a bot challenge that a Worker, being a
 datacenter client like any other, does not get through. They are absent rather than approximated.
 
+## Series, one episode at a time
+
+A television title's panel carries its own episode guide. The season list comes off TMDB and is
+kept in `catalog_seasons`, a season at a time: opening a series fetches the index, opening a season
+fetches its episodes, and each is cached in D1 — twelve hours for a run still going out, a month
+for one that finished. Nothing is fetched twice for the sake of it, and the panel opens on the
+season you are actually in rather than the newest one.
+
+Members tick episodes off, rate them out of five and keep a note against any of them, and against
+the season as a whole. _I am up to here_ marks everything aired before it in one go, for the
+sensible people who do not tick as they watch, and ratings and notes already recorded survive it.
+Every write rolls up into the shelf: the entry's pointer moves to the furthest episode watched, a
+watchlisted series becomes one you are watching, and when the last aired episode is ticked the
+whole thing goes down as watched. Your episode notes are read alongside your title notes when the
+Usher works out what he thinks of you.
+
 ## How search works
 
 Search is hybrid. An FTS5 index over titles, synopses, TMDB keywords and credited names supplies keyword precision; a Vectorize index of bge-m3 embeddings supplies meaning. The two result sets are interleaved and scored by `@cf/baai/bge-reranker-base`, with a small additive boost from a title's Wikipedia pageview trend.

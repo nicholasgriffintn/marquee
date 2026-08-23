@@ -6,6 +6,7 @@ import { ArrowIcon, Poster } from "../components/ui";
 import { UsherCard } from "../components/usher/UsherCard";
 import { UsherMark } from "../components/usher/UsherMark";
 import type { MediaTitle } from "../domain/catalog";
+import { episodeLabel } from "../domain/seasons";
 import type { UsherMoment } from "../domain/usher";
 import type { EntryStatus, ViewingEntry } from "../types";
 
@@ -347,6 +348,9 @@ export function LibraryPage({
                   <small>
                     {STATUS_LABELS[entry.status]}
                     {entry.rating ? ` · ${"★".repeat(entry.rating)}` : ""}
+                    {entry.season && entry.episode
+                      ? ` · ${episodeLabel(entry.season, entry.episode)}`
+                      : ""}
                   </small>
                 </button>
               ))}

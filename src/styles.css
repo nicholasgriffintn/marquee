@@ -6733,3 +6733,323 @@ a.showtime:hover small {
   font-style: italic;
   margin: 0;
 }
+
+.seasons-block {
+  border-top: 1px solid var(--paper-line);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 26px;
+  padding-top: 24px;
+}
+.seasons-top {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.seasons-label {
+  color: #6f7268;
+  font: 800 9px var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.seasons-progress {
+  align-items: center;
+  color: #4d5148;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 13px;
+  gap: 10px;
+  margin: 0;
+}
+.seasons-jump {
+  align-items: center;
+  background: none;
+  border: 0;
+  color: var(--blue);
+  display: inline-flex;
+  font: 800 9px var(--mono);
+  gap: 5px;
+  letter-spacing: 0.08em;
+  padding: 0;
+  text-transform: uppercase;
+}
+.seasons-jump > svg {
+  height: 14px;
+}
+.seasons-message {
+  color: var(--coral);
+  font-size: 13px;
+  margin: 0;
+}
+.seasons-empty,
+.seasons-signed-out {
+  color: #6f7268;
+  font-size: 13px;
+  font-style: italic;
+  margin: 0;
+}
+.season-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.season-tab {
+  align-items: center;
+  background: none;
+  border: 1px solid var(--paper-line);
+  color: var(--ink);
+  display: inline-flex;
+  font: 700 11px var(--sans);
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 12px;
+}
+.season-tab:hover {
+  border-color: var(--ink);
+}
+.season-tab.selected {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+.season-tab em {
+  color: var(--acid-ink);
+  font: 800 9px var(--mono);
+  font-style: normal;
+}
+.season-tab.selected em {
+  color: var(--acid);
+}
+.season-head {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.season-head-copy h4 {
+  font: 700 17px var(--serif);
+  margin: 0 0 4px;
+}
+.season-head-copy p {
+  color: #6f7268;
+  font: 400 12px var(--sans);
+  margin: 0;
+}
+.season-head-copy .season-overview {
+  color: #4d5148;
+  font-size: 13px;
+  line-height: 1.55;
+  margin-top: 8px;
+}
+.season-track {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.season-bar {
+  background: var(--paper-deep);
+  height: 4px;
+  width: 100%;
+}
+.season-bar i {
+  background: var(--acid-ink);
+  display: block;
+  height: 100%;
+}
+.season-track-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.season-track-actions button {
+  background: none;
+  border: 1px solid var(--paper-line);
+  color: var(--ink);
+  font: 800 10px var(--mono);
+  letter-spacing: 0.06em;
+  min-height: 34px;
+  padding: 0 14px;
+  text-transform: uppercase;
+}
+.season-track-actions button:hover {
+  border-color: var(--ink);
+}
+.season-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.episode-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.episode-row {
+  border-top: 1px solid var(--paper-line);
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 26px 1fr;
+  padding: 16px 0;
+}
+.episode-row.plain {
+  grid-template-columns: 1fr;
+}
+.episode-row.unaired {
+  opacity: 0.6;
+}
+.episode-tick {
+  align-self: start;
+  background: none;
+  border: 1px solid var(--paper-line);
+  color: var(--acid-ink);
+  font: 700 14px/1 var(--sans);
+  height: 26px;
+  width: 26px;
+}
+.episode-tick:hover {
+  border-color: var(--ink);
+}
+.episode-row.watched .episode-tick {
+  background: var(--acid);
+  border-color: var(--acid);
+  color: var(--ink);
+}
+.episode-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.episode-head {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.episode-head strong {
+  font: 600 15px var(--sans);
+}
+.episode-head em {
+  color: #6f7268;
+  font: 800 11px var(--mono);
+  font-style: normal;
+  margin-right: 6px;
+}
+.episode-head small {
+  color: #6f7268;
+  font: 400 11px var(--mono);
+}
+.episode-still {
+  aspect-ratio: 16 / 9;
+  max-width: 240px;
+  object-fit: cover;
+  width: 100%;
+}
+.episode-overview {
+  color: #4d5148;
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 0;
+}
+.episode-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.episode-stars {
+  display: flex;
+  gap: 1px;
+}
+.episode-stars button {
+  background: none;
+  border: 0;
+  color: #b7b3a6;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0 1px;
+}
+.episode-stars button.active {
+  color: var(--acid-ink);
+}
+.episode-through {
+  background: none;
+  border: 1px solid var(--paper-line);
+  color: #4d5148;
+  font: 800 9px var(--mono);
+  letter-spacing: 0.06em;
+  min-height: 28px;
+  padding: 0 10px;
+  text-transform: uppercase;
+}
+.episode-through:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+.episode-note-rest {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.episode-note-rest p {
+  background: var(--paper-deep);
+  border-left: 2px solid var(--paper-line);
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 0;
+  padding: 8px 10px;
+  white-space: pre-wrap;
+}
+.episode-note-open {
+  align-self: flex-start;
+  background: none;
+  border: 0;
+  color: var(--blue);
+  font: 800 9px var(--mono);
+  letter-spacing: 0.08em;
+  padding: 0;
+  text-transform: uppercase;
+}
+.episode-note {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.episode-note textarea {
+  background: var(--white);
+  border: 1px solid var(--paper-line);
+  color: var(--ink);
+  min-height: 72px;
+  padding: 10px;
+  resize: vertical;
+  width: 100%;
+}
+.episode-note-actions {
+  display: flex;
+  gap: 8px;
+}
+.episode-note-actions button {
+  background: var(--acid);
+  border: 0;
+  color: var(--ink);
+  font: 800 10px var(--mono);
+  letter-spacing: 0.06em;
+  min-height: 32px;
+  padding: 0 14px;
+  text-transform: uppercase;
+}
+.episode-note-actions button.quiet {
+  background: none;
+  border: 1px solid var(--paper-line);
+}
+
+@media (max-width: 900px) {
+  .episode-row {
+    grid-template-columns: 24px 1fr;
+  }
+  .episode-still {
+    max-width: 100%;
+  }
+}
