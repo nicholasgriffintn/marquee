@@ -102,6 +102,7 @@ export type ViewingContext = {
   status: EntryStatus;
   rating: number | null;
   thoughts: string;
+  updatedAt: string;
 };
 
 export type ViewerContext = {

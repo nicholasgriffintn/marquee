@@ -6,12 +6,16 @@ import type { ChatMessage } from "../lib/curator-payload.ts";
 import { logError } from "../lib/logging.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { isRecord } from "../lib/values.ts";
+import { readBeliefs } from "../repositories/beliefs.ts";
 import { searchCatalogue } from "../repositories/catalog-search.ts";
-import { readViewerContext } from "../repositories/viewer-context.ts";
+import { neverTitleIds, rejectedTitleIds } from "../repositories/signals.ts";
+import { readShelfDetail, readViewerContext } from "../repositories/viewer-context.ts";
 import type { Bindings } from "../types.ts";
+import { viewerSummary } from "./beliefs.ts";
 import { retrieveTitles } from "./retrieval.ts";
 import { tasteVector } from "./taste.ts";
 import { preferenceSummary, readViewerPreferences } from "./usher.ts";
+import { factBrief, factsFor, serviceFor } from "./why.ts";
 
 const SHORTLIST = 8;
 const NEIGHBOUR_TOP_K = 80;
@@ -19,7 +23,7 @@ const NEIGHBOUR_TOP_K = 80;
 const PICK_PROMPT = [
   USHER_VOICE,
   "You are picking exactly one thing for this viewer to watch tonight. Commit to it.",
-  "Give one sentence on why, in your own voice. Name something concrete about the title, not a genre label.",
+  "Give one sentence on why, in your own voice. Use only the facts you are given; never invent a comparison, a runtime or a service.",
   'Reply with JSON only: {"titleId":"","line":""}.',
 ].join(" ");
 
@@ -57,11 +61,16 @@ export async function shortlistFor(
   } = {},
 ) {
   const constraints = options.constraints ?? {};
-  const preferences = await readViewerPreferences(env.DB, viewerId);
+  const [preferences, remembered, refused] = await Promise.all([
+    readViewerPreferences(env.DB, viewerId),
+    rejectedTitleIds(env.DB, viewerId),
+    neverTitleIds(env.DB, viewerId),
+  ]);
   const services = [...new Set([...(options.providerIds ?? []), ...preferences.providerIds])];
   const viewer = await readViewerContext(env.DB, viewerId, services);
   const exclude = [
     ...(options.rejected ?? []),
+    ...remembered,
     ...viewer.entries
       .filter((entry) => entry.status === "watched" || entry.status === "dropped")
       .map((entry) => entry.titleId),
@@ -78,7 +87,10 @@ export async function shortlistFor(
     ...loose,
     ...(constraints.genres?.length ? { genres: constraints.genres.slice(0, 6) } : {}),
   };
-  const vector = await tasteVector(env, viewer, preferences);
+  const vector = await tasteVector(env, viewer, preferences, {
+    never: refused,
+    summary: await viewerSummary(env, viewerId, preferences),
+  });
 
   if (vector) {
     try {
@@ -152,6 +164,16 @@ export async function pickOne(
     )
     .join("\n");
   const summary = preferenceSummary(preferences);
+  const [shelf, beliefs] = await Promise.all([
+    readShelfDetail(env.DB, viewerId, 20).catch((): never[] => []),
+    readBeliefs(env.DB, viewerId),
+  ]);
+  const factsById = new Map(
+    titles.map((title) => [
+      title.id,
+      factsFor(title, { service: serviceFor(title, providerIds), shelf, beliefs }),
+    ]),
+  );
   const messages: ChatMessage[] = [
     { role: "system", content: PICK_PROMPT },
     {
@@ -162,6 +184,10 @@ export async function pickOne(
         summary ? `What I know about them: ${summary}` : "I know very little about them yet.",
         "",
         `Tonight's options:\n${listing}`,
+        "",
+        titles
+          .map((title) => `${title.id} — ${factBrief(factsById.get(title.id) ?? [])}`)
+          .join("\n"),
       ].join("\n"),
     },
   ];
@@ -183,7 +209,11 @@ export async function pickOne(
       if (chosen) {
         const line = typeof parsed.line === "string" ? parsed.line.trim().slice(0, 160) : "";
 
-        return { item: chosen, line: line || fallbackLine(chosen, showing) };
+        return {
+          item: chosen,
+          line: line || fallbackLine(chosen, showing),
+          facts: factsById.get(chosen.id) ?? [],
+        };
       }
     }
   } catch (error) {
@@ -192,5 +222,9 @@ export async function pickOne(
 
   const [chosen] = titles;
 
-  return { item: chosen, line: fallbackLine(chosen, showing) };
+  return {
+    item: chosen,
+    line: fallbackLine(chosen, showing),
+    facts: factsById.get(chosen.id) ?? [],
+  };
 }

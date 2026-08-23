@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import type { MediaTitle } from "../../domain/catalog";
+import type { Guest } from "../../domain/notebook";
 import { orderPhrase, USHER_ORDER, type TonightOrder } from "../../domain/usher";
 import type { OrderResult, UsherOrderState } from "../../hooks/useUsher";
 import { artwork, artworkSrcSet, heroTitleClass, mediaMeta, scoreLabel } from "../../lib/media";
@@ -13,6 +14,7 @@ function serviceLine(service: string) {
 
 export function UsherOrder({
   state,
+  guests,
   onSubmit,
   onOpen,
   onAnother,
@@ -20,7 +22,8 @@ export function UsherOrder({
   onClose,
 }: {
   state: UsherOrderState;
-  onSubmit: (order: TonightOrder) => void;
+  guests: Guest[];
+  onSubmit: (order: TonightOrder, guestIds: string[]) => void;
   onOpen: (item: MediaTitle) => void;
   onAnother: () => void;
   onEdit: () => void;
@@ -28,6 +31,7 @@ export function UsherOrder({
 }) {
   const [answers, setAnswers] = useState<Partial<TonightOrder>>({});
   const [reply, setReply] = useState("");
+  const [seated, setSeated] = useState<string[]>([]);
 
   const index = USHER_ORDER.findIndex((step) => !answers[step.id]);
   const step = USHER_ORDER[index];
@@ -45,13 +49,14 @@ export function UsherOrder({
     setReply(hint);
 
     if (USHER_ORDER.every((entry) => next[entry.id])) {
-      onSubmit(next as TonightOrder);
+      onSubmit(next as TonightOrder, seated);
     }
   }
 
   function restart() {
     setAnswers({});
     setReply("");
+    setSeated([]);
     onEdit();
   }
 
@@ -115,6 +120,13 @@ export function UsherOrder({
                   {pick.line}
                 </p>
                 <p className="usher-order-service">{serviceLine(pick.service)}</p>
+                {pick.facts.length > 0 && (
+                  <ul className="usher-facts">
+                    {pick.facts.map((fact) => (
+                      <li key={fact}>{fact}</li>
+                    ))}
+                  </ul>
+                )}
                 <div className="hero-actions">
                   <button type="button" className="hero-play" onClick={() => onOpen(pick.item)}>
                     <span className="play-icon">↗</span> See where to watch
@@ -216,6 +228,36 @@ export function UsherOrder({
               </button>
             ))}
           </div>
+
+          {step?.id === "company" && guests.length > 0 && (
+            <div className="usher-seats">
+              <span>Anyone I know?</span>
+              <div>
+                {guests.map((guest) => {
+                  const isSeated = seated.includes(guest.id);
+
+                  return (
+                    <button
+                      key={guest.id}
+                      type="button"
+                      className={isSeated ? "seated" : ""}
+                      aria-pressed={isSeated}
+                      title={guest.vetoes.length ? `No ${guest.vetoes.join(", ")}` : undefined}
+                      onClick={() =>
+                        setSeated((current) =>
+                          current.includes(guest.id)
+                            ? current.filter((id) => id !== guest.id)
+                            : [...current, guest.id],
+                        )
+                      }
+                    >
+                      {guest.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         <p className="usher-order-ticket" aria-hidden="true">

@@ -58,6 +58,11 @@ const COUNT_LABELS: { key: string; label: string }[] = [
   { key: "buzz", label: "buzz measured" },
   { key: "upcoming", label: "episodes ahead" },
   { key: "sections", label: "homepage rails" },
+  { key: "cinemas", label: "cinemas" },
+  { key: "cinemasPlaced", label: "cinemas placed" },
+  { key: "cinemaFilms", label: "cinema films" },
+  { key: "screenings", label: "screenings ahead" },
+  { key: "interestCells", label: "places looked from" },
   { key: "users", label: "accounts" },
 ];
 
@@ -98,6 +103,14 @@ function backfillSummary(rows: BackfillRow[]) {
   }
 
   return [...byMedia.entries()];
+}
+
+function cinemaTotals(rows: { cinemas: number; located: number; screenings: number }[]) {
+  const cinemas = rows.reduce((total, row) => total + row.cinemas, 0);
+  const located = rows.reduce((total, row) => total + row.located, 0);
+  const screenings = rows.reduce((total, row) => total + row.screenings, 0);
+
+  return `${cinemas.toLocaleString()} cinemas across ${rows.length.toLocaleString()} chains, ${located.toLocaleString()} of them placed on a map, ${screenings.toLocaleString()} screenings ahead.`;
 }
 
 function stamp(value: string) {
@@ -244,27 +257,40 @@ export function AdminPage({ user }: { user: User }) {
         </section>
       )}
 
-      {overview && overview.cinemas.length > 0 && (
+      {overview && (
         <section className="panel-block" aria-labelledby="admin-cinemas-title">
           <h2 id="admin-cinemas-title">Cinema listings</h2>
-          <ul className="admin-list">
-            {overview.cinemas.map((row) => (
-              <li key={row.source}>
-                <strong>{row.source}</strong>
-                <small>
-                  {row.located.toLocaleString()} of {row.cinemas.toLocaleString()} placed
-                </small>
-                {row.cinemas > row.located && (
-                  <code>{(row.cinemas - row.located).toLocaleString()} unplaced</code>
-                )}
-                <small>
-                  {row.matched.toLocaleString()} / {row.films.toLocaleString()} films matched
-                </small>
-                <span className="spacer" />
-                <small>{row.screenings.toLocaleString()} ahead</small>
-              </li>
-            ))}
-          </ul>
+          <p className="admin-note">
+            {cinemaTotals(overview.cinemas)} A cinema without coordinates never shows up in a nearby
+            search, and listings are only pulled for the{" "}
+            {(overview.catalogue.interestCells ?? 0).toLocaleString()} places a member has looked
+            from in the last thirty days — with none of those, Pull local listings has nothing to
+            queue.
+          </p>
+          {overview.cinemas.length > 0 ? (
+            <ul className="admin-list">
+              {overview.cinemas.map((row) => (
+                <li key={row.source}>
+                  <strong>{row.source}</strong>
+                  <small>
+                    {row.located.toLocaleString()} of {row.cinemas.toLocaleString()} placed
+                  </small>
+                  {row.cinemas > row.located && (
+                    <code>{(row.cinemas - row.located).toLocaleString()} unplaced</code>
+                  )}
+                  <small>
+                    {row.matched.toLocaleString()} / {row.films.toLocaleString()} films matched
+                  </small>
+                  <span className="spacer" />
+                  <small>{row.screenings.toLocaleString()} ahead</small>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="admin-note">
+              No directory yet. Run Refresh cinema directory to pull the chains.
+            </p>
+          )}
         </section>
       )}
 

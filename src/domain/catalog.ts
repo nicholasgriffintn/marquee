@@ -99,6 +99,7 @@ export type CatalogSection = {
   title: string;
   description: string;
   items: MediaTitle[];
+  angle?: string;
 };
 
 export type CatalogResponse = {

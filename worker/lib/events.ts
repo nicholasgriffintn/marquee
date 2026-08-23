@@ -5,6 +5,7 @@ export type MarqueeEvent = {
     | "search"
     | "browse"
     | "title_view"
+    | "provider_exit"
     | "shelf_save"
     | "shelf_remove"
     | "curator_ask"
@@ -25,6 +26,11 @@ export type MarqueeEvent = {
   titleId?: string;
   detail?: string;
   value?: number;
+  journeyId?: string;
+  source?: string;
+  position?: number;
+  providerId?: string;
+  monetization?: string;
 };
 
 export function recordEvent(env: Bindings, event: MarqueeEvent) {
@@ -40,8 +46,12 @@ export function recordEvent(env: Bindings, event: MarqueeEvent) {
         event.viewerId ?? "anonymous",
         event.titleId ?? "",
         (event.detail ?? "").slice(0, 200),
+        event.journeyId ?? "",
+        event.source ?? "",
+        event.providerId ?? "",
+        event.monetization ?? "",
       ],
-      doubles: [event.value ?? 1],
+      doubles: [event.value ?? 1, event.position ?? -1],
     });
   } catch {
     return;

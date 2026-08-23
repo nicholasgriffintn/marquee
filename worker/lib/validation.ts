@@ -136,6 +136,8 @@ export function viewingContext(value: unknown): ViewingContext[] {
         rating: Number.isInteger(rating) && rating >= 1 && rating <= 5 ? rating : null,
         thoughts:
           typeof candidate.thoughts === "string" ? candidate.thoughts.trim().slice(0, 500) : "",
+        updatedAt:
+          typeof candidate.updatedAt === "string" ? candidate.updatedAt : new Date().toISOString(),
       },
     ];
   });

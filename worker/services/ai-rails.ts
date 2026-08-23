@@ -7,6 +7,7 @@ import { isKnownTitle } from "../lib/validation.ts";
 import { isRecord, parseJson } from "../lib/values.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
 import { readGenres, searchCatalogue } from "../repositories/catalog-search.ts";
+import { neverTitleIds } from "../repositories/signals.ts";
 import { readRailFeedback } from "../repositories/usher.ts";
 import {
   readShelfDetail,
@@ -14,6 +15,8 @@ import {
   readViewerContext,
 } from "../repositories/viewer-context.ts";
 import type { Bindings, ViewerContext } from "../types.ts";
+import { readAngleScores } from "./angle-scores.ts";
+import { viewerSummary } from "./beliefs.ts";
 import { tasteVector } from "./taste.ts";
 import { preferenceSummary, readViewerPreferences, type ViewerPreferences } from "./usher.ts";
 
@@ -85,9 +88,19 @@ const BASE_ANGLES: Angle[] = [
   },
 ];
 
-export type StoredRail = { name: string; reason: string; titleIds: string[] };
+export type StoredRail = { name: string; reason: string; titleIds: string[]; angle?: string };
 
 type RailRow = { signature: string; payload: string; ageHours: number };
+
+export function rankAngles(angles: Angle[], scores: Map<string, number>) {
+  if (scores.size === 0) {
+    return angles;
+  }
+
+  return [...angles].sort(
+    (left, right) => (scores.get(right.id) ?? 0) - (scores.get(left.id) ?? 0),
+  );
+}
 
 export function anglesFor(preferences: ViewerPreferences): Angle[] {
   const motivation = new Set(preferences.motivation);
@@ -462,7 +475,7 @@ export async function buildOneRail(
     const rail = parseRail(response.content, availableIds);
 
     if (rail) {
-      return rail;
+      return { ...rail, angle: angle.id };
     }
 
     console.log(
@@ -496,7 +509,7 @@ export async function buildOneRail(
     }),
   );
 
-  return rail;
+  return rail ? { ...rail, angle: angle.id } : null;
 }
 
 export function railSectionId(name: string) {
@@ -579,6 +592,7 @@ async function hydrate(env: Bindings, rails: StoredRail[]): Promise<CatalogSecti
             title: rail.name,
             description: rail.reason,
             items,
+            ...(rail.angle ? { angle: rail.angle } : {}),
           },
         ]
       : [];
@@ -634,10 +648,15 @@ export async function prepareRails(
   viewerId: string,
   preferences: ViewerPreferences,
 ) {
-  const angles = anglesFor(preferences);
+  const scores = await readAngleScores(env.DB);
+  const angles = rankAngles(anglesFor(preferences), scores);
+  const [refused, summary] = await Promise.all([
+    neverTitleIds(env.DB, viewerId),
+    viewerSummary(env, viewerId, preferences),
+  ]);
   const [onHomepage, vector, behaviour, shelf, allGenres, rejected] = await Promise.all([
     homepageTitleIds(env),
-    tasteVector(env, viewer, preferences),
+    tasteVector(env, viewer, preferences, { never: refused, summary }),
     readViewerAffinity(env.DB, viewerId),
     readShelfDetail(env.DB, viewerId),
     readGenres(env.DB).catch((): string[] => []),

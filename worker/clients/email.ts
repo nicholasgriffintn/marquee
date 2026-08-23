@@ -36,3 +36,44 @@ export async function sendSignInEmail(env: Bindings, to: string, link: string, e
     throw new Error("Could not send that email", { cause: error });
   }
 }
+
+export async function sendArrivalEmail(
+  env: Bindings,
+  to: string,
+  arrivals: { title: string; providerName: string; url: string }[],
+) {
+  if (!env.EMAIL || !env.MAIL_FROM || arrivals.length === 0) {
+    return;
+  }
+
+  const lines = arrivals.map(
+    (arrival) => `${arrival.title} — ${arrival.providerName}
+${arrival.url}`,
+  );
+
+  try {
+    await env.EMAIL.send({
+      to,
+      from: { email: env.MAIL_FROM, name: "The Usher" },
+      subject:
+        arrivals.length === 1
+          ? `${arrivals[0].title} has turned up`
+          : `${arrivals.length} things you were waiting for have turned up`,
+      text: [
+        "Evening.",
+        "",
+        arrivals.length === 1
+          ? "Something you put on your shelf is showing now."
+          : "A few things you put on your shelf are showing now.",
+        "",
+        ...lines,
+        "",
+        "I will not mention them again.",
+        "",
+        "The Usher",
+      ].join("\n"),
+    });
+  } catch (error) {
+    logError("arrival_email_failed", error);
+  }
+}

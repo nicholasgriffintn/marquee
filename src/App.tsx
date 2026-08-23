@@ -34,6 +34,7 @@ import { AdminPage } from "./pages/AdminPage";
 import { BrowsePage, type BrowsePreset } from "./pages/BrowsePage";
 import { DigestPage } from "./pages/DigestPage";
 import { LibraryPage } from "./pages/LibraryPage";
+import { NotebookPage } from "./pages/NotebookPage";
 import { SearchPage } from "./pages/SearchPage";
 import { SignInPage } from "./pages/SignInPage";
 import { SourcesPage } from "./pages/SourcesPage";
@@ -49,6 +50,7 @@ const NAV: { to: string; label: string; private: boolean; admin?: boolean }[] = 
   { to: "/listings", label: "Listings", private: false },
   { to: "/shelf", label: "My shelf", private: true },
   { to: "/this-week", label: "This week", private: true },
+  { to: "/notebook", label: "Notebook", private: true },
   { to: "/admin", label: "Admin", private: true, admin: true },
 ];
 
@@ -424,6 +426,7 @@ export function App() {
               usherMoment={usher.moment}
               pick={usher.pick}
               order={usher.order}
+              guests={usher.guests}
               aside={usher.aside}
               onAsk={askCurator}
               onClearCurator={clearAll}
@@ -434,7 +437,9 @@ export function App() {
               }
               onRejectPick={() => void usher.rejectPick(selectedProviderIds)}
               onStartOrder={() => (isSignedIn ? usher.openOrder() : askForTicket())}
-              onOrder={(order) => void usher.placeOrder(order, selectedProviderIds)}
+              onOrder={(order, guestIds) =>
+                void usher.placeOrder(order, selectedProviderIds, guestIds)
+              }
               onOrderAnother={() => void usher.reorder(selectedProviderIds)}
               onOrderEdit={usher.editOrder}
               onSelectProviders={selectProviders}
@@ -449,6 +454,8 @@ export function App() {
         />
 
         <Route path="/usher" element={<UsherPage />} />
+
+        <Route path="/notebook" element={<NotebookPage isSignedIn={isSignedIn} />} />
 
         <Route
           path="/sign-in"

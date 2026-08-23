@@ -15,6 +15,7 @@ import { eventRoutes } from "./routes/events.ts";
 import { linkRoutes } from "./routes/links.ts";
 import { mcpRoutes } from "./routes/mcp.ts";
 import { mediaRoutes } from "./routes/media.ts";
+import { notebookRoutes } from "./routes/notebook.ts";
 import { profileRoutes } from "./routes/profile.ts";
 import { usherRoutes } from "./routes/usher.ts";
 import { apiGuard } from "./security/guard.ts";
@@ -61,6 +62,8 @@ app.route("/api/profile", profileRoutes);
 app.route("/api/curator", curatorRoutes);
 
 app.route("/api/usher", usherRoutes);
+
+app.route("/api/notebook", notebookRoutes);
 
 app.route("/api/links", linkRoutes);
 

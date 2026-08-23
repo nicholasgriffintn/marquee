@@ -1,4 +1,5 @@
 import type { MediaTitle, ProviderAvailability } from "../../src/domain/catalog.ts";
+import { recordProviderState } from "./arrivals.ts";
 import { readRawItems } from "./catalog-reader.ts";
 
 export async function enrichAvailability(
@@ -49,6 +50,8 @@ export async function enrichAvailability(
       titleId,
     )
     .run();
+
+  await recordProviderState(db, titleId, enrichedTitle.providers);
 
   return true;
 }

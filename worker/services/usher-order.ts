@@ -1,4 +1,4 @@
-import type { MediaTitle, ProviderAvailability } from "../../src/domain/catalog.ts";
+import type { MediaTitle } from "../../src/domain/catalog.ts";
 import { showingFor, type TonightOrder } from "../../src/domain/usher.ts";
 import { USHER_VOICE } from "../ai/usher-voice.ts";
 import { fastModel, requestAiCompletion } from "../clients/ai-gateway.ts";
@@ -6,14 +6,16 @@ import type { ChatMessage } from "../lib/curator-payload.ts";
 import { logError } from "../lib/logging.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { isRecord } from "../lib/values.ts";
+import { readBeliefs } from "../repositories/beliefs.ts";
+import { readGuests, type Guest } from "../repositories/guests.ts";
+import { readShelfDetail } from "../repositories/viewer-context.ts";
 import type { Bindings } from "../types.ts";
 import { shortlistFor, type ShortlistConstraints } from "./usher-pick.ts";
 import { preferenceSummary } from "./usher.ts";
+import { factBrief, factsFor, serviceFor } from "./why.ts";
 
 const ORDER_SHORTLIST = 12;
 const BACKUPS = 2;
-const STREAMING_OFFERS = new Set(["Subscription", "Free", "Free with ads"]);
-
 const COMPANY: Record<string, { note: string; text: string; genres?: string[] }> = {
   alone: {
     note: "watching on their own, answerable to nobody",
@@ -85,16 +87,20 @@ const ORDER_PROMPT = [
   USHER_VOICE,
   "A viewer has told you who is in the room, how long they have, and what they are in the mood for.",
   "Pick one title you would stake your name on, then two backups in case they turn the first one down.",
-  "Each gets one sentence on why, in your own voice, naming something concrete about the title.",
+  "Each gets one sentence on why, in your own voice. Use only the facts you are given about a title; never invent a comparison, a runtime or a service.",
   "Never repeat a title across the three.",
   'Reply with JSON only: {"pick":{"titleId":"","line":""},"backups":[{"titleId":"","line":""},{"titleId":"","line":""}]}.',
 ].join(" ");
 
-export function constraintsFor(order: TonightOrder): ShortlistConstraints {
+export function constraintsFor(order: TonightOrder, guests: Guest[] = []): ShortlistConstraints {
   const company = COMPANY[order.company];
   const length = LENGTH[order.length];
   const mood = MOOD[order.mood];
-  const genres = [...new Set([...(mood?.genres ?? []), ...(company?.genres ?? [])])];
+  const vetoed = new Set(guests.flatMap((guest) => guest.vetoes.map((veto) => veto.toLowerCase())));
+  const leanings = guests.flatMap((guest) => guest.leanings);
+  const genres = [
+    ...new Set([...(mood?.genres ?? []), ...(company?.genres ?? []), ...leanings]),
+  ].filter((genre) => !vetoed.has(genre.toLowerCase()));
 
   return {
     limit: ORDER_SHORTLIST,
@@ -103,24 +109,6 @@ export function constraintsFor(order: TonightOrder): ShortlistConstraints {
     ...(genres.length ? { genres } : {}),
     text: [mood?.text, company?.text, length?.text].filter(Boolean).join(", "),
   };
-}
-
-export function serviceFor(item: MediaTitle, providerIds: string[]) {
-  const all = item.providers ?? [];
-  const mine = providerIds.length
-    ? all.filter((provider) => providerIds.includes(provider.id))
-    : all;
-  const pool = mine.length ? mine : all;
-  const streaming = pool.find((provider: ProviderAvailability) =>
-    provider.offerTypes.some((offer) => STREAMING_OFFERS.has(offer)),
-  );
-  const chosen = streaming ?? pool[0];
-
-  if (!chosen) {
-    return "";
-  }
-
-  return streaming ? chosen.name : `${chosen.name}, to rent`;
 }
 
 function orderLine(item: MediaTitle, order: TonightOrder) {
@@ -147,26 +135,41 @@ export async function pickToOrder(
   env: Bindings,
   viewerId: string,
   order: TonightOrder,
-  options: { providerIds?: string[]; rejected?: string[]; hour?: number; isWeekend?: boolean } = {},
+  options: {
+    providerIds?: string[];
+    rejected?: string[];
+    hour?: number;
+    isWeekend?: boolean;
+    guestIds?: string[];
+  } = {},
 ) {
   const providerIds = options.providerIds ?? [];
   const rejected = (options.rejected ?? []).filter(isKnownTitle).slice(0, 40);
   const showing = showingFor(options.hour ?? 20, options.isWeekend ?? false);
+  const everyone = await readGuests(env.DB, viewerId);
+  const guests = options.guestIds?.length
+    ? everyone.filter((guest) => options.guestIds?.includes(guest.id))
+    : [];
   const { titles, preferences } = await shortlistFor(env, viewerId, {
     providerIds,
     rejected,
-    constraints: constraintsFor(order),
+    constraints: constraintsFor(order, guests),
   });
 
   if (titles.length === 0) {
     return null;
   }
 
-  const dress = (item: MediaTitle, line: string) => ({
-    item,
-    line,
-    service: serviceFor(item, providerIds),
-  });
+  const [shelf, beliefs] = await Promise.all([
+    readShelfDetail(env.DB, viewerId, 20).catch((): never[] => []),
+    readBeliefs(env.DB, viewerId),
+  ]);
+  const dress = (item: MediaTitle, line: string) => {
+    const service = serviceFor(item, providerIds);
+
+    return { item, line, service, facts: factsFor(item, { service, shelf, beliefs }) };
+  };
+
   const listing = titles
     .map(
       (title) =>
@@ -185,6 +188,14 @@ export async function pickToOrder(
       content: [
         showing.brief,
         "",
+        guests.length
+          ? `In the room with them: ${guests
+              .map(
+                (guest) =>
+                  `${guest.name}${guest.vetoes.length ? ` (will not sit through ${guest.vetoes.join(", ")})` : ""}`,
+              )
+              .join("; ")}. The pick has to work for all of them.`
+          : "",
         `Tonight they want: ${[
           COMPANY[order.company]?.note,
           LENGTH[order.length]?.note,
@@ -195,6 +206,14 @@ export async function pickToOrder(
         summary ? `What I know about them otherwise: ${summary}` : "I know very little else.",
         "",
         `Tonight's options:\n${listing}`,
+        "",
+        titles
+          .map((title) => {
+            const service = serviceFor(title, providerIds);
+
+            return `${title.id} — ${factBrief(factsFor(title, { service, shelf, beliefs }))}`;
+          })
+          .join("\n"),
       ].join("\n"),
     },
   ];

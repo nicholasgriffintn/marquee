@@ -7,6 +7,8 @@ import { jsonResponse, readJsonObject } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
 import { retryTransient } from "../lib/retry.ts";
 import { isKnownTitle, validProviderIds } from "../lib/validation.ts";
+import { isRecord } from "../lib/values.ts";
+import { recordSignal } from "../repositories/signals.ts";
 import {
   readAnswers,
   readUsherRecord,
@@ -248,6 +250,7 @@ usherRoutes.post("/pick", async (context) => {
       return jsonResponse({
         item: null,
         line: "Nothing left I would put my name to. Widen your services.",
+        facts: [],
       });
     }
 
@@ -257,7 +260,7 @@ usherRoutes.post("/pick", async (context) => {
       titleId: pick.item.id,
     });
 
-    return jsonResponse({ item: pick.item, line: pick.line });
+    return jsonResponse({ item: pick.item, line: pick.line, facts: pick.facts });
   } catch (error) {
     logError("usher_pick_route_failed", error);
 
@@ -275,6 +278,9 @@ usherRoutes.post("/order", async (context) => {
 
   try {
     const result = await pickToOrder(context.env, user.id, body.order, {
+      guestIds: Array.isArray(body?.guestIds)
+        ? body.guestIds.filter((id): id is string => typeof id === "string").slice(0, 8)
+        : [],
       providerIds: validProviderIds(body?.providerIds),
       rejected: Array.isArray(body?.rejected) ? body.rejected.filter(isKnownTitle) : [],
       hour: viewerHour(body?.hour),
@@ -301,5 +307,40 @@ usherRoutes.post("/order", async (context) => {
     logError("usher_order_route_failed", error);
 
     return jsonResponse({ error: "I can't take orders just now." }, 500);
+  }
+});
+
+const REJECTION_DAYS = 45;
+
+usherRoutes.post("/reject", async (context) => {
+  const user = context.get("authenticatedUser");
+  const body = await readJsonObject(context.req.raw);
+
+  if (!isKnownTitle(body?.titleId)) {
+    return jsonResponse({ error: "Unknown title" }, 400);
+  }
+
+  const forever = body?.scope === "never";
+
+  try {
+    await recordSignal(context.env.DB, user.id, {
+      type: forever ? "never" : "rejection",
+      titleId: body.titleId,
+      ...(typeof body?.journeyId === "string" ? { journeyId: body.journeyId } : {}),
+      context: {
+        source: typeof body?.source === "string" ? body.source.slice(0, 40) : "",
+        reason: typeof body?.reason === "string" ? body.reason.slice(0, 80) : "",
+        order: isRecord(body?.order) ? body.order : undefined,
+        providerIds: validProviderIds(body?.providerIds),
+      },
+      weight: forever ? 3 : 1,
+      ...(forever ? {} : { expiresInDays: REJECTION_DAYS }),
+    });
+
+    return jsonResponse({ recorded: true });
+  } catch (error) {
+    logError("usher_reject_failed", error);
+
+    return jsonResponse({ error: "Could not note that down" }, 500);
   }
 });

@@ -198,10 +198,26 @@ export async function readDigest(env: Bindings, viewerId: string) {
   };
 }
 
-export async function viewersWithShelves(env: Bindings) {
-  const rows = await env.DB.prepare(
-    `SELECT DISTINCT viewer_id AS viewerId FROM viewing_entries LIMIT 200`,
-  ).all<{ viewerId: string }>();
+const VIEWER_PAGE = 500;
 
-  return rows.results.map((row) => row.viewerId);
+export async function viewersWithShelves(env: Bindings) {
+  const viewers: string[] = [];
+
+  for (let page = 0; ; page += 1) {
+    // oxlint-disable-next-line no-await-in-loop
+    const rows = await env.DB.prepare(
+      `SELECT DISTINCT viewer_id AS viewerId FROM viewing_entries
+        ORDER BY viewer_id LIMIT ?1 OFFSET ?2`,
+    )
+      .bind(VIEWER_PAGE, page * VIEWER_PAGE)
+      .all<{ viewerId: string }>();
+
+    viewers.push(...rows.results.map((row) => row.viewerId));
+
+    if (rows.results.length < VIEWER_PAGE || page > 40) {
+      break;
+    }
+  }
+
+  return viewers;
 }

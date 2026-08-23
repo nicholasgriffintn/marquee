@@ -5,7 +5,13 @@ import { UsherMark } from "./UsherMark";
 
 export type ExitKind = "provider" | "trailer" | "tmdb" | "wikipedia" | "imdb" | "cinema" | "other";
 
-export type Exit = { href: string; label: string; kind: ExitKind };
+export type Exit = {
+  href: string;
+  label: string;
+  kind: ExitKind;
+  providerId?: string;
+  monetization?: string;
+};
 
 const SKIP_KEY = "marquee.skipExitWarning";
 
@@ -45,7 +51,15 @@ function hostOf(href: string) {
   }
 }
 
-export function ExitDoor({ exit, onClose }: { exit: Exit; onClose: () => void }) {
+export function ExitDoor({
+  exit,
+  onLeave,
+  onClose,
+}: {
+  exit: Exit;
+  onLeave?: () => void;
+  onClose: () => void;
+}) {
   const stayRef = useRef<HTMLButtonElement>(null);
   const skipRef = useRef<HTMLInputElement>(null);
   const shadeRef = useRef<HTMLDivElement>(null);
@@ -80,6 +94,7 @@ export function ExitDoor({ exit, onClose }: { exit: Exit; onClose: () => void })
       rememberSkip();
     }
 
+    onLeave?.();
     window.open(exit.href, "_blank", "noreferrer");
     onClose();
   }

@@ -139,6 +139,13 @@ export function UsherHero({
               {line}
               {curator.isStreaming && !isPick && <i className="curator-caret" />}
             </p>
+            {isPick && pick.facts.length > 0 && (
+              <ul className="usher-facts">
+                {pick.facts.map((fact) => (
+                  <li key={fact}>{fact}</li>
+                ))}
+              </ul>
+            )}
             <div className="hero-actions">
               <button type="button" className="hero-play" onClick={() => onOpen(active)}>
                 <span className="play-icon">↗</span> See where to watch

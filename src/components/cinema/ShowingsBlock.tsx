@@ -1,4 +1,4 @@
-import type { MouseEvent } from "react";
+import { useState, type MouseEvent } from "react";
 
 import type { CinemaListing, Screening } from "../../domain/cinema";
 import { dayLabel, displayAttributes, distanceLabel, screeningTime } from "../../domain/cinema";
@@ -156,6 +156,12 @@ function Listing({
   );
 }
 
+function optionLabel(listing: CinemaListing) {
+  const distance = distanceLabel(listing.cinema.distanceKm);
+
+  return `${listing.cinema.name}${distance ? ` — ${distance}` : ""} · ${listing.cinema.chain}`;
+}
+
 export function ShowingsBlock({
   listings,
   isLoading,
@@ -167,6 +173,8 @@ export function ShowingsBlock({
   placeLabel: string | null;
   onLeave: (exit: Exit) => (event: MouseEvent<HTMLAnchorElement>) => void;
 }) {
+  const [chosen, setChosen] = useState("");
+
   if (isLoading) {
     return (
       <div className="showings">
@@ -180,15 +188,28 @@ export function ShowingsBlock({
     return null;
   }
 
+  const listing = listings.find((entry) => entry.cinema.id === chosen) ?? listings[0];
+
   return (
     <div className="showings">
       <span className="showings-eyebrow">
         On round here{placeLabel ? <em>· {placeLabel}</em> : null}
       </span>
+      {listings.length > 1 && (
+        <label className="showings-picker">
+          <span>Which house</span>
+          <select value={listing.cinema.id} onChange={(event) => setChosen(event.target.value)}>
+            {listings.map((entry) => (
+              <option key={entry.cinema.id} value={entry.cinema.id}>
+                {optionLabel(entry)}
+              </option>
+            ))}
+          </select>
+          <small>{listings.length.toLocaleString()} nearby, nearest first</small>
+        </label>
+      )}
       <ul className="showings-list">
-        {listings.slice(0, 6).map((listing) => (
-          <Listing key={listing.cinema.id} listing={listing} onLeave={onLeave} />
-        ))}
+        <Listing key={listing.cinema.id} listing={listing} onLeave={onLeave} />
       </ul>
       <p className="showings-foot">
         Other people's houses. I only know what they put on the board.

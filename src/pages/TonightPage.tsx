@@ -10,6 +10,7 @@ import { UsherHero } from "../components/usher/UsherHero";
 import { UsherOnboarding } from "../components/usher/UsherOnboarding";
 import { UsherOrder } from "../components/usher/UsherOrder";
 import type { CatalogSection, MediaTitle, Provider } from "../domain/catalog";
+import type { Guest } from "../domain/notebook";
 import type { TonightOrder, UsherMoment } from "../domain/usher";
 import type { CuratorState } from "../hooks/useCurator";
 import type { ScheduledEpisode } from "../hooks/useTonight";
@@ -51,6 +52,7 @@ export function TonightPage({
   usherMoment,
   pick,
   order,
+  guests,
   aside,
   onAsk,
   onClearCurator,
@@ -89,6 +91,7 @@ export function TonightPage({
   usherMoment: UsherMoment | null;
   pick: UsherPickState;
   order: UsherOrderState;
+  guests: Guest[];
   aside: string;
   onAsk: (prompt: string, isRefinement?: boolean) => Promise<void>;
   onClearCurator: () => void;
@@ -97,7 +100,7 @@ export function TonightPage({
   onPick: () => void;
   onRejectPick: () => void;
   onStartOrder: () => void;
-  onOrder: (order: TonightOrder) => void;
+  onOrder: (order: TonightOrder, guestIds: string[]) => void;
   onOrderAnother: () => void;
   onOrderEdit: () => void;
   onSelectProviders: (ids: string[]) => void;
@@ -161,6 +164,7 @@ export function TonightPage({
             {order.isOpen ? (
               <UsherOrder
                 state={order}
+                guests={guests}
                 onSubmit={onOrder}
                 onOpen={onOpen}
                 onAnother={onOrderAnother}

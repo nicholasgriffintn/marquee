@@ -5,6 +5,7 @@ type EntryRow = {
   status: EntryStatus;
   rating: number | null;
   thoughts: string;
+  updatedAt: string;
 };
 
 export async function readViewerContext(
@@ -14,7 +15,7 @@ export async function readViewerContext(
 ) {
   const entriesResult = await db
     .prepare(
-      `SELECT title_id AS titleId, status, rating, thoughts FROM viewing_entries WHERE viewer_id = ? ORDER BY updated_at DESC LIMIT 100`,
+      `SELECT title_id AS titleId, status, rating, thoughts, updated_at AS updatedAt FROM viewing_entries WHERE viewer_id = ? ORDER BY updated_at DESC LIMIT 100`,
     )
     .bind(viewerId)
     .all<EntryRow>();
@@ -23,6 +24,7 @@ export async function readViewerContext(
     status: entry.status,
     rating: entry.rating,
     thoughts: entry.thoughts.slice(0, 500),
+    updatedAt: entry.updatedAt,
   }));
 
   return { entries, selectedProviderIds };

@@ -15,6 +15,7 @@ import { useAvailability } from "../hooks/useAvailability";
 import { useRecommendations } from "../hooks/useRecommendations";
 import { useShowings } from "../hooks/useShowings";
 import { useTitleInsight } from "../hooks/useTitleInsight";
+import { startJourney } from "../lib/journey";
 import {
   artwork,
   artworkSrcSet,
@@ -272,7 +273,7 @@ export function ContentRail({
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting) && !seenRef.current) {
           seenRef.current = true;
-          track("rail_impression", section.id);
+          track("rail_impression", { detail: section.id, source: section.angle ?? section.id });
           seenCallback.current?.(section);
           observer.disconnect();
         }
@@ -339,7 +340,8 @@ export function ContentRail({
               item={item}
               rank={ranked ? index + 1 : undefined}
               onOpen={(title) => {
-                track("rail_click", section.id, title.id);
+                startJourney(title.id, section.angle ?? section.id, index);
+                track("rail_click", { detail: section.id, titleId: title.id });
                 onOpen(title);
               }}
             />
@@ -404,8 +406,27 @@ export function DetailPanel({
       panel.style.overflow = previous;
     };
   }, [exit]);
+  useEffect(() => {
+    track("title_view", { titleId: item.id });
+  }, [item.id]);
+
+  const reportExit = (next: Exit) => {
+    if (next.kind !== "provider") {
+      return;
+    }
+
+    track("provider_exit", {
+      detail: next.label,
+      titleId: item.id,
+      ...(next.providerId ? { providerId: next.providerId } : {}),
+      ...(next.monetization ? { monetization: next.monetization } : {}),
+    });
+  };
+
   const leaveVia = (next: Exit) => (event: MouseEvent<HTMLAnchorElement>) => {
     if (!shouldWarnOnExit()) {
+      reportExit(next);
+
       return;
     }
 
@@ -515,7 +536,13 @@ export function DetailPanel({
                 rel="noreferrer"
                 className="watch-button"
                 key={provider.id}
-                onClick={leaveVia({ href, label: provider.name, kind: "provider" })}
+                onClick={leaveVia({
+                  href,
+                  label: provider.name,
+                  kind: "provider",
+                  providerId: provider.id,
+                  monetization: provider.offerTypes.join(","),
+                })}
               >
                 <ProviderBadge provider={provider} compact />
                 <span>
@@ -777,7 +804,9 @@ export function DetailPanel({
             )}
           </div>
         </div>
-        {exit && <ExitDoor exit={exit} onClose={() => setExit(null)} />}
+        {exit && (
+          <ExitDoor exit={exit} onLeave={() => reportExit(exit)} onClose={() => setExit(null)} />
+        )}
       </dialog>
     </div>
   );
