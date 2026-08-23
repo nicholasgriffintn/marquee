@@ -3,8 +3,17 @@ import { useEffect, useState } from "react";
 import type { MediaTitle } from "../domain/catalog";
 import { requestJson } from "../lib/api";
 
+export type DigestNumbers = {
+  added: number;
+  finished: number;
+  shelved: number;
+  catalogue: number;
+};
+
 export type Digest = {
   createdAt: string;
+  lead: { item: MediaTitle | null; line: string } | null;
+  numbers: DigestNumbers;
   fresh: MediaTitle[];
   trending: MediaTitle[];
   episodes: {

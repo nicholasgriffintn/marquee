@@ -5,13 +5,24 @@ import type { Bindings } from "../types.ts";
 import { prepareRails, readRailViewer } from "./ai-rails.ts";
 import { readTrending } from "./buzz.ts";
 import { readTonight } from "./schedule.ts";
+import { pickOne } from "./usher-pick.ts";
 
-const FRESH_PICKS = 6;
-const DIGEST_EPISODES = 12;
+const FRESH_PICKS = 12;
+const DIGEST_TRENDING = 12;
+const DIGEST_EPISODES = 16;
 const NEIGHBOUR_TOP_K = 100;
+
+export type DigestNumbers = {
+  added: number;
+  finished: number;
+  shelved: number;
+  catalogue: number;
+};
 
 export type Digest = {
   createdAt: string;
+  lead: { titleId: string; line: string } | null;
+  numbers: DigestNumbers;
   fresh: string[];
   trending: string[];
   episodes: {
@@ -22,6 +33,43 @@ export type Digest = {
     airsAt: string;
   }[];
 };
+
+async function weekNumbers(env: Bindings, viewerId: string): Promise<DigestNumbers> {
+  const [shelf, catalogue] = await Promise.all([
+    env.DB.prepare(
+      `SELECT
+         sum(CASE WHEN created_at >= datetime('now', '-7 days') THEN 1 ELSE 0 END) AS added,
+         sum(CASE WHEN status = 'watched'
+                   AND updated_at >= datetime('now', '-7 days') THEN 1 ELSE 0 END) AS finished,
+         count(*) AS shelved
+       FROM viewing_entries WHERE viewer_id = ?`,
+    )
+      .bind(viewerId)
+      .first<{ added: number; finished: number; shelved: number }>(),
+    env.DB.prepare(`SELECT count(*) AS catalogue FROM catalog_titles`).first<{
+      catalogue: number;
+    }>(),
+  ]);
+
+  return {
+    added: shelf?.added ?? 0,
+    finished: shelf?.finished ?? 0,
+    shelved: shelf?.shelved ?? 0,
+    catalogue: catalogue?.catalogue ?? 0,
+  };
+}
+
+async function leadForViewer(env: Bindings, viewerId: string, providerIds: string[]) {
+  try {
+    const pick = await pickOne(env, viewerId, { providerIds, hour: 20 });
+
+    return pick ? { titleId: pick.item.id, line: pick.line } : null;
+  } catch (error) {
+    logError("digest_lead_failed", error, { viewerId });
+
+    return null;
+  }
+}
 
 async function freshForViewer(env: Bindings, vector: number[] | null, exclude: string[]) {
   if (!vector) {
@@ -61,7 +109,7 @@ export async function buildDigest(env: Bindings, viewerId: string) {
   }
 
   const { vector, exclude } = await prepareRails(env, viewer, viewerId, preferences);
-  const [fresh, trending, episodes] = await Promise.all([
+  const [fresh, trending, episodes, numbers, lead] = await Promise.all([
     freshForViewer(env, vector, [
       ...exclude,
       ...viewer.entries.map((entry) => entry.titleId),
@@ -70,11 +118,15 @@ export async function buildDigest(env: Bindings, viewerId: string) {
 
       return [];
     }),
-    readTrending(env, 6),
+    readTrending(env, DIGEST_TRENDING),
     readTonight(env, viewerId, DIGEST_EPISODES, 168),
+    weekNumbers(env, viewerId),
+    leadForViewer(env, viewerId, preferences.providerIds),
   ]);
   const digest: Digest = {
     createdAt: new Date().toISOString(),
+    lead,
+    numbers,
     fresh,
     trending,
     episodes: episodes.map((episode) => ({
@@ -121,7 +173,11 @@ export async function readDigest(env: Bindings, viewerId: string) {
   }
 
   const digest = JSON.parse(row.payload) as Digest;
-  const items = await readRanked(env.DB, [...digest.fresh, ...digest.trending]);
+  const items = await readRanked(env.DB, [
+    ...(digest.lead ? [digest.lead.titleId] : []),
+    ...digest.fresh,
+    ...digest.trending,
+  ]);
   const byId = new Map(items.map((item) => [item.id, item]));
   const pick = (ids: string[]): MediaTitle[] =>
     ids.flatMap((id) => {
@@ -132,6 +188,10 @@ export async function readDigest(env: Bindings, viewerId: string) {
 
   return {
     createdAt: digest.createdAt,
+    lead: digest.lead
+      ? { item: byId.get(digest.lead.titleId) ?? null, line: digest.lead.line }
+      : null,
+    numbers: digest.numbers ?? { added: 0, finished: 0, shelved: 0, catalogue: 0 },
     fresh: pick(digest.fresh),
     trending: pick(digest.trending),
     episodes: digest.episodes,

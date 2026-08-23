@@ -1,7 +1,9 @@
+import { ArtPlaceholder } from "../components/ArtPlaceholder";
 import { TitleCard } from "../components/catalog";
 import { UsherMark } from "../components/usher/UsherMark";
 import type { MediaTitle } from "../domain/catalog";
 import { useDigest } from "../hooks/useDigest";
+import { artwork, mediaMeta } from "../lib/media";
 
 function weekOf(value: string | undefined) {
   const created = value ? new Date(value) : new Date();
@@ -40,6 +42,9 @@ export function DigestPage({
   onOpen: (item: MediaTitle) => void;
 }) {
   const { digest, isLoading } = useDigest(isSignedIn);
+  const returning = (digest?.episodes ?? []).filter(
+    (episode) => episode.episode === 1 && (episode.season ?? 1) > 1,
+  );
 
   return (
     <section className="page-section programme-page">
@@ -74,6 +79,82 @@ export function DigestPage({
           <p>Save a few things to your shelf. The first programme goes out on Monday.</p>
         </div>
       )}
+
+      {digest?.lead?.item ? (
+        <article className="programme-lead">
+          <button
+            type="button"
+            className="programme-lead-art"
+            onClick={() => digest.lead?.item && onOpen(digest.lead.item)}
+          >
+            {digest.lead.item.backdropUrl || digest.lead.item.posterUrl ? (
+              <img
+                src={
+                  artwork(
+                    digest.lead.item.backdropUrl ?? digest.lead.item.posterUrl,
+                    780,
+                    digest.lead.item.backdropUrl ? "backdrop" : "poster",
+                  ) ?? ""
+                }
+                alt=""
+                loading="lazy"
+                decoding="async"
+              />
+            ) : (
+              <ArtPlaceholder seed={digest.lead.item.id} label={digest.lead.item.title} wide />
+            )}
+          </button>
+          <div className="programme-lead-copy">
+            <span>The pick of the week</span>
+            <h2>{digest.lead.item.title}</h2>
+            <p className="programme-lead-meta">{mediaMeta(digest.lead.item)}</p>
+            <blockquote>{digest.lead.line}</blockquote>
+            <button
+              type="button"
+              className="programme-lead-open"
+              onClick={() => digest.lead?.item && onOpen(digest.lead.item)}
+            >
+              See where to watch
+            </button>
+          </div>
+        </article>
+      ) : null}
+
+      {digest && digest.numbers.shelved > 0 ? (
+        <dl className="programme-numbers">
+          <div>
+            <dt>Added this week</dt>
+            <dd>{digest.numbers.added}</dd>
+          </div>
+          <div>
+            <dt>Finished</dt>
+            <dd>{digest.numbers.finished}</dd>
+          </div>
+          <div>
+            <dt>On your shelf</dt>
+            <dd>{digest.numbers.shelved}</dd>
+          </div>
+          <div>
+            <dt>In the building</dt>
+            <dd>{digest.numbers.catalogue.toLocaleString()}</dd>
+          </div>
+        </dl>
+      ) : null}
+
+      {returning.length > 0 ? (
+        <>
+          <h2 className="digest-heading">Back this week</h2>
+          <ul className="digest-episodes">
+            {returning.map((episode) => (
+              <li key={`back-${episode.showName}-${episode.airsAt}`}>
+                <time dateTime={episode.airsAt}>{formatWhen(episode.airsAt)}</time>
+                <strong>{episode.showName}</strong>
+                <small>Series {episode.season} begins</small>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
 
       {digest?.fresh.length ? (
         <>
