@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
-import type { CatalogResponse, MediaTitle, Provider, ProvidersResponse } from "../domain/catalog";
+import type { CatalogResponse, Provider, ProvidersResponse } from "../domain/catalog";
 import { ApiError, requestJson } from "../lib/api";
 
 const emptyCatalogue: CatalogResponse = {
@@ -22,22 +22,15 @@ function message(error: unknown) {
   return error instanceof ApiError ? error.message : "Live catalogue is unavailable";
 }
 
-export function useCatalog(
-  providerIds: string[],
-  savedIds: string[],
-  isReady: boolean,
-  wantsSavedTitles: boolean,
-) {
+export function useCatalog(providerIds: string[], isReady: boolean) {
   const [catalogue, setCatalogue] = useState<CatalogResponse>(emptyCatalogue);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [providerSources, setProviderSources] = useState<string[]>([]);
   const [providerStats, setProviderStats] = useState(emptyProviderStats);
-  const [savedTitles, setSavedTitles] = useState<MediaTitle[]>([]);
   const [error, setError] = useState("");
   const [providerError, setProviderError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const providerKey = providerIds.join(",");
-  const savedKey = savedIds.join(",");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -113,45 +106,12 @@ export function useCatalog(
     };
   }, [isReady, providerKey]);
 
-  useEffect(() => {
-    const controller = new AbortController();
-
-    if (!savedKey || !wantsSavedTitles) {
-      return () => controller.abort();
-    }
-
-    async function loadSavedTitles() {
-      try {
-        const response = await requestJson<{ items: MediaTitle[] }>(
-          `/api/catalog/items?ids=${encodeURIComponent(savedKey)}`,
-          { signal: controller.signal },
-        );
-
-        setSavedTitles(response.items);
-      } catch (caught) {
-        if (!(caught instanceof DOMException && caught.name === "AbortError")) {
-          setError(message(caught));
-        }
-      }
-    }
-
-    void loadSavedTitles();
-
-    return () => controller.abort();
-  }, [savedKey, wantsSavedTitles]);
-
-  const currentSavedTitles = useMemo(
-    () => savedTitles.filter((item) => savedKey.split(",").includes(item.id)),
-    [savedKey, savedTitles],
-  );
   const titlesById = useMemo(
     () =>
       new Map(
-        [...catalogue.sections.flatMap((section) => section.items), ...currentSavedTitles].map(
-          (item) => [item.id, item],
-        ),
+        catalogue.sections.flatMap((section) => section.items).map((item) => [item.id, item]),
       ),
-    [catalogue, currentSavedTitles],
+    [catalogue],
   );
 
   return {
@@ -160,7 +120,6 @@ export function useCatalog(
     providerError,
     providerSources,
     providerStats,
-    savedTitles: currentSavedTitles,
     titlesById,
     error,
     isLoading,

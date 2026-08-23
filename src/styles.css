@@ -1862,6 +1862,28 @@ h2 em {
   font: 10px var(--mono);
   padding: 7px 9px;
 }
+.shelf-more {
+  display: flex;
+  justify-content: center;
+  margin: 34px 0 10px;
+}
+.shelf-more button {
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--white);
+  font: 800 10px var(--mono);
+  letter-spacing: 0.1em;
+  padding: 15px 26px;
+  text-transform: uppercase;
+}
+.shelf-more button:not(:disabled):hover {
+  border-color: var(--acid);
+  color: var(--acid);
+}
+.shelf-more button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
 .empty-library {
   border: 1px dashed var(--line);
   padding: 60px;

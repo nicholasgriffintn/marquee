@@ -93,21 +93,13 @@ export function App() {
   const { selectedProviderIds, selectProviders } = useProviderPreferences();
   const isViewerReady = !session.isLoading && profile.isLoaded;
   const isHome = location.pathname === "/";
-  const catalog = useCatalog(
-    selectedProviderIds,
-    profile.savedIds,
-    isViewerReady && isHome,
-    isViewerReady && (isHome || location.pathname === "/shelf"),
-  );
+  const catalog = useCatalog(selectedProviderIds, isViewerReady && isHome);
   const search = useSearch(query, selectedProviderIds);
   const curator = useCurator();
   const usher = useUsher(isSignedIn);
   const pinned = usePinned(isSignedIn);
-  const aiRails = useAiRails(isSignedIn && isViewerReady && isHome, profile.savedIds.join(","));
-  const personalRails = usePersonalRails(
-    isSignedIn && isViewerReady && isHome,
-    profile.savedIds.join(","),
-  );
+  const aiRails = useAiRails(isSignedIn && isViewerReady && isHome, profile.shelfKey);
+  const personalRails = usePersonalRails(isSignedIn && isViewerReady && isHome, profile.shelfKey);
   const episodes = useTonight(isViewerReady, TONIGHT_EPISODES);
   const trending = useTrending(isViewerReady && isHome);
   const movieMatch = useMatch("/movie/:tmdbId/*");
@@ -316,11 +308,10 @@ export function App() {
   const onShelfMoment = useCallback(
     () =>
       void requestMoment("shelf", {
-        savedCount: profile.savedIds.length,
-        unratedCount: Object.values(profile.entries).filter((entry) => entry.rating === null)
-          .length,
+        savedCount: profile.shelved,
+        unratedCount: profile.unrated,
       }),
-    [profile.entries, profile.savedIds.length, requestMoment],
+    [profile.shelved, profile.unrated, requestMoment],
   );
 
   const onRailSeen = useCallback(
@@ -360,7 +351,7 @@ export function App() {
               aria-current={location.pathname === item.to ? "page" : undefined}
             >
               {item.label}
-              {item.to === "/shelf" && <sup>{profile.savedIds.length}</sup>}
+              {item.to === "/shelf" && <sup>{profile.shelved}</sup>}
             </Link>
           ))}
         </nav>
@@ -540,9 +531,7 @@ export function App() {
             element={
               isSignedIn ? (
                 <LibraryPage
-                  entries={profile.entries}
-                  titles={catalog.savedTitles}
-                  catalogueError={catalog.error}
+                  isSignedIn={isSignedIn}
                   usherMoment={usher.moment?.surface === "shelf" ? usher.moment : null}
                   onClaim={(entry) => void profile.saveEntry(entry)}
                   onDiscard={(titleId) => void profile.removeEntry(titleId)}
@@ -608,6 +597,7 @@ export function App() {
             onStatus={profile.setStatus}
             onUpdateDraft={profile.updateDraft}
             onTracked={profile.refresh}
+            onLoadEntry={profile.loadEntry}
           />
         </ErrorBoundary>
       )}
@@ -695,6 +685,7 @@ function TitleOverlay({
   onStatus,
   onUpdateDraft,
   onTracked,
+  onLoadEntry,
   selectedProviderIds,
 }: {
   titleId: string;
@@ -714,9 +705,14 @@ function TitleOverlay({
   onStatus: (titleId: string, status: EntryStatus) => void;
   onUpdateDraft: (titleId: string, patch: Partial<ViewingEntry>) => void;
   onTracked: () => void;
+  onLoadEntry: (titleId: string) => Promise<void>;
   selectedProviderIds: string[];
 }) {
   const isSaved = Boolean(entries[titleId]);
+
+  useEffect(() => {
+    void onLoadEntry(titleId);
+  }, [onLoadEntry, titleId]);
 
   useEffect(() => {
     if (isSaved) {

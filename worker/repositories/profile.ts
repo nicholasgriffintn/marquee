@@ -91,3 +91,36 @@ export async function deleteViewingEntry(db: D1Database, viewerId: string, title
     .bind(viewerId, titleId)
     .run();
 }
+
+export async function readProfileSummary(db: D1Database, viewerId: string) {
+  const row = await db
+    .prepare(
+      `SELECT count(*) AS shelved,
+              sum(CASE WHEN rating IS NULL THEN 1 ELSE 0 END) AS unrated,
+              COALESCE(max(updated_at), '') AS updatedAt
+         FROM viewing_entries
+        WHERE viewer_id = ?`,
+    )
+    .bind(viewerId)
+    .first<{ shelved: number; unrated: number | null; updatedAt: string }>();
+
+  return {
+    shelved: row?.shelved ?? 0,
+    unrated: row?.unrated ?? 0,
+    updatedAt: row?.updatedAt ?? "",
+  };
+}
+
+export async function readViewingEntry(db: D1Database, viewerId: string, titleId: string) {
+  const row = await db
+    .prepare(
+      `SELECT id, title_id AS titleId, status, rating, thoughts, season, episode,
+              updated_at AS updatedAt
+         FROM viewing_entries
+        WHERE viewer_id = ?1 AND title_id = ?2`,
+    )
+    .bind(viewerId, titleId)
+    .first();
+
+  return isRecord(row) && typeof row.titleId === "string" ? row : null;
+}

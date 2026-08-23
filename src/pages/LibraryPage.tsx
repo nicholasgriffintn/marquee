@@ -7,10 +7,10 @@ import { UsherCard } from "../components/usher/UsherCard";
 import { UsherMark } from "../components/usher/UsherMark";
 import type { MediaTitle } from "../domain/catalog";
 import { episodeLabel } from "../domain/seasons";
+import { isShelfSort, type ShelfSort } from "../domain/shelf";
 import type { UsherMoment } from "../domain/usher";
+import { useShelf } from "../hooks/useShelf";
 import type { EntryStatus, ViewingEntry } from "../types";
-
-type ShelfSort = "added" | "year" | "genre" | "rating" | "status";
 
 const SORTS: { value: ShelfSort; label: string }[] = [
   { value: "added", label: "Recently added" },
@@ -28,14 +28,6 @@ const STATUS_LABELS: Record<EntryStatus, string> = {
 };
 
 const STATUS_ORDER: EntryStatus[] = ["watching", "watchlist", "watched", "dropped"];
-
-const LOST_AFTER_DAYS = 180;
-
-function staleFor(entry: ViewingEntry) {
-  const updated = entry.updatedAt ? Date.parse(entry.updatedAt) : Number.NaN;
-
-  return Number.isFinite(updated) ? (Date.now() - updated) / 86_400_000 : 0;
-}
 
 function sinceLabel(entry: ViewingEntry) {
   const updated = entry.updatedAt ? new Date(entry.updatedAt) : null;
@@ -94,9 +86,7 @@ function sortGroups(sort: ShelfSort, names: string[]) {
 }
 
 export function LibraryPage({
-  entries,
-  titles,
-  catalogueError,
+  isSignedIn,
   usherMoment,
   onClaim,
   onDiscard,
@@ -106,9 +96,7 @@ export function LibraryPage({
   onUsherAction,
   onUsherDismiss,
 }: {
-  entries: Record<string, ViewingEntry>;
-  titles: MediaTitle[];
-  catalogueError: string;
+  isSignedIn: boolean;
   usherMoment: UsherMoment | null;
   onClaim: (entry: ViewingEntry) => void;
   onDiscard: (titleId: string) => void;
@@ -119,30 +107,25 @@ export function LibraryPage({
   onUsherDismiss: (scope: "once" | "kind") => void;
 }) {
   const [params, setParams] = useSearchParams();
-  const savedCount = Object.keys(entries).length;
-  const lost = titles
-    .flatMap((item) => {
-      const entry = entries[item.id];
-
-      return entry && entry.status === "watchlist" && staleFor(entry) >= LOST_AFTER_DAYS
-        ? [{ item, entry }]
-        : [];
-    })
-    .sort((left, right) => staleFor(right.entry) - staleFor(left.entry))
-    .slice(0, 8);
+  const query = (params.get("q") ?? "").trim();
+  const statusFilter = params.get("status") ?? "";
+  const genreFilter = params.get("genre") ?? "";
+  const sortParam = params.get("sort");
+  const sort: ShelfSort = isShelfSort(sortParam) ? sortParam : "added";
+  const shelf = useShelf(isSignedIn, {
+    sort,
+    status: statusFilter,
+    genre: genreFilter,
+    query,
+  });
+  const savedCount = shelf.shelved;
+  const lost = shelf.lost.map(({ entry, title }) => ({ entry, item: title }));
 
   useEffect(() => {
     if (savedCount >= 5) {
       onUsherRequest();
     }
   }, [onUsherRequest, savedCount]);
-  const query = (params.get("q") ?? "").trim().toLowerCase();
-  const statusFilter = params.get("status") ?? "";
-  const genreFilter = params.get("genre") ?? "";
-  const sortParam = params.get("sort");
-  const sort: ShelfSort = SORTS.some((option) => option.value === sortParam)
-    ? (sortParam as ShelfSort)
-    : "added";
 
   function update(next: Record<string, string>) {
     const merged = new URLSearchParams(params);
@@ -158,26 +141,8 @@ export function LibraryPage({
     setParams(merged, { replace: true });
   }
 
-  const shelved = titles.flatMap((item) => {
-    const entry = entries[item.id];
-
-    return entry ? [{ item, entry }] : [];
-  });
-  const genres = [...new Set(shelved.flatMap(({ item }) => item.genres))].sort();
-  const visible = shelved.filter(
-    ({ item, entry }) =>
-      (!query || item.title.toLowerCase().includes(query)) &&
-      (!statusFilter || entry.status === statusFilter) &&
-      (!genreFilter || item.genres.includes(genreFilter)),
-  );
-
-  if (sort === "rating") {
-    visible.sort((left, right) => (right.entry.rating ?? 0) - (left.entry.rating ?? 0));
-  } else if (sort === "year") {
-    visible.sort((left, right) => (right.item.year ?? 0) - (left.item.year ?? 0));
-  } else if (sort === "genre" || sort === "status") {
-    visible.sort((left, right) => left.item.title.localeCompare(right.item.title));
-  }
+  const genres = shelf.genres;
+  const visible = shelf.items.map(({ entry, title }) => ({ entry, item: title }));
 
   const grouped = new Map<string, typeof visible>();
 
@@ -198,7 +163,7 @@ export function LibraryPage({
         </div>
         <p>
           {savedCount
-            ? `${visible.length} of ${savedCount} title${savedCount === 1 ? "" : "s"}. Click a poster to rate it or add notes.`
+            ? `${shelf.matched.toLocaleString()} of ${savedCount.toLocaleString()} title${savedCount === 1 ? "" : "s"}. Click a poster to rate it or add notes.`
             : "Ratings and notes stay in your account and shape your recommendations."}
         </p>
       </div>
@@ -243,9 +208,9 @@ export function LibraryPage({
         </ErrorBoundary>
       )}
 
-      {catalogueError && savedCount > 0 && !titles.length && (
+      {shelf.error && (
         <p className="catalogue-error" role="alert">
-          We couldn’t load your saved titles. Try again in a moment.
+          {shelf.error}
         </p>
       )}
 
@@ -359,7 +324,21 @@ export function LibraryPage({
         </ErrorBoundary>
       ))}
 
-      {savedCount > 0 && visible.length === 0 && (
+      {shelf.hasMore && (
+        <div className="shelf-more">
+          <button
+            type="button"
+            onClick={() => void shelf.loadMore()}
+            disabled={shelf.isLoadingMore}
+          >
+            {shelf.isLoadingMore
+              ? "Fetching…"
+              : `Show more · ${(shelf.matched - visible.length).toLocaleString()} to go`}
+          </button>
+        </div>
+      )}
+
+      {savedCount > 0 && visible.length === 0 && !shelf.isLoading && (
         <div className="search-empty">
           <h2>Nothing on your shelf matches.</h2>
           <p>Try clearing a filter or searching for something else.</p>

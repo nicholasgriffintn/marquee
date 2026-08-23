@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 
+import { isShelfSort, shelfStatus, SHELF_PAGE_SIZE } from "../../src/domain/shelf.ts";
 import type { DiaryRow } from "../../src/lib/letterboxd.ts";
 import { requireAuthentication, type AuthVariables } from "../auth/session.ts";
 import { recordEvent } from "../lib/events.ts";
@@ -9,7 +10,13 @@ import { isKnownTitle } from "../lib/validation.ts";
 import { isRecord } from "../lib/values.ts";
 import { recentExitFor, recordSignal } from "../repositories/signals.ts";
 import { importDiary } from "../services/import-letterboxd.ts";
-import { getProfile, removeFromProfile, updateProfile } from "../services/profile.ts";
+import {
+  getProfile,
+  getShelf,
+  getViewingEntry,
+  removeFromProfile,
+  updateProfile,
+} from "../services/profile.ts";
 import type { Bindings } from "../types.ts";
 
 const IMPORT_BATCH = 100;
@@ -29,6 +36,49 @@ profileRoutes.get("/", async (context) => {
     logError("profile_read_failed", error);
 
     return jsonResponse({ error: "Profile unavailable" }, 500);
+  }
+});
+
+profileRoutes.get("/entry/:titleId", async (context) => {
+  const user = context.get("authenticatedUser");
+
+  try {
+    const entry = await getViewingEntry(context.env.DB, user.id, context.req.param("titleId"));
+
+    context.header("cache-control", "private, no-store");
+
+    return jsonResponse({ entry });
+  } catch (error) {
+    logError("profile_entry_read_failed", error);
+
+    return jsonResponse({ entry: null });
+  }
+});
+
+profileRoutes.get("/shelf", async (context) => {
+  const user = context.get("authenticatedUser");
+  const requestedPage = Number.parseInt(context.req.query("page") ?? "0", 10);
+  const page =
+    Number.isInteger(requestedPage) && requestedPage > 0 ? Math.min(requestedPage, 500) : 0;
+  const sortParam = context.req.query("sort");
+
+  try {
+    const shelf = await getShelf(context.env.DB, user.id, {
+      status: shelfStatus(context.req.query("status")),
+      genre: (context.req.query("genre") ?? "").trim().slice(0, 60) || null,
+      query: (context.req.query("q") ?? "").trim().slice(0, 80),
+      sort: isShelfSort(sortParam) ? sortParam : "added",
+      page,
+      pageSize: SHELF_PAGE_SIZE,
+    });
+
+    context.header("cache-control", "private, no-store");
+
+    return jsonResponse(shelf);
+  } catch (error) {
+    logError("shelf_read_failed", error);
+
+    return jsonResponse({ error: "Your shelf is out of reach for a moment." }, 503);
   }
 });
 

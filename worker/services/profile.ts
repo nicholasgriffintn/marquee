@@ -1,13 +1,61 @@
+import type { ShelfResponse } from "../../src/domain/shelf.ts";
 import { isEntryStatus, isKnownTitle } from "../lib/validation.ts";
 import { deleteEpisodeEntries } from "../repositories/episode-entries.ts";
-import { deleteViewingEntry, readProfile, saveViewingEntry } from "../repositories/profile.ts";
+import {
+  deleteViewingEntry,
+  readProfileSummary,
+  readViewingEntry,
+  saveViewingEntry,
+} from "../repositories/profile.ts";
+import {
+  readLostProperty,
+  readShelfGenres,
+  readShelfPage,
+  type ShelfPageQuery,
+} from "../repositories/shelf.ts";
 
 const MAX_THOUGHTS_LENGTH = 2_000;
 
 type ProfileUpdateResult = { ok: true; payload: unknown } | { ok: false; error: string };
 
 export async function getProfile(db: D1Database, viewerId: string) {
-  return readProfile(db, viewerId);
+  return readProfileSummary(db, viewerId);
+}
+
+export async function getViewingEntry(db: D1Database, viewerId: string, titleId: string) {
+  if (!isKnownTitle(titleId)) {
+    return null;
+  }
+
+  return readViewingEntry(db, viewerId, titleId);
+}
+
+const LOST_AFTER_DAYS = 180;
+const LOST_LIMIT = 8;
+
+export async function getShelf(
+  db: D1Database,
+  viewerId: string,
+  query: ShelfPageQuery,
+): Promise<ShelfResponse> {
+  const [page, genres, lost] = await Promise.all([
+    readShelfPage(db, viewerId, query),
+    query.page === 0 ? readShelfGenres(db, viewerId) : Promise.resolve([]),
+    query.page === 0
+      ? readLostProperty(db, viewerId, LOST_AFTER_DAYS, LOST_LIMIT)
+      : Promise.resolve([]),
+  ]);
+
+  return {
+    items: page.items,
+    lost,
+    genres,
+    matched: page.matched,
+    shelved: page.shelved,
+    page: query.page,
+    pageSize: query.pageSize,
+    hasMore: (query.page + 1) * query.pageSize < page.matched,
+  };
 }
 
 function countOrNull(value: unknown, limit: number) {
