@@ -5,7 +5,7 @@ const SEARCH_ENDPOINT = "https://archive.org/advancedsearch.php";
 const METADATA_ENDPOINT = "https://archive.org/metadata";
 const DOWNLOAD_ORIGIN = "https://archive.org/download";
 const TIMEOUT_MS = 20_000;
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 25;
 
 const PLAYABLE_FORMATS = ["h.264 ia", "h.264", "mpeg4", "512kb mpeg4", "ogg video"];
 

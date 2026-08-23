@@ -169,5 +169,5 @@ export async function searchScreeningRoom(page: number) {
     ];
   });
 
-  return { candidates, hasMore: Boolean(positiveNumber(pagination?.next)) };
+  return { candidates, hasMore: Boolean(firstString(pagination?.next)) };
 }

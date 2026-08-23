@@ -27,8 +27,12 @@ import { findTitleForFilm } from "./cinema-matching.ts";
 const US_TERM_YEARS = 96;
 const MIN_RUNTIME_SECONDS = 60;
 const NOW_SHOWING = 12;
-const DECADE_MIN = 3;
 const HOME_NATIONS = new Set(["United Kingdom", "Ireland"]);
+const ARCHIVE_LANES = 5;
+const ARCHIVE_BUDGET_MS = 45_000;
+const ARCHIVE_PAGE = 25;
+const SHELF_LIMIT = 40;
+const SHELF_MIN = 3;
 
 export function usPublicDomainCutoff(now = new Date()) {
   return now.getUTCFullYear() - US_TERM_YEARS;
@@ -82,13 +86,33 @@ export async function syncArchiveCollection(env: Bindings, collection: string) {
   const page = cursor[collection] ?? 1;
   const { identifiers, total } = await searchArchiveCollection(collection, page, cutoff);
   const counts = { seen: 0, accepted: 0, rejected: 0 };
+  const deadline = Date.now() + ARCHIVE_BUDGET_MS;
+  let cut = false;
 
-  for (const identifier of identifiers) {
-    counts.seen += 1;
+  for (let index = 0; index < identifiers.length; index += ARCHIVE_LANES) {
+    if (Date.now() > deadline) {
+      cut = true;
 
-    try {
-      // oxlint-disable-next-line no-await-in-loop
-      const item = await readArchiveItem(identifier);
+      break;
+    }
+
+    const lane = identifiers.slice(index, index + ARCHIVE_LANES);
+
+    // oxlint-disable-next-line no-await-in-loop
+    const items = await Promise.all(
+      lane.map(async (identifier) => {
+        try {
+          return await readArchiveItem(identifier);
+        } catch (error) {
+          logError("revival_archive_item_failed", error, { area: "revival", identifier });
+
+          return null;
+        }
+      }),
+    );
+
+    for (const item of items) {
+      counts.seen += 1;
 
       if (!item) {
         counts.rejected += 1;
@@ -107,18 +131,16 @@ export async function syncArchiveCollection(env: Bindings, collection: string) {
       } else {
         counts.rejected += 1;
       }
-    } catch (error) {
-      counts.rejected += 1;
-      logError("revival_archive_item_failed", error, { area: "revival", identifier });
     }
   }
 
-  const exhausted = identifiers.length === 0 || page * 50 >= total;
+  const exhausted = identifiers.length === 0 || page * ARCHIVE_PAGE >= total;
+  const next = cut ? page : exhausted ? 1 : page + 1;
 
   await recordSourceRun(
     env.DB,
     "archive",
-    JSON.stringify({ ...cursor, [collection]: exhausted ? 1 : page + 1 }),
+    JSON.stringify({ ...cursor, [collection]: next }),
     counts,
   );
 
@@ -186,9 +208,6 @@ export async function syncEuropeanaCountry(env: Bindings, country: string) {
 
 export async function queueRevivalSources(env: Bindings) {
   const jobs = [
-    ...ARCHIVE_COLLECTIONS.map((collection) => ({
-      body: { type: "sync-revival-source" as const, source: "archive" as const, collection },
-    })),
     { body: { type: "sync-revival-source" as const, source: "loc" as const } },
     ...(env.EUROPEANA_API_KEY
       ? EUROPEANA_COUNTRIES.map((country) => ({
@@ -199,6 +218,9 @@ export async function queueRevivalSources(env: Bindings) {
           },
         }))
       : []),
+    ...ARCHIVE_COLLECTIONS.map((collection) => ({
+      body: { type: "sync-revival-source" as const, source: "archive" as const, collection },
+    })),
   ];
 
   await env.INGESTION_QUEUE.sendBatch(jobs);
@@ -239,49 +261,53 @@ function shelf(id: string, title: string, description: string, works: RevivalWor
 }
 
 export function buildShelves(works: RevivalWork[]) {
-  const features = works.filter((work) => work.kind === "feature");
-  const shorts = works.filter((work) => work.kind === "short");
-  const ephemera = works.filter((work) => work.kind === "ephemeral");
   const shelves: RevivalShelf[] = [];
+  const placed = new Set<string>();
+  const take = (matches: (work: RevivalWork) => boolean) =>
+    works.filter((work) => !placed.has(work.id) && matches(work)).slice(0, SHELF_LIMIT);
+  const add = (id: string, title: string, description: string, items: RevivalWork[]) => {
+    if (items.length < SHELF_MIN) {
+      return;
+    }
 
-  if (features.length || shorts.length) {
+    for (const work of items) {
+      placed.add(work.id);
+    }
+
+    shelves.push(shelf(id, title, description, items));
+  };
+
+  const showable = works.filter((work) => work.kind === "feature" || work.kind === "short");
+
+  if (showable.length) {
     shelves.push(
       shelf(
         "now-showing",
         "On tonight",
         "Running now, on our own screen. No sign-in, no service, no rental.",
-        [...features, ...shorts].slice(0, NOW_SHOWING),
+        showable.slice(0, NOW_SHOWING),
       ),
     );
   }
 
-  const home = works.filter((work) => HOME_NATIONS.has(work.country ?? ""));
-
-  if (home.length >= DECADE_MIN) {
-    shelves.push(
-      shelf("british", "Made here", "British prints, out of copyright and back on a screen.", home),
-    );
-  }
-
-  const european = works.filter(
-    (work) => work.country && !HOME_NATIONS.has(work.country) && work.source === "europeana",
+  add(
+    "british",
+    "Made here",
+    "British and Irish prints, out of copyright and back on a screen.",
+    take((work) => HOME_NATIONS.has(work.country ?? "")),
   );
 
-  if (european.length >= DECADE_MIN) {
-    shelves.push(
-      shelf(
-        "european",
-        "From the continent",
-        "Held by European archives and released by them for anyone to use.",
-        european,
-      ),
-    );
-  }
+  add(
+    "european",
+    "From the continent",
+    "Held by European archives and released by them for anyone to use.",
+    take((work) => Boolean(work.country) && work.source === "europeana"),
+  );
 
   const decades = new Map<number, RevivalWork[]>();
 
-  for (const work of features) {
-    if (work.year === null) {
+  for (const work of works) {
+    if (work.kind !== "feature" || work.year === null || placed.has(work.id)) {
       continue;
     }
 
@@ -291,34 +317,27 @@ export function buildShelves(works: RevivalWork[]) {
   }
 
   for (const [decade, items] of [...decades].sort(([left], [right]) => left - right)) {
-    if (items.length < DECADE_MIN) {
-      continue;
-    }
-
-    shelves.push(
-      shelf(
-        `decade-${decade}`,
-        `The ${decade}s`,
-        `${items.length} feature${items.length === 1 ? "" : "s"} from the ${decade}s.`,
-        [...items].sort((left, right) => (left.year ?? 0) - (right.year ?? 0)),
-      ),
+    add(
+      `decade-${decade}`,
+      `The ${decade}s`,
+      `${items.length} feature${items.length === 1 ? "" : "s"} from the ${decade}s.`,
+      [...items].sort((left, right) => (left.year ?? 0) - (right.year ?? 0)).slice(0, SHELF_LIMIT),
     );
   }
 
-  if (shorts.length) {
-    shelves.push(shelf("shorts", "Shorts and serials", "The bit before the main feature.", shorts));
-  }
+  add(
+    "shorts",
+    "Shorts and serials",
+    "The bit before the main feature.",
+    take((work) => work.kind === "short"),
+  );
 
-  if (ephemera.length) {
-    shelves.push(
-      shelf(
-        "ephemera",
-        "Ephemera",
-        "Industrial films, adverts and instructional reels. Stranger than the features.",
-        ephemera,
-      ),
-    );
-  }
+  add(
+    "ephemera",
+    "Ephemera",
+    "Industrial films, adverts and instructional reels. Stranger than the features.",
+    take((work) => work.kind === "ephemeral"),
+  );
 
   return shelves;
 }
