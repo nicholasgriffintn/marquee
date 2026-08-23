@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { MediaTitle, ProviderAvailability } from "../domain/catalog";
 import { requestJson } from "../lib/api";
@@ -22,6 +22,7 @@ export function useAvailability(item: MediaTitle, enabled: boolean) {
     providers: ProviderAvailability[];
     nextEpisode: NextEpisode | null;
   } | null>(null);
+  const { id, mediaType, tmdbId, providers: listed, watchLink } = item;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -33,7 +34,7 @@ export function useAvailability(item: MediaTitle, enabled: boolean) {
     async function load() {
       try {
         const response = await requestJson<AvailabilityResponse>(
-          `/api/catalog/${item.mediaType}/${item.tmdbId}/availability`,
+          `/api/catalog/${mediaType}/${tmdbId}/availability`,
           { signal: controller.signal },
         );
 
@@ -41,18 +42,10 @@ export function useAvailability(item: MediaTitle, enabled: boolean) {
           return;
         }
 
-        const fallbackById = new Map(item.providers.map((provider) => [provider.id, provider]));
-
         setLoaded({
-          titleId: item.id,
+          titleId: id,
           nextEpisode: response.nextEpisode ?? null,
-          providers: response.providers.map((provider) => {
-            const fallback = fallbackById.get(provider.id);
-
-            return Object.assign({}, provider, {
-              webUrl: provider.webUrl ?? fallback?.webUrl ?? item.watchLink,
-            });
-          }),
+          providers: response.providers,
         });
       } catch (error) {
         if (!(error instanceof DOMException && error.name === "AbortError")) {
@@ -64,12 +57,21 @@ export function useAvailability(item: MediaTitle, enabled: boolean) {
     void load();
 
     return () => controller.abort();
-  }, [enabled, item]);
+  }, [enabled, id, mediaType, tmdbId]);
 
-  const live = enabled && loaded?.titleId === item.id ? loaded : null;
+  const live = enabled && loaded?.titleId === id ? loaded : null;
+  const providers = useMemo(() => {
+    if (!live?.providers.length) {
+      return listed;
+    }
 
-  return {
-    providers: live && live.providers.length ? live.providers : item.providers,
-    nextEpisode: live?.nextEpisode ?? null,
-  };
+    const fallbackById = new Map(listed.map((provider) => [provider.id, provider]));
+
+    return live.providers.map((provider) => ({
+      ...provider,
+      webUrl: provider.webUrl ?? fallbackById.get(provider.id)?.webUrl ?? watchLink,
+    }));
+  }, [listed, live, watchLink]);
+
+  return { providers, nextEpisode: live?.nextEpisode ?? null };
 }

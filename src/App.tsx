@@ -109,15 +109,16 @@ export function App() {
     window.scrollTo({ top: 0, left: 0, behavior: "instant" });
   }, [pagePath]);
 
+  const requestMoment = usher.request;
   const trimmedQuery = query.trim();
   const hasEmptySearch =
     pagePath === "/search" && Boolean(trimmedQuery) && !search.isSearching && !search.items.length;
 
   useEffect(() => {
     if (hasEmptySearch) {
-      void usher.request("search-empty", { query: trimmedQuery });
+      void requestMoment("search-empty", { query: trimmedQuery });
     }
-  }, [hasEmptySearch, trimmedQuery, usher]);
+  }, [hasEmptySearch, requestMoment, trimmedQuery]);
 
   const wantsDrip = isSignedIn && isHome && isViewerReady && !usher.isOnboarding;
 
@@ -126,10 +127,10 @@ export function App() {
       return;
     }
 
-    const timer = window.setTimeout(() => void usher.request("home"), HOME_DRIP_DELAY_MS);
+    const timer = window.setTimeout(() => void requestMoment("home"), HOME_DRIP_DELAY_MS);
 
     return () => window.clearTimeout(timer);
-  }, [usher, wantsDrip]);
+  }, [requestMoment, wantsDrip]);
 
   const openTitle = useCallback(
     (item: MediaTitle) => {
@@ -243,25 +244,25 @@ export function App() {
   );
 
   const onTitleMoment = useCallback(
-    (titleId: string) => void usher.request("title", { titleId }),
-    [usher],
+    (titleId: string) => void requestMoment("title", { titleId }),
+    [requestMoment],
   );
 
   const onShelfMoment = useCallback(
     () =>
-      void usher.request("shelf", {
+      void requestMoment("shelf", {
         savedCount: profile.savedIds.length,
         unratedCount: Object.values(profile.entries).filter((entry) => entry.rating === null)
           .length,
       }),
-    [profile.entries, profile.savedIds.length, usher],
+    [profile.entries, profile.savedIds.length, requestMoment],
   );
 
   const onRailSeen = useCallback(
     (section: CatalogSection) => {
-      void usher.request("rail", { railId: section.id, railName: section.title });
+      void requestMoment("rail", { railId: section.id, railName: section.title });
     },
-    [usher],
+    [requestMoment],
   );
 
   async function saveTitle(item: MediaTitle) {

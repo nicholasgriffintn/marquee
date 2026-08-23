@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { Link } from "react-router-dom";
 
 import type { CatalogSection, MediaTitle } from "../domain/catalog";
@@ -22,6 +30,7 @@ import { ArtPlaceholder } from "./ArtPlaceholder";
 import { ShelfForm } from "./ShelfForm";
 import { TrailerBlock } from "./TrailerBlock";
 import { ArrowIcon, ChevronIcon, PlusIcon, Poster, ProviderBadge } from "./ui";
+import { ExitDoor, shouldWarnOnExit, type Exit } from "./usher/ExitDoor";
 import { UsherMark } from "./usher/UsherMark";
 
 const RAIL_PROVIDER_LIMIT = 3;
@@ -374,6 +383,16 @@ export function DetailPanel({
   const { providers, nextEpisode } = useAvailability(item, availabilityEnabled);
   const { insight, pairs, isLoading: isInsightLoading } = useTitleInsight(item.id);
   const similar = useRecommendations(item.id, item.recommendationIds, SIMILAR_LIMIT);
+  const [exit, setExit] = useState<Exit | null>(null);
+  const leaveVia = (next: Exit) => (event: MouseEvent<HTMLAnchorElement>) => {
+    if (!shouldWarnOnExit()) {
+      return;
+    }
+
+    event.preventDefault();
+    setExit(next);
+  };
+
   const watchDestinations = providers.flatMap((provider) => {
     const href = provider.webUrl ?? item.watchLink;
 
@@ -462,7 +481,7 @@ export function DetailPanel({
             </p>
           )}
           <div className="watch-actions">
-            <span>Watch Now</span>
+            <span>Watch now</span>
             {watchDestinations.map(({ provider, href }) => (
               <a
                 href={href}
@@ -470,6 +489,7 @@ export function DetailPanel({
                 rel="noreferrer"
                 className="watch-button"
                 key={provider.id}
+                onClick={leaveVia({ href, label: provider.name, kind: "provider" })}
               >
                 <ProviderBadge provider={provider} compact />
                 <span>
@@ -682,25 +702,50 @@ export function DetailPanel({
                 href={`https://www.youtube.com/watch?v=${item.trailerKey}`}
                 target="_blank"
                 rel="noreferrer"
+                onClick={leaveVia({
+                  href: `https://www.youtube.com/watch?v=${item.trailerKey}`,
+                  label: "Trailer",
+                  kind: "trailer",
+                })}
               >
                 Trailer <ArrowIcon />
               </a>
             )}
-            <a href={item.tmdbUrl} target="_blank" rel="noreferrer">
+            <a
+              href={item.tmdbUrl}
+              target="_blank"
+              rel="noreferrer"
+              onClick={leaveVia({ href: item.tmdbUrl, label: "TMDB", kind: "tmdb" })}
+            >
               TMDB <ArrowIcon />
             </a>
             {item.buzz && (
-              <a href={item.buzz.articleUrl} target="_blank" rel="noreferrer">
+              <a
+                href={item.buzz.articleUrl}
+                target="_blank"
+                rel="noreferrer"
+                onClick={leaveVia({
+                  href: item.buzz.articleUrl,
+                  label: "Wikipedia",
+                  kind: "wikipedia",
+                })}
+              >
                 Wikipedia <ArrowIcon />
               </a>
             )}
             {item.imdbUrl && (
-              <a href={item.imdbUrl} target="_blank" rel="noreferrer">
+              <a
+                href={item.imdbUrl}
+                target="_blank"
+                rel="noreferrer"
+                onClick={leaveVia({ href: item.imdbUrl, label: "IMDb", kind: "imdb" })}
+              >
                 IMDb <ArrowIcon />
               </a>
             )}
           </div>
         </div>
+        {exit && <ExitDoor exit={exit} onClose={() => setExit(null)} />}
       </dialog>
     </div>
   );

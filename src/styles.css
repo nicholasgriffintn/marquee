@@ -2253,9 +2253,19 @@ h2 em {
   padding-top: 20px;
 }
 .resource-links a {
+  align-items: center;
   border-bottom: 1px solid;
+  display: inline-flex;
   font-size: 10px;
   font-weight: 800;
+  gap: 6px;
+  line-height: 1.6;
+  padding-bottom: 2px;
+}
+.resource-links a svg {
+  flex: 0 0 auto;
+  height: 13px;
+  width: 13px;
 }
 
 .site-footer {
@@ -5022,5 +5032,143 @@ h2 em {
 @media (prefers-reduced-motion: reduce) {
   .programme-lead-open:hover {
     transform: none;
+  }
+}
+
+/* Watch now, matching the other panel headings */
+
+.watch-actions > span {
+  color: #6f7268;
+  font: 800 9px var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* The way out */
+
+.exit-shade {
+  align-items: center;
+  animation: exit-in 0.16s ease;
+  background: rgba(6, 7, 5, 0.72);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 24px;
+  position: fixed;
+  z-index: 60;
+}
+@keyframes exit-in {
+  from {
+    opacity: 0;
+  }
+}
+.exit-backdrop {
+  background: none;
+  border: 0;
+  cursor: default;
+  inset: 0;
+  position: absolute;
+}
+.exit-door {
+  background: var(--panel);
+  position: relative;
+  border: 1px solid var(--panel-line);
+  box-shadow: 12px 12px 0 var(--blue);
+  max-width: 480px;
+  padding: 0 26px 24px;
+  width: 100%;
+}
+.exit-sign {
+  background: var(--acid);
+  color: var(--ink);
+  margin: 0 -26px 24px;
+  padding: 9px 0;
+  text-align: center;
+}
+.exit-sign span {
+  font: 800 12px/1 var(--mono);
+  letter-spacing: 8px;
+  text-transform: uppercase;
+}
+.exit-body {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+.exit-body .usher-mark {
+  flex: 0 0 auto;
+  height: 42px;
+  width: 58px;
+}
+.exit-door h2 {
+  color: var(--white);
+  font: 500 24px/1.1 var(--serif);
+  letter-spacing: -0.02em;
+  margin: 0 0 10px;
+}
+.exit-line {
+  color: var(--white);
+  font: italic 400 16px/1.45 var(--serif);
+  margin: 0 0 14px;
+}
+.exit-host {
+  color: var(--muted);
+  font: 700 10px/1.4 var(--mono);
+  letter-spacing: 1.4px;
+  margin: 0;
+  text-transform: uppercase;
+}
+.exit-host em {
+  color: var(--acid);
+  font-style: normal;
+}
+.exit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.exit-actions button {
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--white);
+  cursor: pointer;
+  font: 700 12px/1 var(--mono);
+  letter-spacing: 1px;
+  padding: 13px 18px;
+  text-transform: uppercase;
+}
+.exit-actions button:hover {
+  border-color: var(--acid);
+  color: var(--acid);
+}
+.exit-actions .exit-go {
+  background: var(--acid);
+  border-color: var(--acid);
+  color: var(--ink);
+}
+.exit-actions .exit-go:hover {
+  background: var(--white);
+  border-color: var(--white);
+  color: var(--ink);
+}
+.exit-skip {
+  align-items: center;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  font: 400 13px/1.3 var(--sans);
+  gap: 9px;
+}
+.exit-skip input {
+  accent-color: var(--acid);
+  flex: 0 0 auto;
+  height: 15px;
+  width: 15px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .exit-shade {
+    animation: none;
   }
 }

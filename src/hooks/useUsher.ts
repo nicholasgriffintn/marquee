@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { MediaTitle } from "../domain/catalog";
 import type { UsherMoment, UsherSurface } from "../domain/usher";
@@ -242,19 +242,37 @@ export function useUsher(isSignedIn: boolean) {
     setAside(line);
   }, []);
 
-  return {
-    moment: isSignedIn ? moment : null,
-    isOnboarding: isSignedIn && isOnboarding,
-    pick,
-    aside: isSignedIn ? aside : "",
-    say,
-    request,
-    answer,
-    skip,
-    dismiss,
-    railVerdict,
-    askForPick,
-    rejectPick,
-    clearPick,
-  };
+  return useMemo(
+    () => ({
+      moment: isSignedIn ? moment : null,
+      isOnboarding: isSignedIn && isOnboarding,
+      pick,
+      aside: isSignedIn ? aside : "",
+      say,
+      request,
+      answer,
+      skip,
+      dismiss,
+      railVerdict,
+      askForPick,
+      rejectPick,
+      clearPick,
+    }),
+    [
+      answer,
+      aside,
+      askForPick,
+      clearPick,
+      dismiss,
+      isOnboarding,
+      isSignedIn,
+      moment,
+      pick,
+      railVerdict,
+      rejectPick,
+      request,
+      say,
+      skip,
+    ],
+  );
 }
