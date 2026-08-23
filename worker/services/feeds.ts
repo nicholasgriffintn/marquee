@@ -5,6 +5,8 @@ import { logError } from "../lib/logging.ts";
 import { databaseDate, parseJson } from "../lib/values.ts";
 import { recentAlerts } from "../repositories/alerts.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
+import { readWatchedEpisodeKeys } from "../repositories/episode-entries.ts";
+import { readShelfEpisodes, type UpcomingEpisode } from "../repositories/seasons.ts";
 import type { Bindings } from "../types.ts";
 import { isAlertKind, KIND_LABELS } from "./alerts/types.ts";
 import type { Digest } from "./digest.ts";
@@ -31,21 +33,30 @@ type ReleaseRow = {
   releaseDate: string;
 };
 
-function behindProgress(row: EpisodeRow) {
-  if (row.watchedSeason === null || row.season === null) {
+function behind(
+  season: number | null,
+  episode: number | null,
+  furthestSeason: number | null,
+  furthestEpisode: number | null,
+) {
+  if (furthestSeason === null || season === null) {
     return false;
   }
 
-  if (row.season < row.watchedSeason) {
+  if (season < furthestSeason) {
     return true;
   }
 
   return (
-    row.season === row.watchedSeason &&
-    row.episode !== null &&
-    row.watchedEpisode !== null &&
-    row.episode <= row.watchedEpisode
+    season === furthestSeason &&
+    episode !== null &&
+    furthestEpisode !== null &&
+    episode <= furthestEpisode
   );
+}
+
+function behindProgress(row: EpisodeRow) {
+  return behind(row.season, row.episode, row.watchedSeason, row.watchedEpisode);
 }
 
 function episodeNumber(row: EpisodeRow) {
@@ -60,6 +71,10 @@ function minutesFor(title: MediaTitle | undefined) {
   const runtime = title?.runtimeMinutes ?? DEFAULT_EPISODE_MINUTES;
 
   return Math.max(15, Math.min(180, runtime));
+}
+
+function slotKey(titleId: string, season: number | null, episode: number | null) {
+  return `${titleId}:${season ?? 0}:${episode ?? 0}`;
 }
 
 async function readEpisodes(env: Bindings, viewerId: string) {
@@ -78,6 +93,13 @@ async function readEpisodes(env: Bindings, viewerId: string) {
     .all<EpisodeRow>();
 
   return rows.results.filter((row) => !behindProgress(row));
+}
+
+async function readAnnouncedEpisodes(env: Bindings, viewerId: string) {
+  const today = new Date().toISOString().slice(0, 10);
+  const episodes = await readShelfEpisodes(env.DB, viewerId);
+
+  return episodes.filter((episode) => episode.airDate !== null && episode.airDate >= today);
 }
 
 async function readReleases(env: Bindings, viewerId: string) {
@@ -148,9 +170,23 @@ function releaseEvent(row: ReleaseRow, title: MediaTitle, origin: string, host: 
   } satisfies CalendarEvent;
 }
 
+function announcedEvent(episode: UpcomingEpisode, title: MediaTitle, origin: string, host: string) {
+  const number = `S${episode.seasonNumber}E${String(episode.episodeNumber).padStart(2, "0")}`;
+  const named = [number, episode.name].filter(Boolean).join(" · ");
+
+  return {
+    uid: `episode-${episode.titleId.replace(":", "-")}-${number}@${host}`,
+    start: episode.airDate ?? "",
+    summary: `${title.title} — ${named}`,
+    description: [episode.overview, "Date announced; no time given yet."].filter(Boolean).join(" "),
+    url: `${origin}${titlePath(title)}`,
+    categories: ["Marquee", "Episode"],
+  } satisfies CalendarEvent;
+}
+
 export async function buildDiaryCalendar(env: Bindings, viewerId: string, origin: string) {
   const host = new URL(origin).hostname;
-  const [episodes, releases] = await Promise.all([
+  const [episodes, releases, announced, watched] = await Promise.all([
     readEpisodes(env, viewerId).catch((error: unknown): EpisodeRow[] => {
       logError("feed_episodes_failed", error, { viewerId });
 
@@ -161,18 +197,56 @@ export async function buildDiaryCalendar(env: Bindings, viewerId: string, origin
 
       return [];
     }),
+    readAnnouncedEpisodes(env, viewerId).catch((error: unknown): UpcomingEpisode[] => {
+      logError("feed_announced_failed", error, { viewerId });
+
+      return [];
+    }),
+    readWatchedEpisodeKeys(env.DB, viewerId).catch((error: unknown): Set<string> => {
+      logError("feed_watched_failed", error, { viewerId });
+
+      return new Set();
+    }),
   ]);
+  const timed = new Set(episodes.map((row) => slotKey(row.titleId, row.season, row.episode)));
   const titles = await readItems(
     env.DB,
-    [...episodes.map((row) => row.titleId), ...releases.map((row) => row.titleId)],
+    [
+      ...episodes.map((row) => row.titleId),
+      ...releases.map((row) => row.titleId),
+      ...announced.map((episode) => episode.titleId),
+    ],
     EPISODE_LIMIT + RELEASE_LIMIT,
   );
   const byId = new Map(titles.map((title) => [title.id, title]));
   const events = [
     ...episodes.flatMap((row) => {
+      if (watched.has(slotKey(row.titleId, row.season, row.episode))) {
+        return [];
+      }
+
       const event = episodeEvent(row, byId.get(row.titleId), origin, host);
 
       return event ? [event] : [];
+    }),
+    ...announced.flatMap((episode) => {
+      const key = slotKey(episode.titleId, episode.seasonNumber, episode.episodeNumber);
+      const title = byId.get(episode.titleId);
+
+      const seen =
+        watched.has(key) ||
+        behind(
+          episode.seasonNumber,
+          episode.episodeNumber,
+          episode.progressSeason,
+          episode.progressEpisode,
+        );
+
+      if (!title || timed.has(key) || seen) {
+        return [];
+      }
+
+      return [announcedEvent(episode, title, origin, host)];
     }),
     ...releases.flatMap((row) => {
       const title = byId.get(row.titleId);

@@ -174,3 +174,40 @@ export async function writeSeasonEpisodes(
     )
     .run();
 }
+
+export type UpcomingEpisode = Episode & {
+  titleId: string;
+  progressSeason: number | null;
+  progressEpisode: number | null;
+};
+
+export async function readShelfEpisodes(db: D1Database, viewerId: string, limit = 200) {
+  const rows = await db
+    .prepare(
+      `SELECT s.title_id AS titleId, s.season_number AS seasonNumber, s.payload AS payload,
+              v.season AS progressSeason, v.episode AS progressEpisode
+         FROM catalog_seasons AS s
+         JOIN viewing_entries AS v ON v.title_id = s.title_id AND v.viewer_id = ?1
+        WHERE v.status IN ('watching', 'watchlist')
+          AND s.season_number > 0
+        ORDER BY s.title_id, s.season_number
+        LIMIT ?2`,
+    )
+    .bind(viewerId, limit)
+    .all<{
+      titleId: string;
+      seasonNumber: number;
+      payload: string;
+      progressSeason: number | null;
+      progressEpisode: number | null;
+    }>();
+
+  return rows.results.flatMap((row): UpcomingEpisode[] =>
+    parseEpisodes(row.payload, row.seasonNumber).map((episode) => ({
+      ...episode,
+      titleId: row.titleId,
+      progressSeason: row.progressSeason,
+      progressEpisode: row.progressEpisode,
+    })),
+  );
+}

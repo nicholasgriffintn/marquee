@@ -317,11 +317,14 @@ on the Notebook page and it goes where you already look. You get two links: an i
 `/feeds/<key>/diary.ics` for Apple Calendar, Google Calendar or Outlook, and an Atom feed at
 `/feeds/<key>/alerts.atom` for a reader.
 
-The calendar carries episodes of anything you are watching or have on the watchlist, skipping what
-sits behind the progress you have recorded, with the running time taken from the catalogue rather
-than guessed. Unreleased watchlist titles arrive as all-day entries on their release date. Cinema
-showings are deliberately absent: a calendar client reads from wherever it happens to live, so
-placing them would mean keeping a location against an account, and Marquee does not.
+The calendar carries episodes of anything you are watching or have on the watchlist, from both
+places dates are kept: TVmaze's schedule for the week ahead, which knows the clock time, and the
+season records from TMDB for everything announced after that, which only knows the day. An episode
+you have ticked off, or one behind the furthest you have reached, is left out, and where the same
+episode appears in both sources the one with a time wins. Unreleased watchlist titles arrive as
+all-day entries on their release date. Cinema showings are deliberately absent: a calendar client
+reads from wherever it happens to live, so placing them would mean keeping a location against an
+account, and Marquee does not.
 
 The reader carries the notes the Usher would have posted — an arrival, a series coming back, a
 cinema run, someone you follow — and the Monday digest. Those alerts previously needed a confirmed
