@@ -2,6 +2,9 @@ import type { RevivalBillSlot, RevivalWork } from "../../src/domain/revival.ts";
 
 const LATE_NIGHT = /horror|crime|noir|thriller|mystery|ghost|monster|murder/iu;
 
+const UNSCORED_STANDING = 550;
+const STANDING_BIAS = 3;
+
 function seedFrom(day: string) {
   let hash = 2_166_136_261;
 
@@ -26,16 +29,17 @@ function shuffler(seed: number) {
   };
 }
 
-function shuffled<T>(items: T[], next: () => number) {
-  const copy = [...items];
+function weightFor(work: RevivalWork) {
+  const standing = (work.popularity ?? UNSCORED_STANDING) / 100;
 
-  for (let index = copy.length - 1; index > 0; index -= 1) {
-    const swap = Math.floor(next() * (index + 1));
+  return Math.max(0.01, standing ** STANDING_BIAS);
+}
 
-    [copy[index], copy[swap]] = [copy[swap], copy[index]];
-  }
-
-  return copy;
+function drawn(items: RevivalWork[], next: () => number) {
+  return items
+    .map((work) => ({ work, key: next() ** (1 / weightFor(work)) }))
+    .sort((left, right) => right.key - left.key)
+    .map((entry) => entry.work);
 }
 
 function lateNight(work: RevivalWork) {
@@ -50,7 +54,7 @@ export function buildBill(works: RevivalWork[], day: string): RevivalBillSlot[] 
   const next = shuffler(seedFrom(day));
   const taken = new Set<string>();
   const bill: RevivalBillSlot[] = [];
-  const pool = shuffled(
+  const pool = drawn(
     works.filter((work) => !work.contentNotice),
     next,
   );

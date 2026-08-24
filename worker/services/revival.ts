@@ -20,6 +20,7 @@ import { billDay, buildBill } from "../lib/revival-bill.ts";
 import { isRecord } from "../lib/values.ts";
 import {
   deleteWork,
+  readAlsoShowing,
   readApprovedWorks,
   readProgress,
   readSourceCursor,
@@ -112,6 +113,7 @@ export async function syncArchiveCollection(env: Bindings, collection: string) {
     entries.map((entry) => ({
       sourceId: entry.identifier,
       popularity: archivePopularity(entry.downloads),
+      downloads: entry.downloads,
     })),
   );
 
@@ -356,7 +358,23 @@ function shelf(id: string, title: string, description: string, works: RevivalWor
   return { id, title, description, works } satisfies RevivalShelf;
 }
 
-type Grouped = { key: string; label: string; works: RevivalWork[] };
+type Grouped = { key: string; label: string; works: RevivalWork[]; size: number };
+
+function upTo(works: RevivalWork[], cap: number, keep: (work: RevivalWork) => boolean) {
+  const picked: RevivalWork[] = [];
+
+  for (const work of works) {
+    if (picked.length >= cap) {
+      break;
+    }
+
+    if (keep(work)) {
+      picked.push(work);
+    }
+  }
+
+  return picked;
+}
 
 function groupBy(
   works: RevivalWork[],
@@ -371,14 +389,19 @@ function groupBy(
     }
 
     for (const { key, label } of pick(work)) {
-      const group = groups.get(key) ?? { key, label, works: [] };
+      const group = groups.get(key) ?? { key, label, works: [], size: 0 };
 
-      group.works.push(work);
+      group.size += 1;
+
+      if (group.works.length < SHELF_LIMIT) {
+        group.works.push(work);
+      }
+
       groups.set(key, group);
     }
   }
 
-  return [...groups.values()].sort((left, right) => right.works.length - left.works.length);
+  return [...groups.values()].sort((left, right) => right.size - left.size);
 }
 
 function tagsOf(work: RevivalWork, kind: RevivalTagKind) {
@@ -400,7 +423,7 @@ export function buildShelves(works: RevivalWork[]) {
       placed.add(work.id);
     }
 
-    shelves.push(shelf(id, title, description, items.slice(0, SHELF_LIMIT)));
+    shelves.push(shelf(id, title, description, items));
   };
 
   const addGroups = (
@@ -442,14 +465,14 @@ export function buildShelves(works: RevivalWork[]) {
     "british",
     "Made here",
     "British and Irish prints, out of copyright and back on a screen.",
-    works.filter((work) => HOME_NATIONS.has(work.country ?? "")),
+    upTo(works, SHELF_LIMIT, (work) => HOME_NATIONS.has(work.country ?? "")),
   );
 
   addGroups(
     groupBy(works, placed, (work) => tagsOf(work, "genre")),
     GENRE_SHELVES,
     (group) => group.label,
-    (group) => `${group.works.length} of them, filed under ${group.label.toLowerCase()}.`,
+    (group) => `${group.size} of them, filed under ${group.label.toLowerCase()}.`,
   );
 
   addGroups(
@@ -494,7 +517,7 @@ export function buildShelves(works: RevivalWork[]) {
     ),
     DECADE_SHELVES,
     (group) => group.label,
-    (group) => `${group.works.length} from the decade.`,
+    (group) => `${group.size} from the decade.`,
   );
 
   add(
@@ -546,16 +569,12 @@ export async function getScreening(env: Bindings, id: string, viewerId: string |
     return null;
   }
 
-  const [progress, approved] = await Promise.all([
+  const [progress, alsoShowing] = await Promise.all([
     viewerId
       ? readProgress(env.DB, viewerId, id)
       : Promise.resolve({ positionSeconds: 0, finished: false }),
-    readApprovedWorks(env.DB, 60),
+    readAlsoShowing(env.DB, work.id, work.kind),
   ]);
-
-  const alsoShowing = approved
-    .filter((other) => other.id !== work.id && other.kind === work.kind)
-    .slice(0, 8);
 
   return { work, ...progress, alsoShowing };
 }

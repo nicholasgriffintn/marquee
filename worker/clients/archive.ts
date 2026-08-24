@@ -55,6 +55,7 @@ export type ArchiveCandidate = {
   rightsNote: string;
   rightsUrl: string | null;
   popularity: number | null;
+  downloads: number | null;
   tags: RevivalTag[];
 };
 
@@ -259,6 +260,7 @@ export async function readArchiveItem(
       : "No public domain marker on the Internet Archive item",
     rightsUrl: licenseUrl || null,
     popularity: archivePopularity(downloads),
+    downloads,
     tags: [
       ...tagList("subject", splitSubjects(metadata.subject)),
       ...tagList(

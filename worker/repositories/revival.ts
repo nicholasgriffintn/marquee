@@ -32,6 +32,7 @@ export type RevivalCandidate = {
   rightsNote: string;
   rightsUrl: string | null;
   popularity?: number | null;
+  downloads?: number | null;
   tags?: RevivalTag[];
 };
 
@@ -60,6 +61,8 @@ type WorkRow = {
   width: number | null;
   height: number | null;
   contentNotice: string | null;
+  popularity: number | null;
+  downloads: number | null;
   posterKey: string | null;
   catalogueBackdrop: string | null;
   cataloguePoster: string | null;
@@ -72,6 +75,7 @@ const WORK_COLUMNS = `w.id, w.source, w.source_url AS sourceUrl, w.title, w.year
    w.title_id AS titleId, w.country, w.uk_clear AS ukClear,
    w.uk_expires_year AS ukExpiresYear, w.stream_url AS streamUrl,
    w.mirror_state AS mirrorState, w.plays, w.content_notice AS contentNotice,
+   w.popularity, w.downloads,
    w.stream_bytes AS streamBytes, w.width, w.height,
    t.poster_key AS posterKey,
    json_extract(t.payload, '$.backdropUrl') AS catalogueBackdrop,
@@ -80,6 +84,10 @@ const WORK_COLUMNS = `w.id, w.source, w.source_url AS sourceUrl, w.title, w.year
 const WORK_FROM = `FROM revival_works AS w LEFT JOIN catalog_titles AS t ON t.id = w.title_id`;
 
 const UNSCORED_POPULARITY = 550;
+
+const SOURCE_QUOTA = 200;
+
+const BY_STANDING = `w.plays DESC, COALESCE(w.popularity, ${UNSCORED_POPULARITY}) DESC, w.sort_title`;
 
 const ID_PATTERN = /^(archive|loc|europeana)\.[\w.-]{1,120}$/u;
 
@@ -141,6 +149,8 @@ function toWork(row: WorkRow): RevivalWork {
     delivery: row.ukClear === 1 ? "mirror" : "source",
     reelUrl: row.ukClear === 1 ? reelPath(row.id) : row.streamUrl,
     plays: row.plays,
+    popularity: row.popularity,
+    downloads: row.downloads,
     condition: printCondition(row.streamBytes, row.runtimeSeconds, row.height),
     contentNotice: row.contentNotice ?? contentNoticeFor(row.title, row.synopsis),
     tags: [],
@@ -214,9 +224,10 @@ export async function upsertWork(
       `INSERT INTO revival_works (
          id, source, source_id, source_url, title, sort_title, year, director, synopsis,
          kind, runtime_seconds, still_url, stream_url, stream_bytes, stream_type,
-         width, height, country, rights_basis, rights_note, rights_url, popularity, status
+         width, height, country, rights_basis, rights_note, rights_url, popularity, downloads,
+         status
        )
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(source, source_id) DO UPDATE SET
          source_url = excluded.source_url,
          title = excluded.title,
@@ -237,6 +248,7 @@ export async function upsertWork(
          rights_note = excluded.rights_note,
          rights_url = excluded.rights_url,
          popularity = COALESCE(excluded.popularity, revival_works.popularity),
+         downloads = COALESCE(excluded.downloads, revival_works.downloads),
          status = CASE
            WHEN revival_works.reviewed_at IS NOT NULL THEN revival_works.status
            ELSE excluded.status
@@ -266,6 +278,7 @@ export async function upsertWork(
       candidate.rightsNote,
       candidate.rightsUrl,
       candidate.popularity ?? null,
+      candidate.downloads ?? null,
       status,
     )
     .run();
@@ -327,13 +340,45 @@ export async function storeUkRights(
 export async function readApprovedWorks(db: D1Database, limit = 400) {
   const rows = await db
     .prepare(
-      `SELECT ${WORK_COLUMNS}
+      `WITH ranked AS (
+         SELECT id, ROW_NUMBER() OVER (
+           PARTITION BY source
+           ORDER BY plays DESC, COALESCE(popularity, ${UNSCORED_POPULARITY}) DESC, sort_title
+         ) AS standing
+         FROM revival_works
+         WHERE status = 'approved'
+       )
+       SELECT ${WORK_COLUMNS}
        ${WORK_FROM}
+       JOIN ranked ON ranked.id = w.id
        WHERE w.status = 'approved'
-       ORDER BY w.plays DESC, COALESCE(w.popularity, ${UNSCORED_POPULARITY}) DESC, w.sort_title
+         AND ranked.standing <= ${SOURCE_QUOTA}
+       ORDER BY ${BY_STANDING}
        LIMIT ?`,
     )
     .bind(Math.min(limit, 800))
+    .all<WorkRow>();
+
+  return attachTags(db, rows.results.map(toWork));
+}
+
+export async function readAlsoShowing(
+  db: D1Database,
+  workId: string,
+  kind: RevivalKind,
+  limit = 8,
+) {
+  const rows = await db
+    .prepare(
+      `SELECT ${WORK_COLUMNS}
+       ${WORK_FROM}
+       WHERE w.status = 'approved'
+         AND w.kind = ?
+         AND w.id <> ?
+       ORDER BY ${BY_STANDING}
+       LIMIT ?`,
+    )
+    .bind(kind, workId, Math.min(limit, 24))
     .all<WorkRow>();
 
   return attachTags(db, rows.results.map(toWork));
@@ -569,11 +614,9 @@ export async function selectKnownSourceIds(
 export async function refreshPopularity(
   db: D1Database,
   source: RevivalSource,
-  entries: { sourceId: string; popularity: number | null }[],
+  entries: { sourceId: string; popularity: number | null; downloads: number | null }[],
 ) {
-  const scored = entries.filter(
-    (entry): entry is { sourceId: string; popularity: number } => entry.popularity !== null,
-  );
+  const scored = entries.filter((entry) => entry.popularity !== null);
 
   if (scored.length === 0) {
     return 0;
@@ -583,10 +626,10 @@ export async function refreshPopularity(
     scored.map((entry) =>
       db
         .prepare(
-          `UPDATE revival_works SET popularity = ?
+          `UPDATE revival_works SET popularity = ?, downloads = COALESCE(?, downloads)
            WHERE source = ? AND source_id = ?`,
         )
-        .bind(entry.popularity, source, entry.sourceId),
+        .bind(entry.popularity, entry.downloads, source, entry.sourceId),
     ),
   );
 

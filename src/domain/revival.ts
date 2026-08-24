@@ -48,6 +48,8 @@ export type RevivalWork = {
   delivery: "mirror" | "source";
   reelUrl: string;
   plays: number;
+  popularity: number | null;
+  downloads: number | null;
   condition: PrintCondition;
   contentNotice: string | null;
   tags: RevivalTag[];
