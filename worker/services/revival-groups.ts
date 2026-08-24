@@ -4,6 +4,33 @@ import type { Bindings } from "../types.ts";
 
 const RUNTIME_TOLERANCE = 0.1;
 const WRITE_CHUNK = 200;
+const BELIEVABLE_YEAR = 1980;
+const YEAR_GAP = 10;
+
+const EDITION_NOISE =
+  /\b(hd|sd|4k|720p?|1080p?|480p?|360p?|ipod|mp4|xvid|divx|complete|completo|clearer|clear|restored|remastered|uncut|colou?ri[sz]ed|silent|soundtrack|score|music|version|edition|edit|print|copy|reissue|full movie|full length|feature|film|movie|sub esp|with)\b/gu;
+
+const ANY_YEAR = /\b(1[89]\d{2}|20\d{2})\b/gu;
+
+export function groupingTitle(sortTitle: string) {
+  return sortTitle
+    .replaceAll(ANY_YEAR, " ")
+    .replaceAll(EDITION_NOISE, " ")
+    .replaceAll(/\s+/gu, " ")
+    .trim();
+}
+
+function believableYear(year: number | null) {
+  return year !== null && year > 0 && year <= BELIEVABLE_YEAR;
+}
+
+function differentFilm(candidate: GroupCandidate, held: GroupCandidate) {
+  return (
+    believableYear(candidate.year) &&
+    believableYear(held.year) &&
+    Math.abs((candidate.year ?? 0) - (held.year ?? 0)) > YEAR_GAP
+  );
+}
 
 function printQuality(work: GroupCandidate) {
   return [
@@ -31,7 +58,7 @@ export function clusterPrints(works: GroupCandidate[]) {
   const byTitle = new Map<string, GroupCandidate[]>();
 
   for (const work of works) {
-    const title = work.sortTitle.trim();
+    const title = groupingTitle(work.sortTitle);
 
     if (!title || !work.runtimeSeconds) {
       continue;
@@ -44,7 +71,9 @@ export function clusterPrints(works: GroupCandidate[]) {
 
   for (const items of byTitle.values()) {
     const ordered = [...items].sort(
-      (left, right) => (left.runtimeSeconds ?? 0) - (right.runtimeSeconds ?? 0),
+      (left, right) =>
+        (left.runtimeSeconds ?? 0) - (right.runtimeSeconds ?? 0) ||
+        (left.year ?? 0) - (right.year ?? 0),
     );
     let run: GroupCandidate[] = [];
 
@@ -52,7 +81,8 @@ export function clusterPrints(works: GroupCandidate[]) {
       const previous = run.at(-1);
       const within =
         previous &&
-        (work.runtimeSeconds ?? 0) <= (previous.runtimeSeconds ?? 0) * (1 + RUNTIME_TOLERANCE);
+        (work.runtimeSeconds ?? 0) <= (previous.runtimeSeconds ?? 0) * (1 + RUNTIME_TOLERANCE) &&
+        !run.some((held) => differentFilm(work, held));
 
       if (previous && !within) {
         clusters.push(run);

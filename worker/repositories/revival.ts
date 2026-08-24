@@ -512,6 +512,7 @@ export async function drawFromShelf(db: D1Database, selector: ShelfSelector, off
 export type GroupCandidate = {
   id: string;
   sortTitle: string;
+  year: number | null;
   runtimeSeconds: number | null;
   popularity: number | null;
   streamBytes: number | null;
@@ -522,7 +523,7 @@ export type GroupCandidate = {
 export async function readGroupCandidates(db: D1Database) {
   const rows = await db
     .prepare(
-      `SELECT id, sort_title AS sortTitle, runtime_seconds AS runtimeSeconds,
+      `SELECT id, sort_title AS sortTitle, year, runtime_seconds AS runtimeSeconds,
               popularity, stream_bytes AS streamBytes, height, plays
        FROM revival_works
        WHERE status = 'approved'
