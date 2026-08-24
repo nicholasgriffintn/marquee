@@ -83,7 +83,20 @@ async function catalogueStats(env: Bindings) {
          (SELECT count(*) FROM viewer_alerts) AS alertsSent,
          (SELECT count(*) FROM viewer_alerts WHERE julianday(sent_at) > julianday('now', '-7 days')) AS alertsWeek,
          (SELECT count(*) FROM viewer_signals) AS signals,
-         (SELECT count(*) FROM viewer_beliefs WHERE revoked_at IS NULL) AS beliefs`,
+         (SELECT count(*) FROM viewer_beliefs WHERE revoked_at IS NULL) AS beliefs,
+         (SELECT count(*) FROM catalog_people) AS people,
+         (SELECT count(*) FROM catalog_seasons) AS seasons,
+         (SELECT count(*) FROM title_insights) AS insights,
+         (SELECT count(*) FROM catalog_titles
+           WHERE json_extract(payload, '$.externalIds.anilistId') IS NOT NULL) AS animeIds,
+         (SELECT count(*) FROM catalog_titles
+           WHERE json_extract(payload, '$.anime') IS NOT NULL) AS animeDetails,
+         (SELECT count(*) FROM revival_works) AS revivalWorks,
+         (SELECT count(*) FROM revival_works WHERE status = 'approved') AS revivalApproved,
+         (SELECT count(*) FROM revival_works WHERE mirror_state = 'mirrored') AS revivalMirrored,
+         (SELECT count(*) FROM revival_works WHERE status = 'candidate') AS revivalPending,
+         (SELECT count(*) FROM ai_rails) AS railSets,
+         (SELECT count(*) FROM pinned_shelves) AS pinnedShelves`,
     ).first<CountRow>(),
     readWorkingSetStats(env.DB),
   ]);

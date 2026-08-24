@@ -26,7 +26,8 @@ export type AdminAction =
   | "revival-match"
   | "revival-rights"
   | "revival-recheck"
-  | "revival-mirror";
+  | "revival-mirror"
+  | "anime-ids";
 
 export type AdminOverview = {
   catalogue: Record<string, number>;

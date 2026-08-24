@@ -149,19 +149,44 @@ export async function resumeSource(env: Bindings, source: EnrichmentSource) {
     .run();
 }
 
+function statusOf(error: unknown) {
+  return error instanceof Error && "status" in error
+    ? (error as { status?: unknown }).status
+    : undefined;
+}
+
 export function isRateLimited(error: unknown) {
-  return (
-    error instanceof Error && "status" in error && (error as { status?: unknown }).status === 429
-  );
+  return statusOf(error) === 429;
+}
+
+export function isRefused(error: unknown) {
+  return statusOf(error) === 403 || statusOf(error) === 401;
 }
 
 export async function readBudgets(env: Bindings) {
+  const configured = Object.keys(SOURCE_BUDGETS);
   const rows = await env.DB.prepare(
     `SELECT source, window_kind AS windowKind, call_limit AS callLimit, used,
             window_started_at AS windowStartedAt, paused_until AS pausedUntil
      FROM source_budgets
+     WHERE source IN (${configured.map(() => "?").join(",")})
      ORDER BY source`,
-  ).all<BudgetRow & { source: string }>();
+  )
+    .bind(...configured)
+    .all<BudgetRow & { source: string }>();
+  const seen = new Set(rows.results.map((row) => row.source));
+  const missing = configured
+    .filter((source) => !seen.has(source))
+    .map((source) => ({
+      source,
+      windowKind: SOURCE_BUDGETS[source as BudgetSource].windowKind,
+      callLimit: SOURCE_BUDGETS[source as BudgetSource].callLimit,
+      used: 0,
+      windowStartedAt: "",
+      pausedUntil: null,
+    }));
 
-  return rows.results;
+  return [...rows.results, ...missing].sort((left, right) =>
+    left.source.localeCompare(right.source),
+  );
 }

@@ -82,7 +82,6 @@ export type ExternalIds = {
   livechartId?: number | null;
   animeNewsNetworkId?: number | null;
   animeCountdownId?: number | null;
-  simklId?: number | null;
 };
 
 export type MediaTitle = {

@@ -1,4 +1,5 @@
-import { isRateLimited, pauseSource } from "../repositories/budgets.ts";
+import { logEvent } from "../lib/logging.ts";
+import { isRateLimited, isRefused, pauseSource } from "../repositories/budgets.ts";
 import type { Bindings, EnrichmentSource } from "../types.ts";
 
 const RATE_LIMIT_PAUSE_MINUTES: Partial<Record<EnrichmentSource, number>> = {
@@ -6,6 +7,7 @@ const RATE_LIMIT_PAUSE_MINUTES: Partial<Record<EnrichmentSource, number>> = {
 };
 
 const DEFAULT_PAUSE_MINUTES = 30;
+const REFUSED_PAUSE_MINUTES = 60 * 24 * 7;
 
 export type SourceAttempt<T> = { limited: true } | { limited: false; value: T };
 
@@ -17,6 +19,13 @@ export async function withRateLimitPause<T>(
   try {
     return { limited: false, value: await run() };
   } catch (error) {
+    if (isRefused(error)) {
+      await pauseSource(env, source, REFUSED_PAUSE_MINUTES);
+      logEvent("source_refused", { source, detail: String(error).slice(0, 200) });
+
+      return { limited: true };
+    }
+
     if (!isRateLimited(error)) {
       throw error;
     }

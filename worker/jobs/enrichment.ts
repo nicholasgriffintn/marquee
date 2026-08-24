@@ -21,7 +21,7 @@ const ANILIST_KEYWORD_LIMIT = 60;
 const ENRICHERS = [
   { source: "omdb", job: "enrich-ratings", maxAgeDays: 30, perRun: 3_000, budgetGated: true },
   { source: "poster", job: "cache-poster", maxAgeDays: 365, perRun: 2_000, budgetGated: false },
-  { source: "anilist", job: "enrich-anilist", maxAgeDays: 14, perRun: 400, budgetGated: true },
+  { source: "anilist", job: "enrich-anilist", maxAgeDays: 14, perRun: 120, budgetGated: true },
 ] as const satisfies readonly {
   source: EnrichmentSource;
   job: IngestionJob["type"];

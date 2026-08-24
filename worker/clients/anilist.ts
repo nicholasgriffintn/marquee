@@ -3,6 +3,7 @@ import { upstreamFetch } from "./fetch.ts";
 import { upstreamError } from "./upstream.ts";
 
 const TIMEOUT_MS = 12_000;
+const MIN_GAP_MS = 3_000;
 
 const API_BASE = "https://graphql.anilist.co";
 
@@ -85,6 +86,8 @@ export type AnilistDetails = {
 };
 
 export async function getAnilistDetails(anilistId: number): Promise<AnilistDetails | null> {
+  await new Promise((resolve) => setTimeout(resolve, MIN_GAP_MS));
+
   const response = await upstreamFetch(API_BASE, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -97,7 +100,12 @@ export async function getAnilistDetails(anilistId: number): Promise<AnilistDetai
   }
 
   if (!response.ok) {
-    throw new AnilistError(`AniList request failed (${response.status})`, response.status);
+    const body = await response.text().catch(() => "");
+
+    throw new AnilistError(
+      `AniList request failed (${response.status}) ${body.slice(0, 180).replaceAll(/\s+/gu, " ")}`,
+      response.status,
+    );
   }
 
   const payload = await response.json();

@@ -20,7 +20,6 @@ const NUMBER_IDS = [
   ["livechart_id", "livechartId"],
   ["animenewsnetwork_id", "animeNewsNetworkId"],
   ["animecountdown_id", "animeCountdownId"],
-  ["simkl_id", "simklId"],
   ["tvdb_id", "tvdbId"],
 ] as const;
 
