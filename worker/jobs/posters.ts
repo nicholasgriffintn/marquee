@@ -1,3 +1,4 @@
+import { UPSTREAM_AGENT } from "../clients/fetch.ts";
 import { getOmdbPoster } from "../clients/omdb.ts";
 import { imdbIdFrom } from "../lib/text.ts";
 import { claimBudget } from "../repositories/budgets.ts";
@@ -16,6 +17,7 @@ function originPosterUrl(url: string | null | undefined) {
 
 async function fetchImage(url: string) {
   const response = await fetch(url, {
+    headers: { "user-agent": UPSTREAM_AGENT },
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     cf: { cacheEverything: true, cacheTtl: 86_400 },
   });

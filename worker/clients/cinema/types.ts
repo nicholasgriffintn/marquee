@@ -1,4 +1,5 @@
 import type { ScreeningPrecision } from "../../../src/domain/cinema.ts";
+import { UPSTREAM_AGENT } from "../fetch.ts";
 import { upstreamError } from "../upstream.ts";
 
 export const CinemaSourceError = upstreamError("CinemaSourceError");
@@ -72,6 +73,7 @@ export async function fetchSourceJson(url: string, init: RequestInit = {}) {
 
   headers.set("accept", "application/json");
   headers.set("accept-language", "en-GB,en;q=0.9");
+  headers.set("user-agent", UPSTREAM_AGENT);
 
   const response = await fetch(url, {
     ...init,

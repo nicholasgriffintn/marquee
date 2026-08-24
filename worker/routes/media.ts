@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 
+import { UPSTREAM_AGENT } from "../clients/fetch.ts";
 import { logError } from "../lib/logging.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
@@ -101,7 +102,10 @@ mediaRoutes.get("/og/:titleId", async (context) => {
   try {
     const upstream = source.startsWith("/media/")
       ? await context.env.MEDIA.get(source.replace("/media/", ""))
-      : await fetch(source, { cf: { cacheEverything: true, cacheTtl: 86_400 } });
+      : await fetch(source, {
+          headers: { "user-agent": UPSTREAM_AGENT },
+          cf: { cacheEverything: true, cacheTtl: 86_400 },
+        });
     const body = upstream instanceof Response ? upstream.body : (upstream?.body ?? null);
 
     if (!body) {

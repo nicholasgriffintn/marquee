@@ -1,10 +1,9 @@
 import { isRecord, records, stringAt } from "../lib/values.ts";
-import { upstreamFetch } from "./fetch.ts";
+import { upstreamFetch, UPSTREAM_AGENT } from "./fetch.ts";
 
 const CACHE_TTL = 604_800;
 
 const SPARQL_ENDPOINT = "https://query.wikidata.org/sparql";
-const USER_AGENT = "Marquee/1.0 (personal streaming discovery; https://marquee.pashi.app)";
 const BATCH = 40;
 const TIMEOUT_MS = 30_000;
 
@@ -35,7 +34,7 @@ async function queryAuthors(imdbIds: string[]) {
   url.search = new URLSearchParams({ query, format: "json" }).toString();
 
   const response = await upstreamFetch(url, {
-    headers: { accept: "application/sparql-results+json", "user-agent": USER_AGENT },
+    headers: { accept: "application/sparql-results+json", "user-agent": UPSTREAM_AGENT },
     timeoutMs: TIMEOUT_MS,
     cacheTtl: CACHE_TTL,
   });

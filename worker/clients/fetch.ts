@@ -6,7 +6,8 @@ type UpstreamRequest = {
   body?: string;
 };
 
-export const UPSTREAM_AGENT = "Marquee/1.0 (+https://marquee.pashi.app)";
+export const UPSTREAM_AGENT =
+  "Marquee/1.0 (personal streaming discovery; https://marquee.pashi.app)";
 
 export function upstreamFetch(url: string | URL, request: UpstreamRequest) {
   return fetch(url, {

@@ -1,3 +1,4 @@
+import { UPSTREAM_AGENT } from "../fetch.ts";
 import { CinemaSourceError } from "./types.ts";
 
 const OVERPASS = "https://overpass-api.de/api/interpreter";
@@ -29,7 +30,10 @@ export async function geocodeChain(brand: string): Promise<GeocodedVenue[]> {
 
   const response = await fetch(OVERPASS, {
     method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
+    headers: {
+      "content-type": "application/x-www-form-urlencoded",
+      "user-agent": UPSTREAM_AGENT,
+    },
     body: new URLSearchParams({ data: query }).toString(),
     signal: AbortSignal.timeout(60_000),
     cf: { cacheEverything: true, cacheTtl: 604_800 },

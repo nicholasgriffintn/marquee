@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 
+import { UPSTREAM_AGENT } from "../clients/fetch.ts";
 import { logError } from "../lib/logging.ts";
 import {
   isRevivalId,
@@ -116,7 +117,7 @@ async function serveFromMirror(
 async function serveFromSource(url: string, contentType: string, range: string | undefined) {
   const upstream = await fetch(url, {
     redirect: "follow",
-    headers: range ? { range } : undefined,
+    headers: range ? { range, "user-agent": UPSTREAM_AGENT } : { "user-agent": UPSTREAM_AGENT },
     signal: AbortSignal.timeout(30_000),
     cf: { cacheEverything: true, cacheTtl: 86_400 },
   });
@@ -157,6 +158,7 @@ reelRoutes.get("/still/:workId", async (context) => {
   try {
     const upstream = await fetch(source, {
       redirect: "follow",
+      headers: { "user-agent": UPSTREAM_AGENT },
       signal: AbortSignal.timeout(12_000),
       cf: { cacheEverything: true, cacheTtl: 2_592_000 },
     });

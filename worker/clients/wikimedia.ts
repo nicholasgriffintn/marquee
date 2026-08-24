@@ -1,5 +1,5 @@
 import { isRecord, numberAt, records, stringAt } from "../lib/values.ts";
-import { upstreamFetch } from "./fetch.ts";
+import { upstreamFetch, UPSTREAM_AGENT } from "./fetch.ts";
 import { upstreamError } from "./upstream.ts";
 
 const TIMEOUT_MS = 12_000;
@@ -9,7 +9,6 @@ const VIEWS_CACHE_TTL = 43_200;
 const SEARCH_BASE = "https://en.wikipedia.org/w/api.php";
 const METRICS_BASE =
   "https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/user";
-const USER_AGENT = "Marquee/1.0 (personal streaming discovery; https://marquee.pashi.app)";
 
 export const WikimediaError = upstreamError("WikimediaError");
 
@@ -64,7 +63,7 @@ export async function findArticle(names: (string | null)[], year: number | null,
   }).toString();
 
   const response = await upstreamFetch(url, {
-    headers: { "user-agent": USER_AGENT },
+    headers: { "user-agent": UPSTREAM_AGENT },
     timeoutMs: TIMEOUT_MS,
     cacheTtl: SEARCH_CACHE_TTL,
   });
@@ -89,7 +88,7 @@ export async function getPageviews(article: string, days = 14) {
   const start = new Date(end.getTime() - days * 86_400_000);
   const url = `${METRICS_BASE}/${encodeURIComponent(article.replaceAll(" ", "_"))}/daily/${stamp(start)}/${stamp(end)}`;
   const response = await upstreamFetch(url, {
-    headers: { "user-agent": USER_AGENT },
+    headers: { "user-agent": UPSTREAM_AGENT },
     timeoutMs: TIMEOUT_MS,
     cacheTtl: VIEWS_CACHE_TTL,
   });

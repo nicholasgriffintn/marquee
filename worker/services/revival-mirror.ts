@@ -1,3 +1,4 @@
+import { UPSTREAM_AGENT } from "../clients/fetch.ts";
 import { logError } from "../lib/logging.ts";
 import {
   completeMirror,
@@ -46,6 +47,7 @@ async function probeSource(url: string) {
   const response = await fetch(url, {
     method: "HEAD",
     redirect: "follow",
+    headers: { "user-agent": UPSTREAM_AGENT },
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
 
@@ -66,6 +68,7 @@ async function probeSource(url: string) {
 async function copyWholeObject(env: Bindings, id: string, url: string, contentType: string) {
   const response = await fetch(url, {
     redirect: "follow",
+    headers: { "user-agent": UPSTREAM_AGENT },
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
 
@@ -143,7 +146,7 @@ async function mirrorInParts(
     // oxlint-disable-next-line no-await-in-loop
     const response = await fetch(url, {
       redirect: "follow",
-      headers: { range: `bytes=${offset}-${end}` },
+      headers: { range: `bytes=${offset}-${end}`, "user-agent": UPSTREAM_AGENT },
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
 

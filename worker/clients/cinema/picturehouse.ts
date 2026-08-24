@@ -1,4 +1,5 @@
 import { numberAt, records, stringAt } from "../../lib/values.ts";
+import { UPSTREAM_AGENT } from "../fetch.ts";
 import {
   CinemaSourceError,
   businessDayOf,
@@ -23,6 +24,7 @@ async function fetchText(url: string) {
     headers: {
       accept: "text/html,application/xhtml+xml",
       "accept-language": "en-GB,en;q=0.9",
+      "user-agent": UPSTREAM_AGENT,
     },
     redirect: "follow",
     signal: AbortSignal.timeout(20_000),
@@ -43,6 +45,7 @@ async function postForm(form: Record<string, string>) {
       accept: "application/json",
       "content-type": "application/x-www-form-urlencoded",
       "x-requested-with": "XMLHttpRequest",
+      "user-agent": UPSTREAM_AGENT,
     },
     body: new URLSearchParams(form).toString(),
     signal: AbortSignal.timeout(20_000),
