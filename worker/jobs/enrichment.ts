@@ -16,7 +16,7 @@ import {
 import type { Bindings, EnrichmentSource, IngestionJob } from "../types.ts";
 import { withRateLimitPause } from "./sources.ts";
 
-const ANILIST_KEYWORD_LIMIT = 40;
+const ANILIST_KEYWORD_LIMIT = 60;
 
 const ENRICHERS = [
   { source: "omdb", job: "enrich-ratings", maxAgeDays: 30, perRun: 3_000, budgetGated: true },
@@ -233,15 +233,29 @@ export async function enrichAnilist(env: Bindings, titleId: string) {
     return;
   }
 
+  const searchable = [
+    ...details.anime.synonyms,
+    details.anime.romajiTitle,
+    details.anime.englishTitle,
+    details.anime.nativeTitle,
+  ]
+    .filter((name): name is string => Boolean(name))
+    .map((name) => name.toLowerCase());
+  const material = details.anime.source
+    ? [`source:${details.anime.source.toLowerCase().replaceAll("_", "-")}`]
+    : [];
   const keywords = [
     ...new Set([
       ...(title?.keywords ?? []),
       ...details.tags,
       ...details.studios.map((studio) => studio.toLowerCase()),
+      ...searchable,
+      ...material,
     ]),
   ].slice(0, ANILIST_KEYWORD_LIMIT);
 
   await storeEnrichment(env, titleId, "anilist", {
+    anime: details.anime,
     keywords,
     ratings: {
       imdbScore: title?.ratings?.imdbScore ?? null,

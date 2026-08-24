@@ -7,7 +7,7 @@ import { readRawItems } from "./catalog-reader.ts";
 type FieldsFor<S extends EnrichmentSource> = S extends "omdb"
   ? Pick<MediaTitle, "ratings">
   : S extends "anilist"
-    ? Pick<MediaTitle, "keywords" | "ratings">
+    ? Pick<MediaTitle, "keywords" | "ratings" | "anime">
     : Pick<MediaTitle, "externalIds">;
 
 export async function storeEnrichment<S extends EnrichmentSource>(

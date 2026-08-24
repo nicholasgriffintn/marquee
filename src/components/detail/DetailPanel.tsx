@@ -22,6 +22,7 @@ import { ArrowIcon, PlusIcon, Poster } from "../ui";
 import { ExitDoor } from "../usher/ExitDoor";
 import { WatchBlock } from "../WatchBlock";
 import { AirLine } from "./AirLine";
+import { AnimeBlock } from "./AnimeBlock";
 import { BuzzNote } from "./BuzzNote";
 import { MarqueeRead } from "./MarqueeRead";
 import { ScoreRow } from "./ScoreRow";
@@ -230,6 +231,7 @@ export function DetailPanel({
               </ErrorBoundary>
             )}
             <AirLine item={item} nextEpisode={nextEpisode} />
+            <AnimeBlock item={item} />
             <ErrorBoundary label="Where to watch">
               <WatchBlock
                 providers={providers}

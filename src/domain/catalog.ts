@@ -36,6 +36,36 @@ export type TitleBuzz = {
   measuredAt: string;
 };
 
+export type AnimeRelation = {
+  anilistId: number;
+  relation: string;
+  format: string | null;
+  title: string;
+  year: number | null;
+};
+
+export type AnimeStream = {
+  site: string;
+  url: string;
+  language: string | null;
+};
+
+export type AnimeDetails = {
+  format: string | null;
+  episodes: number | null;
+  durationMinutes: number | null;
+  season: string | null;
+  seasonYear: number | null;
+  source: string | null;
+  country: string | null;
+  synonyms: string[];
+  romajiTitle: string | null;
+  englishTitle: string | null;
+  nativeTitle: string | null;
+  relations: AnimeRelation[];
+  streams: AnimeStream[];
+};
+
 export type ExternalIds = {
   imdbId?: string | null;
   tvdbId?: number | null;
@@ -78,6 +108,7 @@ export type MediaTitle = {
   tmdbUrl: string;
   imdbUrl: string | null;
   keywords?: string[];
+  anime?: AnimeDetails;
   people?: string[];
   trailerKey?: string | null;
   videos?: { key: string; name: string; type: string }[];
