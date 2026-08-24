@@ -121,6 +121,7 @@ function EpisodeRow({
     airLabel(episode.airDate),
     runtimeLabel(episode.runtimeMinutes),
     episode.tmdbScore ? `TMDB ${episode.tmdbScore.toFixed(1)}` : "",
+    episode.imdbScore ? `IMDb ${episode.imdbScore.toFixed(1)}` : "",
   ].filter(Boolean);
   const patch: EpisodePatch = { season: episode.seasonNumber, episode: episode.episodeNumber };
   const label = episodeLabel(episode.seasonNumber, episode.episodeNumber);

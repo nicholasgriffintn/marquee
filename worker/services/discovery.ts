@@ -3,6 +3,8 @@ import { searchOmdb, type OmdbSearchResult } from "../clients/omdb.ts";
 import type { Bindings, IngestionJob } from "../types.ts";
 
 const PENDING_LIMIT = 12;
+const SEARCH_PAGES = 3;
+const PAGE_SIZE = 10;
 
 function pendingTitle(result: OmdbSearchResult): MediaTitle {
   return {
@@ -31,12 +33,31 @@ function pendingTitle(result: OmdbSearchResult): MediaTitle {
   };
 }
 
+async function searchPages(env: Bindings, query: string) {
+  const found = new Map<string, OmdbSearchResult>();
+
+  for (let page = 1; page <= SEARCH_PAGES; page += 1) {
+    // oxlint-disable-next-line no-await-in-loop
+    const results = await searchOmdb(env, query, { page });
+
+    for (const result of results) {
+      found.set(result.imdbId, result);
+    }
+
+    if (results.length < PAGE_SIZE || found.size >= PENDING_LIMIT * 2) {
+      break;
+    }
+  }
+
+  return [...found.values()];
+}
+
 export async function findPendingTitles(env: Bindings, query: string, known: MediaTitle[]) {
   if (!env.OMDB_API_KEY || !query) {
     return [];
   }
 
-  const results = await searchOmdb(env, query);
+  const results = await searchPages(env, query);
 
   if (results.length === 0) {
     return [];

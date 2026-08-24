@@ -246,7 +246,7 @@ export function UsherPage() {
               <dd>TVmaze</dd>
             </div>
             <div>
-              <dt>Awards and box office</dt>
+              <dt>Ratings, awards and box office</dt>
               <dd>OMDb</dd>
             </div>
             <div>

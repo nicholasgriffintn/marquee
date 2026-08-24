@@ -1,9 +1,12 @@
+import { getOmdbTitle, type OmdbRecord } from "../clients/omdb.ts";
 import { findByImdbId, findByTitle, getItems } from "../clients/tmdb.ts";
 import { logEvent } from "../lib/logging.ts";
+import { claimBudget } from "../repositories/budgets.ts";
 import { storeItems } from "../repositories/catalog-writer.ts";
 import type { Bindings } from "../types.ts";
 import { queueAvailability } from "./availability.ts";
 import { queueTitleEmbeddings } from "./embeddings.ts";
+import { withRateLimitPause } from "./sources.ts";
 
 async function ingestTitle(env: Bindings, titleId: string) {
   const [title] = await getItems(env, [titleId]);
@@ -19,8 +22,38 @@ async function ingestTitle(env: Bindings, titleId: string) {
   return true;
 }
 
+async function askOmdb(env: Bindings, run: () => Promise<OmdbRecord | null>) {
+  if (!env.OMDB_API_KEY || !(await claimBudget(env, "omdb"))) {
+    return null;
+  }
+
+  const attempt = await withRateLimitPause(env, "omdb", run);
+
+  return attempt.limited ? null : attempt.value;
+}
+
+async function matchThroughOmdb(env: Bindings, imdbId: string) {
+  const record = await askOmdb(env, () => getOmdbTitle(env, { imdbId }));
+
+  if (!record?.title) {
+    return null;
+  }
+
+  return findByTitle(env, record.title, record.year, record.mediaType);
+}
+
+async function matchThroughImdb(env: Bindings, name: string, year: number | null) {
+  const record = await askOmdb(env, () => getOmdbTitle(env, { title: name, year }));
+
+  if (!record?.imdbId) {
+    return null;
+  }
+
+  return findByImdbId(env, record.imdbId);
+}
+
 export async function importImdbTitle(env: Bindings, imdbId: string) {
-  const titleId = await findByImdbId(env, imdbId);
+  const titleId = (await findByImdbId(env, imdbId)) ?? (await matchThroughOmdb(env, imdbId));
 
   if (!titleId) {
     logEvent("imdb_import_unmatched", { imdbId });
@@ -41,7 +74,9 @@ export async function importDiaryRow(
     watchedAt: string;
   },
 ) {
-  const titleId = await findByTitle(env, job.name, job.year);
+  const titleId =
+    (await findByTitle(env, job.name, job.year)) ??
+    (await matchThroughImdb(env, job.name, job.year));
 
   if (!titleId) {
     logEvent("diary_import_unmatched", { name: job.name });

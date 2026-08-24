@@ -10,9 +10,15 @@ const MIN_POSTER_BYTES = 40_000;
 const FETCH_TIMEOUT_MS = 20_000;
 
 function originPosterUrl(url: string | null | undefined) {
-  return url?.startsWith("https://image.tmdb.org/")
-    ? url.replace(/\/t\/p\/w\d+\//u, "/t/p/w780/")
-    : null;
+  if (url?.startsWith("https://image.tmdb.org/")) {
+    return url.replace(/\/t\/p\/w\d+\//u, "/t/p/w780/");
+  }
+
+  if (url?.startsWith("https://m.media-amazon.com/")) {
+    return url.replace(/\._V1_.*?(\.\w+)$/u, "._V1_SX1000$1");
+  }
+
+  return null;
 }
 
 async function fetchImage(url: string) {

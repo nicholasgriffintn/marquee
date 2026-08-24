@@ -9,12 +9,81 @@ const POSTER_TIMEOUT_MS = 20_000;
 const SEARCH_TIMEOUT_MS = 8_000;
 const RATINGS_CACHE_TTL = 86_400;
 const SEARCH_CACHE_TTL = 3_600;
+const SEASON_CACHE_TTL = 604_800;
 
 const API_BASE = "https://www.omdbapi.com/";
 const POSTER_BASE = "https://img.omdbapi.com/";
 const POSTER_HEIGHT = 1_000;
+const PLOT_LIMIT = 1_200;
+const LIST_LIMIT = 12;
+const PEOPLE_LIMIT = 12;
+
+const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+
+const UNRATED = new Set(["n/a", "not rated", "unrated", "none", "no rating"]);
 
 export const OmdbError = upstreamError("OmdbError");
+
+export type OmdbFacts = {
+  certification: string | null;
+  runtimeMinutes: number | null;
+  genres: string[];
+  releaseDate: string | null;
+  plot: string | null;
+  people: string[];
+  studios: string[];
+  countries: string[];
+  languages: string[];
+  numberOfSeasons: number | null;
+  posterUrl: string | null;
+};
+
+export type OmdbRecord = {
+  imdbId: string | null;
+  title: string;
+  year: number | null;
+  mediaType: MediaType;
+  omdbType: string;
+  ratings: TitleRatings;
+  facts: OmdbFacts;
+};
+
+export type OmdbLookup =
+  | { imdbId: string }
+  | { title: string; year?: number | null; mediaType?: MediaType };
+
+export type OmdbEpisode = {
+  episodeNumber: number;
+  imdbId: string | null;
+  imdbScore: number | null;
+};
+
+function text(value: unknown) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+
+  return trimmed && trimmed !== "N/A" ? trimmed : null;
+}
+
+function list(value: unknown, limit = LIST_LIMIT) {
+  const raw = text(value);
+
+  if (!raw) {
+    return [];
+  }
+
+  return [
+    ...new Set(
+      raw
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter((entry) => entry && entry !== "N/A"),
+    ),
+  ].slice(0, limit);
+}
 
 function ratingValue(payload: Record<string, unknown>, source: string) {
   const ratings = Array.isArray(payload.Ratings) ? payload.Ratings : [];
@@ -39,6 +108,49 @@ function money(value: unknown) {
   return typeof value === "string" ? numeric(value.replace(/^[^\d]*/u, "")) : null;
 }
 
+function minutes(value: unknown) {
+  const raw = text(value);
+  const match = raw ? /(\d+)\s*min/iu.exec(raw) : null;
+
+  return match ? Number(match[1]) : null;
+}
+
+function releaseDate(value: unknown) {
+  const raw = text(value);
+  const match = raw ? /^(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})$/u.exec(raw) : null;
+
+  if (!match) {
+    return null;
+  }
+
+  const month = MONTHS.indexOf((match[2] ?? "").toLowerCase());
+
+  if (month < 0) {
+    return null;
+  }
+
+  return `${match[3]}-${String(month + 1).padStart(2, "0")}-${(match[1] ?? "").padStart(2, "0")}`;
+}
+
+function certification(value: unknown) {
+  const raw = text(value);
+
+  return raw && !UNRATED.has(raw.toLowerCase()) ? `US ${raw}` : null;
+}
+
+function releaseYear(value: unknown) {
+  const raw = text(value);
+  const year = raw ? Number(raw.slice(0, 4)) : Number.NaN;
+
+  return Number.isInteger(year) ? year : null;
+}
+
+function posterUrl(value: unknown) {
+  const raw = text(value);
+
+  return raw?.startsWith("https://") ? raw : null;
+}
+
 function awardWins(value: unknown) {
   if (typeof value !== "string" || value === "N/A") {
     return { awards: null, awardWins: null };
@@ -51,26 +163,87 @@ function awardWins(value: unknown) {
   return { awards: value.slice(0, 200), awardWins: Number.isFinite(total) ? total : null };
 }
 
-export async function getOmdbRatings(env: Bindings, imdbId: string): Promise<TitleRatings> {
+function omdbFacts(payload: Record<string, unknown>): OmdbFacts {
+  const plot = text(payload.Plot);
+
+  return {
+    certification: certification(payload.Rated),
+    runtimeMinutes: minutes(payload.Runtime),
+    genres: list(payload.Genre),
+    releaseDate: releaseDate(payload.Released),
+    plot: plot ? plot.slice(0, PLOT_LIMIT) : null,
+    people: [
+      ...new Set([...list(payload.Director), ...list(payload.Writer), ...list(payload.Actors)]),
+    ]
+      .map((name) => name.replace(/\s*\([^)]*\)\s*$/u, "").trim())
+      .filter(Boolean)
+      .slice(0, PEOPLE_LIMIT),
+    studios: list(payload.Production),
+    countries: list(payload.Country),
+    languages: list(payload.Language),
+    numberOfSeasons: numeric(payload.totalSeasons),
+    posterUrl: posterUrl(payload.Poster),
+  };
+}
+
+function omdbRatings(payload: Record<string, unknown>): TitleRatings {
+  return {
+    imdbScore: numeric(payload.imdbRating),
+    imdbVotes: numeric(payload.imdbVotes),
+    rottenTomatoes: ratingValue(payload, "Rotten Tomatoes"),
+    metascore: numeric(payload.Metascore),
+    boxOffice: money(payload.BoxOffice),
+    ...awardWins(payload.Awards),
+  };
+}
+
+function omdbRecord(payload: Record<string, unknown>): OmdbRecord {
+  const omdbType = text(payload.Type) ?? "";
+
+  return {
+    imdbId:
+      typeof payload.imdbID === "string" && /^tt\d+$/u.test(payload.imdbID) ? payload.imdbID : null,
+    title: text(payload.Title) ?? "",
+    year: releaseYear(payload.Year),
+    mediaType: omdbType === "series" ? "tv" : "movie",
+    omdbType,
+    ratings: omdbRatings(payload),
+    facts: omdbFacts(payload),
+  };
+}
+
+function lookupParams(lookup: OmdbLookup): Record<string, string> {
+  if ("imdbId" in lookup) {
+    return { i: lookup.imdbId };
+  }
+
+  return {
+    t: lookup.title.slice(0, 120),
+    ...(lookup.year ? { y: String(lookup.year) } : {}),
+    ...(lookup.mediaType ? { type: lookup.mediaType === "tv" ? "series" : "movie" } : {}),
+  };
+}
+
+async function requestOmdb(
+  env: Bindings,
+  params: Record<string, string>,
+  options: { timeoutMs: number; cacheTtl: number; label: string },
+) {
   if (!env.OMDB_API_KEY) {
     throw new OmdbError("OMDb is not configured", 503);
   }
 
   const url = new URL(API_BASE);
 
-  url.search = new URLSearchParams({
-    apikey: env.OMDB_API_KEY,
-    i: imdbId,
-    tomatoes: "true",
-  }).toString();
+  url.search = new URLSearchParams({ apikey: env.OMDB_API_KEY, ...params }).toString();
 
   const response = await upstreamFetch(url, {
-    timeoutMs: TIMEOUT_MS,
-    cacheTtl: RATINGS_CACHE_TTL,
+    timeoutMs: options.timeoutMs,
+    cacheTtl: options.cacheTtl,
   });
 
   if (!response.ok) {
-    throw new OmdbError(`OMDb request failed (${response.status})`);
+    throw new OmdbError(`OMDb ${options.label} failed (${response.status})`, response.status);
   }
 
   const payload = await response.json();
@@ -80,23 +253,61 @@ export async function getOmdbRatings(env: Bindings, imdbId: string): Promise<Tit
   }
 
   if (payload.Response === "False") {
-    const error = typeof payload.Error === "string" ? payload.Error : "OMDb has no record";
+    const error = text(payload.Error) ?? "OMDb has no record";
 
     if (error.toLowerCase().includes("limit")) {
       throw new OmdbError("OMDb daily limit reached", 429);
     }
 
-    return { imdbScore: null, imdbVotes: null, rottenTomatoes: null, metascore: null };
+    return null;
   }
 
-  return {
-    imdbScore: numeric(payload.imdbRating),
-    imdbVotes: numeric(payload.imdbVotes),
-    rottenTomatoes: ratingValue(payload, "Rotten Tomatoes"),
-    metascore: numeric(payload.Metascore),
-    boxOffice: money(payload.BoxOffice),
-    ...awardWins(payload.Awards),
-  };
+  return payload;
+}
+
+export async function getOmdbTitle(env: Bindings, lookup: OmdbLookup) {
+  const payload = await requestOmdb(
+    env,
+    { ...lookupParams(lookup), plot: "full", tomatoes: "true" },
+    { timeoutMs: TIMEOUT_MS, cacheTtl: RATINGS_CACHE_TTL, label: "lookup" },
+  );
+
+  return payload ? omdbRecord(payload) : null;
+}
+
+export async function getOmdbSeason(env: Bindings, imdbId: string, seasonNumber: number) {
+  const payload = await requestOmdb(
+    env,
+    { i: imdbId, Season: String(seasonNumber) },
+    { timeoutMs: TIMEOUT_MS, cacheTtl: SEASON_CACHE_TTL, label: "season lookup" },
+  );
+
+  if (!payload || !Array.isArray(payload.Episodes)) {
+    return [];
+  }
+
+  return payload.Episodes.flatMap((entry): OmdbEpisode[] => {
+    if (!isRecord(entry)) {
+      return [];
+    }
+
+    const episodeNumber = numeric(entry.Episode);
+
+    if (episodeNumber === null || !Number.isInteger(episodeNumber)) {
+      return [];
+    }
+
+    const imdbScore = numeric(entry.imdbRating);
+
+    return [
+      {
+        episodeNumber,
+        imdbId:
+          typeof entry.imdbID === "string" && /^tt\d+$/u.test(entry.imdbID) ? entry.imdbID : null,
+        imdbScore: imdbScore !== null && imdbScore > 0 ? imdbScore : null,
+      },
+    ];
+  });
 }
 
 export async function getOmdbPoster(env: Bindings, imdbId: string, height = POSTER_HEIGHT) {
@@ -146,31 +357,27 @@ export type OmdbSearchResult = {
   posterUrl: string | null;
 };
 
-export async function searchOmdb(env: Bindings, query: string, page = 1) {
+export async function searchOmdb(
+  env: Bindings,
+  query: string,
+  options: { page?: number; year?: number | null; mediaType?: MediaType } = {},
+) {
   if (!env.OMDB_API_KEY) {
     return [];
   }
 
-  const url = new URL(API_BASE);
+  const payload = await requestOmdb(
+    env,
+    {
+      s: query.slice(0, 120),
+      page: String(options.page ?? 1),
+      ...(options.year ? { y: String(options.year) } : {}),
+      ...(options.mediaType ? { type: options.mediaType === "tv" ? "series" : "movie" } : {}),
+    },
+    { timeoutMs: SEARCH_TIMEOUT_MS, cacheTtl: SEARCH_CACHE_TTL, label: "search" },
+  );
 
-  url.search = new URLSearchParams({
-    apikey: env.OMDB_API_KEY,
-    s: query,
-    page: String(page),
-  }).toString();
-
-  const response = await upstreamFetch(url, {
-    timeoutMs: SEARCH_TIMEOUT_MS,
-    cacheTtl: SEARCH_CACHE_TTL,
-  });
-
-  if (!response.ok) {
-    throw new OmdbError(`OMDb search failed (${response.status})`, response.status);
-  }
-
-  const payload = await response.json();
-
-  if (!isRecord(payload) || !Array.isArray(payload.Search)) {
+  if (!payload || !Array.isArray(payload.Search)) {
     return [];
   }
 
@@ -183,18 +390,14 @@ export async function searchOmdb(env: Bindings, query: string, page = 1) {
       return [];
     }
 
-    const year = typeof entry.Year === "string" ? Number(entry.Year.slice(0, 4)) : Number.NaN;
-    const poster =
-      typeof entry.Poster === "string" && entry.Poster.startsWith("https://") ? entry.Poster : null;
-
     return [
       {
         imdbId: entry.imdbID,
         title: entry.Title,
-        year: Number.isInteger(year) ? year : null,
+        year: releaseYear(entry.Year),
         mediaType: entry.Type === "series" ? "tv" : "movie",
-        omdbType: typeof entry.Type === "string" ? entry.Type : "",
-        posterUrl: poster,
+        omdbType: text(entry.Type) ?? "",
+        posterUrl: posterUrl(entry.Poster),
       },
     ];
   });
