@@ -732,7 +732,8 @@ svg {
   display: block;
 }
 @media (prefers-reduced-motion: reduce) {
-  .skeleton {
+  .skeleton,
+  .availability-spinner {
     animation: none;
   }
   .hero-actions .hero-play,
@@ -2585,8 +2586,25 @@ h2 em {
   opacity: 0.75;
 }
 .availability-empty {
+  align-items: center;
   color: #696b62;
+  display: flex;
   font-size: 11px;
+  gap: 8px;
+}
+.availability-spinner {
+  animation: availability-spin 0.8s linear infinite;
+  border: 2px solid #d8d5c8;
+  border-radius: 50%;
+  border-top-color: #696b62;
+  display: inline-block;
+  height: 12px;
+  width: 12px;
+}
+@keyframes availability-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 .watch-grid {
   display: grid;

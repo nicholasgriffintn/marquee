@@ -67,10 +67,7 @@ export async function getJustwatchAvailability(
   });
 
   if (!response.ok) {
-    throw new JustwatchError(
-      `JustWatch request failed (${response.status})`,
-      response.status === 429 ? 429 : 502,
-    );
+    throw new JustwatchError(`JustWatch request failed (${response.status})`, response.status);
   }
 
   const payload = await response.json();

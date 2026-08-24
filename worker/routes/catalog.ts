@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 
 import { requireAuthentication, sessionPrincipal, type AuthVariables } from "../auth/session.ts";
+import { refreshTitleAvailability } from "../jobs/availability.ts";
 import { edgeCache } from "../lib/cache.ts";
 import { recordEvent } from "../lib/events.ts";
 import { edgeOrigin } from "../lib/geo.ts";
@@ -359,6 +360,29 @@ catalogRoutes.get("/:mediaType/:tmdbId/availability", edgeCache(900), async (con
     return context.json(availability);
   } catch (error) {
     logError("catalogue_read_failed", error, { area: "availability" });
+
+    return context.json({ error: "Availability is unavailable" }, 500);
+  }
+});
+
+catalogRoutes.post("/:mediaType/:tmdbId/availability/refresh", async (context) => {
+  const mediaType = context.req.param("mediaType");
+  const tmdbId = pathInteger(context, "tmdbId", 1, MAX_TMDB_ID);
+
+  if ((mediaType !== "movie" && mediaType !== "tv") || tmdbId === null) {
+    return context.json({ error: "Unknown title" }, 404);
+  }
+
+  try {
+    const availability = await refreshTitleAvailability(context.env, `${mediaType}:${tmdbId}`);
+
+    if (!availability) {
+      return context.json({ error: "Unknown title" }, 404);
+    }
+
+    return context.json(availability);
+  } catch (error) {
+    logError("catalogue_refresh_failed", error, { area: "availability" });
 
     return context.json({ error: "Availability is unavailable" }, 500);
   }

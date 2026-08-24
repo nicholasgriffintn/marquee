@@ -91,7 +91,7 @@ export function DetailPanel({
   const tracker = useEpisodeEntries(item.id, canSave);
   const progress = tracker.progress;
   const continueAt = isSeries && progress && progress.watched > 0 ? progress.upNext : null;
-  const { providers, nextEpisode } = useAvailability(item, availabilityEnabled);
+  const { providers, nextEpisode, isRefreshing } = useAvailability(item, availabilityEnabled);
   const watchProviders = mergeAnimeProviders(item, providers);
   const watchOrder = useWatchOrder(item);
   const { insight, pairs, isLoading: isInsightLoading } = useTitleInsight(item.id);
@@ -252,6 +252,7 @@ export function DetailPanel({
                 fallbackHref={item.watchLink}
                 selectedProviderIds={selectedProviderIds}
                 hideIfEmpty={reels.length > 0}
+                isRefreshing={isRefreshing}
                 onLeave={leaveVia}
               />
             </ErrorBoundary>

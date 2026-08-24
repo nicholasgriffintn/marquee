@@ -43,12 +43,14 @@ export function WatchBlock({
   fallbackHref,
   selectedProviderIds,
   hideIfEmpty,
+  isRefreshing,
   onLeave,
 }: {
   providers: ProviderAvailability[];
   fallbackHref: string | null;
   selectedProviderIds: string[];
   hideIfEmpty?: boolean;
+  isRefreshing?: boolean;
   onLeave: (exit: Exit) => (event: MouseEvent<HTMLAnchorElement>) => void;
 }) {
   const [showAll, setShowAll] = useState(false);
@@ -59,6 +61,18 @@ export function WatchBlock({
   const fromMyAnimeList = listed.some((option) => option.provider.source === "MyAnimeList");
 
   if (!primary && rest.length === 0 && paid.length === 0) {
+    if (isRefreshing) {
+      return (
+        <div className="watch-actions">
+          <span>Watch now</span>
+          <p className="availability-empty">
+            <i className="availability-spinner" aria-hidden="true" />
+            Checking where this is streaming…
+          </p>
+        </div>
+      );
+    }
+
     if (hideIfEmpty) {
       return null;
     }
