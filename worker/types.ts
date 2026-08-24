@@ -101,6 +101,7 @@ export type IngestionJob =
       chain?: boolean;
     }
   | { type: "match-revival-works"; chain?: boolean }
+  | { type: "group-revival-prints" }
   | { type: "check-revival-rights" }
   | { type: "recheck-revival-works" }
   | { type: "mirror-revival-work"; workId: string }

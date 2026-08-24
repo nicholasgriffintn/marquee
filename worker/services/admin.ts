@@ -38,6 +38,7 @@ export const ADMIN_ACTIONS = [
   "revival-recheck",
   "revival-mirror",
   "anime-ids",
+  "revival-group",
 ] as const;
 
 const RUN_WINDOW_HOURS = 24;
@@ -290,6 +291,12 @@ export async function runAdminAction(env: Bindings, action: AdminAction) {
       queued: frontier.pages,
       detail: `Queued ${frontier.pages} discover pages and ${frontier.measuring} window measurements`,
     };
+  }
+
+  if (action === "revival-group") {
+    await env.REVIVAL_QUEUE.send({ type: "group-revival-prints" });
+
+    return { queued: 1, detail: "Grouping the duplicate prints" };
   }
 
   if (action === "anime-ids") {

@@ -50,6 +50,9 @@ export type RevivalWork = {
   plays: number;
   popularity: number | null;
   downloads: number | null;
+  groupId: string | null;
+  streamBytes: number | null;
+  height: number | null;
   condition: PrintCondition;
   contentNotice: string | null;
   tags: RevivalTag[];
@@ -110,8 +113,51 @@ export type RevivalProgramme = {
   fetchedAt: string;
 };
 
+export type RevivalPrint = {
+  id: string;
+  source: RevivalSource;
+  sourceUrl: string;
+  title: string;
+  runtimeSeconds: number | null;
+  condition: RevivalWork["condition"];
+  streamBytes: number | null;
+  height: number | null;
+  downloads: number | null;
+  mirrored: boolean;
+};
+
+export function toPrint(work: RevivalWork): RevivalPrint {
+  return {
+    id: work.id,
+    source: work.source,
+    sourceUrl: work.sourceUrl,
+    title: work.title,
+    runtimeSeconds: work.runtimeSeconds,
+    condition: work.condition,
+    streamBytes: work.streamBytes,
+    height: work.height,
+    downloads: work.downloads,
+    mirrored: work.mirrored,
+  };
+}
+
+export function printMeta(print: RevivalPrint) {
+  const megabytes = print.streamBytes ? Math.round(print.streamBytes / 1_048_576) : null;
+
+  return [
+    print.mirrored ? "Our print" : SOURCE_LABELS[print.source],
+    runtimeLabel(print.runtimeSeconds),
+    print.height ? `${print.height}p` : null,
+    megabytes ? `${megabytes} MB` : null,
+    print.condition === "rough" ? "rough print" : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
 export type RevivalScreening = {
   work: RevivalWork;
+  prints: RevivalPrint[];
   positionSeconds: number;
   finished: boolean;
   alsoShowing: RevivalWork[];

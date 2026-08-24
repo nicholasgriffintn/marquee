@@ -8227,3 +8227,41 @@ a.showtime:hover small {
   border-color: var(--acid);
   outline: none;
 }
+
+.revival-prints {
+  margin-block: 40px;
+}
+.revival-print-list {
+  border-top: 1px solid var(--line);
+  display: grid;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.revival-print-list > li {
+  border-bottom: 1px solid var(--line);
+}
+.revival-print-list a {
+  align-items: baseline;
+  color: inherit;
+  display: grid;
+  gap: 4px 20px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding-block: 14px;
+  text-decoration: none;
+}
+.revival-print-list a:hover strong,
+.revival-print-list a:focus-visible strong {
+  color: var(--accent);
+}
+.revival-print-list small {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+}
+@media (max-width: 640px) {
+  .revival-print-list a {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

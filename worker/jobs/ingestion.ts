@@ -9,6 +9,7 @@ import { syncBuzz } from "../services/buzz.ts";
 import { syncCinemaDirectory, syncCinemaScreenings } from "../services/cinema-sync.ts";
 import { advanceDiscoverFrontier, measureDiscoverPartition } from "../services/discover.ts";
 import { embedTitles } from "../services/embeddings.ts";
+import { groupRevivalPrints } from "../services/revival-groups.ts";
 import { mirrorWork } from "../services/revival-mirror.ts";
 import { checkRevivalRights } from "../services/revival-rights.ts";
 import {
@@ -241,6 +242,12 @@ export async function executeIngestionJob(env: Bindings, job: IngestionJob) {
       if (job.chain && !run.exhausted) {
         await env.REVIVAL_QUEUE.send({ type: "match-revival-works", chain: true });
       }
+
+      return;
+    }
+
+    case "group-revival-prints": {
+      await groupRevivalPrints(env);
 
       return;
     }

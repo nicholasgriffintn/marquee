@@ -1,4 +1,4 @@
-import { assertsPublicDomain, RUNTIME_BANDS, toCard } from "../../src/domain/revival.ts";
+import { assertsPublicDomain, RUNTIME_BANDS, toCard, toPrint } from "../../src/domain/revival.ts";
 import type { RevivalStatus, RevivalWork } from "../../src/domain/revival.ts";
 import {
   ARCHIVE_COLLECTIONS,
@@ -20,6 +20,7 @@ import {
   readAlsoShowing,
   readCountryGroups,
   readDecadeGroups,
+  readGroupPrints,
   readProgress,
   readShelfPage,
   readTagGroups,
@@ -670,12 +671,13 @@ export async function getScreening(env: Bindings, id: string, viewerId: string |
     return null;
   }
 
-  const [progress, alsoShowing] = await Promise.all([
+  const [progress, alsoShowing, prints] = await Promise.all([
     viewerId
       ? readProgress(env.DB, viewerId, id)
       : Promise.resolve({ positionSeconds: 0, finished: false }),
     readAlsoShowing(env.DB, work.id, work.kind),
+    work.groupId ? readGroupPrints(env.DB, work.groupId, work.id) : Promise.resolve([]),
   ]);
 
-  return { work, ...progress, alsoShowing };
+  return { work, ...progress, alsoShowing, prints: prints.map(toPrint) };
 }
