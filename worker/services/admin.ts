@@ -228,7 +228,7 @@ export async function runAdminAction(env: Bindings, action: AdminAction) {
   if (action === "enrichment") {
     await queueEnrichment(env);
 
-    return { detail: "Queued ratings, posters and AniList enrichment" };
+    return { detail: "Queued ratings, posters and anime enrichment" };
   }
 
   if (action === "embeddings") {

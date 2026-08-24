@@ -25,8 +25,9 @@ type OmdbFields = Pick<MediaTitle, "ratings"> &
 
 type FieldsFor<S extends EnrichmentSource> = S extends "omdb"
   ? OmdbFields
-  : S extends "anilist"
-    ? Pick<MediaTitle, "keywords" | "ratings" | "anime">
+  : S extends "jikan"
+    ? Pick<MediaTitle, "keywords" | "ratings" | "anime"> &
+        Partial<Pick<MediaTitle, "status" | "lastAirDate" | "studios" | "posterUrl">>
     : Pick<MediaTitle, "externalIds">;
 
 export async function storeEnrichment<S extends EnrichmentSource>(
@@ -128,12 +129,12 @@ export async function storeAnimeIds(db: D1Database, mappings: AnimeMapping[]) {
   return written.reduce((sum, result) => sum + (result.meta.changes ?? 0), 0);
 }
 
-export async function selectAnilistCandidates(env: Bindings, maxAgeDays: number, limit: number) {
+export async function selectAnimeCandidates(env: Bindings, maxAgeDays: number, limit: number) {
   const rows = await env.DB.prepare(
     `SELECT t.id AS titleId
      FROM catalog_titles AS t
-     LEFT JOIN title_enrichment AS e ON e.title_id = t.id AND e.source = 'anilist'
-     WHERE json_extract(t.payload, '$.externalIds.anilistId') IS NOT NULL
+     LEFT JOIN title_enrichment AS e ON e.title_id = t.id AND e.source = 'jikan'
+     WHERE json_extract(t.payload, '$.externalIds.malId') IS NOT NULL
        AND (${DUE_FOR_ENRICHMENT})
      ORDER BY t.popularity DESC
      LIMIT ?`,

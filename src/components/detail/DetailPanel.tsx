@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
+import { animeProviders } from "../../domain/anime";
 import type { MediaTitle } from "../../domain/catalog";
 import { useAvailability } from "../../hooks/useAvailability";
 import { useCollection } from "../../hooks/useCollection";
@@ -9,6 +10,7 @@ import { useTitleReels } from "../../hooks/useRevival";
 import { useEpisodeEntries } from "../../hooks/useSeasons";
 import { useShowings } from "../../hooks/useShowings";
 import { useTitleInsight } from "../../hooks/useTitleInsight";
+import { useWatchOrder } from "../../hooks/useWatchOrder";
 import { detailMeta, languageLabel } from "../../lib/media";
 import { track } from "../../lib/telemetry";
 import type { EntryStatus, ViewingEntry } from "../../types";
@@ -22,14 +24,15 @@ import { ArrowIcon, PlusIcon, Poster } from "../ui";
 import { ExitDoor } from "../usher/ExitDoor";
 import { WatchBlock } from "../WatchBlock";
 import { AirLine } from "./AirLine";
-import { AnimeBlock } from "./AnimeBlock";
 import { BuzzNote } from "./BuzzNote";
 import { MarqueeRead } from "./MarqueeRead";
 import { ScoreRow } from "./ScoreRow";
 import { SourceLinks } from "./SourceLinks";
+import { ThemeSongs } from "./ThemeSongs";
 import { collectionCaption, similarCaption, TitleTrack } from "./TitleTrack";
 import { useExitWarning } from "./useExitWarning";
 import { WatchNext } from "./WatchNext";
+import { WatchOrder } from "./WatchOrder";
 
 const SIMILAR_LIMIT = 12;
 const DETAIL_TABS = ["overview", "episodes"] as const;
@@ -89,6 +92,8 @@ export function DetailPanel({
   const progress = tracker.progress;
   const continueAt = isSeries && progress && progress.watched > 0 ? progress.upNext : null;
   const { providers, nextEpisode } = useAvailability(item, availabilityEnabled);
+  const watchProviders = [...providers, ...animeProviders(item, providers)];
+  const watchOrder = useWatchOrder(item);
   const { insight, pairs, isLoading: isInsightLoading } = useTitleInsight(item.id);
   const similar = useRecommendations(item.id, item.recommendationIds, SIMILAR_LIMIT);
   const showings = useShowings(item, canSave);
@@ -214,6 +219,12 @@ export function DetailPanel({
             hidden={isSeries && tab !== "overview"}
           >
             <p className="detail-synopsis">{item.overview || "No synopsis available."}</p>
+            {item.anime?.background && (
+              <p className="detail-background">
+                {item.anime.background}
+                <small className="detail-credit">Background from MyAnimeList</small>
+              </p>
+            )}
             <MarqueeRead insight={insight} isLoading={isInsightLoading} />
             {canSave && (
               <ErrorBoundary label="The shelf card">
@@ -234,16 +245,18 @@ export function DetailPanel({
               </ErrorBoundary>
             )}
             <AirLine item={item} nextEpisode={nextEpisode} />
-            <AnimeBlock item={item} />
+            <WatchOrder label="Before this" entries={watchOrder.before} onOpen={onOpen} />
             <ErrorBoundary label="Where to watch">
               <WatchBlock
-                providers={providers}
+                providers={watchProviders}
                 fallbackHref={item.watchLink}
                 selectedProviderIds={selectedProviderIds}
                 hideIfEmpty={reels.length > 0}
                 onLeave={leaveVia}
               />
             </ErrorBoundary>
+            <WatchOrder label="After this" entries={watchOrder.after} onOpen={onOpen} />
+            <WatchOrder label="Related" entries={watchOrder.related} onOpen={onOpen} />
             {continueAt && (
               <button type="button" className="detail-continue" onClick={resumeWatching}>
                 <span>
@@ -266,6 +279,7 @@ export function DetailPanel({
             <ErrorBoundary label="The trailer">
               <TrailerBlock item={item} />
             </ErrorBoundary>
+            <ThemeSongs item={item} />
             {usherSlot}
             <ScoreRow item={item} />
             {item.buzz && <BuzzNote buzz={item.buzz} />}

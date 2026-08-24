@@ -1,6 +1,11 @@
 import type { MediaTitle, TitleBuzz } from "../../src/domain/catalog.ts";
 import { logError } from "../lib/logging.ts";
-import { readAvailability, readCatalog, readItems } from "../repositories/catalog-reader.ts";
+import {
+  readAvailability,
+  readCatalog,
+  readItems,
+  readTitlesByMalId,
+} from "../repositories/catalog-reader.ts";
 import {
   readGenres,
   readKeywords,
@@ -79,6 +84,39 @@ export async function getCatalogueItems(db: D1Database, ids: string[]) {
   return {
     items: await withBuzz(db, await readItems(db, ids)),
     source: "Marquee catalogue",
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
+export async function getAnimeWatchOrder(db: D1Database, titleId: string) {
+  const [title] = await readItems(db, [titleId]);
+  const relations = title?.anime?.relations ?? [];
+
+  if (relations.length === 0) {
+    return { related: [], source: "MyAnimeList", fetchedAt: new Date().toISOString() };
+  }
+
+  const found = await readTitlesByMalId(
+    db,
+    relations.map((relation) => relation.malId),
+  );
+  const related = relations.flatMap((relation) => {
+    const item = found.get(relation.malId);
+
+    return item && item.id !== titleId ? [{ relation: relation.relation, item }] : [];
+  });
+
+  const withCounts = await withBuzz(
+    db,
+    related.map((entry) => entry.item),
+  );
+
+  return {
+    related: related.map((entry, index) => ({
+      relation: entry.relation,
+      item: withCounts[index] ?? entry.item,
+    })),
+    source: "MyAnimeList",
     fetchedAt: new Date().toISOString(),
   };
 }

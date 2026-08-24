@@ -54,8 +54,11 @@ export function WatchBlock({
   const [showAll, setShowAll] = useState(false);
   const [showPaid, setShowPaid] = useState(false);
   const { primary, rest, paid } = watchOptions(providers, fallbackHref, selectedProviderIds);
+  const listed = [primary, ...rest, ...paid].filter(Boolean);
+  const fromJustWatch = listed.some((option) => option.provider.source !== "MyAnimeList");
+  const fromMyAnimeList = listed.some((option) => option.provider.source === "MyAnimeList");
 
-  if (!primary && paid.length === 0) {
+  if (!primary && rest.length === 0 && paid.length === 0) {
     if (hideIfEmpty) {
       return null;
     }
@@ -116,11 +119,17 @@ export function WatchBlock({
         </div>
       )}
       <p className="watch-credit">
-        Availability from{" "}
-        <a href="https://www.justwatch.com" target="_blank" rel="noreferrer">
-          JustWatch
-        </a>
-        . It changes without telling me.
+        {fromJustWatch && (
+          <>
+            Availability from{" "}
+            <a href="https://www.justwatch.com" target="_blank" rel="noreferrer">
+              JustWatch
+            </a>
+            .{" "}
+          </>
+        )}
+        {fromMyAnimeList ? "Streaming sites from MyAnimeList. " : ""}
+        It changes without telling me.
       </p>
     </div>
   );

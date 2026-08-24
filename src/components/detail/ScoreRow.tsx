@@ -1,6 +1,6 @@
 import type { MediaTitle } from "../../domain/catalog";
 import { blendedRating } from "../../domain/ratings";
-import { moneyLabel, scoreLabel, votesLabel } from "../../lib/media";
+import { compactCount, moneyLabel, scoreLabel, votesLabel } from "../../lib/media";
 
 function Score({ value, label }: { value: string; label: string }) {
   return (
@@ -14,7 +14,9 @@ function Score({ value, label }: { value: string; label: string }) {
 export function ScoreRow({ item }: { item: MediaTitle }) {
   const consensus = blendedRating(item);
   const ratings = item.ratings;
+  const anime = item.anime;
   const imdbVotes = ratings?.imdbVotes ? ` · ${votesLabel(ratings.imdbVotes)}` : "";
+  const animeVotes = ratings?.animeVotes ? ` · ${votesLabel(ratings.animeVotes)}` : "";
 
   return (
     <>
@@ -34,8 +36,14 @@ export function ScoreRow({ item }: { item: MediaTitle }) {
           <Score value={ratings.rottenTomatoes} label="Rotten Tomatoes" />
         )}
         {ratings?.metascore != null && <Score value={`${ratings.metascore}`} label="Metascore" />}
-        {ratings?.anilistScore != null && (
-          <Score value={`${ratings.anilistScore}%`} label="AniList" />
+        {ratings?.animeScore != null && (
+          <Score value={ratings.animeScore.toFixed(1)} label={`MyAnimeList${animeVotes}`} />
+        )}
+        {anime?.rank != null && (
+          <Score value={`#${anime.rank.toLocaleString()}`} label="MyAnimeList rank" />
+        )}
+        {anime?.members != null && anime.members > 0 && (
+          <Score value={compactCount(anime.members)} label="MyAnimeList members" />
         )}
         {ratings?.boxOffice != null && ratings.boxOffice > 0 && (
           <Score value={moneyLabel(ratings.boxOffice)} label="Box office" />

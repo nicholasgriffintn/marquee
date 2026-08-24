@@ -48,8 +48,16 @@ export function AirLine({
     );
   }
 
+  const slot = item.anime?.broadcast ?? null;
+  const slotLabel = item.anime?.airing ? "Airs" : "Aired";
+
   if (item.mediaType !== "tv" || !item.lastAirDate) {
-    return null;
+    return slot ? (
+      <p className="detail-next">
+        <span>{slotLabel}</span> {slot}
+        <small className="detail-credit">Slot from MyAnimeList</small>
+      </p>
+    ) : null;
   }
 
   return (
@@ -57,6 +65,8 @@ export function AirLine({
       <span>Last shown</span>{" "}
       {formatDate(item.lastAirDate, { day: "numeric", month: "long", year: "numeric" })}
       {item.status ? ` · ${item.status}` : ""}
+      {slot ? ` · ${slot}` : ""}
+      {slot ? <small className="detail-credit">Slot from MyAnimeList</small> : null}
     </p>
   );
 }

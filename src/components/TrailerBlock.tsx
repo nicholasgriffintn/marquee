@@ -6,11 +6,18 @@ import { artwork } from "../lib/media";
 type Video = { key: string; name: string; type: string };
 
 function videosFor(item: MediaTitle): Video[] {
-  if (item.videos?.length) {
-    return item.videos;
+  const videos = item.videos?.length
+    ? item.videos
+    : item.trailerKey
+      ? [{ key: item.trailerKey, name: "Trailer", type: "Trailer" }]
+      : [];
+  const malKey = item.anime?.trailerKey;
+
+  if (!malKey || videos.some((video) => video.key === malKey)) {
+    return videos;
   }
 
-  return item.trailerKey ? [{ key: item.trailerKey, name: "Trailer", type: "Trailer" }] : [];
+  return [...videos, { key: malKey, name: "MyAnimeList trailer", type: "Trailer" }];
 }
 
 export function TrailerBlock({ item }: { item: MediaTitle }) {

@@ -1,7 +1,16 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { Link } from "react-router-dom";
 
 import type { CatalogSection, MediaTitle } from "../domain/catalog";
+import { useNearViewport } from "../hooks/useNearViewport";
 import { startJourney } from "../lib/journey";
 import { track } from "../lib/telemetry";
 import { TitleCard } from "./TitleCard";
@@ -86,11 +95,27 @@ function useRailScroll(trackRef: RefObject<HTMLDivElement | null>) {
     const observer = new ResizeObserver(measure);
 
     observer.observe(element);
-    element.addEventListener("scroll", measure, { passive: true });
+
+    let frame = 0;
+    const onScroll = () => {
+      if (frame) {
+        return;
+      }
+
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        measure();
+      });
+    };
+
+    element.addEventListener("scroll", onScroll, { passive: true });
 
     return () => {
       observer.disconnect();
-      element.removeEventListener("scroll", measure);
+      element.removeEventListener("scroll", onScroll);
+      if (frame) {
+        cancelAnimationFrame(frame);
+      }
     };
   }, [trackRef, measure]);
 
@@ -117,6 +142,17 @@ export function ContentRail({
   const seenRef = useRef("");
   const seenCallback = useRef(onSeen);
   const scroll = useRailScroll(trackRef);
+  const near = useNearViewport(railRef);
+
+  const openHandlers = useMemo(
+    () =>
+      section.items.map((_item, index) => (title: MediaTitle) => {
+        startJourney(title.id, section.angle ?? section.id, index);
+        track("rail_click", { detail: section.id, titleId: title.id });
+        onOpen(title);
+      }),
+    [section, onOpen],
+  );
 
   const turn = useCallback((direction: 1 | -1) => {
     const element = trackRef.current;
@@ -214,18 +250,20 @@ export function ContentRail({
       </div>
       <div className="rail-track" ref={trackRef}>
         {section.items.length ? (
-          section.items.map((item, index) => (
-            <TitleCard
-              key={`${section.id}-${item.id}`}
-              item={item}
-              rank={ranked ? index + 1 : undefined}
-              onOpen={(title) => {
-                startJourney(title.id, section.angle ?? section.id, index);
-                track("rail_click", { detail: section.id, titleId: title.id });
-                onOpen(title);
-              }}
-            />
-          ))
+          near ? (
+            section.items.map((item, index) => (
+              <TitleCard
+                key={`${section.id}-${item.id}`}
+                item={item}
+                rank={ranked ? index + 1 : undefined}
+                onOpen={openHandlers[index]}
+              />
+            ))
+          ) : (
+            section.items
+              .slice(0, 4)
+              .map((item) => <span key={item.id} className="skeleton skeleton-reel" />)
+          )
         ) : (
           <p className="rail-empty">No titles found.</p>
         )}

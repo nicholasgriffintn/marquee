@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { ErrorBoundary } from "../components/ErrorBoundary";
@@ -7,15 +7,19 @@ import { ProjectionNote } from "../components/revival/ProjectionNote";
 import { ReelCard } from "../components/revival/ReelCard";
 import { UsherMark } from "../components/usher/UsherMark";
 import { revivalPath, workMeta, type RevivalBillSlot, type RevivalShelf } from "../domain/revival";
+import { useNearViewport } from "../hooks/useNearViewport";
 import { useProgramme, useVaultSearch } from "../hooks/useRevival";
 
 function Shelf({ shelf }: { shelf: RevivalShelf }) {
+  const ref = useRef<HTMLElement>(null);
+  const near = useNearViewport(ref);
+
   if (shelf.works.length === 0) {
     return null;
   }
 
   return (
-    <section className="content-rail">
+    <section className="content-rail" ref={ref}>
       <div className="rail-heading">
         <div>
           <span>{shelf.description}</span>
@@ -23,9 +27,11 @@ function Shelf({ shelf }: { shelf: RevivalShelf }) {
         </div>
       </div>
       <div className="rail-track">
-        {shelf.works.map((work) => (
-          <ReelCard key={`${shelf.id}-${work.id}`} work={work} />
-        ))}
+        {near
+          ? shelf.works.map((work) => <ReelCard key={`${shelf.id}-${work.id}`} work={work} />)
+          : shelf.works
+              .slice(0, 4)
+              .map((work) => <span key={work.id} className="skeleton skeleton-reel" />)}
       </div>
     </section>
   );

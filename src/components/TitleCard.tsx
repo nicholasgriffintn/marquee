@@ -1,3 +1,5 @@
+import { memo } from "react";
+
 import type { MediaTitle } from "../domain/catalog";
 import { changeLabel, compactCount, mediaMeta } from "../lib/media";
 import { RatingLine } from "./RatingLine";
@@ -7,7 +9,7 @@ import { ProviderBadge } from "./ui";
 const RAIL_PROVIDER_LIMIT = 3;
 const RAIL_RATING_LIMIT = 3;
 
-export function TitleCard({
+export const TitleCard = memo(function TitleCard({
   item,
   onOpen,
   rank,
@@ -64,4 +66,4 @@ export function TitleCard({
       </div>
     </article>
   );
-}
+});

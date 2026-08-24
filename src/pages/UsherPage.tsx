@@ -251,7 +251,7 @@ export function UsherPage() {
             </div>
             <div>
               <dt>Anime tags</dt>
-              <dd>AniList</dd>
+              <dd>MyAnimeList</dd>
             </div>
             <div>
               <dt>What people are reading</dt>

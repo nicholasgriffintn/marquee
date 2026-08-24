@@ -8,7 +8,7 @@ export const RATING_WEIGHTS = {
   imdb: 1.3,
   rottenTomatoes: 0.8,
   metascore: 0.8,
-  anilist: 0.8,
+  mal: 0.8,
 } as const;
 
 export type RatingKey = keyof typeof RATING_WEIGHTS;
@@ -77,14 +77,14 @@ export function ratingSources(item: MediaTitle): RatingSource[] {
     });
   }
 
-  if (ratings?.anilistScore != null) {
+  if (ratings?.animeScore != null) {
     sources.push({
-      key: "anilist",
-      label: "AniList",
-      display: `${ratings.anilistScore}%`,
-      outOfTen: false,
-      score: ratings.anilistScore / 10,
-      votes: null,
+      key: "mal",
+      label: "MyAnimeList",
+      display: ratings.animeScore.toFixed(1),
+      outOfTen: true,
+      score: ratings.animeScore,
+      votes: ratings.animeVotes ?? null,
     });
   }
 

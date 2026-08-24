@@ -18,6 +18,7 @@ import {
   getTonight,
   getTrending,
   searchCatalogue,
+  getAnimeWatchOrder,
   getCatalogueItems,
   getProviderCatalogue,
   getTitleAvailability,
@@ -276,6 +277,18 @@ catalogRoutes.get("/providers", edgeCache(300), async (context) => {
     logError("catalogue_read_failed", error, { area: "providers" });
 
     return context.json({ error: "Provider catalogue is unavailable" }, 500);
+  }
+});
+
+catalogRoutes.get("/titles/:titleId/watch-order", edgeCache(3_600), async (context) => {
+  const titleId = context.req.param("titleId");
+
+  try {
+    return context.json(await getAnimeWatchOrder(context.env.DB, titleId));
+  } catch (error) {
+    logError("watch_order_read_failed", error, { area: "anime" });
+
+    return context.json({ related: [] });
   }
 });
 

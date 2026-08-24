@@ -20,7 +20,7 @@ export const SOURCE_BUDGETS: Record<
   tmdb: { windowKind: "day", callLimit: 12_000 },
   justwatch: { windowKind: "day", callLimit: 20_000 },
   omdb: { windowKind: "day", callLimit: 500_000 },
-  anilist: { windowKind: "day", callLimit: 2_000 },
+  jikan: { windowKind: "day", callLimit: 20_000 },
 };
 
 export function budgetSource(source: EnrichmentSource): BudgetSource {
@@ -157,6 +157,12 @@ function statusOf(error: unknown) {
 
 export function isRateLimited(error: unknown) {
   return statusOf(error) === 429;
+}
+
+export function isUpstreamDown(error: unknown) {
+  const status = statusOf(error);
+
+  return status === 502 || status === 503 || status === 504;
 }
 
 export function isRefused(error: unknown) {

@@ -1,5 +1,5 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
-import { getAnilistDetails } from "../clients/anilist.ts";
+import { getJikanDetails } from "../clients/jikan.ts";
 import {
   getOmdbTitle,
   searchOmdb,
@@ -9,10 +9,10 @@ import {
 import { logEvent } from "../lib/logging.ts";
 import { enqueue } from "../lib/queue.ts";
 import { comparableTitle, imdbIdFrom } from "../lib/text.ts";
-import { claimBudget, readBudgetRoom } from "../repositories/budgets.ts";
+import { claimBudget, isUpstreamDown, readBudgetRoom } from "../repositories/budgets.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
 import {
-  selectAnilistCandidates,
+  selectAnimeCandidates,
   selectUnenriched,
   storeEnrichment,
   storeEnrichmentMiss,
@@ -21,13 +21,19 @@ import {
 import type { Bindings, EnrichmentSource, IngestionJob } from "../types.ts";
 import { withRateLimitPause, type SourceAttempt } from "./sources.ts";
 
-const ANILIST_KEYWORD_LIMIT = 60;
+const ANIME_KEYWORD_LIMIT = 60;
+
+const RUN_STATUS: Record<string, string> = {
+  "Finished Airing": "Ended",
+  "Currently Airing": "Returning Series",
+  "Not yet aired": "Planned",
+};
 const YEAR_SLACK = 2;
 
 const ENRICHERS = [
   { source: "omdb", job: "enrich-ratings", maxAgeDays: 30, perRun: 3_000, budgetGated: true },
   { source: "poster", job: "cache-poster", maxAgeDays: 365, perRun: 2_000, budgetGated: false },
-  { source: "anilist", job: "enrich-anilist", maxAgeDays: 14, perRun: 120, budgetGated: true },
+  { source: "jikan", job: "enrich-anime", maxAgeDays: 14, perRun: 120, budgetGated: true },
 ] as const satisfies readonly {
   source: EnrichmentSource;
   job: IngestionJob["type"];
@@ -56,8 +62,8 @@ function sourceCandidates(
   maxAgeDays: number,
   perRun: number,
 ) {
-  return source === "anilist"
-    ? selectAnilistCandidates(env, maxAgeDays, perRun)
+  return source === "jikan"
+    ? selectAnimeCandidates(env, maxAgeDays, perRun)
     : selectUnenriched(env, source, maxAgeDays, perRun);
 }
 
@@ -66,7 +72,7 @@ function sourceConfigured(env: Bindings, source: EnrichmentSource) {
     return Boolean(env.OMDB_API_KEY);
   }
 
-  return source === "anilist";
+  return source === "jikan";
 }
 
 function enrichmentRoom(env: Bindings, enricher: Enricher) {
@@ -243,7 +249,11 @@ function omdbFields(title: MediaTitle, record: OmdbRecord) {
   const facts = record.facts;
 
   return {
-    ratings: { ...record.ratings, anilistScore: title.ratings?.anilistScore ?? null },
+    ratings: {
+      ...record.ratings,
+      animeScore: title.ratings?.animeScore ?? null,
+      animeVotes: title.ratings?.animeVotes ?? null,
+    },
     ...(title.certification || !facts.certification ? {} : { certification: facts.certification }),
     ...(title.runtimeMinutes || !facts.runtimeMinutes
       ? {}
@@ -299,49 +309,33 @@ export async function enrichRatings(env: Bindings, titleId: string) {
   await storeEnrichment(env, titleId, "omdb", omdbFields(title, record));
 }
 
-function anilistSchedule(
-  env: Bindings,
-  anilistId: number,
-  title: MediaTitle,
-  nextEpisode: { airsAt: string; episode: number },
-) {
-  return env.DB.prepare(
-    `INSERT INTO title_schedule
-       (id, title_id, imdb_id, show_name, season, episode, episode_name, airs_at, network, source)
-     VALUES (?, ?, ?, ?, NULL, ?, NULL, ?, NULL, 'anilist')
-     ON CONFLICT(id) DO UPDATE SET
-       episode = excluded.episode,
-       airs_at = excluded.airs_at,
-       fetched_at = CURRENT_TIMESTAMP`,
-  )
-    .bind(
-      `anilist:${anilistId}`,
-      title.id,
-      imdbIdFrom(title.imdbUrl),
-      title.title,
-      nextEpisode.episode,
-      nextEpisode.airsAt,
-    )
-    .run();
-}
-
-export async function enrichAnilist(env: Bindings, titleId: string) {
+export async function enrichAnime(env: Bindings, titleId: string) {
   const [title] = await readItems(env.DB, [titleId]);
-  const anilistId = title?.externalIds?.anilistId ?? null;
+  const malId = title?.externalIds?.malId ?? null;
 
-  if (!anilistId) {
-    await storeEnrichmentMiss(env, titleId, "anilist", "no-anilist-id");
-
-    return;
-  }
-
-  if (!(await claimBudget(env, "anilist"))) {
-    logEvent("budget_exhausted", { source: "anilist", titleId });
+  if (!malId) {
+    await storeEnrichmentMiss(env, titleId, "jikan", "no-mal-id");
 
     return;
   }
 
-  const attempt = await withRateLimitPause(env, "anilist", () => getAnilistDetails(anilistId));
+  if (!(await claimBudget(env, "jikan"))) {
+    logEvent("budget_exhausted", { source: "jikan", titleId });
+
+    return;
+  }
+
+  const attempt = await withRateLimitPause(env, "jikan", async () => {
+    try {
+      return await getJikanDetails(malId);
+    } catch (error) {
+      if (!isUpstreamDown(error)) {
+        throw error;
+      }
+
+      return "unavailable" as const;
+    }
+  });
 
   if (attempt.limited) {
     return;
@@ -349,8 +343,14 @@ export async function enrichAnilist(env: Bindings, titleId: string) {
 
   const details = attempt.value;
 
+  if (details === "unavailable") {
+    await storeEnrichmentMiss(env, titleId, "jikan", "mal-unavailable");
+
+    return;
+  }
+
   if (!details) {
-    await storeEnrichmentMiss(env, titleId, "anilist", "no-anilist-record");
+    await storeEnrichmentMiss(env, titleId, "jikan", "no-mal-record");
 
     return;
   }
@@ -374,11 +374,29 @@ export async function enrichAnilist(env: Bindings, titleId: string) {
       ...searchable,
       ...material,
     ]),
-  ].slice(0, ANILIST_KEYWORD_LIMIT);
+  ].slice(0, ANIME_KEYWORD_LIMIT);
 
-  await storeEnrichment(env, titleId, "anilist", {
-    anime: details.anime,
+  await storeEnrichment(env, titleId, "jikan", {
+    anime: {
+      ...details.anime,
+      broadcast: details.broadcast,
+      background: details.background,
+      licensors: details.licensors,
+      producers: details.producers,
+      rank: details.rank,
+      members: details.members,
+      favorites: details.favorites,
+      keyVisualUrl: details.keyVisualUrl,
+      trailerKey: details.trailerKey,
+      links: details.links,
+    },
     keywords,
+    ...(title?.status || !RUN_STATUS[details.status ?? ""]
+      ? {}
+      : { status: RUN_STATUS[details.status ?? ""] }),
+    ...(title?.lastAirDate || !details.airedTo ? {} : { lastAirDate: details.airedTo }),
+    ...(title?.studios?.length || details.studios.length === 0 ? {} : { studios: details.studios }),
+    ...(title?.posterUrl || !details.keyVisualUrl ? {} : { posterUrl: details.keyVisualUrl }),
     ratings: {
       imdbScore: title?.ratings?.imdbScore ?? null,
       imdbVotes: title?.ratings?.imdbVotes ?? null,
@@ -387,11 +405,8 @@ export async function enrichAnilist(env: Bindings, titleId: string) {
       awards: title?.ratings?.awards ?? null,
       awardWins: title?.ratings?.awardWins ?? null,
       boxOffice: title?.ratings?.boxOffice ?? null,
-      anilistScore: details.score,
+      animeScore: details.score,
+      animeVotes: details.scoredBy,
     },
   });
-
-  if (details.nextEpisode && title) {
-    await anilistSchedule(env, anilistId, title, details.nextEpisode);
-  }
 }

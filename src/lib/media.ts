@@ -1,3 +1,4 @@
+import { animeMeta } from "../domain/anime";
 import type { MediaTitle } from "../domain/catalog";
 
 const POSTER_WIDTHS = [160, 320, 500, 780];
@@ -45,8 +46,9 @@ export function artworkSrcSet(
 }
 
 export function mediaMeta(item: MediaTitle) {
+  const anime = animeMeta(item);
   const values = [
-    item.year?.toString(),
+    anime.year ?? item.year?.toString(),
     item.certification,
     item.mediaType === "movie"
       ? item.runtimeMinutes
@@ -86,14 +88,16 @@ export function detailMeta(item: MediaTitle) {
     return mediaMeta(item);
   }
 
+  const anime = animeMeta(item);
   const values = [
-    item.year?.toString(),
+    anime.year ?? item.year?.toString(),
     item.certification,
     runStatusLabel(item),
     item.numberOfSeasons
       ? `${item.numberOfSeasons} season${item.numberOfSeasons === 1 ? "" : "s"}`
       : null,
     item.episodeCount ? `${item.episodeCount} episodes` : null,
+    ...anime.extras,
     item.genres.slice(0, 2).join(" / ") || null,
   ];
 

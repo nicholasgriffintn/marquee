@@ -22,7 +22,7 @@ export type ProviderAvailability = {
   name: string;
   offerTypes: string[];
   webUrl: string | null;
-  source: "JustWatch" | "TMDB / JustWatch";
+  source: "JustWatch" | "TMDB / JustWatch" | "MyAnimeList";
 };
 
 export type TitleBuzz = {
@@ -36,18 +36,27 @@ export type TitleBuzz = {
   measuredAt: string;
 };
 
-export type AnimeRelation = {
-  anilistId: number;
-  relation: string;
-  format: string | null;
+export type AnimeLink = {
+  name: string;
+  url: string;
+};
+
+export type AnimeTheme = {
   title: string;
-  year: number | null;
+  artist: string | null;
+  episodes: string | null;
 };
 
 export type AnimeStream = {
   site: string;
   url: string;
-  language: string | null;
+};
+export type AnimeRelation = {
+  malId: number;
+  relation: string;
+  format: string | null;
+  title: string;
+  year: number | null;
 };
 
 export type AnimeDetails = {
@@ -57,13 +66,25 @@ export type AnimeDetails = {
   season: string | null;
   seasonYear: number | null;
   source: string | null;
-  country: string | null;
   synonyms: string[];
   romajiTitle: string | null;
   englishTitle: string | null;
   nativeTitle: string | null;
   relations: AnimeRelation[];
   streams: AnimeStream[];
+  broadcast?: string | null;
+  airing?: boolean;
+  openings?: AnimeTheme[];
+  endings?: AnimeTheme[];
+  background?: string | null;
+  licensors?: string[];
+  producers?: string[];
+  rank?: number | null;
+  members?: number | null;
+  favorites?: number | null;
+  keyVisualUrl?: string | null;
+  trailerKey?: string | null;
+  links?: AnimeLink[];
 };
 
 export type ExternalIds = {
@@ -134,7 +155,8 @@ export type MediaTitle = {
     awards?: string | null;
     awardWins?: number | null;
     boxOffice?: number | null;
-    anilistScore?: number | null;
+    animeScore?: number | null;
+    animeVotes?: number | null;
   };
 
   externalIds?: ExternalIds;

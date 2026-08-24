@@ -25,7 +25,7 @@ import type { Bindings, IngestionJob } from "../types.ts";
 import { importAnimeIds } from "./anime-ids.ts";
 import { enrichTitleAvailability, queueAvailability } from "./availability.ts";
 import { queueEmbeddings } from "./embeddings.ts";
-import { enrichAnilist, enrichRatings, queueEnrichment } from "./enrichment.ts";
+import { enrichAnime, enrichRatings, queueEnrichment } from "./enrichment.ts";
 import { importDiaryRow, importImdbTitle } from "./imports.ts";
 import { cachePoster } from "./posters.ts";
 import { getProviderLedger } from "./provider-ledger.ts";
@@ -164,8 +164,9 @@ export async function executeIngestionJob(env: Bindings, job: IngestionJob) {
       return;
     }
 
+    case "enrich-anime":
     case "enrich-anilist": {
-      await enrichAnilist(env, job.titleId);
+      await enrichAnime(env, job.titleId);
 
       return;
     }

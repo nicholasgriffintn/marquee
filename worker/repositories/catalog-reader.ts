@@ -155,6 +155,35 @@ export async function readItems(db: D1Database, ids: string[], limit = 30) {
   });
 }
 
+export async function readTitlesByMalId(db: D1Database, malIds: number[]) {
+  const unique = [...new Set(malIds.filter((id) => Number.isInteger(id) && id > 0))].slice(0, 40);
+  const found = new Map<number, MediaTitle>();
+
+  if (unique.length === 0) {
+    return found;
+  }
+
+  const rows = await db
+    .prepare(
+      `SELECT payload, poster_key AS posterKey,
+              json_extract(payload, '$.externalIds.malId') AS malId
+       FROM catalog_titles
+       WHERE json_extract(payload, '$.externalIds.malId') IN (${unique.map(() => "?").join(",")})`,
+    )
+    .bind(...unique)
+    .all<PayloadRow & { malId: number }>();
+
+  for (const row of rows.results) {
+    const title = parseStoredTitle(row.payload);
+
+    if (title) {
+      found.set(row.malId, withStoredPoster(title, row.posterKey));
+    }
+  }
+
+  return found;
+}
+
 export async function readCatalog(db: D1Database, query: string, providerIds: string[]) {
   if (query) {
     return readSearchResults(db, query, providerIds);

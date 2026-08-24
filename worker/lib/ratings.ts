@@ -14,7 +14,7 @@ function ratingSources(payload: string): SqlRatingSource[] {
   const imdbVotes = `COALESCE(${at("ratings.imdbVotes")}, 0)`;
   const rotten = at("ratings.rottenTomatoes");
   const metascore = at("ratings.metascore");
-  const anilist = at("ratings.anilistScore");
+  const anime = at("ratings.animeScore");
   const rottenValue = `(CAST(replace(COALESCE(${rotten}, '0'), '%', '') AS REAL) / 10.0)`;
 
   return [
@@ -43,10 +43,10 @@ function ratingSources(payload: string): SqlRatingSource[] {
       damped: `(COALESCE(${metascore}, 0) / 10.0)`,
     },
     {
-      weight: RATING_WEIGHTS.anilist,
-      guard: anilist,
-      value: `(COALESCE(${anilist}, 0) / 10.0)`,
-      damped: `(COALESCE(${anilist}, 0) / 10.0)`,
+      weight: RATING_WEIGHTS.mal,
+      guard: anime,
+      value: `COALESCE(${anime}, 0)`,
+      damped: `COALESCE(${anime}, 0)`,
     },
   ];
 }

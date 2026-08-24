@@ -22,12 +22,24 @@ export function SourceLinks({ item, onLeave }: { item: MediaTitle; onLeave: Leav
       ? [{ href: item.buzz.articleUrl, label: "Wikipedia", kind: "wikipedia" as const }]
       : []),
     ...(item.imdbUrl ? [{ href: item.imdbUrl, label: "IMDb", kind: "imdb" as const }] : []),
+    ...(item.anime?.links ?? []).map((link) => ({
+      href: link.url,
+      label: link.name,
+      kind: "other" as const,
+    })),
   ];
+
+  const seen = new Set<string>();
+  const shown = exits.filter((exit) => {
+    const key = exit.label.toLowerCase();
+
+    return seen.has(key) ? false : Boolean(seen.add(key));
+  });
 
   return (
     <div className="resource-links">
       <span>SOURCE LINKS</span>
-      {exits.map((exit) => (
+      {shown.map((exit) => (
         <a
           key={exit.label}
           href={exit.href}

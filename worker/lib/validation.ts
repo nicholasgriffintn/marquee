@@ -147,6 +147,7 @@ export function isIngestionJob(value: unknown): value is IngestionJob {
   if (
     value.type === "enrich-availability" ||
     value.type === "enrich-ratings" ||
+    value.type === "enrich-anime" ||
     value.type === "enrich-anilist" ||
     value.type === "cache-poster"
   ) {

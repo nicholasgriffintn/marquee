@@ -53,7 +53,7 @@ export type Bindings = {
 
 export type CatalogSweepParameters = { deep?: boolean };
 
-export type EnrichmentSource = "tmdb" | "justwatch" | "omdb" | "poster" | "anilist";
+export type EnrichmentSource = "tmdb" | "justwatch" | "omdb" | "poster" | "jikan";
 
 export type TitleRatings = {
   imdbScore: number | null;
@@ -63,7 +63,8 @@ export type TitleRatings = {
   awards?: string | null;
   awardWins?: number | null;
   boxOffice?: number | null;
-  anilistScore?: number | null;
+  animeScore?: number | null;
+  animeVotes?: number | null;
 };
 
 export type IngestionJob =
@@ -73,6 +74,7 @@ export type IngestionJob =
   | { type: "measure-discover-partition"; partitionId: string }
   | { type: "enrich-availability"; titleId: string }
   | { type: "enrich-ratings"; titleId: string }
+  | { type: "enrich-anime"; titleId: string }
   | { type: "enrich-anilist"; titleId: string }
   | { type: "import-anime-ids"; offset?: number; force?: boolean }
   | { type: "cache-poster"; titleId: string }

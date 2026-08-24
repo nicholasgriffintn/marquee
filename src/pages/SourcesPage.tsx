@@ -18,7 +18,11 @@ const CREDITS: { name: string; href: string; note: string; logo?: string }[] = [
     note: "Every piece of availability on this site",
   },
   { name: "TVmaze", href: "https://www.tvmaze.com", note: "Air dates and episode schedules" },
-  { name: "AniList", href: "https://anilist.co", note: "Anime tags and episode schedules" },
+  {
+    name: "MyAnimeList via Jikan",
+    href: "https://jikan.moe",
+    note: "Anime formats, seasons, watch order and where it streams",
+  },
   {
     name: "Fribb's anime lists",
     href: "https://github.com/Fribb/anime-lists",

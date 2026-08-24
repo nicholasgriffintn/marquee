@@ -6,6 +6,7 @@ export function jobSubject(job: IngestionJob) {
   if (
     job.type === "enrich-availability" ||
     job.type === "enrich-ratings" ||
+    job.type === "enrich-anime" ||
     job.type === "enrich-anilist" ||
     job.type === "cache-poster"
   ) {
