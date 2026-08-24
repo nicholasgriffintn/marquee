@@ -4,6 +4,8 @@ import type { Bindings, EnrichmentSource } from "../types.ts";
 
 const RATE_LIMIT_PAUSE_MINUTES: Partial<Record<EnrichmentSource, number>> = {
   jikan: 60,
+  omdb: 10,
+  poster: 10,
 };
 
 const DEFAULT_PAUSE_MINUTES = 30;

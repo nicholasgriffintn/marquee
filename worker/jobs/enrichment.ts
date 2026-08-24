@@ -9,7 +9,7 @@ import {
 import { logEvent } from "../lib/logging.ts";
 import { enqueue } from "../lib/queue.ts";
 import { comparableTitle, imdbIdFrom } from "../lib/text.ts";
-import { claimBudget, isUpstreamDown, readBudgetRoom } from "../repositories/budgets.ts";
+import { claimBudget, isUpstreamDown, readBudgetPace } from "../repositories/budgets.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
 import {
   selectAnimeCandidates,
@@ -29,17 +29,40 @@ const RUN_STATUS: Record<string, string> = {
   "Not yet aired": "Planned",
 };
 const YEAR_SLACK = 2;
+const LATIN_SCRIPT = /^[\p{Script=Latin}\p{Script=Common}\p{Script=Inherited}]+$/u;
 
 const ENRICHERS = [
-  { source: "omdb", job: "enrich-ratings", maxAgeDays: 30, perRun: 3_000, budgetGated: true },
-  { source: "poster", job: "cache-poster", maxAgeDays: 365, perRun: 2_000, budgetGated: false },
-  { source: "jikan", job: "enrich-anime", maxAgeDays: 14, perRun: 120, budgetGated: true },
+  {
+    source: "omdb",
+    job: "enrich-ratings",
+    maxAgeDays: 14,
+    missBackoffDays: 10,
+    perRun: 20_000,
+    share: 0.7,
+  },
+  {
+    source: "poster",
+    job: "cache-poster",
+    maxAgeDays: 365,
+    missBackoffDays: 30,
+    perRun: 10_000,
+    share: 0.3,
+  },
+  {
+    source: "jikan",
+    job: "enrich-anime",
+    maxAgeDays: 14,
+    missBackoffDays: 3,
+    perRun: 120,
+    share: 1,
+  },
 ] as const satisfies readonly {
   source: EnrichmentSource;
   job: IngestionJob["type"];
   maxAgeDays: number;
+  missBackoffDays: number;
   perRun: number;
-  budgetGated: boolean;
+  share: number;
 }[];
 
 type Enricher = (typeof ENRICHERS)[number];
@@ -56,15 +79,12 @@ function enrichmentQueue(env: Bindings, source: EnrichmentSource) {
   return env.ANIME_QUEUE;
 }
 
-function sourceCandidates(
-  env: Bindings,
-  source: EnrichmentSource,
-  maxAgeDays: number,
-  perRun: number,
-) {
-  return source === "jikan"
-    ? selectAnimeCandidates(env, maxAgeDays, perRun)
-    : selectUnenriched(env, source, maxAgeDays, perRun);
+function sourceCandidates(env: Bindings, enricher: Enricher, limit: number) {
+  const window = { maxAgeDays: enricher.maxAgeDays, missBackoffDays: enricher.missBackoffDays };
+
+  return enricher.source === "jikan"
+    ? selectAnimeCandidates(env, window, limit)
+    : selectUnenriched(env, enricher.source, window, limit);
 }
 
 function sourceConfigured(env: Bindings, source: EnrichmentSource) {
@@ -75,10 +95,10 @@ function sourceConfigured(env: Bindings, source: EnrichmentSource) {
   return source === "jikan";
 }
 
-function enrichmentRoom(env: Bindings, enricher: Enricher) {
-  return enricher.budgetGated
-    ? readBudgetRoom(env, enricher.source)
-    : Promise.resolve(enricher.perRun);
+async function enrichmentRoom(env: Bindings, enricher: Enricher) {
+  const pace = await readBudgetPace(env, enricher.source);
+
+  return Math.floor(pace * enricher.share);
 }
 
 export async function queueEnrichment(env: Bindings) {
@@ -97,12 +117,7 @@ export async function queueEnrichment(env: Bindings) {
     }
 
     // oxlint-disable-next-line no-await-in-loop
-    const titleIds = await sourceCandidates(
-      env,
-      enricher.source,
-      enricher.maxAgeDays,
-      Math.min(enricher.perRun, room),
-    );
+    const titleIds = await sourceCandidates(env, enricher, Math.min(enricher.perRun, room));
 
     logEvent("enrichment_queued", { source: enricher.source, count: titleIds.length, room });
 
@@ -112,6 +127,10 @@ export async function queueEnrichment(env: Bindings) {
       titleIds.map((titleId): IngestionJob => ({ type: enricher.job, titleId })),
     );
   }
+}
+
+function latinName(name: string) {
+  return name.length > 0 && LATIN_SCRIPT.test(name);
 }
 
 function searchNames(title: MediaTitle) {
@@ -124,11 +143,16 @@ function searchNames(title: MediaTitle) {
     names.push(title.originalTitle);
   }
 
-  return names;
+  return names.filter((name) => latinName(name));
 }
 
 function comparableNames(title: MediaTitle) {
-  return new Set(searchNames(title).map((name) => comparableTitle(name)));
+  return new Set(
+    [title.title, title.originalTitle]
+      .filter((name): name is string => Boolean(name))
+      .map((name) => comparableTitle(name))
+      .filter(Boolean),
+  );
 }
 
 function yearMatches(wanted: number | null, found: number | null) {
@@ -202,10 +226,15 @@ async function searchFor(
 async function findBySearch(
   env: Bindings,
   title: MediaTitle,
+  names: string[],
 ): Promise<SourceAttempt<OmdbRecord | null>> {
+  if (!title.year) {
+    return { limited: false, value: null };
+  }
+
   let found: OmdbSearchResult | null = null;
 
-  for (const name of searchNames(title)) {
+  for (const name of names) {
     // oxlint-disable-next-line no-await-in-loop
     const attempt = await searchFor(env, title, name);
 
@@ -229,11 +258,20 @@ async function findBySearch(
   return lookup(env, () => getOmdbTitle(env, { imdbId: match.imdbId }));
 }
 
-async function resolveOmdbRecord(env: Bindings, title: MediaTitle) {
+async function resolveOmdbRecord(
+  env: Bindings,
+  title: MediaTitle,
+): Promise<SourceAttempt<OmdbRecord | null>> {
   const known = imdbIdFrom(title.imdbUrl);
 
   if (known) {
     return lookup(env, () => getOmdbTitle(env, { imdbId: known }));
+  }
+
+  const names = searchNames(title);
+
+  if (names.length === 0) {
+    return { limited: false, value: null };
   }
 
   const named = await findByName(env, title);
@@ -242,7 +280,7 @@ async function resolveOmdbRecord(env: Bindings, title: MediaTitle) {
     return named;
   }
 
-  return findBySearch(env, title);
+  return findBySearch(env, title, names);
 }
 
 function omdbFields(title: MediaTitle, record: OmdbRecord) {
@@ -295,7 +333,12 @@ export async function enrichRatings(env: Bindings, titleId: string) {
   const record = attempt.value;
 
   if (!record) {
-    await storeEnrichmentMiss(env, titleId, "omdb", "no-omdb-record");
+    const reason =
+      imdbIdFrom(title.imdbUrl) || searchNames(title).length > 0
+        ? "no-omdb-record"
+        : "unsearchable-title";
+
+    await storeEnrichmentMiss(env, titleId, "omdb", reason);
 
     return;
   }

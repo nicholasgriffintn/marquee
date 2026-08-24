@@ -86,16 +86,19 @@ export async function storeEnrichmentMiss(
     .run();
 }
 
-const MISS_BACKOFF_DAYS = 3;
 const MISS_BACKOFF_CAP_DAYS = 120;
 
-const DUE_FOR_ENRICHMENT = `e.title_id IS NULL
+export type EnrichmentWindow = { maxAgeDays: number; missBackoffDays: number };
+
+function dueForEnrichment(window: EnrichmentWindow) {
+  return `e.title_id IS NULL
        OR (e.miss = 0 AND e.fetched_at < datetime('now', ?))
        OR (e.miss = 1
            AND e.fetched_at < datetime(
              'now',
-             '-' || min(e.attempts * ${MISS_BACKOFF_DAYS}, ${MISS_BACKOFF_CAP_DAYS}) || ' days'
+             '-' || min(e.attempts * ${window.missBackoffDays}, ${MISS_BACKOFF_CAP_DAYS}) || ' days'
            ))`;
+}
 
 export async function storeAnimeIds(db: D1Database, mappings: AnimeMapping[]) {
   if (mappings.length === 0) {
@@ -129,17 +132,21 @@ export async function storeAnimeIds(db: D1Database, mappings: AnimeMapping[]) {
   return written.reduce((sum, result) => sum + (result.meta.changes ?? 0), 0);
 }
 
-export async function selectAnimeCandidates(env: Bindings, maxAgeDays: number, limit: number) {
+export async function selectAnimeCandidates(
+  env: Bindings,
+  window: EnrichmentWindow,
+  limit: number,
+) {
   const rows = await env.DB.prepare(
     `SELECT t.id AS titleId
      FROM catalog_titles AS t
      LEFT JOIN title_enrichment AS e ON e.title_id = t.id AND e.source = 'jikan'
      WHERE json_extract(t.payload, '$.externalIds.malId') IS NOT NULL
-       AND (${DUE_FOR_ENRICHMENT})
+       AND (${dueForEnrichment(window)})
      ORDER BY t.popularity DESC
      LIMIT ?`,
   )
-    .bind(`-${maxAgeDays} days`, limit)
+    .bind(`-${window.maxAgeDays} days`, limit)
     .all<{ titleId: string }>();
 
   return rows.results.map((row) => row.titleId);
@@ -148,7 +155,7 @@ export async function selectAnimeCandidates(env: Bindings, maxAgeDays: number, l
 export async function selectUnenriched(
   env: Bindings,
   source: EnrichmentSource,
-  maxAgeDays: number,
+  window: EnrichmentWindow,
   limit: number,
 ) {
   const rows = await env.DB.prepare(
@@ -156,11 +163,11 @@ export async function selectUnenriched(
      FROM catalog_titles AS t
      LEFT JOIN title_enrichment AS e
        ON e.title_id = t.id AND e.source = ?
-     WHERE ${DUE_FOR_ENRICHMENT}
+     WHERE ${dueForEnrichment(window)}
      ORDER BY t.popularity DESC
      LIMIT ?`,
   )
-    .bind(source, `-${maxAgeDays} days`, limit)
+    .bind(source, `-${window.maxAgeDays} days`, limit)
     .all<{ titleId: string }>();
 
   return rows.results.map((row) => row.titleId);
