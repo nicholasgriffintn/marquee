@@ -15,12 +15,12 @@ const CREDITS: { name: string; href: string; note: string; logo?: string }[] = [
   {
     name: "JustWatch",
     href: "https://www.justwatch.com",
-    note: "Availability and deep links",
+    note: "Every piece of availability on this site",
   },
   {
     name: "Watchmode",
     href: "https://www.watchmode.com",
-    note: "Service directory and gap filling",
+    note: "The service directory, and cover when JustWatch goes quiet",
   },
   { name: "TVmaze", href: "https://www.tvmaze.com", note: "Air dates and episode schedules" },
   { name: "AniList", href: "https://anilist.co", note: "Anime tags and episode schedules" },

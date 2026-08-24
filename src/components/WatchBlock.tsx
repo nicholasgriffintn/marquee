@@ -115,6 +115,13 @@ export function WatchBlock({
           )}
         </div>
       )}
+      <p className="watch-credit">
+        Availability from{" "}
+        <a href="https://www.justwatch.com" target="_blank" rel="noreferrer">
+          JustWatch
+        </a>
+        . It changes without telling me.
+      </p>
     </div>
   );
 }

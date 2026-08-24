@@ -212,7 +212,11 @@ export function ShowingsBlock({
         <Listing key={listing.cinema.id} listing={listing} onLeave={onLeave} />
       </ul>
       <p className="showings-foot">
-        Other people's houses. I only know what they put on the board.
+        Other people's houses. I only know what they put on the board. Where they are comes from{" "}
+        <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">
+          © OpenStreetMap contributors
+        </a>
+        .
       </p>
     </div>
   );

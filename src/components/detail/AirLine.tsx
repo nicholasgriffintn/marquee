@@ -31,6 +31,7 @@ export function AirLine({
           minute: "2-digit",
         })}
         {nextEpisode.network ? ` · ${nextEpisode.network}` : ""}
+        <small className="detail-credit">Schedule from TVmaze</small>
       </p>
     );
   }
@@ -42,6 +43,7 @@ export function AirLine({
       <p className="detail-next">
         <span>Next episode</span>{" "}
         {formatDate(upcoming, { weekday: "long", day: "numeric", month: "long" })}, date only
+        <small className="detail-credit">Schedule from TVmaze</small>
       </p>
     );
   }

@@ -2325,6 +2325,25 @@ h2 em {
 .source-attribution .source-terms a {
   color: var(--paper);
 }
+.watch-credit {
+  color: #5a5c53;
+  font: 10px/1.6 var(--mono);
+  letter-spacing: 0.04em;
+  margin: 10px 0 0;
+}
+.watch-credit a {
+  color: #2a4bc9;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.detail-credit {
+  color: var(--muted);
+  display: block;
+  font: 9px var(--mono);
+  letter-spacing: 0.06em;
+  margin-top: 5px;
+  text-transform: uppercase;
+}
 .tmdb-logo {
   display: block;
   height: 15px;

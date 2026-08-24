@@ -10,7 +10,16 @@ export function SiteFooter() {
         <span>Marquee</span>
       </div>
       <p>
-        Data by TMDB · Availability by Watchmode and JustWatch ·{" "}
+        Data by TMDB · Availability by JustWatch · Service directory by Watchmode · Cinemas by{" "}
+        <a
+          className="footer-link"
+          href="https://www.openstreetmap.org/copyright"
+          target="_blank"
+          rel="noreferrer"
+        >
+          © OpenStreetMap contributors
+        </a>{" "}
+        ·{" "}
         <Link className="footer-link" to="/sources">
           Services and sources
         </Link>
