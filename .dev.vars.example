@@ -1,6 +1,5 @@
 TMDB_API_TOKEN=your-tmdb-api-read-access-token
 OMDB_API_KEY=your-omdb-api-key
-SIMKL_CLIENT_ID=your-simkl-client-id
 TRAKT_CLIENT_ID=your-trakt-client-id
 TRAKT_CLIENT_SECRET=your-trakt-client-secret
 EUROPEANA_API_KEY=your-europeana-api-key

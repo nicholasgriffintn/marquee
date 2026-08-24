@@ -20,6 +20,11 @@ const CREDITS: { name: string; href: string; note: string; logo?: string }[] = [
   { name: "TVmaze", href: "https://www.tvmaze.com", note: "Air dates and episode schedules" },
   { name: "AniList", href: "https://anilist.co", note: "Anime tags and episode schedules" },
   {
+    name: "Fribb's anime lists",
+    href: "https://github.com/Fribb/anime-lists",
+    note: "The map between anime databases",
+  },
+  {
     name: "Wikimedia",
     href: "https://wikimediafoundation.org",
     note: "Pageview trends behind Trending",

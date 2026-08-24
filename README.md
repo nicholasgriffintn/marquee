@@ -189,7 +189,6 @@ partial setup runs; it just knows less.
 | `TMDB_API_TOKEN`                       | Titles, images, credits, providers — the catalogue |
 | `GITHUB_CLIENT_ID` / `_SECRET`         | Sign-in                                            |
 | `OMDB_API_KEY`                         | Awards, box office, search beyond the catalogue    |
-| `SIMKL_CLIENT_ID`                      | Anime tags and scores                              |
 | `TRAKT_CLIENT_ID` / `_SECRET`          | Importing a viewer's history                       |
 | `EUROPEANA_API_KEY`                    | British and European prints for the revival house  |
 | `CLOUDFLARE_ACCOUNT_ID` / `_API_TOKEN` | AI Gateway                                         |
@@ -210,6 +209,7 @@ cp .dev.vars.example .dev.vars
 pnpm install
 pnpm exec wrangler vectorize create marquee-titles --dimensions=1024 --metric=cosine
 pnpm exec wrangler queues create marquee-revival
+pnpm exec wrangler queues create marquee-anime
 pnpm db:migrate:local
 pnpm dev
 ```
@@ -267,6 +267,18 @@ model only names a shelf and picks from a shortlist it can see.
 fans TMDB's discover pages out over the ingestion queue. Sweeps merge rather than replace,
 embeddings are keyed on a hash of their source text so nothing is re-embedded for the sake of it,
 and a source that answers 429 is stood down rather than retried.
+
+**External ids** come from whoever has them cheapest. TMDB hands over imdb, tvdb and wikidata ids
+on the detail call we already make, so those are kept rather than fetched again. The anime ids —
+AniList, MAL, AniDB, Kitsu, AniSearch, LiveChart, ANN and Simkl — come from Fribb's anime lists as
+one file, because per-title lookups against an anime API cost more requests than they are worth.
+
+**Bulk imports** never write straight through. `external_imports` records the source, the dataset,
+the upstream version and what each run wrote. The version is the raw file's ETag, so an unchanged
+list is skipped without downloading it; a list that has lost more than a tenth of its mappings
+since the last good run is refused and logged rather than applied, and the writes themselves are a
+`json_patch` that only touches a row whose ids would actually change. Trigger one from `/admin` or
+let the nightly deep sweep check.
 
 **The door** is one guard in `worker/security/guard.ts`, driven by two tables in
 `worker/security/policies.ts` — `POLICIES` for stances and budgets, `RULES` for path matching, first

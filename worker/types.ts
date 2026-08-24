@@ -1,3 +1,4 @@
+import type { ExternalIds } from "../src/domain/catalog.ts";
 import type { EntryStatus } from "../src/domain/entries.ts";
 
 export type Bindings = {
@@ -30,7 +31,6 @@ export type Bindings = {
   TMDB_API_TOKEN?: string;
   EUROPEANA_API_KEY?: string;
   OMDB_API_KEY?: string;
-  SIMKL_CLIENT_ID?: string;
   AI: Ai;
   VECTORS: Vectorize;
   IMAGES?: ImagesBinding;
@@ -38,7 +38,7 @@ export type Bindings = {
   INGESTION_QUEUE: Queue<IngestionJob>;
   AVAILABILITY_QUEUE: Queue<IngestionJob>;
   RATINGS_QUEUE: Queue<IngestionJob>;
-  SIMKL_QUEUE: Queue<IngestionJob>;
+  ANIME_QUEUE: Queue<IngestionJob>;
   POSTER_QUEUE: Queue<IngestionJob>;
   EMBEDDING_QUEUE: Queue<IngestionJob>;
   REVIVAL_QUEUE: Queue<IngestionJob>;
@@ -53,7 +53,7 @@ export type Bindings = {
 
 export type CatalogSweepParameters = { deep?: boolean };
 
-export type EnrichmentSource = "tmdb" | "justwatch" | "omdb" | "poster" | "simkl" | "anilist";
+export type EnrichmentSource = "tmdb" | "justwatch" | "omdb" | "poster" | "anilist";
 
 export type TitleRatings = {
   imdbScore: number | null;
@@ -66,14 +66,6 @@ export type TitleRatings = {
   anilistScore?: number | null;
 };
 
-export type ExternalIds = {
-  simklId: number | null;
-  imdbId: string | null;
-  tvdbId: number | null;
-  malId: number | null;
-  anilistId: number | null;
-};
-
 export type IngestionJob =
   | { type: "sync-catalog" }
   | { type: "sync-providers" }
@@ -81,8 +73,8 @@ export type IngestionJob =
   | { type: "measure-discover-partition"; partitionId: string }
   | { type: "enrich-availability"; titleId: string }
   | { type: "enrich-ratings"; titleId: string }
-  | { type: "enrich-simkl"; titleId: string }
   | { type: "enrich-anilist"; titleId: string }
+  | { type: "import-anime-ids"; offset?: number; force?: boolean }
   | { type: "cache-poster"; titleId: string }
   | { type: "import-imdb-title"; imdbId: string }
   | {
@@ -132,3 +124,5 @@ export type CuratorResult = {
   summary: string;
   reasons: Record<string, string>;
 };
+
+export type { ExternalIds };

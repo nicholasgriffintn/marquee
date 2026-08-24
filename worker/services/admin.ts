@@ -37,6 +37,7 @@ export const ADMIN_ACTIONS = [
   "revival-rights",
   "revival-recheck",
   "revival-mirror",
+  "anime-ids",
 ] as const;
 
 const RUN_WINDOW_HOURS = 24;
@@ -214,7 +215,7 @@ export async function runAdminAction(env: Bindings, action: AdminAction) {
   if (action === "enrichment") {
     await queueEnrichment(env);
 
-    return { detail: "Queued ratings, posters, Simkl and AniList enrichment" };
+    return { detail: "Queued ratings, posters and AniList enrichment" };
   }
 
   if (action === "embeddings") {
@@ -253,6 +254,12 @@ export async function runAdminAction(env: Bindings, action: AdminAction) {
       queued: frontier.pages,
       detail: `Queued ${frontier.pages} discover pages and ${frontier.measuring} window measurements`,
     };
+  }
+
+  if (action === "anime-ids") {
+    await env.ANIME_QUEUE.send({ type: "import-anime-ids", offset: 0 });
+
+    return { queued: 1, detail: "Checked the anime id list for a new version" };
   }
 
   if (action === "revival-sweep") {

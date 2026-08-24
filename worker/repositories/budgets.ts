@@ -20,7 +20,6 @@ export const SOURCE_BUDGETS: Record<
   tmdb: { windowKind: "day", callLimit: 12_000 },
   justwatch: { windowKind: "day", callLimit: 20_000 },
   omdb: { windowKind: "day", callLimit: 500_000 },
-  simkl: { windowKind: "day", callLimit: 5_000 },
   anilist: { windowKind: "day", callLimit: 2_000 },
 };
 

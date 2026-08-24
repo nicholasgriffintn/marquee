@@ -1,4 +1,4 @@
-import { numberAt, records, recordAt, stringAt } from "../lib/values.ts";
+import { calendarDate, numberAt, recordAt, records, stringAt } from "../lib/values.ts";
 import { upstreamFetch } from "./fetch.ts";
 import { upstreamError } from "./upstream.ts";
 
@@ -29,7 +29,7 @@ function airstamp(episode: Record<string, unknown>) {
 
   const date = stringAt(episode, "airdate");
 
-  return date && /^\d{4}-\d{2}-\d{2}$/u.test(date) ? `${date}T00:00:00.000Z` : null;
+  return calendarDate(date) ? `${date}T00:00:00.000Z` : null;
 }
 
 function networkName(show: Record<string, unknown>) {

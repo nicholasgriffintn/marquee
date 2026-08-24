@@ -8,7 +8,7 @@ import { jsonResponse, readJsonObject } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
 import { queryInteger, queryText } from "../lib/params.ts";
 import { isKnownTitle } from "../lib/validation.ts";
-import { isRecord } from "../lib/values.ts";
+import { calendarDate, isRecord } from "../lib/values.ts";
 import { recentExitFor, recordSignal } from "../repositories/signals.ts";
 import { importDiary } from "../services/import-letterboxd.ts";
 import {
@@ -161,10 +161,7 @@ profileRoutes.post("/import/letterboxd", async (context) => {
         name: row.name.trim().slice(0, 160),
         year: Number.isInteger(year) && year > 1870 && year < 2100 ? year : null,
         rating: Number.isInteger(rating) && rating >= 1 && rating <= 5 ? rating : null,
-        watchedAt:
-          typeof row.watchedAt === "string" && /^\d{4}-\d{2}-\d{2}$/u.test(row.watchedAt)
-            ? row.watchedAt
-            : "",
+        watchedAt: calendarDate(row.watchedAt) ?? "",
       },
     ];
   });

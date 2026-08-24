@@ -28,6 +28,18 @@ export function numberAt(value: Record<string, unknown>, key: string) {
   return typeof value[key] === "number" && Number.isFinite(value[key]) ? value[key] : null;
 }
 
+export function positiveNumber(value: unknown) {
+  const parsed = typeof value === "number" ? value : Number(value);
+
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+const CALENDAR_DATE = /^\d{4}-\d{2}-\d{2}$/u;
+
+export function calendarDate(value: unknown) {
+  return typeof value === "string" && CALENDAR_DATE.test(value) ? value : null;
+}
+
 export function parseJson(value: string): unknown {
   try {
     return JSON.parse(value);

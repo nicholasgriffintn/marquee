@@ -2,7 +2,6 @@ import { isRateLimited, pauseSource } from "../repositories/budgets.ts";
 import type { Bindings, EnrichmentSource } from "../types.ts";
 
 const RATE_LIMIT_PAUSE_MINUTES: Partial<Record<EnrichmentSource, number>> = {
-  simkl: 60,
   anilist: 60,
 };
 

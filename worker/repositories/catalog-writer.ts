@@ -68,7 +68,21 @@ function mergeWithStored(fresh: MediaTitle, stored: MediaTitle | null): MediaTit
       KEYWORD_LIMIT,
     ),
     ratings: stored.ratings ?? fresh.ratings,
-    externalIds: stored.externalIds ?? fresh.externalIds,
+    externalIds: mergeExternalIds(fresh, stored),
+  };
+}
+
+function mergeExternalIds(fresh: MediaTitle, stored: MediaTitle) {
+  if (!fresh.externalIds && !stored.externalIds) {
+    return undefined;
+  }
+
+  return {
+    imdbId: fresh.externalIds?.imdbId ?? stored.externalIds?.imdbId ?? null,
+    tvdbId: fresh.externalIds?.tvdbId ?? stored.externalIds?.tvdbId ?? null,
+    wikidataId: fresh.externalIds?.wikidataId ?? stored.externalIds?.wikidataId ?? null,
+    malId: stored.externalIds?.malId ?? fresh.externalIds?.malId ?? null,
+    anilistId: stored.externalIds?.anilistId ?? fresh.externalIds?.anilistId ?? null,
   };
 }
 

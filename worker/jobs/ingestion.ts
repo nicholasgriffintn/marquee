@@ -22,9 +22,10 @@ import { syncSchedule } from "../services/schedule.ts";
 import { buildSections } from "../services/sections.ts";
 import { exportTraktShelf, importTraktHistory } from "../services/trakt.ts";
 import type { Bindings, IngestionJob } from "../types.ts";
+import { importAnimeIds } from "./anime-ids.ts";
 import { enrichTitleAvailability, queueAvailability } from "./availability.ts";
 import { queueEmbeddings } from "./embeddings.ts";
-import { enrichAnilist, enrichRatings, enrichSimkl, queueEnrichment } from "./enrichment.ts";
+import { enrichAnilist, enrichRatings, queueEnrichment } from "./enrichment.ts";
 import { importDiaryRow, importImdbTitle } from "./imports.ts";
 import { cachePoster } from "./posters.ts";
 import { getProviderLedger } from "./provider-ledger.ts";
@@ -163,14 +164,18 @@ export async function executeIngestionJob(env: Bindings, job: IngestionJob) {
       return;
     }
 
-    case "enrich-simkl": {
-      await enrichSimkl(env, job.titleId);
+    case "enrich-anilist": {
+      await enrichAnilist(env, job.titleId);
 
       return;
     }
 
-    case "enrich-anilist": {
-      await enrichAnilist(env, job.titleId);
+    case "import-anime-ids": {
+      const run = await importAnimeIds(env, job.offset ?? 0, job.force ?? false);
+
+      if (!run.done) {
+        await env.ANIME_QUEUE.send({ type: "import-anime-ids", offset: run.reached });
+      }
 
       return;
     }

@@ -132,10 +132,17 @@ export function isIngestionJob(value: unknown): value is IngestionJob {
     );
   }
 
+  if (value.type === "import-anime-ids") {
+    const offsetOk =
+      value.offset === undefined ||
+      (typeof value.offset === "number" && Number.isInteger(value.offset) && value.offset >= 0);
+
+    return offsetOk && (value.force === undefined || typeof value.force === "boolean");
+  }
+
   if (
     value.type === "enrich-availability" ||
     value.type === "enrich-ratings" ||
-    value.type === "enrich-simkl" ||
     value.type === "enrich-anilist" ||
     value.type === "cache-poster"
   ) {

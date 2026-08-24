@@ -1,7 +1,6 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
 import { getAnilistDetails } from "../clients/anilist.ts";
 import { getOmdbRatings, searchOmdb } from "../clients/omdb.ts";
-import { getSimklIds } from "../clients/simkl.ts";
 import { logEvent } from "../lib/logging.ts";
 import { enqueue } from "../lib/queue.ts";
 import { comparableTitle, imdbIdFrom } from "../lib/text.ts";
@@ -15,13 +14,12 @@ import {
   storeImdbId,
 } from "../repositories/enrichment.ts";
 import type { Bindings, EnrichmentSource, IngestionJob } from "../types.ts";
-import { titleParts, withRateLimitPause } from "./sources.ts";
+import { withRateLimitPause } from "./sources.ts";
 
 const ANILIST_KEYWORD_LIMIT = 40;
 
 const ENRICHERS = [
   { source: "omdb", job: "enrich-ratings", maxAgeDays: 30, perRun: 3_000, budgetGated: true },
-  { source: "simkl", job: "enrich-simkl", maxAgeDays: 90, perRun: 120, budgetGated: true },
   { source: "poster", job: "cache-poster", maxAgeDays: 365, perRun: 2_000, budgetGated: false },
   { source: "anilist", job: "enrich-anilist", maxAgeDays: 14, perRun: 400, budgetGated: true },
 ] as const satisfies readonly {
@@ -43,7 +41,7 @@ function enrichmentQueue(env: Bindings, source: EnrichmentSource) {
     return env.POSTER_QUEUE;
   }
 
-  return env.SIMKL_QUEUE;
+  return env.ANIME_QUEUE;
 }
 
 function sourceCandidates(
@@ -62,11 +60,7 @@ function sourceConfigured(env: Bindings, source: EnrichmentSource) {
     return Boolean(env.OMDB_API_KEY);
   }
 
-  if (source === "anilist") {
-    return true;
-  }
-
-  return Boolean(env.SIMKL_CLIENT_ID);
+  return source === "anilist";
 }
 
 function enrichmentRoom(env: Bindings, enricher: Enricher) {
@@ -264,34 +258,4 @@ export async function enrichAnilist(env: Bindings, titleId: string) {
   if (details.nextEpisode && title) {
     await anilistSchedule(env, anilistId, title, details.nextEpisode);
   }
-}
-
-export async function enrichSimkl(env: Bindings, titleId: string) {
-  const parts = env.SIMKL_CLIENT_ID ? titleParts(titleId) : null;
-
-  if (!parts) {
-    return;
-  }
-
-  if (!(await claimBudget(env, "simkl"))) {
-    logEvent("budget_exhausted", { source: "simkl", titleId });
-
-    return;
-  }
-
-  const attempt = await withRateLimitPause(env, "simkl", () =>
-    getSimklIds(env, parts.mediaType, parts.tmdbId),
-  );
-
-  if (attempt.limited) {
-    return;
-  }
-
-  if (!attempt.value) {
-    await storeEnrichmentMiss(env, titleId, "simkl", "no-simkl-match");
-
-    return;
-  }
-
-  await storeEnrichment(env, titleId, "simkl", { externalIds: attempt.value });
 }

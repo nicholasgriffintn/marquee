@@ -1,11 +1,24 @@
-import type { MediaTitle, MediaType, ProviderAvailability } from "../../src/domain/catalog.ts";
+import type {
+  ExternalIds,
+  MediaTitle,
+  MediaType,
+  ProviderAvailability,
+} from "../../src/domain/catalog.ts";
 import {
   findRegistryProviderForOffer,
   type ProviderOfferKind,
 } from "../../src/domain/providers.ts";
 import type { Episode, SeasonDetail, SeasonSummary } from "../../src/domain/seasons.ts";
 import { httpsUrl } from "./urls.ts";
-import { isRecord, numberAt, recordAt, records, stringAt } from "./values.ts";
+import {
+  calendarDate,
+  isRecord,
+  numberAt,
+  positiveNumber,
+  recordAt,
+  records,
+  stringAt,
+} from "./values.ts";
 
 const IMAGE_BASE = "https://image.tmdb.org/t/p";
 const PROVIDER_REGION = "GB";
@@ -182,6 +195,24 @@ function parseTrailer(details: Record<string, unknown>) {
   return best ? stringAt(best, "key") : null;
 }
 
+function parseExternalIds(value: Record<string, unknown> | null, imdbId: string | null) {
+  const wikidataId = value ? stringAt(value, "wikidata_id") : null;
+  const ids: ExternalIds = {
+    ...(imdbId && /^tt\d+$/u.test(imdbId) ? { imdbId } : {}),
+    ...(value && numberAt(value, "tvdb_id") ? { tvdbId: numberAt(value, "tvdb_id") } : {}),
+    ...(wikidataId && /^Q\d+$/u.test(wikidataId) ? { wikidataId } : {}),
+    ...(value && stringAt(value, "facebook_id")
+      ? { facebookId: stringAt(value, "facebook_id") }
+      : {}),
+    ...(value && stringAt(value, "instagram_id")
+      ? { instagramId: stringAt(value, "instagram_id") }
+      : {}),
+    ...(value && stringAt(value, "twitter_id") ? { twitterId: stringAt(value, "twitter_id") } : {}),
+  };
+
+  return Object.keys(ids).length > 0 ? ids : undefined;
+}
+
 function parseKeywords(details: Record<string, unknown>) {
   const container = recordAt(details, "keywords");
 
@@ -219,10 +250,6 @@ function parsePeople(mediaType: MediaType, details: Record<string, unknown>) {
   return [...new Set([...directors, ...creators, ...cast])].slice(0, 10);
 }
 
-function cleanDate(value: string | null) {
-  return value && /^\d{4}-\d{2}-\d{2}$/u.test(value) ? value : null;
-}
-
 const STUDIO_LIMIT = 4;
 const RECOMMENDATION_LIMIT = 12;
 
@@ -252,10 +279,6 @@ function parseRecommendations(details: Record<string, unknown>) {
     .slice(0, RECOMMENDATION_LIMIT);
 }
 
-function positive(value: number | null) {
-  return value !== null && value > 0 ? value : null;
-}
-
 export function parseTmdbTitle(mediaType: MediaType, value: unknown): MediaTitle | null {
   if (!isRecord(value)) {
     return null;
@@ -268,7 +291,7 @@ export function parseTmdbTitle(mediaType: MediaType, value: unknown): MediaTitle
     return null;
   }
 
-  const releaseDate = cleanDate(
+  const releaseDate = calendarDate(
     stringAt(value, mediaType === "movie" ? "release_date" : "first_air_date"),
   );
   const voteCount = numberAt(value, "vote_count") ?? 0;
@@ -306,6 +329,7 @@ export function parseTmdbTitle(mediaType: MediaType, value: unknown): MediaTitle
     watchLink,
     tmdbUrl: `https://www.themoviedb.org/${mediaType}/${tmdbId}`,
     imdbUrl: imdbId && /^tt\d+$/u.test(imdbId) ? `https://www.imdb.com/title/${imdbId}/` : null,
+    externalIds: parseExternalIds(externalIds, imdbId),
     keywords: parseKeywords(value),
     people: parsePeople(mediaType, value),
     trailerKey: parseTrailer(value),
@@ -315,13 +339,13 @@ export function parseTmdbTitle(mediaType: MediaType, value: unknown): MediaTitle
     status: stringAt(value, "status"),
     collection: mediaType === "movie" ? parseCollection(value) : null,
     studios: parseStudios(mediaType, value),
-    revenue: mediaType === "movie" ? positive(numberAt(value, "revenue")) : null,
-    budget: mediaType === "movie" ? positive(numberAt(value, "budget")) : null,
-    episodeCount: mediaType === "tv" ? positive(numberAt(value, "number_of_episodes")) : null,
-    lastAirDate: mediaType === "tv" ? cleanDate(stringAt(value, "last_air_date")) : null,
+    revenue: mediaType === "movie" ? positiveNumber(numberAt(value, "revenue")) : null,
+    budget: mediaType === "movie" ? positiveNumber(numberAt(value, "budget")) : null,
+    episodeCount: mediaType === "tv" ? positiveNumber(numberAt(value, "number_of_episodes")) : null,
+    lastAirDate: mediaType === "tv" ? calendarDate(stringAt(value, "last_air_date")) : null,
     nextAirDate:
       mediaType === "tv"
-        ? cleanDate(stringAt(recordAt(value, "next_episode_to_air") ?? {}, "air_date"))
+        ? calendarDate(stringAt(recordAt(value, "next_episode_to_air") ?? {}, "air_date"))
         : null,
     recommendationIds: parseRecommendations(value),
   };
@@ -347,7 +371,7 @@ export function parseTmdbSeasonSummaries(value: unknown): SeasonSummary[] {
         seasonNumber,
         name: stringAt(season, "name") ?? `Season ${seasonNumber}`,
         overview: (stringAt(season, "overview") ?? "").slice(0, SEASON_OVERVIEW_LIMIT),
-        airDate: cleanDate(stringAt(season, "air_date")),
+        airDate: calendarDate(stringAt(season, "air_date")),
         episodeCount: Math.max(0, numberAt(season, "episode_count") ?? 0),
         posterUrl: imageUrl(stringAt(season, "poster_path"), "w342"),
       },
@@ -373,7 +397,7 @@ function parseTmdbEpisode(seasonNumber: number, value: Record<string, unknown>):
       episodeNumber,
       name: name?.trim() || `Episode ${episodeNumber}`,
       overview: (stringAt(value, "overview") ?? "").slice(0, EPISODE_OVERVIEW_LIMIT),
-      airDate: cleanDate(stringAt(value, "air_date")),
+      airDate: calendarDate(stringAt(value, "air_date")),
       runtimeMinutes: runtime !== null && runtime > 0 ? runtime : null,
       stillUrl: imageUrl(stringAt(value, "still_path"), "w300"),
       tmdbScore: voteCount > 0 && voteAverage ? Math.round(voteAverage * 10) / 10 : null,
@@ -398,7 +422,7 @@ export function parseTmdbSeason(
     seasonNumber: numberAt(value, "season_number") ?? seasonNumber,
     name: stringAt(value, "name") ?? `Season ${seasonNumber}`,
     overview: (stringAt(value, "overview") ?? "").slice(0, SEASON_OVERVIEW_LIMIT),
-    airDate: cleanDate(stringAt(value, "air_date")),
+    airDate: calendarDate(stringAt(value, "air_date")),
     episodeCount: episodes.length,
     posterUrl: imageUrl(stringAt(value, "poster_path"), "w342"),
     episodes,

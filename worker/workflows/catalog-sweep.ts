@@ -35,6 +35,12 @@ export class CatalogSweep extends WorkflowEntrypoint<Bindings, CatalogSweepParam
     const deep = event.payload?.deep === true;
 
     if (deep) {
+      await step.do("import anime ids", { retries: RETRIES }, async () => {
+        await this.env.ANIME_QUEUE.send({ type: "import-anime-ids", offset: 0 });
+
+        return true;
+      });
+
       await step.do("sync providers", { retries: RETRIES }, async () => {
         const providers = await getProviderLedger(this.env);
 

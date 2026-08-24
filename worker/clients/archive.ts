@@ -8,7 +8,7 @@ import {
   tidyText,
 } from "../lib/revival-text.ts";
 import { firstString, stripMarkup } from "../lib/text.ts";
-import { isRecord } from "../lib/values.ts";
+import { isRecord, positiveNumber } from "../lib/values.ts";
 import { upstreamFetch } from "./fetch.ts";
 
 const CACHE_TTL = 3_600;
@@ -117,16 +117,10 @@ export async function searchArchiveCollection(collection: string, page: number, 
     total: Math.min(found, MAX_OFFSET),
     entries: docs.flatMap<ArchiveEntry>((doc) =>
       typeof doc.identifier === "string" && /^[\w.-]{1,120}$/u.test(doc.identifier)
-        ? [{ identifier: doc.identifier, downloads: numberOrNull(doc.downloads) }]
+        ? [{ identifier: doc.identifier, downloads: positiveNumber(doc.downloads) }]
         : [],
     ),
   };
-}
-
-function numberOrNull(value: unknown) {
-  const parsed = Number(firstString(value) || value);
-
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
 function licenseBasis(licenseUrl: string): RevivalRightsBasis | null {
@@ -154,10 +148,10 @@ function bestDerivative(files: unknown) {
       {
         name: file.name,
         rank,
-        bytes: numberOrNull(file.size),
+        bytes: positiveNumber(file.size),
         seconds: durationSeconds(firstString(file.length)),
-        width: numberOrNull(file.width),
-        height: numberOrNull(file.height),
+        width: positiveNumber(file.width),
+        height: positiveNumber(file.height),
         type: /\.ogv$/iu.test(file.name) ? "video/ogg" : "video/mp4",
       },
     ];
@@ -236,7 +230,7 @@ export async function readArchiveItem(
   const collections = collectionList;
   const licenseUrl = firstString(metadata.licenseurl);
   const basis = licenseBasis(licenseUrl);
-  const year = numberOrNull(metadata.year) ?? yearFromDate(firstString(metadata.date));
+  const year = positiveNumber(metadata.year) ?? yearFromDate(firstString(metadata.date));
   const runtimeSeconds = derivative.seconds ?? durationSeconds(firstString(metadata.runtime));
 
   return {

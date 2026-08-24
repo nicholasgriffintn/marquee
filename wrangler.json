@@ -137,7 +137,6 @@
       "GITHUB_CLIENT_ID",
       "GITHUB_CLIENT_SECRET",
       "OMDB_API_KEY",
-      "SIMKL_CLIENT_ID",
       "TRAKT_CLIENT_ID",
       "TRAKT_CLIENT_SECRET",
       "EUROPEANA_API_KEY"
@@ -164,8 +163,8 @@
         "queue": "marquee-ratings"
       },
       {
-        "binding": "SIMKL_QUEUE",
-        "queue": "marquee-simkl"
+        "binding": "ANIME_QUEUE",
+        "queue": "marquee-anime"
       },
       {
         "binding": "POSTER_QUEUE",
@@ -209,7 +208,7 @@
         "retry_delay": 60
       },
       {
-        "queue": "marquee-simkl",
+        "queue": "marquee-anime",
         "max_batch_size": 1,
         "max_batch_timeout": 5,
         "max_retries": 5,

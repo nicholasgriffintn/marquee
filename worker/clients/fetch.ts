@@ -2,7 +2,7 @@ type UpstreamRequest = {
   timeoutMs: number;
   headers?: Record<string, string>;
   cacheTtl?: number;
-  method?: "GET" | "POST";
+  method?: "GET" | "POST" | "HEAD";
   body?: string;
 };
 

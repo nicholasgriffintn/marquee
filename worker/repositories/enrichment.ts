@@ -1,4 +1,5 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
+import type { AnimeMapping } from "../clients/fribb.ts";
 import { logEvent } from "../lib/logging.ts";
 import type { Bindings, EnrichmentSource } from "../types.ts";
 import { readRawItems } from "./catalog-reader.ts";
@@ -75,6 +76,38 @@ const DUE_FOR_ENRICHMENT = `e.title_id IS NULL
              'now',
              '-' || min(e.attempts * ${MISS_BACKOFF_DAYS}, ${MISS_BACKOFF_CAP_DAYS}) || ' days'
            ))`;
+
+export async function storeAnimeIds(db: D1Database, mappings: AnimeMapping[]) {
+  if (mappings.length === 0) {
+    return 0;
+  }
+
+  const written = await db.batch(
+    mappings.map((mapping) =>
+      db
+        .prepare(
+          `UPDATE catalog_titles
+           SET payload = json_set(
+                 payload,
+                 '$.externalIds',
+                 json_patch(
+                   COALESCE(json_extract(payload, '$.externalIds'), json('{}')),
+                   json(?)
+                 )
+               ),
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = ?
+             AND json_patch(
+                   COALESCE(json_extract(payload, '$.externalIds'), json('{}')),
+                   json(?)
+                 ) <> COALESCE(json_extract(payload, '$.externalIds'), json('{}'))`,
+        )
+        .bind(JSON.stringify(mapping.ids), mapping.titleId, JSON.stringify(mapping.ids)),
+    ),
+  );
+
+  return written.reduce((sum, result) => sum + (result.meta.changes ?? 0), 0);
+}
 
 export async function selectAnilistCandidates(env: Bindings, maxAgeDays: number, limit: number) {
   const rows = await env.DB.prepare(

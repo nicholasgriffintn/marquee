@@ -36,6 +36,25 @@ export type TitleBuzz = {
   measuredAt: string;
 };
 
+export type ExternalIds = {
+  imdbId?: string | null;
+  tvdbId?: number | null;
+  wikidataId?: string | null;
+  facebookId?: string | null;
+  instagramId?: string | null;
+  twitterId?: string | null;
+  malId?: number | null;
+  anilistId?: number | null;
+  anidbId?: number | null;
+  kitsuId?: number | null;
+  aniSearchId?: number | null;
+  animePlanetId?: string | null;
+  livechartId?: number | null;
+  animeNewsNetworkId?: number | null;
+  animeCountdownId?: number | null;
+  simklId?: number | null;
+};
+
 export type MediaTitle = {
   id: string;
   tmdbId: number;
@@ -86,13 +105,7 @@ export type MediaTitle = {
     anilistScore?: number | null;
   };
 
-  externalIds?: {
-    simklId: number | null;
-    imdbId: string | null;
-    tvdbId: number | null;
-    malId: number | null;
-    anilistId: number | null;
-  };
+  externalIds?: ExternalIds;
 };
 
 export type SectionAudience = {
