@@ -50,7 +50,10 @@ export function buildBill(works: RevivalWork[], day: string): RevivalBillSlot[] 
   const next = shuffler(seedFrom(day));
   const taken = new Set<string>();
   const bill: RevivalBillSlot[] = [];
-  const pool = shuffled(works, next);
+  const pool = shuffled(
+    works.filter((work) => !work.contentNotice),
+    next,
+  );
   const take = (slot: string, note: string, matches: (work: RevivalWork) => boolean) => {
     const work = pool.find((entry) => !taken.has(entry.id) && matches(entry));
 

@@ -4,6 +4,12 @@ const RACIST_CONTENT =
 const COLONIAL_CONTENT =
   "Contains colonial-era attitudes and depictions that are racist by any reading. Presented for historical study, not endorsement.";
 
+const ATROCITY_CONTENT =
+  "Contains graphic footage of atrocities and human suffering. Filmed as evidence and presented for historical study.";
+
+const DISTRESSING_CONTENT =
+  "The archive holding this print warns that it contains distressing scenes. Presented for historical study.";
+
 const NAZI_CONTENT =
   "State propaganda produced under a fascist government. Presented for historical study, not endorsement.";
 
@@ -30,7 +36,15 @@ const NAMED: { pattern: RegExp; notice: string }[] = [
     pattern: /\bsavage\b.*\btribe|\bdarkest africa\b|\bnative races\b/iu,
     notice: COLONIAL_CONTENT,
   },
+  {
+    pattern:
+      /\bconcentration camps?\b|\bdeath camps?\b|\bholocaust\b|\batrocit(y|ies)\b|\bmass graves?\b|\blynching\b|\bwar crimes?\b/iu,
+    notice: ATROCITY_CONTENT,
+  },
 ];
+
+const SOURCE_WARNING =
+  /\bextremely graphic\b|\bgraphic (scenes|footage|images|content)\b|\bviewer discretion\b|\bexercise caution\b|\bdisturbing (scenes|footage|images)\b/iu;
 
 export function contentNoticeFor(title: string, synopsis = "") {
   const haystack = `${title} ${synopsis}`;
@@ -41,5 +55,5 @@ export function contentNoticeFor(title: string, synopsis = "") {
     }
   }
 
-  return null;
+  return SOURCE_WARNING.test(haystack) ? DISTRESSING_CONTENT : null;
 }
