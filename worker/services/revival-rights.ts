@@ -74,7 +74,9 @@ export function assessUk(
       clear,
       expiresYear: expires,
       basis: clear ? "uk-expired" : basis,
-      note: `Last of the ${authors.named} named authors died ${latest}, so UK copyright ran out at the end of ${expires - 1}`,
+      note: clear
+        ? `Last of the ${authors.named} named authors died ${latest}, so UK copyright ran out at the end of ${expires - 1}`
+        : `Last of the ${authors.named} named authors died ${latest}, so UK copyright runs until the end of ${expires - 1}`,
     };
   }
 
@@ -94,7 +96,9 @@ export function assessUk(
     expiresYear: null,
     basis,
     note: anonymous
-      ? `${unresolvedNote(subject, authors)}. If it were genuinely anonymous the term would have run out at the end of ${anonymous - 1}`
+      ? `${unresolvedNote(subject, authors)}. If it were genuinely anonymous the term would ${
+          anonymous <= thisYear ? "have run out" : "run until"
+        } the end of ${anonymous - 1}`
       : unresolvedNote(subject, authors),
   };
 }
