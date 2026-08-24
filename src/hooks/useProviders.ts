@@ -21,6 +21,6 @@ export function useProviders() {
     providers: data?.providers ?? NO_PROVIDERS,
     sources: data?.sources ?? NO_SOURCES,
     stats: data?.stats ?? EMPTY_STATS,
-    error: error || (data?.errors ?? []).join(". "),
+    error,
   };
 }

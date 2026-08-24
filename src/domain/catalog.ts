@@ -15,6 +15,7 @@ export type Provider = {
   homepage: string | null;
   watchmodeSourceIds: number[];
   tmdbProviderIds: number[];
+  stale?: boolean;
 };
 
 export type ProviderAvailability = {

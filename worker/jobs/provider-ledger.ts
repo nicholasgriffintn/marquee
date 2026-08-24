@@ -6,6 +6,7 @@ import {
   providerRegistry,
   providerSourceLabel,
   providerStatus,
+  type ProviderIntegration,
 } from "../../src/domain/providers.ts";
 import { getTmdbProviders } from "../clients/tmdb.ts";
 import { getWatchmodeSources } from "../clients/watchmode.ts";
@@ -90,7 +91,7 @@ function preferName(provider: Provider, name: string) {
 function mergeProviderLedger(
   watchmodeSources: Awaited<ReturnType<typeof getWatchmodeSources>>,
   tmdbSources: Awaited<ReturnType<typeof getTmdbProviders>>,
-  errors: string[] = [],
+  silent: ProviderIntegration[] = [],
 ): ProvidersResponse {
   const providers = configuredProviders();
   const byId = new Map(providers.map((provider) => [provider.id, provider]));
@@ -182,7 +183,20 @@ function mergeProviderLedger(
     ...(tmdbSources.length ? ["TMDB / JustWatch"] : []),
   ];
 
-  return { providers, region: "GB", sources, errors, stats, fetchedAt: new Date().toISOString() };
+  for (const provider of providers) {
+    if (silent.includes(provider.integration)) {
+      provider.stale = true;
+    }
+  }
+
+  return {
+    providers,
+    region: "GB",
+    sources,
+    errors: [],
+    stats,
+    fetchedAt: new Date().toISOString(),
+  };
 }
 
 export async function getProviderLedger(env: Bindings): Promise<ProvidersResponse> {
@@ -192,18 +206,10 @@ export async function getProviderLedger(env: Bindings): Promise<ProvidersRespons
   ]);
   const watchmodeSources = watchmodeResult.status === "fulfilled" ? watchmodeResult.value : [];
   const tmdbSources = tmdbResult.status === "fulfilled" ? tmdbResult.value : [];
-  const errors = [
-    ...(watchmodeResult.status === "rejected"
-      ? [
-          "Watchmode did not answer on the last sweep. Its services are still listed from the last good run.",
-        ]
-      : []),
-    ...(tmdbResult.status === "rejected"
-      ? [
-          "TMDB did not answer on the last sweep. Its services are still listed from the last good run.",
-        ]
-      : []),
+  const silent: ProviderIntegration[] = [
+    ...(watchmodeResult.status === "rejected" ? (["watchmode"] as const) : []),
+    ...(tmdbResult.status === "rejected" ? (["tmdb"] as const) : []),
   ];
 
-  return mergeProviderLedger(watchmodeSources, tmdbSources, errors);
+  return mergeProviderLedger(watchmodeSources, tmdbSources, silent);
 }

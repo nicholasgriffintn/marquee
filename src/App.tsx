@@ -497,7 +497,16 @@ export function App() {
             element={<PersonPage isSignedIn={isSignedIn} onOpen={openTitle} />}
           />
 
-          <Route path="/sources" element={<SourcesPage stats={catalog.providerStats} />} />
+          <Route
+            path="/sources"
+            element={
+              <SourcesPage
+                providers={catalog.providers}
+                providerError={catalog.providerError}
+                stats={catalog.providerStats}
+              />
+            }
+          />
 
           <Route
             path="/admin"
