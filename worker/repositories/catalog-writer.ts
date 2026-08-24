@@ -81,6 +81,10 @@ function mergeWithStored(fresh: MediaTitle, stored: MediaTitle | null): MediaTit
     ),
     ratings: stored.ratings ?? fresh.ratings,
     externalIds: mergeExternalIds(fresh, stored),
+    status: fresh.status ?? stored.status,
+    lastAirDate: fresh.lastAirDate ?? stored.lastAirDate,
+    trailerKey: fresh.trailerKey ?? stored.trailerKey,
+    anime: fresh.anime ?? stored.anime,
   };
 }
 

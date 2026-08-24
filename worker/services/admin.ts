@@ -88,7 +88,7 @@ async function catalogueStats(env: Bindings) {
          (SELECT count(*) FROM catalog_seasons) AS seasons,
          (SELECT count(*) FROM title_insights) AS insights,
          (SELECT count(*) FROM catalog_titles
-           WHERE json_extract(payload, '$.externalIds.anilistId') IS NOT NULL) AS animeIds,
+           WHERE json_extract(payload, '$.externalIds.malId') IS NOT NULL) AS animeIds,
          (SELECT count(*) FROM catalog_titles
            WHERE json_extract(payload, '$.anime') IS NOT NULL) AS animeDetails,
          (SELECT count(*) FROM revival_works) AS revivalWorks,
