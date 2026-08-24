@@ -7,10 +7,10 @@ const SUPPRESSED_COLLECTIONS = new Set([
 ]);
 
 const STRONG =
-  /\b(sexploitation|pornograph\w*|porno|xxx|hardcore|softcore|bdsm|striptease|tortured females|peep show|nudist|nudie|smut|adults? only|blue movie)\b/iu;
+  /\b(sex[\s-]?exploitation|pornograph\w*|porno|xxx|hardcore|softcore|bdsm|striptease|tortured females|peep show|nudist|nudie|smut|adults? only|blue movie)\b/iu;
 
 const WEAK =
-  /\b(fetish|burlesque|erotic\w*|nudes?|naked|sexy|stag|spanking|whipping|bondage|slavery|abduction|catfight|hooker\w*|brothel|prostitut\w*|corporal punishment)\b/giu;
+  /\b(fetish|burlesque|erotic\w*|nudes?|naked|sexy|stag|spanking|whipping|bondage|slavery|abduction|catfight|hooker\w*|brothel|prostitut\w*|corporal punishment|promiscuity|premarital sex|casting couch|exploitation film)\b/giu;
 
 const WEAK_THRESHOLD = 2;
 
