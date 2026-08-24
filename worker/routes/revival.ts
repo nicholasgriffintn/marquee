@@ -7,12 +7,17 @@ import { readJsonObject } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import {
+  countApproved,
+  countSearch,
+  countShelf,
+  readShelfPage,
+  readVaultPage,
   isRevivalId,
   readWorksForTitle,
   saveProgress,
   searchApproved,
 } from "../repositories/revival.ts";
-import { getProgramme, getScreening } from "../services/revival.ts";
+import { getProgramme, getScreening, shelfSelector } from "../services/revival.ts";
 import type { Bindings } from "../types.ts";
 
 export const revivalRoutes = new Hono<{ Bindings: Bindings }>();
@@ -41,13 +46,85 @@ revivalRoutes.get("/search", async (context) => {
   try {
     context.header("cache-control", "public, max-age=300");
 
-    const found = await searchApproved(context.env.DB, query);
+    const page = pageParam(context.req.query("page"));
+    const [found, total] = await Promise.all([
+      searchApproved(context.env.DB, query, PAGE_SIZE, (page - 1) * PAGE_SIZE),
+      countSearch(context.env.DB, query),
+    ]);
 
-    return context.json({ works: found.map(toCard), query });
+    return context.json({
+      works: found.map(toCard),
+      query,
+      page,
+      pageSize: PAGE_SIZE,
+      total,
+      hasMore: page * PAGE_SIZE < total,
+    });
   } catch (error) {
     logError("revival_search_failed", error, { area: "revival" });
 
     return context.json({ works: [], query });
+  }
+});
+
+function pageParam(raw: string | undefined) {
+  const page = Number(raw ?? "1");
+
+  return Number.isInteger(page) && page > 0 && page <= 10_000 ? page : 1;
+}
+
+const PAGE_SIZE = 60;
+
+revivalRoutes.get("/browse", edgeCache(300), async (context) => {
+  const page = pageParam(context.req.query("page"));
+
+  try {
+    const [works, total] = await Promise.all([
+      readVaultPage(context.env.DB, PAGE_SIZE, (page - 1) * PAGE_SIZE),
+      countApproved(context.env.DB),
+    ]);
+
+    return context.json({
+      works: works.map(toCard),
+      page,
+      pageSize: PAGE_SIZE,
+      total,
+      hasMore: page * PAGE_SIZE < total,
+    });
+  } catch (error) {
+    logError("revival_browse_failed", error, { area: "revival" });
+
+    return context.json({ works: [], page, pageSize: PAGE_SIZE, total: 0, hasMore: false });
+  }
+});
+
+revivalRoutes.get("/shelf/:id", edgeCache(300), async (context) => {
+  const id = context.req.param("id");
+  const selector = shelfSelector(id);
+  const page = pageParam(context.req.query("page"));
+
+  if (!selector) {
+    return context.json({ error: "No such shelf" }, 404);
+  }
+
+  try {
+    const [works, total] = await Promise.all([
+      readShelfPage(context.env.DB, selector, PAGE_SIZE, (page - 1) * PAGE_SIZE),
+      countShelf(context.env.DB, selector),
+    ]);
+
+    return context.json({
+      id,
+      works: works.map(toCard),
+      page,
+      pageSize: PAGE_SIZE,
+      total,
+      hasMore: page * PAGE_SIZE < total,
+    });
+  } catch (error) {
+    logError("revival_shelf_failed", error, { area: "revival", shelf: id });
+
+    return context.json({ id, works: [], page, pageSize: PAGE_SIZE, total: 0, hasMore: false });
   }
 });
 

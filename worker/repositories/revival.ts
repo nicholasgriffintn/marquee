@@ -85,8 +85,6 @@ const WORK_FROM = `FROM revival_works AS w LEFT JOIN catalog_titles AS t ON t.id
 
 const UNSCORED_POPULARITY = 550;
 
-const SOURCE_QUOTA = 400;
-
 const BY_STANDING = `w.plays DESC, COALESCE(w.popularity, ${UNSCORED_POPULARITY}) DESC, w.sort_title`;
 
 const ID_PATTERN = /^(archive|loc|europeana)\.[\w.-]{1,120}$/u;
@@ -337,29 +335,169 @@ export async function storeUkRights(
     .run();
 }
 
-export async function readApprovedWorks(db: D1Database, limit = 800) {
+export type ShelfSelector =
+  | { of: "home" }
+  | { of: "tag"; kind: RevivalTagKind; slug: string }
+  | { of: "country"; country: string }
+  | { of: "decade"; decade: number }
+  | { of: "runtime"; min: number; max: number }
+  | { of: "kind"; kind: RevivalKind };
+
+function selectorClause(selector: ShelfSelector) {
+  if (selector.of === "home") {
+    const none: unknown[] = [];
+
+    return { where: `w.country IN ('United Kingdom', 'Ireland')`, binds: none };
+  }
+
+  if (selector.of === "tag") {
+    return {
+      where: `EXISTS (
+        SELECT 1 FROM revival_tags AS g
+        WHERE g.work_id = w.id AND g.kind = ? AND g.slug = ?
+      )`,
+      binds: [selector.kind, selector.slug],
+    };
+  }
+
+  if (selector.of === "country") {
+    return { where: `w.country = ?`, binds: [selector.country] };
+  }
+
+  if (selector.of === "decade") {
+    return {
+      where: `w.kind = 'feature' AND w.year >= ? AND w.year < ?`,
+      binds: [selector.decade, selector.decade + 10],
+    };
+  }
+
+  if (selector.of === "runtime") {
+    return {
+      where: `w.runtime_seconds >= ? AND w.runtime_seconds < ?`,
+      binds: [selector.min, selector.max],
+    };
+  }
+
+  return { where: `w.kind = ?`, binds: [selector.kind] };
+}
+
+export async function readShelfPage(
+  db: D1Database,
+  selector: ShelfSelector,
+  limit: number,
+  offset = 0,
+) {
+  const { where, binds } = selectorClause(selector);
   const rows = await db
     .prepare(
-      `WITH ranked AS (
-         SELECT id, ROW_NUMBER() OVER (
-           PARTITION BY source
-           ORDER BY plays DESC, COALESCE(popularity, ${UNSCORED_POPULARITY}) DESC, sort_title
-         ) AS standing
-         FROM revival_works
-         WHERE status = 'approved'
-       )
-       SELECT ${WORK_COLUMNS}
+      `SELECT ${WORK_COLUMNS}
        ${WORK_FROM}
-       JOIN ranked ON ranked.id = w.id
-       WHERE w.status = 'approved'
-         AND ranked.standing <= ${SOURCE_QUOTA}
+       WHERE w.status = 'approved' AND ${where}
        ORDER BY ${BY_STANDING}
-       LIMIT ?`,
+       LIMIT ? OFFSET ?`,
     )
-    .bind(Math.min(limit, 800))
+    .bind(...binds, Math.min(Math.max(1, limit), 120), Math.max(0, offset))
     .all<WorkRow>();
 
-  return attachTags(db, rows.results.map(toWork));
+  return rows.results.map(toWork);
+}
+
+export async function countShelf(db: D1Database, selector: ShelfSelector) {
+  const { where, binds } = selectorClause(selector);
+  const row = await db
+    .prepare(
+      `SELECT COUNT(*) AS total
+       FROM revival_works AS w
+       WHERE w.status = 'approved' AND ${where}`,
+    )
+    .bind(...binds)
+    .first<{ total: number }>();
+
+  return row?.total ?? 0;
+}
+
+export async function readVaultPage(db: D1Database, limit: number, offset = 0) {
+  const rows = await db
+    .prepare(
+      `SELECT ${WORK_COLUMNS}
+       ${WORK_FROM}
+       WHERE w.status = 'approved'
+       ORDER BY ${BY_STANDING}
+       LIMIT ? OFFSET ?`,
+    )
+    .bind(Math.min(Math.max(1, limit), 120), Math.max(0, offset))
+    .all<WorkRow>();
+
+  return rows.results.map(toWork);
+}
+
+export type ShelfGroup = { slug: string; label: string; size: number };
+
+export async function readTagGroups(
+  db: D1Database,
+  kind: RevivalTagKind,
+  limit: number,
+  minimum: number,
+) {
+  const rows = await db
+    .prepare(
+      `SELECT g.slug, MIN(g.label) AS label, COUNT(*) AS size
+       FROM revival_tags AS g
+       JOIN revival_works AS w ON w.id = g.work_id AND w.status = 'approved'
+       WHERE g.kind = ?
+       GROUP BY g.slug
+       HAVING COUNT(*) >= ?
+       ORDER BY size DESC, label
+       LIMIT ?`,
+    )
+    .bind(kind, minimum, Math.min(limit, 40))
+    .all<ShelfGroup>();
+
+  return rows.results;
+}
+
+export async function readCountryGroups(db: D1Database, limit: number, minimum: number) {
+  const rows = await db
+    .prepare(
+      `SELECT country AS slug, country AS label, COUNT(*) AS size
+       FROM revival_works
+       WHERE status = 'approved' AND country IS NOT NULL AND country <> ''
+       GROUP BY country
+       HAVING COUNT(*) >= ?
+       ORDER BY size DESC, country
+       LIMIT ?`,
+    )
+    .bind(minimum, Math.min(limit, 40))
+    .all<ShelfGroup>();
+
+  return rows.results;
+}
+
+export async function readDecadeGroups(db: D1Database, limit: number, minimum: number) {
+  const rows = await db
+    .prepare(
+      `SELECT (year / 10) * 10 AS slug, (year / 10) * 10 AS label, COUNT(*) AS size
+       FROM revival_works
+       WHERE status = 'approved' AND kind = 'feature' AND year IS NOT NULL
+       GROUP BY slug
+       HAVING COUNT(*) >= ?
+       ORDER BY size DESC, slug DESC
+       LIMIT ?`,
+    )
+    .bind(minimum, Math.min(limit, 40))
+    .all<{ slug: number; label: number; size: number }>();
+
+  return rows.results.map((row) => ({
+    slug: String(row.slug),
+    label: String(row.label),
+    size: row.size,
+  }));
+}
+
+export async function drawFromShelf(db: D1Database, selector: ShelfSelector, offset: number) {
+  const [work] = await readShelfPage(db, selector, 1, offset);
+
+  return work ?? null;
 }
 
 export async function countApproved(db: D1Database) {
@@ -392,7 +530,30 @@ export async function readAlsoShowing(
   return attachTags(db, rows.results.map(toWork));
 }
 
-export async function searchApproved(db: D1Database, query: string, limit = 60) {
+export async function countSearch(db: D1Database, query: string) {
+  const like = `%${query.replaceAll(/[%_]/gu, "")}%`;
+  const row = await db
+    .prepare(
+      `SELECT COUNT(*) AS total
+       FROM revival_works AS w
+       WHERE w.status = 'approved'
+         AND (
+           w.title LIKE ?1
+           OR w.sort_title LIKE ?1
+           OR w.director LIKE ?1
+           OR EXISTS (
+             SELECT 1 FROM revival_tags AS g
+             WHERE g.work_id = w.id AND g.label LIKE ?1
+           )
+         )`,
+    )
+    .bind(like)
+    .first<{ total: number }>();
+
+  return row?.total ?? 0;
+}
+
+export async function searchApproved(db: D1Database, query: string, limit = 60, offset = 0) {
   const like = `%${query.replaceAll(/[%_]/gu, "")}%`;
   const rows = await db
     .prepare(
@@ -409,9 +570,9 @@ export async function searchApproved(db: D1Database, query: string, limit = 60) 
            )
          )
        ORDER BY COALESCE(w.popularity, ${UNSCORED_POPULARITY}) DESC, w.sort_title
-       LIMIT ?2`,
+       LIMIT ?2 OFFSET ?3`,
     )
-    .bind(like, Math.min(limit, 120))
+    .bind(like, Math.min(Math.max(1, limit), 120), Math.max(0, offset))
     .all<WorkRow>();
 
   return attachTags(db, rows.results.map(toWork));
@@ -774,6 +935,30 @@ export async function saveProgress(
     )
     .bind(viewerId, workId, Math.max(0, Math.floor(positionSeconds)), finished ? 1 : 0)
     .run();
+}
+
+export async function readWorksByIds(db: D1Database, ids: string[]) {
+  if (ids.length === 0) {
+    return [];
+  }
+
+  const wanted = ids.slice(0, 50);
+  const rows = await db
+    .prepare(
+      `SELECT ${WORK_COLUMNS}
+       ${WORK_FROM}
+       WHERE w.status = 'approved'
+         AND w.id IN (${wanted.map(() => "?").join(", ")})`,
+    )
+    .bind(...wanted)
+    .all<WorkRow>();
+  const byId = new Map(rows.results.map((row) => [row.id, toWork(row)]));
+
+  return wanted.flatMap((id) => {
+    const work = byId.get(id);
+
+    return work ? [work] : [];
+  });
 }
 
 export async function readViewerProgress(db: D1Database, viewerId: string, limit = 12) {

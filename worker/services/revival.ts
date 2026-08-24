@@ -1,10 +1,5 @@
-import { assertsPublicDomain, runtimeBand, toCard } from "../../src/domain/revival.ts";
-import type {
-  RevivalShelfOf,
-  RevivalStatus,
-  RevivalTagKind,
-  RevivalWork,
-} from "../../src/domain/revival.ts";
+import { assertsPublicDomain, RUNTIME_BANDS, toCard } from "../../src/domain/revival.ts";
+import type { RevivalStatus, RevivalWork } from "../../src/domain/revival.ts";
 import {
   ARCHIVE_COLLECTIONS,
   archivePageCap,
@@ -16,14 +11,19 @@ import {
 import { EUROPEANA_COUNTRIES, searchEuropeana } from "../clients/europeana.ts";
 import { searchScreeningRoom } from "../clients/loc.ts";
 import { logError } from "../lib/logging.ts";
-import { billDay, buildBill } from "../lib/revival-bill.ts";
+import { billDay, lateNight, seedFrom, shuffler, standingOffset } from "../lib/revival-bill.ts";
 import { isRecord } from "../lib/values.ts";
 import {
   deleteWork,
   countApproved,
+  countShelf,
   readAlsoShowing,
-  readApprovedWorks,
+  readCountryGroups,
+  readDecadeGroups,
   readProgress,
+  readShelfPage,
+  readTagGroups,
+  readWorksByIds,
   readSourceCursor,
   readViewerProgress,
   readWork,
@@ -36,20 +36,19 @@ import {
   touchWork,
   upsertWork,
   type RevivalCandidate,
+  type ShelfGroup,
+  type ShelfSelector,
 } from "../repositories/revival.ts";
 import type { Bindings } from "../types.ts";
 import { findTitleForFilm } from "./cinema-matching.ts";
 
 const US_TERM_YEARS = 96;
 const MIN_RUNTIME_SECONDS = 60;
-const HOME_NATIONS = new Set(["United Kingdom", "Ireland"]);
 const ARCHIVE_LANES = 5;
 const ARCHIVE_BUDGET_MS = 45_000;
 const ARCHIVE_PAGE = 25;
 const CURATED_POPULARITY = 550;
 const KNOWN_FRESH_DAYS = 30;
-const SHELF_LIMIT = 40;
-const MAX_SHELVES = 18;
 const GENRE_SHELVES = 5;
 const SUBJECT_SHELVES = 4;
 const COUNTRY_SHELVES = 3;
@@ -57,6 +56,10 @@ const PERSON_SHELVES = 3;
 const RUNTIME_SHELVES = 2;
 const DECADE_SHELVES = 3;
 const SHELF_MIN = 3;
+const RAIL_LENGTH = 40;
+const MAX_RUNTIME = 86_400;
+const DRAW_BATCH = 12;
+const DRAW_ATTEMPTS = 3;
 
 export function usPublicDomainCutoff(now = new Date()) {
   return now.getUTCFullYear() - US_TERM_YEARS;
@@ -351,219 +354,294 @@ export async function matchRevivalWorks(env: Bindings, limit = 400) {
   return { considered: pending.length, matched };
 }
 
-function decadeOf(year: number) {
-  return Math.floor(year / 10) * 10;
-}
+type ShelfPlan = {
+  id: string;
+  title: string;
+  description: string;
+  selector: ShelfSelector;
+};
 
-function shelf(id: string, title: string, description: string, works: RevivalWork[]) {
-  return { id, title, description, works } satisfies RevivalShelfOf<RevivalWork>;
-}
-
-type Grouped = { key: string; label: string; works: RevivalWork[]; size: number };
-
-function upTo(works: RevivalWork[], cap: number, keep: (work: RevivalWork) => boolean) {
-  const picked: RevivalWork[] = [];
-
-  for (const work of works) {
-    if (picked.length >= cap) {
-      break;
-    }
-
-    if (keep(work)) {
-      picked.push(work);
-    }
+export function shelfSelector(id: string): ShelfSelector | null {
+  if (id === "home") {
+    return { of: "home" };
   }
 
-  return picked;
-}
+  const divide = id.indexOf(":");
+  const family = divide < 0 ? id : id.slice(0, divide);
+  const value = divide < 0 ? "" : id.slice(divide + 1);
 
-function groupBy(
-  works: RevivalWork[],
-  placed: Set<string>,
-  pick: (work: RevivalWork) => { key: string; label: string }[],
-) {
-  const groups = new Map<string, Grouped>();
-
-  for (const work of works) {
-    if (placed.has(work.id)) {
-      continue;
-    }
-
-    for (const { key, label } of pick(work)) {
-      const group = groups.get(key) ?? { key, label, works: [], size: 0 };
-
-      group.size += 1;
-
-      if (group.works.length < SHELF_LIMIT) {
-        group.works.push(work);
-      }
-
-      groups.set(key, group);
-    }
+  if (family === "genre" || family === "subject" || family === "person") {
+    return value ? { of: "tag", kind: family, slug: value } : null;
   }
 
-  return [...groups.values()].sort((left, right) => right.size - left.size);
+  if (family === "country") {
+    return value ? { of: "country", country: value } : null;
+  }
+
+  if (family === "decade") {
+    const decade = Number(value);
+
+    return Number.isInteger(decade) && decade > 1800 ? { of: "decade", decade } : null;
+  }
+
+  if (family === "runtime") {
+    const band = RUNTIME_BANDS.findIndex((entry) => entry.id === value);
+
+    return band < 0
+      ? null
+      : {
+          of: "runtime",
+          min: band === 0 ? 1 : RUNTIME_BANDS[band - 1].max,
+          max: Number.isFinite(RUNTIME_BANDS[band].max) ? RUNTIME_BANDS[band].max : MAX_RUNTIME,
+        };
+  }
+
+  if (family === "kind") {
+    return value === "short" || value === "feature" || value === "ephemeral"
+      ? { of: "kind", kind: value }
+      : null;
+  }
+
+  return null;
 }
 
-function tagsOf(work: RevivalWork, kind: RevivalTagKind) {
-  return work.tags
-    .filter((tag) => tag.kind === kind)
-    .map((tag) => ({ key: `${kind}:${tag.slug}`, label: tag.label }));
-}
-
-export function buildShelves(works: RevivalWork[]) {
-  const shelves: RevivalShelfOf<RevivalWork>[] = [];
-  const placed = new Set<string>();
-  const topics = new Set<string>();
-  const add = (id: string, title: string, description: string, items: RevivalWork[]) => {
-    if (items.length < SHELF_MIN || shelves.length >= MAX_SHELVES) {
-      return;
-    }
-
-    for (const work of items) {
-      placed.add(work.id);
-    }
-
-    shelves.push(shelf(id, title, description, items));
-  };
-
-  const addGroups = (
-    groups: Grouped[],
-    limit: number,
-    title: (group: Grouped) => string,
-    description: (group: Grouped) => string,
-  ) => {
-    let used = 0;
+async function planShelves(db: D1Database): Promise<ShelfPlan[]> {
+  const [rawGenres, rawSubjects, people, countries, decades] = await Promise.all([
+    readTagGroups(db, "genre", GENRE_SHELVES * 2, SHELF_MIN),
+    readTagGroups(db, "subject", SUBJECT_SHELVES * 3, SHELF_MIN),
+    readTagGroups(db, "person", PERSON_SHELVES, SHELF_MIN),
+    readCountryGroups(db, COUNTRY_SHELVES, SHELF_MIN),
+    readDecadeGroups(db, DECADE_SHELVES, SHELF_MIN),
+  ]);
+  const spoken = new Set<string>();
+  const fresh = (groups: ShelfGroup[], limit: number) => {
+    const kept: ShelfGroup[] = [];
 
     for (const group of groups) {
-      if (used >= limit) {
-        return;
+      if (kept.length >= limit) {
+        break;
       }
 
-      const topic = group.key.split(":").slice(1).join(":");
-
-      if (topics.has(topic)) {
+      if (spoken.has(group.slug)) {
         continue;
       }
 
-      const before = shelves.length;
-
-      add(
-        group.key,
-        title(group),
-        description(group),
-        group.works.filter((work) => !placed.has(work.id)),
-      );
-
-      if (shelves.length > before) {
-        topics.add(topic);
-        used += 1;
-      }
+      spoken.add(group.slug);
+      kept.push(group);
     }
+
+    return kept;
   };
 
-  add(
-    "british",
-    "Made here",
-    "British and Irish prints, out of copyright and back on a screen.",
-    upTo(works, SHELF_LIMIT, (work) => HOME_NATIONS.has(work.country ?? "")),
+  const genres = fresh(rawGenres, GENRE_SHELVES);
+  const subjects = fresh(rawSubjects, SUBJECT_SHELVES);
+
+  return [
+    {
+      id: "home",
+      title: "Made here",
+      description: "British and Irish prints, out of copyright and back on a screen.",
+      selector: { of: "home" },
+    },
+    ...genres.map((group) => ({
+      id: `genre:${group.slug}`,
+      title: group.label,
+      description: `${group.size} of them, filed under ${group.label.toLowerCase()}.`,
+      selector: { of: "tag" as const, kind: "genre" as const, slug: group.slug },
+    })),
+    ...subjects.map((group) => ({
+      id: `subject:${group.slug}`,
+      title: group.label,
+      description: "Everything we hold on the subject.",
+      selector: { of: "tag" as const, kind: "subject" as const, slug: group.slug },
+    })),
+    ...countries.map((group) => ({
+      id: `country:${group.slug}`,
+      title: `From ${group.label}`,
+      description: `Held by archives in ${group.label} and released by them.`,
+      selector: { of: "country" as const, country: group.slug },
+    })),
+    ...people.map((group) => ({
+      id: `person:${group.slug}`,
+      title: group.label,
+      description: "Their work, as far as we hold it.",
+      selector: { of: "tag" as const, kind: "person" as const, slug: group.slug },
+    })),
+    ...RUNTIME_BANDS.slice(0, RUNTIME_SHELVES).map((band, index) => ({
+      id: `runtime:${band.id}`,
+      title: band.label,
+      description: "Picked by how much of an evening it wants.",
+      selector: {
+        of: "runtime" as const,
+        min: index === 0 ? 1 : RUNTIME_BANDS[index - 1].max,
+        max: Number.isFinite(band.max) ? band.max : MAX_RUNTIME,
+      },
+    })),
+    ...decades.map((group) => ({
+      id: `decade:${group.slug}`,
+      title: `The ${group.label}s`,
+      description: `${group.size} from the decade.`,
+      selector: { of: "decade" as const, decade: Number(group.slug) },
+    })),
+    {
+      id: "kind:short",
+      title: "Shorts and serials",
+      description: "The bit before the main feature.",
+      selector: { of: "kind", kind: "short" },
+    },
+    {
+      id: "kind:ephemeral",
+      title: "Ephemera",
+      description: "Industrial films, adverts and instructional reels. Stranger than the features.",
+      selector: { of: "kind", kind: "ephemeral" },
+    },
+  ];
+}
+
+async function readShelves(db: D1Database) {
+  const plans = await planShelves(db);
+  const filled = await Promise.all(
+    plans.map(async (plan) => ({
+      plan,
+      works: await readShelfPage(db, plan.selector, RAIL_LENGTH),
+    })),
   );
 
-  addGroups(
-    groupBy(works, placed, (work) => tagsOf(work, "genre")),
-    GENRE_SHELVES,
-    (group) => group.label,
-    (group) => `${group.size} of them, filed under ${group.label.toLowerCase()}.`,
-  );
+  return filled
+    .filter((entry) => entry.works.length >= SHELF_MIN)
+    .map((entry) => ({
+      id: entry.plan.id,
+      title: entry.plan.title,
+      description: entry.plan.description,
+      works: entry.works.map(toCard),
+    }));
+}
 
-  addGroups(
-    groupBy(works, placed, (work) => tagsOf(work, "subject")),
-    SUBJECT_SHELVES,
-    (group) => group.label,
-    () => "Everything we hold on the subject.",
-  );
+type BillSlot = {
+  slot: string;
+  note: string;
+  selector: ShelfSelector;
+  prefer?: (work: RevivalWork) => boolean;
+};
 
-  addGroups(
-    groupBy(works, placed, (work) =>
-      work.country ? [{ key: `country:${work.country}`, label: work.country }] : [],
-    ),
-    COUNTRY_SHELVES,
-    (group) => `From ${group.label}`,
-    (group) => `Held by archives in ${group.label} and released by them.`,
-  );
+const BILL: BillSlot[] = [
+  {
+    slot: "Feature presentation",
+    note: "Tonight's main attraction.",
+    selector: { of: "kind", kind: "feature" },
+  },
+  {
+    slot: "Supporting feature",
+    note: "The second half of the double bill.",
+    selector: { of: "kind", kind: "feature" },
+  },
+  {
+    slot: "Short before the feature",
+    note: "Something to settle into your seat with.",
+    selector: { of: "kind", kind: "short" },
+  },
+  {
+    slot: "Late-night picture",
+    note: "For after the lights have gone down twice.",
+    selector: { of: "kind", kind: "feature" },
+    prefer: lateNight,
+  },
+  {
+    slot: "Curiosity",
+    note: "Odds and ends from the vault.",
+    selector: { of: "kind", kind: "ephemeral" },
+  },
+  {
+    slot: "Curiosity",
+    note: "Odds and ends from the vault.",
+    selector: { of: "kind", kind: "ephemeral" },
+  },
+  {
+    slot: "Curiosity",
+    note: "Odds and ends from the vault.",
+    selector: { of: "kind", kind: "short" },
+  },
+];
 
-  addGroups(
-    groupBy(works, placed, (work) => tagsOf(work, "person")),
-    PERSON_SHELVES,
-    (group) => group.label,
-    () => "Their work, as far as we hold it.",
-  );
+export async function drawBill(db: D1Database, day: string) {
+  const next = shuffler(seedFrom(day));
+  const taken = new Set<string>();
+  const sizes = new Map<string, number>();
+  const drawn: { slot: string; note: string; work: RevivalWork }[] = [];
 
-  addGroups(
-    groupBy(works, placed, (work) => {
-      const band = runtimeBand(work.runtimeSeconds);
+  for (const entry of BILL) {
+    const key = JSON.stringify(entry.selector);
 
-      return band ? [{ key: `runtime:${band.id}`, label: band.label }] : [];
-    }),
-    RUNTIME_SHELVES,
-    (group) => group.label,
-    () => "Picked by how much of an evening it wants.",
-  );
+    if (!sizes.has(key)) {
+      // oxlint-disable-next-line no-await-in-loop
+      sizes.set(key, await countShelf(db, entry.selector));
+    }
 
-  addGroups(
-    groupBy(works, placed, (work) =>
-      work.kind === "feature" && work.year !== null
-        ? [{ key: `decade:${decadeOf(work.year)}`, label: `The ${decadeOf(work.year)}s` }]
-        : [],
-    ),
-    DECADE_SHELVES,
-    (group) => group.label,
-    (group) => `${group.size} from the decade.`,
-  );
+    const total = sizes.get(key) ?? 0;
 
-  add(
-    "shorts",
-    "Shorts and serials",
-    "The bit before the main feature.",
-    works.filter((work) => !placed.has(work.id) && work.kind === "short"),
-  );
+    if (total === 0) {
+      continue;
+    }
 
-  add(
-    "ephemera",
-    "Ephemera",
-    "Industrial films, adverts and instructional reels. Stranger than the features.",
-    works.filter((work) => !placed.has(work.id) && work.kind === "ephemeral"),
-  );
+    let chosen: RevivalWork | null = null;
 
-  return shelves;
+    for (let attempt = 0; attempt <= DRAW_ATTEMPTS && !chosen; attempt += 1) {
+      const loose = attempt === DRAW_ATTEMPTS;
+      // oxlint-disable-next-line no-await-in-loop
+      const batch = await readShelfPage(
+        db,
+        entry.selector,
+        DRAW_BATCH,
+        standingOffset(total, next()),
+      );
+
+      chosen =
+        batch.find(
+          (work) =>
+            !taken.has(work.id) &&
+            !work.contentNotice &&
+            (loose || !entry.prefer || entry.prefer(work)),
+        ) ?? null;
+    }
+
+    if (chosen) {
+      taken.add(chosen.id);
+      drawn.push({ slot: entry.slot, note: entry.note, work: chosen });
+    }
+  }
+
+  return drawn.map((entry) => ({ ...entry, work: toCard(entry.work) }));
 }
 
 export async function getProgramme(env: Bindings, viewerId: string | null) {
-  const [works, total] = await Promise.all([readApprovedWorks(env.DB), countApproved(env.DB)]);
-  const shelves = buildShelves(works);
   const day = billDay();
-  const bill = buildBill(works, day);
+  const [total, shelves, bill] = await Promise.all([
+    countApproved(env.DB),
+    readShelves(env.DB),
+    drawBill(env.DB, day),
+  ]);
 
   if (viewerId) {
     const progress = await readViewerProgress(env.DB, viewerId);
-    const byId = new Map(works.map((work) => [work.id, work]));
-    const resuming = progress.flatMap((entry) => {
-      const work = byId.get(entry.id);
-
-      return work ? [work] : [];
-    });
+    const resuming = await readWorksByIds(
+      env.DB,
+      progress.map((entry) => entry.id),
+    );
 
     if (resuming.length) {
-      shelves.unshift(
-        shelf("resume", "Where you left off", "The lights are still down on these.", resuming),
-      );
+      shelves.unshift({
+        id: "resume",
+        title: "Where you left off",
+        description: "The lights are still down on these.",
+        works: resuming.map(toCard),
+      });
     }
   }
 
   return {
-    bill: bill.map((entry) => ({ ...entry, work: toCard(entry.work) })),
+    bill,
     billDate: day,
-    shelves: shelves.map((entry) => ({ ...entry, works: entry.works.map(toCard) })),
+    shelves,
     total,
     fetchedAt: new Date().toISOString(),
   };

@@ -6,11 +6,17 @@ type UpstreamRequest = {
   body?: string;
 };
 
+export const UPSTREAM_AGENT = "Marquee/1.0 (+https://marquee.pashi.app)";
+
 export function upstreamFetch(url: string | URL, request: UpstreamRequest) {
   return fetch(url, {
     method: request.method,
     body: request.body,
-    headers: { accept: "application/json", ...request.headers },
+    headers: {
+      accept: "application/json",
+      "user-agent": UPSTREAM_AGENT,
+      ...request.headers,
+    },
     signal: AbortSignal.timeout(request.timeoutMs),
     ...(request.cacheTtl
       ? { cf: { cacheEverything: true, cacheTtl: request.cacheTtl } }
