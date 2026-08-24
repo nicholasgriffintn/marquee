@@ -89,20 +89,21 @@ export function watchOrderPlacement(relation: string) {
   return AFTER.has(relation) ? ("after" as const) : ("related" as const);
 }
 
-export function animeProviders(item: MediaTitle, providers: ProviderAvailability[]) {
-  const known = new Set(providers.map((provider) => provider.id));
-  const listed: ProviderAvailability[] = [];
+const FALLBACK_SOURCE = "TMDB / JustWatch";
+
+export function mergeAnimeProviders(item: MediaTitle, providers: ProviderAvailability[]) {
+  const merged = new Map(providers.map((provider) => [provider.id, provider]));
 
   for (const stream of item.anime?.streams ?? []) {
     const registered = findRegistryProvider(stream.site);
     const id = registered?.id ?? `mal:${stream.site.toLowerCase().replaceAll(/[^a-z0-9]+/gu, "-")}`;
+    const existing = merged.get(id);
 
-    if (known.has(id)) {
+    if (existing && existing.source !== FALLBACK_SOURCE) {
       continue;
     }
 
-    known.add(id);
-    listed.push({
+    merged.set(id, {
       id,
       name: registered?.name ?? stream.site,
       offerTypes: [SUBSCRIPTION],
@@ -111,5 +112,5 @@ export function animeProviders(item: MediaTitle, providers: ProviderAvailability
     });
   }
 
-  return listed;
+  return [...merged.values()];
 }

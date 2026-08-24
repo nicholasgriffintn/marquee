@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
-import { animeProviders } from "../../domain/anime";
+import { mergeAnimeProviders } from "../../domain/anime";
 import type { MediaTitle } from "../../domain/catalog";
 import { useAvailability } from "../../hooks/useAvailability";
 import { useCollection } from "../../hooks/useCollection";
@@ -92,7 +92,7 @@ export function DetailPanel({
   const progress = tracker.progress;
   const continueAt = isSeries && progress && progress.watched > 0 ? progress.upNext : null;
   const { providers, nextEpisode } = useAvailability(item, availabilityEnabled);
-  const watchProviders = [...providers, ...animeProviders(item, providers)];
+  const watchProviders = mergeAnimeProviders(item, providers);
   const watchOrder = useWatchOrder(item);
   const { insight, pairs, isLoading: isInsightLoading } = useTitleInsight(item.id);
   const similar = useRecommendations(item.id, item.recommendationIds, SIMILAR_LIMIT);

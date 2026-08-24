@@ -30,11 +30,7 @@ export async function enrichAvailability(
     return false;
   }
 
-  const mergedProviders = new Map(
-    title.providers
-      .filter((provider) => provider.source === "TMDB / JustWatch")
-      .map((provider) => [provider.id, provider]),
-  );
+  const mergedProviders = new Map(title.providers.map((provider) => [provider.id, provider]));
 
   for (const provider of availability) {
     const existing = mergedProviders.get(provider.id);
