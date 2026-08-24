@@ -1,6 +1,4 @@
-import type { MediaType } from "../../src/domain/catalog.ts";
 import { getJustwatchAvailability } from "../clients/justwatch.ts";
-import { getWatchmodeAvailability } from "../clients/watchmode.ts";
 import { logEvent } from "../lib/logging.ts";
 import { enqueue } from "../lib/queue.ts";
 import { isKnownTitle } from "../lib/validation.ts";
@@ -13,7 +11,7 @@ import {
   selectStaleWorkingSet,
 } from "../repositories/working-set.ts";
 import type { Bindings, IngestionJob } from "../types.ts";
-import { titleParts, withRateLimitPause } from "./sources.ts";
+import { titleParts } from "./sources.ts";
 
 const AVAILABILITY_PER_RUN = 600;
 
@@ -72,39 +70,6 @@ export async function queueAvailability(env: Bindings, titleIds: string[]) {
   );
 }
 
-async function isSavedTitle(env: Bindings, titleId: string) {
-  const row = await env.DB.prepare(
-    `SELECT 1 AS saved FROM viewing_entries WHERE title_id = ? LIMIT 1`,
-  )
-    .bind(titleId)
-    .first<{ saved: number }>();
-
-  return Boolean(row);
-}
-
-async function watchmodeAvailability(
-  env: Bindings,
-  titleId: string,
-  mediaType: MediaType,
-  tmdbId: number,
-) {
-  if (!env.WATCHMODE_API_KEY || !(await isSavedTitle(env, titleId))) {
-    return [];
-  }
-
-  if (!(await claimBudget(env, "watchmode"))) {
-    logEvent("budget_exhausted", { source: "watchmode", titleId });
-
-    return [];
-  }
-
-  const attempt = await withRateLimitPause(env, "watchmode", () =>
-    getWatchmodeAvailability(env, mediaType, tmdbId),
-  );
-
-  return attempt.limited ? [] : (attempt.value ?? []);
-}
-
 export async function enrichTitleAvailability(env: Bindings, titleId: string) {
   const parts = titleParts(titleId);
 
@@ -129,9 +94,5 @@ export async function enrichTitleAvailability(env: Bindings, titleId: string) {
 
   const availability = await getJustwatchAvailability(parts.mediaType, parts.tmdbId, title.title);
 
-  await enrichAvailability(
-    env.DB,
-    titleId,
-    availability ?? (await watchmodeAvailability(env, titleId, parts.mediaType, parts.tmdbId)),
-  );
+  await enrichAvailability(env.DB, titleId, availability ?? []);
 }

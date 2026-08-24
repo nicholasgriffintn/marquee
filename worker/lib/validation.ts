@@ -21,7 +21,7 @@ export function validProviderIds(value: unknown) {
       value.filter(
         (id): id is string =>
           typeof id === "string" &&
-          (providerRegistryIds.has(id) || /^(watchmode|tmdb):[1-9]\d{0,9}$/u.test(id)),
+          (providerRegistryIds.has(id) || /^tmdb:[1-9]\d{0,9}$/u.test(id)),
       ),
     ),
   ].slice(0, 500);
@@ -214,7 +214,7 @@ export function curatorCandidates(value: unknown): CuratorCandidate[] {
                 name: provider.name.slice(0, 100),
                 offerTypes,
                 webUrl: null,
-                source: provider.source === "Watchmode" ? "Watchmode" : "TMDB / JustWatch",
+                source: provider.source === "JustWatch" ? "JustWatch" : "TMDB / JustWatch",
               },
             ];
           })

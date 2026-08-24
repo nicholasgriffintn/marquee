@@ -19,7 +19,6 @@ export type Bindings = {
   LOCAL_SYNC?: string;
   CLOUDFLARE_ACCOUNT_ID: string;
   CLOUDFLARE_API_TOKEN?: string;
-  WATCHMODE_API_KEY?: string;
   AI_GATEWAY_ID: string;
   AI_MODEL: string;
   AI_FAST_MODEL?: string;
@@ -54,14 +53,7 @@ export type Bindings = {
 
 export type CatalogSweepParameters = { deep?: boolean };
 
-export type EnrichmentSource =
-  | "tmdb"
-  | "justwatch"
-  | "watchmode"
-  | "omdb"
-  | "poster"
-  | "simkl"
-  | "anilist";
+export type EnrichmentSource = "tmdb" | "justwatch" | "omdb" | "poster" | "simkl" | "anilist";
 
 export type TitleRatings = {
   imdbScore: number | null;

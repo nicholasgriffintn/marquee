@@ -137,9 +137,7 @@ export function TonightPage({
   }, [isUsherMode]);
   const featured = isHeroReady ? heroSections.flatMap((section) => section.items)[0] : undefined;
   const filterableProviders = providers.filter(
-    (provider) =>
-      provider.status === "feed" &&
-      Boolean(provider.watchmodeSourceIds?.length || provider.tmdbProviderIds?.length),
+    (provider) => provider.status === "feed" && Boolean(provider.tmdbProviderIds?.length),
   );
 
   function toggleProvider(id: string) {

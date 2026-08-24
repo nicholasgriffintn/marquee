@@ -18,10 +18,7 @@ const CATEGORIES: Array<{ id: string; name: ProviderCategory }> = [
 const OPEN_BY_DEFAULT = new Set(["subscription", "broadcaster"]);
 
 function hasLiveFeed(provider: Provider) {
-  return (
-    provider.status === "feed" &&
-    Boolean(provider.watchmodeSourceIds?.length || provider.tmdbProviderIds?.length)
-  );
+  return provider.status === "feed" && Boolean(provider.tmdbProviderIds?.length);
 }
 
 export function ServicesPanel({

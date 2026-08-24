@@ -13,7 +13,6 @@ export type Provider = {
   sourceLabel: string;
   displayPriority: number;
   homepage: string | null;
-  watchmodeSourceIds: number[];
   tmdbProviderIds: number[];
   stale?: boolean;
 };
@@ -23,7 +22,7 @@ export type ProviderAvailability = {
   name: string;
   offerTypes: string[];
   webUrl: string | null;
-  source: "Watchmode" | "JustWatch" | "TMDB / JustWatch";
+  source: "JustWatch" | "TMDB / JustWatch";
 };
 
 export type TitleBuzz = {

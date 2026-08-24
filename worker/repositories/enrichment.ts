@@ -9,7 +9,7 @@ type FieldsFor<S extends EnrichmentSource> = S extends "omdb"
     ? Pick<MediaTitle, "keywords" | "ratings">
     : Pick<MediaTitle, "externalIds">;
 
-export async function storeEnrichment<S extends Exclude<EnrichmentSource, "watchmode">>(
+export async function storeEnrichment<S extends EnrichmentSource>(
   env: Bindings,
   titleId: string,
   source: S,

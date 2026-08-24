@@ -7,7 +7,7 @@ export type ProviderCategory =
   | "Sport"
   | "Rent or buy"
   | "Additional coverage";
-export type ProviderIntegration = "watchmode" | "tmdb" | "direct" | "marker";
+export type ProviderIntegration = "feed" | "direct" | "marker";
 export type ProviderStatus = "feed" | "link" | "marker";
 export type ProviderOfferKind = "subscription" | "free" | "rent" | "buy" | "other";
 
@@ -40,73 +40,68 @@ const entry = (
 });
 
 export const providerRegistry: ProviderRegistryEntry[] = [
-  entry("netflix", "N", "Netflix", "Subscription", "watchmode"),
-  entry("prime-video", "prime", "Prime Video", "Subscription", "watchmode", ["Amazon Prime Video"]),
-  entry("disney-plus", "Disney+", "Disney+", "Subscription", "watchmode", ["Disney Plus"]),
-  entry("apple-tv-plus", "tv+", "Apple TV+", "Subscription", "watchmode", [
-    "AppleTV+",
-    "Apple TV Plus",
-  ]),
-  entry("now", "NOW", "NOW", "Subscription", "watchmode", ["Now TV", "Now TV Cinema"]),
-  entry("hbo-max", "HBO", "HBO Max", "Subscription", "watchmode", ["Max"]),
-  entry("paramount-plus", "P+", "Paramount+", "Subscription", "watchmode", ["Paramount Plus"]),
-  entry("discovery-plus", "d+", "discovery+", "Subscription", "watchmode", ["Discovery+"]),
-  entry("sky-go", "Sky", "Sky Go", "Subscription", "tmdb"),
-  entry("mgm-plus", "MGM+", "MGM+", "Subscription", "tmdb", ["MGM Plus"]),
-  entry("hayu", "hayu", "Hayu", "Subscription", "watchmode"),
-  entry("crunchyroll", "CR", "Crunchyroll", "Subscription", "watchmode"),
+  entry("netflix", "N", "Netflix", "Subscription", "feed"),
+  entry("prime-video", "prime", "Prime Video", "Subscription", "feed", ["Amazon Prime Video"]),
+  entry("disney-plus", "Disney+", "Disney+", "Subscription", "feed", ["Disney Plus"]),
+  entry("apple-tv-plus", "tv+", "Apple TV+", "Subscription", "feed", ["AppleTV+", "Apple TV Plus"]),
+  entry("now", "NOW", "NOW", "Subscription", "feed", ["Now TV", "Now TV Cinema"]),
+  entry("hbo-max", "HBO", "HBO Max", "Subscription", "feed", ["Max"]),
+  entry("paramount-plus", "P+", "Paramount+", "Subscription", "feed", ["Paramount Plus"]),
+  entry("discovery-plus", "d+", "discovery+", "Subscription", "feed", ["Discovery+"]),
+  entry("sky-go", "Sky", "Sky Go", "Subscription", "feed"),
+  entry("mgm-plus", "MGM+", "MGM+", "Subscription", "feed", ["MGM Plus"]),
+  entry("hayu", "hayu", "Hayu", "Subscription", "feed"),
+  entry("crunchyroll", "CR", "Crunchyroll", "Subscription", "feed"),
 
-  entry("bbc-iplayer", "BBC", "BBC iPlayer", "Broadcaster", "tmdb", ["BBC IPlayer"]),
-  entry("itvx", "ITVX", "ITVX", "Broadcaster", "tmdb", ["ITV", "ITV Amazon Channel"]),
-  entry("channel-4", "4", "Channel 4", "Broadcaster", "tmdb", ["All 4"]),
-  entry("channel-5", "5", "5", "Broadcaster", "tmdb", ["My5"]),
+  entry("bbc-iplayer", "BBC", "BBC iPlayer", "Broadcaster", "feed", ["BBC IPlayer"]),
+  entry("itvx", "ITVX", "ITVX", "Broadcaster", "feed", ["ITV", "ITV Amazon Channel"]),
+  entry("channel-4", "4", "Channel 4", "Broadcaster", "feed", ["All 4"]),
+  entry("channel-5", "5", "5", "Broadcaster", "feed", ["My5"]),
   entry("u", "U", "U", "Broadcaster", "marker"),
   entry("stv-player", "STV", "STV Player", "Broadcaster", "marker"),
   entry("s4c-clic", "S4C", "S4C Clic", "Broadcaster", "marker"),
   entry("freely", "FREE", "Freely", "Broadcaster", "marker"),
 
-  entry("tubi", "tubi", "Tubi", "Free", "watchmode"),
-  entry("pluto-tv", "PLUTO", "Pluto TV", "Free", "watchmode"),
-  entry("plex", "PLEX", "Plex", "Free", "watchmode"),
-  entry("rakuten-tv-free", "R", "Rakuten TV Free", "Free", "watchmode", ["Rakuten TV"]),
+  entry("tubi", "tubi", "Tubi", "Free", "feed"),
+  entry("pluto-tv", "PLUTO", "Pluto TV", "Free", "feed"),
+  entry("plex", "PLEX", "Plex", "Free", "feed"),
+  entry("rakuten-tv-free", "R", "Rakuten TV Free", "Free", "feed", ["Rakuten TV"]),
   entry("samsung-tv-plus", "S+", "Samsung TV Plus", "Free", "marker"),
   entry("lg-channels", "LG", "LG Channels", "Free", "marker"),
   entry("youtube", "YT", "YouTube", "Free", "direct", [], "https://www.youtube.com/"),
 
-  entry("mubi", "MUBI", "MUBI", "Cinema", "watchmode"),
-  entry("bfi-player", "BFI", "BFI Player", "Cinema", "watchmode"),
-  entry("curzon-home-cinema", "C", "Curzon Home Cinema", "Cinema", "tmdb", ["Curzon"]),
-  entry("arrow", "ARROW", "ARROW", "Cinema", "watchmode", ["Arrow Video Channel", "ARROW Player"]),
-  entry("shudder", "S", "Shudder", "Cinema", "watchmode"),
-  entry("cultpix", "CULT", "Cultpix", "Cinema", "tmdb"),
+  entry("mubi", "MUBI", "MUBI", "Cinema", "feed"),
+  entry("bfi-player", "BFI", "BFI Player", "Cinema", "feed"),
+  entry("curzon-home-cinema", "C", "Curzon Home Cinema", "Cinema", "feed", ["Curzon"]),
+  entry("arrow", "ARROW", "ARROW", "Cinema", "feed", ["Arrow Video Channel", "ARROW Player"]),
+  entry("shudder", "S", "Shudder", "Cinema", "feed"),
+  entry("cultpix", "CULT", "Cultpix", "Cinema", "feed"),
   entry("klassiki", "K", "Klassiki", "Cinema", "marker"),
   entry("dafilms", "DA", "DAFilms", "Cinema", "marker"),
   entry("eventive", "E", "Eventive", "Cinema", "direct", [], "https://watch.eventive.org/"),
-  entry("filmbox-plus", "FB+", "FilmBox+", "Cinema", "tmdb", ["Filmbox+"]),
+  entry("filmbox-plus", "FB+", "FilmBox+", "Cinema", "feed", ["Filmbox+"]),
 
-  entry("acorn-tv", "ACORN", "Acorn TV", "Specialist", "watchmode"),
-  entry("history-hit", "HH", "History Hit", "Specialist", "watchmode"),
-  entry("sundance-now", "SN", "Sundance Now", "Specialist", "watchmode", ["SundanceNow Doc Club"]),
-  entry("curiosity-stream", "CS", "Curiosity Stream", "Specialist", "watchmode", [
-    "CuriosityStream",
-  ]),
+  entry("acorn-tv", "ACORN", "Acorn TV", "Specialist", "feed"),
+  entry("history-hit", "HH", "History Hit", "Specialist", "feed"),
+  entry("sundance-now", "SN", "Sundance Now", "Specialist", "feed", ["SundanceNow Doc Club"]),
+  entry("curiosity-stream", "CS", "Curiosity Stream", "Specialist", "feed", ["CuriosityStream"]),
   entry("nebula", "NEB", "Nebula", "Specialist", "direct", [], "https://nebula.tv/"),
   entry("dropout", "DO", "Dropout", "Specialist", "direct", [], "https://www.dropout.tv/"),
   entry("gaia", "GAIA", "Gaia", "Specialist", "direct", [], "https://www.gaia.com/"),
-  entry("wow-presents-plus", "WOW", "WOW Presents Plus", "Specialist", "tmdb"),
+  entry("wow-presents-plus", "WOW", "WOW Presents Plus", "Specialist", "feed"),
   entry("national-theatre-at-home", "NT", "National Theatre at Home", "Specialist", "marker"),
   entry("marquee-tv", "MTV", "Marquee TV", "Specialist", "marker"),
   entry("royal-opera-house-stream", "ROH", "Royal Opera House Stream", "Specialist", "marker"),
   entry("broadwayhd", "BHD", "BroadwayHD", "Specialist", "marker"),
-  entry("kocowa-plus", "K+", "KOCOWA+", "Specialist", "tmdb", ["Kocowa"]),
-  entry("hoichoi", "HC", "Hoichoi", "Specialist", "tmdb"),
-  entry("eros-now", "EN", "Eros Now", "Specialist", "tmdb"),
-  entry("sun-nxt", "SUN", "Sun NXT", "Specialist", "tmdb"),
+  entry("kocowa-plus", "K+", "KOCOWA+", "Specialist", "feed", ["Kocowa"]),
+  entry("hoichoi", "HC", "Hoichoi", "Specialist", "feed"),
+  entry("eros-now", "EN", "Eros Now", "Specialist", "feed"),
+  entry("sun-nxt", "SUN", "Sun NXT", "Specialist", "feed"),
   entry("simply-south", "SS", "Simply South", "Specialist", "marker"),
-  entry("dekkoo", "D", "Dekkoo", "Specialist", "tmdb"),
-  entry("outtv", "OUT", "OUTtv", "Specialist", "tmdb", ["OUTtv Apple TV Channel"]),
-  entry("amc-plus", "AMC+", "AMC+", "Specialist", "tmdb", ["AMC Plus"]),
-  entry("hidive", "HD", "HIDIVE", "Specialist", "tmdb"),
+  entry("dekkoo", "D", "Dekkoo", "Specialist", "feed"),
+  entry("outtv", "OUT", "OUTtv", "Specialist", "feed", ["OUTtv Apple TV Channel"]),
+  entry("amc-plus", "AMC+", "AMC+", "Specialist", "feed", ["AMC Plus"]),
+  entry("hidive", "HD", "HIDIVE", "Specialist", "feed"),
   entry(
     "rakuten-viki",
     "VIKI",
@@ -119,13 +114,13 @@ export const providerRegistry: ProviderRegistryEntry[] = [
   entry("iqiyi", "iQIYI", "iQIYI", "Specialist", "direct", [], "https://www.iq.com/"),
   entry("wetv", "WeTV", "WeTV", "Specialist", "direct", [], "https://wetv.vip/"),
   entry("shahid", "SH", "Shahid", "Specialist", "marker"),
-  entry("zee5", "Z5", "ZEE5", "Specialist", "tmdb"),
+  entry("zee5", "Z5", "ZEE5", "Specialist", "feed"),
   entry("sonyliv", "SL", "SonyLIV", "Specialist", "marker"),
-  entry("hotstar", "HS", "Hotstar", "Specialist", "tmdb", ["Disney+ Hotstar"]),
+  entry("hotstar", "HS", "Hotstar", "Specialist", "feed", ["Disney+ Hotstar"]),
   entry("aha", "aha", "aha", "Specialist", "marker"),
   entry("manoramamax", "MAX", "ManoramaMAX", "Specialist", "marker"),
   entry("revry", "REV", "Revry", "Specialist", "marker"),
-  entry("shortstv", "SHORT", "ShortsTV", "Specialist", "tmdb", ["ShortsTV Amazon Channel"]),
+  entry("shortstv", "SHORT", "ShortsTV", "Specialist", "feed", ["ShortsTV Amazon Channel"]),
   entry("docplay", "DOC", "DocPlay", "Specialist", "marker"),
   entry("true-story", "TRUE", "True Story", "Specialist", "marker"),
   entry("magellantv", "MAG", "MagellanTV", "Specialist", "marker"),
@@ -188,19 +183,16 @@ export const providerRegistry: ProviderRegistryEntry[] = [
     "https://www.redbull.com/gb-en/discover",
   ),
 
-  entry("amazon-video", "A£", "Amazon Video", "Rent or buy", "watchmode", [
-    "Amazon Video",
-    "Amazon",
-  ]),
-  entry("apple-tv-store", "A£", "Apple TV Store", "Rent or buy", "watchmode", [
+  entry("amazon-video", "A£", "Amazon Video", "Rent or buy", "feed", ["Amazon Video", "Amazon"]),
+  entry("apple-tv-store", "A£", "Apple TV Store", "Rent or buy", "feed", [
     "iTunes",
     "Apple iTunes",
   ]),
-  entry("sky-store", "SKY£", "Sky Store", "Rent or buy", "watchmode"),
-  entry("rakuten-tv", "R£", "Rakuten TV", "Rent or buy", "watchmode"),
-  entry("youtube-movies", "YT£", "YouTube Movies", "Rent or buy", "watchmode", ["YouTube"]),
-  entry("microsoft-store", "MS£", "Microsoft Store", "Rent or buy", "tmdb", ["Windows Store"]),
-  entry("google-play", "GP£", "Google Play Movies", "Rent or buy", "watchmode", [
+  entry("sky-store", "SKY£", "Sky Store", "Rent or buy", "feed"),
+  entry("rakuten-tv", "R£", "Rakuten TV", "Rent or buy", "feed"),
+  entry("youtube-movies", "YT£", "YouTube Movies", "Rent or buy", "feed", ["YouTube"]),
+  entry("microsoft-store", "MS£", "Microsoft Store", "Rent or buy", "feed", ["Windows Store"]),
+  entry("google-play", "GP£", "Google Play Movies", "Rent or buy", "feed", [
     "Google Play",
     "Google Play Movies & TV",
   ]),
@@ -227,28 +219,21 @@ export function providerStatus(integration: ProviderIntegration): ProviderStatus
 }
 
 export function providerSourceLabel(integration: ProviderIntegration) {
-  if (integration === "watchmode") {
-    return "Watchmode";
-  }
-
-  if (integration === "tmdb") {
-    return "TMDB / JustWatch";
+  if (integration === "feed") {
+    return "JustWatch";
   }
 
   if (integration === "direct") {
-    return "Direct link";
+    return "Direct link, no feed";
   }
 
-  return "Source marker";
+  return "Listed only, no feed";
 }
 
 export function normaliseProviderName(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/gu, "");
 }
 
-// Aggregators list the same service many times over: reseller channels ("Shudder Amazon
-// Channel"), storefront wrappers ("Acorn TV (Via Amazon Prime)"), and ad or tier variants
-// ("Netflix Standard with Ads"). Trimming those markers gives one comparable key per service.
 const REDUNDANT_MARKERS = [
   "withads",
   "amazonchannels",

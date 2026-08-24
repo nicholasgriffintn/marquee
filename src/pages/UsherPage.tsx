@@ -239,7 +239,7 @@ export function UsherPage() {
             </div>
             <div>
               <dt>Where to watch</dt>
-              <dd>JustWatch · Watchmode</dd>
+              <dd>JustWatch</dd>
             </div>
             <div>
               <dt>Air dates</dt>

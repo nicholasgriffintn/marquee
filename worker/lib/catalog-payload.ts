@@ -22,9 +22,7 @@ function isAvailability(value: unknown): value is ProviderAvailability {
     typeof value.name === "string" &&
     isStringArray(value.offerTypes) &&
     isNullableString(value.webUrl) &&
-    (value.source === "Watchmode" ||
-      value.source === "JustWatch" ||
-      value.source === "TMDB / JustWatch")
+    (value.source === "JustWatch" || value.source === "TMDB / JustWatch")
   );
 }
 
@@ -68,7 +66,6 @@ function isProvider(value: unknown): value is Provider {
     typeof value.sourceLabel === "string" &&
     typeof value.displayPriority === "number" &&
     isNullableString(value.homepage) &&
-    isNumberArray(value.watchmodeSourceIds) &&
     isNumberArray(value.tmdbProviderIds)
   );
 }

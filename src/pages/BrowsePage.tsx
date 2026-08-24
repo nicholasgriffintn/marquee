@@ -62,9 +62,7 @@ export function BrowsePage({
       ? sortParam
       : preset.sort;
   const filterable = providers.filter(
-    (provider) =>
-      provider.status === "feed" &&
-      Boolean(provider.watchmodeSourceIds?.length || provider.tmdbProviderIds?.length),
+    (provider) => provider.status === "feed" && Boolean(provider.tmdbProviderIds?.length),
   );
   const shownKeywords = [
     ...selectedKeywords,

@@ -188,7 +188,6 @@ partial setup runs; it just knows less.
 | -------------------------------------- | -------------------------------------------------- |
 | `TMDB_API_TOKEN`                       | Titles, images, credits, providers — the catalogue |
 | `GITHUB_CLIENT_ID` / `_SECRET`         | Sign-in                                            |
-| `WATCHMODE_API_KEY`                    | Service directory, gap-filling on saved titles     |
 | `OMDB_API_KEY`                         | Awards, box office, search beyond the catalogue    |
 | `SIMKL_CLIENT_ID`                      | Anime tags and scores                              |
 | `TRAKT_CLIENT_ID` / `_SECRET`          | Importing a viewer's history                       |

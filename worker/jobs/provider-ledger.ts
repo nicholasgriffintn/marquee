@@ -9,8 +9,6 @@ import {
   type ProviderIntegration,
 } from "../../src/domain/providers.ts";
 import { getTmdbProviders } from "../clients/tmdb.ts";
-import { getWatchmodeSources } from "../clients/watchmode.ts";
-import { watchmodeOfferKind } from "../lib/watchmode-payload.ts";
 import type { Bindings } from "../types.ts";
 
 function configuredProviders(): Provider[] {
@@ -24,7 +22,6 @@ function configuredProviders(): Provider[] {
     sourceLabel: providerSourceLabel(provider.integration),
     displayPriority: index,
     homepage: provider.homepage,
-    watchmodeSourceIds: [],
     tmdbProviderIds: [],
   }));
 }
@@ -70,7 +67,7 @@ function indexProviders(byId: Map<string, Provider>) {
 }
 
 function isLongTail(provider: Provider) {
-  return provider.id.startsWith("watchmode:") || provider.id.startsWith("tmdb:");
+  return provider.id.startsWith("tmdb:");
 }
 
 function addSourceId(ids: number[], id: number) {
@@ -89,48 +86,12 @@ function preferName(provider: Provider, name: string) {
 }
 
 function mergeProviderLedger(
-  watchmodeSources: Awaited<ReturnType<typeof getWatchmodeSources>>,
   tmdbSources: Awaited<ReturnType<typeof getTmdbProviders>>,
   silent: ProviderIntegration[] = [],
 ): ProvidersResponse {
   const providers = configuredProviders();
   const byId = new Map(providers.map((provider) => [provider.id, provider]));
   const byCanonicalName = indexProviders(byId);
-
-  for (const source of watchmodeSources) {
-    const name = tidyName(source.name);
-    const registry = findRegistryProviderForOffer(name, watchmodeOfferKind(source.type));
-    const canonical = canonicalProviderName(name);
-    const existing = registry ? byId.get(registry.id) : byCanonicalName.get(canonical);
-
-    if (existing) {
-      addSourceId(existing.watchmodeSourceIds, source.id);
-
-      if (isLongTail(existing)) {
-        preferName(existing, name);
-      }
-
-      continue;
-    }
-
-    const provider: Provider = {
-      id: `watchmode:${source.id}`,
-      mark: dynamicMark(name),
-      name,
-      category: "Additional coverage",
-      integration: "watchmode",
-      status: "feed",
-      sourceLabel: "Watchmode",
-      displayPriority: 1_000 + providers.length,
-      homepage: null,
-      watchmodeSourceIds: [source.id],
-      tmdbProviderIds: [],
-    };
-
-    providers.push(provider);
-    byId.set(provider.id, provider);
-    byCanonicalName.set(canonical, provider);
-  }
 
   for (const source of tmdbSources) {
     const name = tidyName(source.name);
@@ -153,12 +114,11 @@ function mergeProviderLedger(
       mark: dynamicMark(name),
       name,
       category: "Additional coverage",
-      integration: "tmdb",
+      integration: "feed",
       status: "feed",
       sourceLabel: "TMDB / JustWatch",
       displayPriority: 2_000 + source.displayPriority,
       homepage: null,
-      watchmodeSourceIds: [],
       tmdbProviderIds: [source.id],
     };
 
@@ -178,10 +138,7 @@ function mergeProviderLedger(
     ).length,
     longTail: providers.length - providerRegistry.length,
   };
-  const sources = [
-    ...(watchmodeSources.length ? ["Watchmode"] : []),
-    ...(tmdbSources.length ? ["TMDB / JustWatch"] : []),
-  ];
+  const sources = tmdbSources.length ? ["TMDB / JustWatch"] : [];
 
   for (const provider of providers) {
     if (silent.includes(provider.integration)) {
@@ -200,16 +157,11 @@ function mergeProviderLedger(
 }
 
 export async function getProviderLedger(env: Bindings): Promise<ProvidersResponse> {
-  const [watchmodeResult, tmdbResult] = await Promise.allSettled([
-    env.WATCHMODE_API_KEY ? getWatchmodeSources(env) : Promise.resolve([]),
+  const [tmdbResult] = await Promise.allSettled([
     env.TMDB_API_TOKEN ? getTmdbProviders(env) : Promise.resolve([]),
   ]);
-  const watchmodeSources = watchmodeResult.status === "fulfilled" ? watchmodeResult.value : [];
   const tmdbSources = tmdbResult.status === "fulfilled" ? tmdbResult.value : [];
-  const silent: ProviderIntegration[] = [
-    ...(watchmodeResult.status === "rejected" ? (["watchmode"] as const) : []),
-    ...(tmdbResult.status === "rejected" ? (["tmdb"] as const) : []),
-  ];
+  const silent: ProviderIntegration[] = tmdbResult.status === "rejected" ? ["feed"] : [];
 
-  return mergeProviderLedger(watchmodeSources, tmdbSources, silent);
+  return mergeProviderLedger(tmdbSources, silent);
 }

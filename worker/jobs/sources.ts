@@ -4,7 +4,6 @@ import type { Bindings, EnrichmentSource } from "../types.ts";
 const RATE_LIMIT_PAUSE_MINUTES: Partial<Record<EnrichmentSource, number>> = {
   simkl: 60,
   anilist: 60,
-  watchmode: 24 * 60,
 };
 
 const DEFAULT_PAUSE_MINUTES = 30;
