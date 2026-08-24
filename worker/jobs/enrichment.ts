@@ -344,7 +344,7 @@ export async function enrichAnime(env: Bindings, titleId: string) {
   const details = attempt.value;
 
   if (details === "unavailable") {
-    await storeEnrichmentMiss(env, titleId, "jikan", "mal-unavailable");
+    logEvent("enrichment_upstream_down", { source: "jikan", titleId });
 
     return;
   }
