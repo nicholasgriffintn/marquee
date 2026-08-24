@@ -1,13 +1,44 @@
+import type { BackoffPolicy } from "../lib/backoff.ts";
 import { logEvent } from "../lib/logging.ts";
-import { isRateLimited, isRefused, pauseSource } from "../repositories/budgets.ts";
+import { isRateLimited, isRefused, pauseSource, resetBackoff } from "../repositories/budgets.ts";
 import type { Bindings, EnrichmentSource } from "../types.ts";
 
-const RATE_LIMIT_PAUSE_MINUTES: Partial<Record<EnrichmentSource, number>> = {
-  jikan: 60,
+// Every source's pause behaviour lives here, in one place, so a bad backoff
+// is a one-line fix instead of a hunt through each job file.
+//
+// rateLimited: the source told us to slow down (429). Doubles on repeat
+// hits so a struggling free API isn't hammered every cycle; a single
+// successful call resets it back to the base.
+// refused: the source blocked us outright (401/403). Long and flat -
+// a block rarely clears itself within a day, so escalating further buys
+// nothing.
+const BACKOFF: Record<EnrichmentSource, { rateLimited: BackoffPolicy; refused: BackoffPolicy }> = {
+  jikan: {
+    rateLimited: { baseMinutes: 60, capMinutes: 60 * 12 },
+    refused: { baseMinutes: 60 * 24 * 7, capMinutes: 60 * 24 * 7 },
+  },
+  justwatch: {
+    rateLimited: { baseMinutes: 30, capMinutes: 60 * 6 },
+    refused: { baseMinutes: 60 * 24 * 7, capMinutes: 60 * 24 * 7 },
+  },
+  omdb: {
+    rateLimited: { baseMinutes: 30, capMinutes: 60 * 6 },
+    refused: { baseMinutes: 60 * 24 * 7, capMinutes: 60 * 24 * 7 },
+  },
+  tmdb: {
+    rateLimited: { baseMinutes: 30, capMinutes: 60 * 6 },
+    refused: { baseMinutes: 60 * 24 * 7, capMinutes: 60 * 24 * 7 },
+  },
+  poster: {
+    rateLimited: { baseMinutes: 30, capMinutes: 60 * 6 },
+    refused: { baseMinutes: 60 * 24 * 7, capMinutes: 60 * 24 * 7 },
+  },
 };
 
-const DEFAULT_PAUSE_MINUTES = 30;
-const REFUSED_PAUSE_MINUTES = 60 * 24 * 7;
+const DEFAULT_BACKOFF = {
+  rateLimited: { baseMinutes: 30, capMinutes: 60 * 6 },
+  refused: { baseMinutes: 60 * 24 * 7, capMinutes: 60 * 24 * 7 },
+};
 
 export type SourceAttempt<T> = { limited: true } | { limited: false; value: T };
 
@@ -16,11 +47,17 @@ export async function withRateLimitPause<T>(
   source: EnrichmentSource,
   run: () => Promise<T>,
 ): Promise<SourceAttempt<T>> {
+  const policy = BACKOFF[source] ?? DEFAULT_BACKOFF;
+
   try {
-    return { limited: false, value: await run() };
+    const value = await run();
+
+    await resetBackoff(env, source);
+
+    return { limited: false, value };
   } catch (error) {
     if (isRefused(error)) {
-      await pauseSource(env, source, REFUSED_PAUSE_MINUTES);
+      await pauseSource(env, source, policy.refused);
       logEvent("source_refused", { source, detail: String(error).slice(0, 200) });
 
       return { limited: true };
@@ -30,7 +67,7 @@ export async function withRateLimitPause<T>(
       throw error;
     }
 
-    await pauseSource(env, source, RATE_LIMIT_PAUSE_MINUTES[source] ?? DEFAULT_PAUSE_MINUTES);
+    await pauseSource(env, source, policy.rateLimited);
 
     return { limited: true };
   }

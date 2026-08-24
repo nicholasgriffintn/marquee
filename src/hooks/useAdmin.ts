@@ -60,6 +60,7 @@ export type AdminOverview = {
     used: number;
     windowKind: string;
     pausedUntil: string | null;
+    consecutivePauses: number;
   }[];
   cinemas: {
     source: string;

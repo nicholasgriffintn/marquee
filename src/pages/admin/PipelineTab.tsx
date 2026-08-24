@@ -97,6 +97,9 @@ export function PipelineTab({ overview }: { overview: AdminOverview | null }) {
                     {isPaused && pausedUntil && (
                       <code className="run-status-failed">
                         paused until {pausedUntil.toLocaleString()}
+                        {budget && budget.consecutivePauses > 1
+                          ? ` · ${budget.consecutivePauses}x in a row`
+                          : ""}
                       </code>
                     )}
                     <span className="spacer" />
