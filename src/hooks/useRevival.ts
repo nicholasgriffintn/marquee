@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { RevivalProgramme, RevivalScreening, RevivalWork } from "../domain/revival";
+import type {
+  RevivalCard,
+  RevivalProgramme,
+  RevivalScreening,
+  RevivalWork,
+} from "../domain/revival";
 import { jsonRequest, requestJson } from "../lib/api";
 
 const EMPTY: RevivalProgramme = { bill: [], billDate: "", shelves: [], total: 0, fetchedAt: "" };
@@ -100,7 +105,7 @@ export function useTitleReels(titleId: string, mediaType: string, tmdbId: number
 const SEARCH_DEBOUNCE_MS = 250;
 
 export function useVaultSearch(query: string) {
-  const [state, setState] = useState<{ query: string; works: RevivalWork[] }>({
+  const [state, setState] = useState<{ query: string; works: RevivalCard[] }>({
     query: "",
     works: [],
   });
@@ -114,7 +119,7 @@ export function useVaultSearch(query: string) {
 
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
-      requestJson<{ works: RevivalWork[] }>(
+      requestJson<{ works: RevivalCard[] }>(
         `/api/revival/search?q=${encodeURIComponent(trimmed)}`,
         {
           signal: controller.signal,

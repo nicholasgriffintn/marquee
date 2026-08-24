@@ -1,4 +1,4 @@
-import type { RevivalBillSlot, RevivalWork } from "../../src/domain/revival.ts";
+import type { RevivalBillSlotOf, RevivalWork } from "../../src/domain/revival.ts";
 
 const LATE_NIGHT = /horror|crime|noir|thriller|mystery|ghost|monster|murder/iu;
 
@@ -50,10 +50,10 @@ export function billDay(now = new Date()) {
   return now.toISOString().slice(0, 10);
 }
 
-export function buildBill(works: RevivalWork[], day: string): RevivalBillSlot[] {
+export function buildBill(works: RevivalWork[], day: string) {
   const next = shuffler(seedFrom(day));
   const taken = new Set<string>();
-  const bill: RevivalBillSlot[] = [];
+  const bill: RevivalBillSlotOf<RevivalWork>[] = [];
   const pool = drawn(
     works.filter((work) => !work.contentNotice),
     next,

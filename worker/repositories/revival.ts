@@ -85,7 +85,7 @@ const WORK_FROM = `FROM revival_works AS w LEFT JOIN catalog_titles AS t ON t.id
 
 const UNSCORED_POPULARITY = 550;
 
-const SOURCE_QUOTA = 200;
+const SOURCE_QUOTA = 400;
 
 const BY_STANDING = `w.plays DESC, COALESCE(w.popularity, ${UNSCORED_POPULARITY}) DESC, w.sort_title`;
 
@@ -337,7 +337,7 @@ export async function storeUkRights(
     .run();
 }
 
-export async function readApprovedWorks(db: D1Database, limit = 400) {
+export async function readApprovedWorks(db: D1Database, limit = 800) {
   const rows = await db
     .prepare(
       `WITH ranked AS (
@@ -360,6 +360,14 @@ export async function readApprovedWorks(db: D1Database, limit = 400) {
     .all<WorkRow>();
 
   return attachTags(db, rows.results.map(toWork));
+}
+
+export async function countApproved(db: D1Database) {
+  const row = await db
+    .prepare(`SELECT COUNT(*) AS total FROM revival_works WHERE status = 'approved'`)
+    .first<{ total: number }>();
+
+  return row?.total ?? 0;
 }
 
 export async function readAlsoShowing(

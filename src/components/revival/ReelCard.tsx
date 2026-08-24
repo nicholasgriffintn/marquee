@@ -1,9 +1,9 @@
 import { Link } from "react-router-dom";
 
-import { revivalPath, workMeta, type RevivalWork } from "../../domain/revival";
+import { revivalPath, workMeta, type RevivalCard } from "../../domain/revival";
 import { TitleArt } from "../TitleArt";
 
-export function ReelCard({ work }: { work: RevivalWork }) {
+export function ReelCard({ work }: { work: RevivalCard }) {
   return (
     <article className="rail-card revival-card">
       <Link className="rail-card-hit" to={revivalPath(work)} aria-label={`Open ${work.title}`}>

@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 
+import { toCard } from "../../src/domain/revival.ts";
 import { sessionPrincipal } from "../auth/session.ts";
 import { edgeCache } from "../lib/cache.ts";
 import { readJsonObject } from "../lib/http.ts";
@@ -40,7 +41,9 @@ revivalRoutes.get("/search", async (context) => {
   try {
     context.header("cache-control", "public, max-age=300");
 
-    return context.json({ works: await searchApproved(context.env.DB, query), query });
+    const found = await searchApproved(context.env.DB, query);
+
+    return context.json({ works: found.map(toCard), query });
   } catch (error) {
     logError("revival_search_failed", error, { area: "revival" });
 

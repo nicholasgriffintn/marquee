@@ -1,6 +1,6 @@
-import { assertsPublicDomain, runtimeBand } from "../../src/domain/revival.ts";
+import { assertsPublicDomain, runtimeBand, toCard } from "../../src/domain/revival.ts";
 import type {
-  RevivalShelf,
+  RevivalShelfOf,
   RevivalStatus,
   RevivalTagKind,
   RevivalWork,
@@ -20,6 +20,7 @@ import { billDay, buildBill } from "../lib/revival-bill.ts";
 import { isRecord } from "../lib/values.ts";
 import {
   deleteWork,
+  countApproved,
   readAlsoShowing,
   readApprovedWorks,
   readProgress,
@@ -355,7 +356,7 @@ function decadeOf(year: number) {
 }
 
 function shelf(id: string, title: string, description: string, works: RevivalWork[]) {
-  return { id, title, description, works } satisfies RevivalShelf;
+  return { id, title, description, works } satisfies RevivalShelfOf<RevivalWork>;
 }
 
 type Grouped = { key: string; label: string; works: RevivalWork[]; size: number };
@@ -411,7 +412,7 @@ function tagsOf(work: RevivalWork, kind: RevivalTagKind) {
 }
 
 export function buildShelves(works: RevivalWork[]) {
-  const shelves: RevivalShelf[] = [];
+  const shelves: RevivalShelfOf<RevivalWork>[] = [];
   const placed = new Set<string>();
   const topics = new Set<string>();
   const add = (id: string, title: string, description: string, items: RevivalWork[]) => {
@@ -538,7 +539,7 @@ export function buildShelves(works: RevivalWork[]) {
 }
 
 export async function getProgramme(env: Bindings, viewerId: string | null) {
-  const works = await readApprovedWorks(env.DB);
+  const [works, total] = await Promise.all([readApprovedWorks(env.DB), countApproved(env.DB)]);
   const shelves = buildShelves(works);
   const day = billDay();
   const bill = buildBill(works, day);
@@ -559,7 +560,13 @@ export async function getProgramme(env: Bindings, viewerId: string | null) {
     }
   }
 
-  return { bill, billDate: day, shelves, total: works.length, fetchedAt: new Date().toISOString() };
+  return {
+    bill: bill.map((entry) => ({ ...entry, work: toCard(entry.work) })),
+    billDate: day,
+    shelves: shelves.map((entry) => ({ ...entry, works: entry.works.map(toCard) })),
+    total,
+    fetchedAt: new Date().toISOString(),
+  };
 }
 
 export async function getScreening(env: Bindings, id: string, viewerId: string | null) {

@@ -55,18 +55,52 @@ export type RevivalWork = {
   tags: RevivalTag[];
 };
 
-export type RevivalBillSlot = {
+export const CARD_FIELDS = [
+  "id",
+  "title",
+  "year",
+  "country",
+  "kind",
+  "runtimeSeconds",
+  "director",
+  "stillUrl",
+  "mirrored",
+  "condition",
+] as const;
+
+export type RevivalCard = Pick<RevivalWork, (typeof CARD_FIELDS)[number]>;
+
+export function toCard(work: RevivalWork): RevivalCard {
+  return {
+    id: work.id,
+    title: work.title,
+    year: work.year,
+    country: work.country,
+    kind: work.kind,
+    runtimeSeconds: work.runtimeSeconds,
+    director: work.director,
+    stillUrl: work.stillUrl,
+    mirrored: work.mirrored,
+    condition: work.condition,
+  };
+}
+
+export type RevivalBillSlotOf<T> = {
   slot: string;
   note: string;
-  work: RevivalWork;
+  work: T;
 };
 
-export type RevivalShelf = {
+export type RevivalShelfOf<T> = {
   id: string;
   title: string;
   description: string;
-  works: RevivalWork[];
+  works: T[];
 };
+
+export type RevivalBillSlot = RevivalBillSlotOf<RevivalCard>;
+
+export type RevivalShelf = RevivalShelfOf<RevivalCard>;
 
 export type RevivalProgramme = {
   bill: RevivalBillSlot[];
@@ -155,7 +189,7 @@ export function deliveryNote(work: RevivalWork) {
     : `Hosted by ${SOURCE_LABELS[work.source]}, relayed through us`;
 }
 
-export function revivalPath(work: Pick<RevivalWork, "id">) {
+export function revivalPath(work: Pick<RevivalCard, "id">) {
   return `/revival/${work.id}`;
 }
 
@@ -192,7 +226,7 @@ export function runtimeLabel(seconds: number | null) {
   return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m`;
 }
 
-export function workMeta(work: RevivalWork) {
+export function workMeta(work: RevivalCard) {
   return [
     work.year?.toString(),
     work.country,
