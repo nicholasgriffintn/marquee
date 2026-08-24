@@ -49,6 +49,8 @@ const ARCHIVE_BUDGET_MS = 45_000;
 const ARCHIVE_PAGE = 25;
 const CURATED_POPULARITY = 550;
 const KNOWN_FRESH_DAYS = 30;
+const MATCH_BATCH = 200;
+const MATCH_BUDGET_MS = 20_000;
 const GENRE_SHELVES = 5;
 const SUBJECT_SHELVES = 4;
 const COUNTRY_SHELVES = 3;
@@ -330,28 +332,42 @@ export async function recheckArchiveWorks(env: Bindings, limit = 80) {
   return counts;
 }
 
-export async function matchRevivalWorks(env: Bindings, limit = 400) {
-  const pending = await selectUnmatched(env.DB, limit);
-  let matched = 0;
+export async function matchRevivalWorks(env: Bindings, limit = MATCH_BATCH) {
+  const deadline = Date.now() + MATCH_BUDGET_MS;
+  const counts = { considered: 0, matched: 0 };
+  let exhausted = false;
 
-  for (const work of pending) {
+  while (Date.now() < deadline) {
     // oxlint-disable-next-line no-await-in-loop
-    const result = await findTitleForFilm(env.DB, {
-      sourceFilmId: work.id,
-      sourceTitle: work.title,
-      sourceYear: work.year,
-      runtimeMinutes: work.runtimeSeconds ? Math.round(work.runtimeSeconds / 60) : null,
-    });
+    const pending = await selectUnmatched(env.DB, limit);
 
-    // oxlint-disable-next-line no-await-in-loop
-    await recordMatch(env.DB, work.id, result.titleId, result.confidence);
+    if (pending.length === 0) {
+      exhausted = true;
 
-    if (result.titleId) {
-      matched += 1;
+      break;
+    }
+
+    for (const work of pending) {
+      // oxlint-disable-next-line no-await-in-loop
+      const result = await findTitleForFilm(env.DB, {
+        sourceFilmId: work.id,
+        sourceTitle: work.title,
+        sourceYear: work.year,
+        runtimeMinutes: work.runtimeSeconds ? Math.round(work.runtimeSeconds / 60) : null,
+      });
+
+      // oxlint-disable-next-line no-await-in-loop
+      await recordMatch(env.DB, work.id, result.titleId, result.confidence);
+
+      counts.considered += 1;
+
+      if (result.titleId) {
+        counts.matched += 1;
+      }
     }
   }
 
-  return { considered: pending.length, matched };
+  return { ...counts, exhausted };
 }
 
 type ShelfPlan = {

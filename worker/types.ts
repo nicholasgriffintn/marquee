@@ -98,7 +98,7 @@ export type IngestionJob =
       collection?: string;
       chain?: boolean;
     }
-  | { type: "match-revival-works" }
+  | { type: "match-revival-works"; chain?: boolean }
   | { type: "check-revival-rights" }
   | { type: "recheck-revival-works" }
   | { type: "mirror-revival-work"; workId: string }

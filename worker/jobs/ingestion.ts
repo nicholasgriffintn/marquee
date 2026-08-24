@@ -235,7 +235,11 @@ export async function executeIngestionJob(env: Bindings, job: IngestionJob) {
     }
 
     case "match-revival-works": {
-      await matchRevivalWorks(env);
+      const run = await matchRevivalWorks(env);
+
+      if (job.chain && !run.exhausted) {
+        await env.REVIVAL_QUEUE.send({ type: "match-revival-works", chain: true });
+      }
 
       return;
     }

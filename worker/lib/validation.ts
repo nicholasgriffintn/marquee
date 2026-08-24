@@ -132,6 +132,10 @@ export function isIngestionJob(value: unknown): value is IngestionJob {
     );
   }
 
+  if (value.type === "match-revival-works") {
+    return value.chain === undefined || typeof value.chain === "boolean";
+  }
+
   if (value.type === "import-anime-ids") {
     const offsetOk =
       value.offset === undefined ||
