@@ -19,7 +19,11 @@ import { queueCinemaDirectories, queueCinemaScreenings } from "../services/cinem
 import { advanceDiscoverFrontier } from "../services/discover.ts";
 import { queueRevivalMirrors } from "../services/revival-mirror.ts";
 import { checkRevivalRights } from "../services/revival-rights.ts";
-import { matchRevivalWorks, queueRevivalSources } from "../services/revival.ts";
+import {
+  matchRevivalWorks,
+  queueRevivalSources,
+  recheckArchiveWorks,
+} from "../services/revival.ts";
 import { syncSchedule } from "../services/schedule.ts";
 import { buildSections } from "../services/sections.ts";
 import type { Bindings, CatalogSweepParameters } from "../types.ts";
@@ -112,6 +116,10 @@ export class CatalogSweep extends WorkflowEntrypoint<Bindings, CatalogSweepParam
 
     await step.do("check public domain rights", { retries: RETRIES }, async () =>
       checkRevivalRights(this.env),
+    );
+
+    await step.do("recheck print suitability", { retries: RETRIES }, async () =>
+      recheckArchiveWorks(this.env),
     );
 
     await step.do("queue reel mirrors", { retries: RETRIES }, async () =>

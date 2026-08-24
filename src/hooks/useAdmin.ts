@@ -25,6 +25,7 @@ export type AdminAction =
   | "revival-sweep"
   | "revival-match"
   | "revival-rights"
+  | "revival-recheck"
   | "revival-mirror";
 
 export type AdminOverview = {

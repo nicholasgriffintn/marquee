@@ -420,6 +420,32 @@ export async function readStillSource(db: D1Database, id: string) {
   return row?.stillUrl ?? null;
 }
 
+export async function selectArchiveForRecheck(db: D1Database, limit = 60) {
+  const rows = await db
+    .prepare(
+      `SELECT source_id AS sourceId, id
+       FROM revival_works
+       WHERE source = 'archive'
+       ORDER BY updated_at
+       LIMIT ?`,
+    )
+    .bind(Math.min(limit, 200))
+    .all<{ sourceId: string; id: string }>();
+
+  return rows.results;
+}
+
+export async function deleteWork(db: D1Database, id: string) {
+  await db.prepare(`DELETE FROM revival_works WHERE id = ?`).bind(id).run();
+}
+
+export async function touchWork(db: D1Database, id: string) {
+  await db
+    .prepare(`UPDATE revival_works SET updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
+    .bind(id)
+    .run();
+}
+
 export async function recordPlay(db: D1Database, id: string) {
   await db.prepare(`UPDATE revival_works SET plays = plays + 1 WHERE id = ?`).bind(id).run();
 }

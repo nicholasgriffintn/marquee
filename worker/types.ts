@@ -115,6 +115,7 @@ export type IngestionJob =
     }
   | { type: "match-revival-works" }
   | { type: "check-revival-rights" }
+  | { type: "recheck-revival-works" }
   | { type: "mirror-revival-work"; workId: string }
   | { type: "build-sections" };
 

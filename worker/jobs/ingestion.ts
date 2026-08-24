@@ -13,6 +13,7 @@ import { mirrorWork } from "../services/revival-mirror.ts";
 import { checkRevivalRights } from "../services/revival-rights.ts";
 import {
   matchRevivalWorks,
+  recheckArchiveWorks,
   syncArchiveCollection,
   syncEuropeanaCountry,
   syncScreeningRoom,
@@ -228,6 +229,12 @@ export async function executeIngestionJob(env: Bindings, job: IngestionJob) {
 
     case "check-revival-rights": {
       await checkRevivalRights(env);
+
+      return;
+    }
+
+    case "recheck-revival-works": {
+      await recheckArchiveWorks(env);
 
       return;
     }

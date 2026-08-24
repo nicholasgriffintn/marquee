@@ -17,6 +17,7 @@ import { logError } from "../lib/logging.ts";
 import { billDay, buildBill } from "../lib/revival-bill.ts";
 import { isRecord } from "../lib/values.ts";
 import {
+  deleteWork,
   readApprovedWorks,
   readProgress,
   readSourceCursor,
@@ -24,7 +25,9 @@ import {
   readWork,
   recordMatch,
   recordSourceRun,
+  selectArchiveForRecheck,
   selectUnmatched,
+  touchWork,
   upsertWork,
   type RevivalCandidate,
 } from "../repositories/revival.ts";
@@ -235,6 +238,55 @@ export async function queueRevivalSources(env: Bindings) {
   await env.INGESTION_QUEUE.sendBatch(jobs);
 
   return jobs.length;
+}
+
+export async function recheckArchiveWorks(env: Bindings, limit = 80) {
+  const pending = await selectArchiveForRecheck(env.DB, limit);
+  const deadline = Date.now() + ARCHIVE_BUDGET_MS;
+  const counts = { checked: 0, removed: 0, skipped: 0 };
+
+  for (let index = 0; index < pending.length; index += ARCHIVE_LANES) {
+    if (Date.now() > deadline) {
+      break;
+    }
+
+    const lane = pending.slice(index, index + ARCHIVE_LANES);
+
+    // oxlint-disable-next-line no-await-in-loop
+    const verdicts = await Promise.all(
+      lane.map(async (row) => {
+        try {
+          return { row, item: await readArchiveItem(row.sourceId), failed: false };
+        } catch {
+          return { row, item: null, failed: true };
+        }
+      }),
+    );
+
+    for (const verdict of verdicts) {
+      counts.checked += 1;
+
+      if (verdict.failed) {
+        counts.skipped += 1;
+
+        continue;
+      }
+
+      if (verdict.item) {
+        // oxlint-disable-next-line no-await-in-loop
+        await touchWork(env.DB, verdict.row.id);
+
+        continue;
+      }
+
+      counts.removed += 1;
+      console.log(JSON.stringify({ event: "revival_work_withdrawn", workId: verdict.row.id }));
+      // oxlint-disable-next-line no-await-in-loop
+      await deleteWork(env.DB, verdict.row.id);
+    }
+  }
+
+  return counts;
 }
 
 export async function matchRevivalWorks(env: Bindings, limit = 400) {

@@ -1,325 +1,317 @@
 {
-	"$schema": "./node_modules/wrangler/config-schema.json",
-	"name": "marquee",
-	"main": "./worker/index.ts",
-	"compatibility_date": "2026-08-21",
-	"compatibility_flags": [
-		"nodejs_compat"
-	],
-	"workers_dev": false,
-	"preview_urls": false,
-	"routes": [
-		{
-			"pattern": "marquee.pashi.app",
-			"custom_domain": true
-		}
-	],
-	"assets": {
-		"directory": "./dist",
-		"binding": "ASSETS",
-		"not_found_handling": "single-page-application",
-		"run_worker_first": true
-	},
-	"r2_buckets": [
-		{
-			"binding": "MEDIA",
-			"bucket_name": "marquee-media"
-		}
-	],
-	"d1_databases": [
-		{
-			"binding": "DB",
-			"database_name": "marquee",
-			"database_id": "4bdf8e03-0ac3-496c-8e69-c8dedd116976",
-			"migrations_dir": "./migrations",
-			"remote": false
-		}
-	],
-	"ratelimits": [
-		{
-			"name": "AUTH_RATE_LIMITER",
-			"namespace_id": "764216",
-			"simple": {
-				"limit": 20,
-				"period": 60
-			}
-		},
-		{
-			"name": "CURATOR_RATE_LIMITER",
-			"namespace_id": "764215",
-			"simple": {
-				"limit": 10,
-				"period": 60
-			}
-		},
-		{
-			"name": "SEARCH_RATE_LIMITER",
-			"namespace_id": "764217",
-			"simple": {
-				"limit": 30,
-				"period": 60
-			}
-		},
-		{
-			"name": "SEARCH_MEMBER_RATE_LIMITER",
-			"namespace_id": "764218",
-			"simple": {
-				"limit": 120,
-				"period": 60
-			}
-		},
-		{
-			"name": "CURATOR_FREE_RATE_LIMITER",
-			"namespace_id": "764219",
-			"simple": {
-				"limit": 4,
-				"period": 60
-			}
-		},
-		{
-			"name": "INSIGHT_RATE_LIMITER",
-			"namespace_id": "764220",
-			"simple": {
-				"limit": 40,
-				"period": 60
-			}
-		},
-		{
-			"name": "PUBLIC_RATE_LIMITER",
-			"namespace_id": "764221",
-			"simple": {
-				"limit": 120,
-				"period": 60
-			}
-		},
-		{
-			"name": "MEMBER_RATE_LIMITER",
-			"namespace_id": "764222",
-			"simple": {
-				"limit": 600,
-				"period": 60
-			}
-		},
-		{
-			"name": "WRITE_RATE_LIMITER",
-			"namespace_id": "764223",
-			"simple": {
-				"limit": 30,
-				"period": 60
-			}
-		},
-		{
-			"name": "TELEMETRY_RATE_LIMITER",
-			"namespace_id": "764224",
-			"simple": {
-				"limit": 120,
-				"period": 60
-			}
-		},
-		{
-			"name": "MEDIA_RATE_LIMITER",
-			"namespace_id": "764225",
-			"simple": {
-				"limit": 1200,
-				"period": 60
-			}
-		}
-	],
-	"vars": {
-		"AI_GATEWAY_ID": "marquee",
-		"MAIL_FROM": "usher@email.pashi.app",
-		"AI_MODEL": "@cf/moonshotai/kimi-k2.6",
-		"AI_FAST_MODEL": "@cf/meta/llama-4-scout-17b-16e-instruct"
-	},
-	"secrets": {
-		"required": [
-			"TMDB_API_TOKEN",
-			"WATCHMODE_API_KEY",
-			"CLOUDFLARE_ACCOUNT_ID",
-			"CLOUDFLARE_API_TOKEN",
-			"GITHUB_CLIENT_ID",
-			"GITHUB_CLIENT_SECRET",
-			"OMDB_API_KEY",
-			"SIMKL_CLIENT_ID",
-			"TRAKT_CLIENT_ID",
-			"TRAKT_CLIENT_SECRET",
-			"EUROPEANA_API_KEY"
-		]
-	},
-	"observability": {
-		"enabled": true
-	},
-	"triggers": {
-		"crons": [
-			"17 */3 * * *",
-			"41 4 * * *",
-			"0 9 * * 1"
-		]
-	},
-	"queues": {
-		"producers": [
-			{
-				"binding": "INGESTION_QUEUE",
-				"queue": "marquee-ingestion"
-			},
-			{
-				"binding": "AVAILABILITY_QUEUE",
-				"queue": "marquee-availability"
-			},
-			{
-				"binding": "RATINGS_QUEUE",
-				"queue": "marquee-ratings"
-			},
-			{
-				"binding": "SIMKL_QUEUE",
-				"queue": "marquee-simkl"
-			},
-			{
-				"binding": "POSTER_QUEUE",
-				"queue": "marquee-posters"
-			},
-			{
-				"binding": "EMBEDDING_QUEUE",
-				"queue": "marquee-embeddings"
-			},
-			{
-				"binding": "REVIVAL_QUEUE",
-				"queue": "marquee-revival"
-			}
-		],
-		"consumers": [
-			{
-				"queue": "marquee-ingestion",
-				"max_batch_size": 5,
-				"max_batch_timeout": 5,
-				"max_retries": 5,
-				"dead_letter_queue": "marquee-ingestion-dead-letter",
-				"max_concurrency": 5,
-				"retry_delay": 30
-			},
-			{
-				"queue": "marquee-availability",
-				"max_batch_size": 1,
-				"max_batch_timeout": 5,
-				"max_retries": 10,
-				"dead_letter_queue": "marquee-ingestion-dead-letter",
-				"max_concurrency": 1,
-				"retry_delay": 60
-			},
-			{
-				"queue": "marquee-ratings",
-				"max_batch_size": 1,
-				"max_batch_timeout": 5,
-				"max_retries": 5,
-				"dead_letter_queue": "marquee-ingestion-dead-letter",
-				"max_concurrency": 3,
-				"retry_delay": 60
-			},
-			{
-				"queue": "marquee-simkl",
-				"max_batch_size": 1,
-				"max_batch_timeout": 5,
-				"max_retries": 5,
-				"dead_letter_queue": "marquee-ingestion-dead-letter",
-				"max_concurrency": 1,
-				"retry_delay": 120
-			},
-			{
-				"queue": "marquee-posters",
-				"max_batch_size": 3,
-				"max_batch_timeout": 5,
-				"max_retries": 5,
-				"dead_letter_queue": "marquee-ingestion-dead-letter",
-				"max_concurrency": 3,
-				"retry_delay": 30
-			},
-			{
-				"queue": "marquee-embeddings",
-				"max_batch_size": 25,
-				"max_batch_timeout": 10,
-				"max_retries": 3,
-				"dead_letter_queue": "marquee-ingestion-dead-letter",
-				"max_concurrency": 4,
-				"retry_delay": 30
-			},
-			{
-				"queue": "marquee-revival",
-				"max_batch_size": 1,
-				"max_batch_timeout": 5,
-				"max_retries": 5,
-				"dead_letter_queue": "marquee-ingestion-dead-letter",
-				"max_concurrency": 2,
-				"retry_delay": 60
-			},
-			{
-				"queue": "marquee-ingestion-dead-letter",
-				"max_batch_size": 25,
-				"max_batch_timeout": 30,
-				"max_retries": 1,
-				"max_concurrency": 1
-			}
-		]
-	},
-	"placement": {
-		"mode": "smart"
-	},
-	"images": {
-		"binding": "IMAGES"
-	},
-	"vectorize": [
-		{
-			"binding": "VECTORS",
-			"index_name": "marquee-titles",
-			"remote": true
-		}
-	],
-	"ai": {
-		"binding": "AI",
-		"remote": true
-	},
-	"send_email": [
-		{
-			"name": "EMAIL",
-			"remote": true
-		}
-	],
-	"analytics_engine_datasets": [
-		{
-			"binding": "EVENTS",
-			"dataset": "marquee_events"
-		}
-	],
-	"workflows": [
-		{
-			"name": "marquee-catalog-sweep",
-			"binding": "CATALOG_SWEEP",
-			"class_name": "CatalogSweep"
-		},
-		{
-			"name": "marquee-rails",
-			"binding": "RAILS_WORKFLOW",
-			"class_name": "RailsWorkflow"
-		},
-		{
-			"name": "marquee-digest",
-			"binding": "DIGEST_WORKFLOW",
-			"class_name": "DigestWorkflow"
-		}
-	],
-	"durable_objects": {
-		"bindings": [
-			{
-				"name": "CURATOR_SESSION",
-				"class_name": "CuratorSession"
-			}
-		]
-	},
-	"migrations": [
-		{
-			"tag": "v1",
-			"new_sqlite_classes": [
-				"CuratorSession"
-			]
-		}
-	]
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "marquee",
+  "main": "./worker/index.ts",
+  "compatibility_date": "2026-08-21",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [
+    {
+      "pattern": "marquee.pashi.app",
+      "custom_domain": true
+    }
+  ],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": true
+  },
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "marquee-media"
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "marquee",
+      "database_id": "4bdf8e03-0ac3-496c-8e69-c8dedd116976",
+      "migrations_dir": "./migrations",
+      "remote": false
+    }
+  ],
+  "ratelimits": [
+    {
+      "name": "AUTH_RATE_LIMITER",
+      "namespace_id": "764216",
+      "simple": {
+        "limit": 20,
+        "period": 60
+      }
+    },
+    {
+      "name": "CURATOR_RATE_LIMITER",
+      "namespace_id": "764215",
+      "simple": {
+        "limit": 10,
+        "period": 60
+      }
+    },
+    {
+      "name": "SEARCH_RATE_LIMITER",
+      "namespace_id": "764217",
+      "simple": {
+        "limit": 30,
+        "period": 60
+      }
+    },
+    {
+      "name": "SEARCH_MEMBER_RATE_LIMITER",
+      "namespace_id": "764218",
+      "simple": {
+        "limit": 120,
+        "period": 60
+      }
+    },
+    {
+      "name": "CURATOR_FREE_RATE_LIMITER",
+      "namespace_id": "764219",
+      "simple": {
+        "limit": 4,
+        "period": 60
+      }
+    },
+    {
+      "name": "INSIGHT_RATE_LIMITER",
+      "namespace_id": "764220",
+      "simple": {
+        "limit": 40,
+        "period": 60
+      }
+    },
+    {
+      "name": "PUBLIC_RATE_LIMITER",
+      "namespace_id": "764221",
+      "simple": {
+        "limit": 120,
+        "period": 60
+      }
+    },
+    {
+      "name": "MEMBER_RATE_LIMITER",
+      "namespace_id": "764222",
+      "simple": {
+        "limit": 600,
+        "period": 60
+      }
+    },
+    {
+      "name": "WRITE_RATE_LIMITER",
+      "namespace_id": "764223",
+      "simple": {
+        "limit": 30,
+        "period": 60
+      }
+    },
+    {
+      "name": "TELEMETRY_RATE_LIMITER",
+      "namespace_id": "764224",
+      "simple": {
+        "limit": 120,
+        "period": 60
+      }
+    },
+    {
+      "name": "MEDIA_RATE_LIMITER",
+      "namespace_id": "764225",
+      "simple": {
+        "limit": 1200,
+        "period": 60
+      }
+    }
+  ],
+  "vars": {
+    "AI_GATEWAY_ID": "marquee",
+    "MAIL_FROM": "usher@email.pashi.app",
+    "AI_MODEL": "@cf/moonshotai/kimi-k2.6",
+    "AI_FAST_MODEL": "@cf/meta/llama-4-scout-17b-16e-instruct"
+  },
+  "secrets": {
+    "required": [
+      "TMDB_API_TOKEN",
+      "WATCHMODE_API_KEY",
+      "CLOUDFLARE_ACCOUNT_ID",
+      "CLOUDFLARE_API_TOKEN",
+      "GITHUB_CLIENT_ID",
+      "GITHUB_CLIENT_SECRET",
+      "OMDB_API_KEY",
+      "SIMKL_CLIENT_ID",
+      "TRAKT_CLIENT_ID",
+      "TRAKT_CLIENT_SECRET",
+      "EUROPEANA_API_KEY"
+    ]
+  },
+  "observability": {
+    "enabled": true
+  },
+  "triggers": {
+    "crons": ["17 */3 * * *", "41 4 * * *", "0 9 * * 1"]
+  },
+  "queues": {
+    "producers": [
+      {
+        "binding": "INGESTION_QUEUE",
+        "queue": "marquee-ingestion"
+      },
+      {
+        "binding": "AVAILABILITY_QUEUE",
+        "queue": "marquee-availability"
+      },
+      {
+        "binding": "RATINGS_QUEUE",
+        "queue": "marquee-ratings"
+      },
+      {
+        "binding": "SIMKL_QUEUE",
+        "queue": "marquee-simkl"
+      },
+      {
+        "binding": "POSTER_QUEUE",
+        "queue": "marquee-posters"
+      },
+      {
+        "binding": "EMBEDDING_QUEUE",
+        "queue": "marquee-embeddings"
+      },
+      {
+        "binding": "REVIVAL_QUEUE",
+        "queue": "marquee-revival"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "marquee-ingestion",
+        "max_batch_size": 5,
+        "max_batch_timeout": 5,
+        "max_retries": 5,
+        "dead_letter_queue": "marquee-ingestion-dead-letter",
+        "max_concurrency": 5,
+        "retry_delay": 30
+      },
+      {
+        "queue": "marquee-availability",
+        "max_batch_size": 1,
+        "max_batch_timeout": 5,
+        "max_retries": 10,
+        "dead_letter_queue": "marquee-ingestion-dead-letter",
+        "max_concurrency": 1,
+        "retry_delay": 60
+      },
+      {
+        "queue": "marquee-ratings",
+        "max_batch_size": 1,
+        "max_batch_timeout": 5,
+        "max_retries": 5,
+        "dead_letter_queue": "marquee-ingestion-dead-letter",
+        "max_concurrency": 3,
+        "retry_delay": 60
+      },
+      {
+        "queue": "marquee-simkl",
+        "max_batch_size": 1,
+        "max_batch_timeout": 5,
+        "max_retries": 5,
+        "dead_letter_queue": "marquee-ingestion-dead-letter",
+        "max_concurrency": 1,
+        "retry_delay": 120
+      },
+      {
+        "queue": "marquee-posters",
+        "max_batch_size": 3,
+        "max_batch_timeout": 5,
+        "max_retries": 5,
+        "dead_letter_queue": "marquee-ingestion-dead-letter",
+        "max_concurrency": 3,
+        "retry_delay": 30
+      },
+      {
+        "queue": "marquee-embeddings",
+        "max_batch_size": 25,
+        "max_batch_timeout": 10,
+        "max_retries": 3,
+        "dead_letter_queue": "marquee-ingestion-dead-letter",
+        "max_concurrency": 4,
+        "retry_delay": 30
+      },
+      {
+        "queue": "marquee-revival",
+        "max_batch_size": 1,
+        "max_batch_timeout": 5,
+        "max_retries": 5,
+        "dead_letter_queue": "marquee-ingestion-dead-letter",
+        "max_concurrency": 2,
+        "retry_delay": 60
+      },
+      {
+        "queue": "marquee-ingestion-dead-letter",
+        "max_batch_size": 25,
+        "max_batch_timeout": 30,
+        "max_retries": 1,
+        "max_concurrency": 1
+      }
+    ]
+  },
+  "placement": {
+    "mode": "smart"
+  },
+  "images": {
+    "binding": "IMAGES"
+  },
+  "vectorize": [
+    {
+      "binding": "VECTORS",
+      "index_name": "marquee-titles",
+      "remote": true
+    }
+  ],
+  "ai": {
+    "binding": "AI",
+    "remote": true
+  },
+  "send_email": [
+    {
+      "name": "EMAIL",
+      "remote": true
+    }
+  ],
+  "analytics_engine_datasets": [
+    {
+      "binding": "EVENTS",
+      "dataset": "marquee_events"
+    }
+  ],
+  "workflows": [
+    {
+      "name": "marquee-catalog-sweep",
+      "binding": "CATALOG_SWEEP",
+      "class_name": "CatalogSweep"
+    },
+    {
+      "name": "marquee-rails",
+      "binding": "RAILS_WORKFLOW",
+      "class_name": "RailsWorkflow"
+    },
+    {
+      "name": "marquee-digest",
+      "binding": "DIGEST_WORKFLOW",
+      "class_name": "DigestWorkflow"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CURATOR_SESSION",
+        "class_name": "CuratorSession"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["CuratorSession"]
+    }
+  ]
 }
