@@ -76,15 +76,34 @@ export function PipelineTab({ overview }: { overview: AdminOverview | null }) {
           <section className="panel-block" aria-labelledby="admin-enrichment-title">
             <h2 id="admin-enrichment-title">Enrichment coverage</h2>
             <ul className="admin-list">
-              {overview.enrichment.map((source) => (
-                <li key={source.source}>
-                  <strong>{source.source}</strong>
-                  <small>{source.titles.toLocaleString()} titles</small>
-                  {source.misses > 0 && <code>{source.misses.toLocaleString()} no data</code>}
-                  <span className="spacer" />
-                  <time dateTime={source.newest}>{stamp(source.newest)}</time>
-                </li>
-              ))}
+              {overview.enrichment.map((source) => {
+                const attempted = source.titles + source.misses;
+                const hitRate =
+                  attempted > 0 ? Math.round((source.titles / attempted) * 100) : null;
+                const budget = overview.budgets.find((row) => row.source === source.source);
+                const pausedUntil = budget?.pausedUntil
+                  ? parseDatabaseDate(budget.pausedUntil)
+                  : null;
+                const isPaused = pausedUntil
+                  ? pausedUntil.getTime() > new Date(overview.fetchedAt).getTime()
+                  : false;
+
+                return (
+                  <li key={source.source}>
+                    <strong>{source.source}</strong>
+                    <small>{source.titles.toLocaleString()} titles</small>
+                    {hitRate !== null && <small>{hitRate}% hit rate</small>}
+                    {source.misses > 0 && <code>{source.misses.toLocaleString()} no data</code>}
+                    {isPaused && pausedUntil && (
+                      <code className="run-status-failed">
+                        paused until {pausedUntil.toLocaleString()}
+                      </code>
+                    )}
+                    <span className="spacer" />
+                    <time dateTime={source.newest}>{stamp(source.newest)}</time>
+                  </li>
+                );
+              })}
             </ul>
           </section>
         )}

@@ -105,17 +105,40 @@ async function catalogueStats(env: Bindings) {
 }
 
 async function enrichmentStats(env: Bindings) {
-  const rows = await env.DB.prepare(
-    `SELECT source,
-            sum(CASE WHEN miss = 0 THEN 1 ELSE 0 END) AS titles,
-            sum(CASE WHEN miss = 1 THEN 1 ELSE 0 END) AS misses,
-            max(fetched_at) AS newest
-     FROM title_enrichment
-     GROUP BY source
-     ORDER BY source`,
-  ).all<{ source: string; titles: number; misses: number; newest: string }>();
+  const [enriched, justwatch] = await Promise.all([
+    env.DB.prepare(
+      `SELECT source,
+              sum(CASE WHEN miss = 0 THEN 1 ELSE 0 END) AS titles,
+              sum(CASE WHEN miss = 1 THEN 1 ELSE 0 END) AS misses,
+              max(fetched_at) AS newest
+       FROM title_enrichment
+       GROUP BY source
+       ORDER BY source`,
+    ).all<{ source: string; titles: number; misses: number; newest: string }>(),
+    env.DB.prepare(
+      `SELECT
+         sum(CASE WHEN json_array_length(COALESCE(json_extract(payload, '$.providers'), json('[]'))) > 0 THEN 1 ELSE 0 END) AS titles,
+         sum(CASE WHEN json_array_length(COALESCE(json_extract(payload, '$.providers'), json('[]'))) = 0 THEN 1 ELSE 0 END) AS misses,
+         max(enriched_at) AS newest
+       FROM catalog_titles
+       WHERE enriched_at IS NOT NULL`,
+    ).first<{ titles: number; misses: number; newest: string }>(),
+  ]);
 
-  return rows.results;
+  const justwatchRow = justwatch
+    ? [
+        {
+          source: "justwatch",
+          titles: justwatch.titles,
+          misses: justwatch.misses,
+          newest: justwatch.newest,
+        },
+      ]
+    : [];
+
+  return [...enriched.results, ...justwatchRow].sort((left, right) =>
+    left.source.localeCompare(right.source),
+  );
 }
 
 export async function readAdminOverview(env: Bindings) {
