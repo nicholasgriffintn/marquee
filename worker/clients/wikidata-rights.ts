@@ -7,8 +7,10 @@ const SPARQL_ENDPOINT = "https://query.wikidata.org/sparql";
 const BATCH = 40;
 const TIMEOUT_MS = 30_000;
 
+export type FilmRef = { key: string; wikidataId?: string | null; imdbId?: string | null };
+
 export type FilmAuthors = {
-  imdbId: string;
+  key: string;
   named: number;
   withDeathYear: number;
   latestDeathYear: number | null;
@@ -20,11 +22,26 @@ function yearOf(value: string) {
   return match ? Number(match[1]) : null;
 }
 
-async function queryAuthors(imdbIds: string[]) {
-  const values = imdbIds.map((id) => `"${id}"`).join(" ");
-  const query = `SELECT ?imdb ?person ?death WHERE {
-  VALUES ?imdb { ${values} }
-  ?film wdt:P345 ?imdb .
+function entityId(value: string) {
+  const match = /\/(Q\d+)$/u.exec(value);
+
+  return match ? match[1] : null;
+}
+
+function clauses(refs: FilmRef[]) {
+  const entities = refs.flatMap((ref) => (ref.wikidataId ? [`wd:${ref.wikidataId}`] : []));
+  const imdbIds = refs.flatMap((ref) => (ref.imdbId ? [`"${ref.imdbId}"`] : []));
+  const parts = [
+    entities.length ? `{ VALUES ?film { ${entities.join(" ")} } }` : null,
+    imdbIds.length ? `{ VALUES ?imdb { ${imdbIds.join(" ")} } ?film wdt:P345 ?imdb . }` : null,
+  ].filter(Boolean);
+
+  return parts.join("\n  UNION\n  ");
+}
+
+async function queryAuthors(refs: FilmRef[]) {
+  const query = `SELECT ?film ?imdb ?person ?death WHERE {
+  ${clauses(refs)}
   VALUES ?prop { wdt:P57 wdt:P58 wdt:P86 wdt:P1040 }
   ?film ?prop ?person .
   OPTIONAL { ?person wdt:P570 ?death . }
@@ -45,30 +62,46 @@ async function queryAuthors(imdbIds: string[]) {
 
   const payload = await response.json();
   const bindings = isRecord(payload) && isRecord(payload.results) ? payload.results.bindings : [];
+  const byEntity = new Map<string, string>();
+  const byImdb = new Map<string, string>();
+
+  for (const ref of refs) {
+    if (ref.wikidataId) {
+      byEntity.set(ref.wikidataId, ref.key);
+    }
+
+    if (ref.imdbId) {
+      byImdb.set(ref.imdbId, ref.key);
+    }
+  }
+
   const people = new Map<string, Map<string, number | null>>();
 
   for (const binding of records(bindings)) {
+    const film = isRecord(binding.film) ? stringAt(binding.film, "value") : null;
     const imdb = isRecord(binding.imdb) ? stringAt(binding.imdb, "value") : null;
     const person = isRecord(binding.person) ? stringAt(binding.person, "value") : null;
+    const entity = film ? entityId(film) : null;
+    const key = (entity ? byEntity.get(entity) : null) ?? (imdb ? byImdb.get(imdb) : null);
 
-    if (!imdb || !person) {
+    if (!key || !person) {
       continue;
     }
 
     const death = isRecord(binding.death) ? stringAt(binding.death, "value") : null;
     const year = death ? yearOf(death) : null;
-    const seen = people.get(imdb) ?? new Map<string, number | null>();
+    const seen = people.get(key) ?? new Map<string, number | null>();
     const known = seen.get(person) ?? null;
 
     seen.set(person, year !== null && (known === null || year > known) ? year : known);
-    people.set(imdb, seen);
+    people.set(key, seen);
   }
 
-  return [...people].map(([imdbId, byPerson]): FilmAuthors => {
+  return [...people].map(([key, byPerson]): FilmAuthors => {
     const years = [...byPerson.values()].filter((year): year is number => year !== null);
 
     return {
-      imdbId,
+      key,
       named: byPerson.size,
       withDeathYear: years.length,
       latestDeathYear: years.length ? Math.max(...years) : null,
@@ -76,16 +109,21 @@ async function queryAuthors(imdbIds: string[]) {
   });
 }
 
-export async function readFilmAuthors(imdbIds: string[]) {
-  const unique = [...new Set(imdbIds.filter((id) => /^tt\d+$/u.test(id)))];
+export async function readFilmAuthors(refs: FilmRef[]) {
+  const usable = refs.flatMap((ref) => {
+    const wikidataId = ref.wikidataId && /^Q\d+$/u.test(ref.wikidataId) ? ref.wikidataId : null;
+    const imdbId = ref.imdbId && /^tt\d+$/u.test(ref.imdbId) ? ref.imdbId : null;
+
+    return wikidataId || imdbId ? [{ key: ref.key, wikidataId, imdbId }] : [];
+  });
   const found = new Map<string, FilmAuthors>();
 
-  for (let index = 0; index < unique.length; index += BATCH) {
+  for (let index = 0; index < usable.length; index += BATCH) {
     // oxlint-disable-next-line no-await-in-loop
-    const wave = await queryAuthors(unique.slice(index, index + BATCH));
+    const wave = await queryAuthors(usable.slice(index, index + BATCH));
 
     for (const entry of wave) {
-      found.set(entry.imdbId, entry);
+      found.set(entry.key, entry);
     }
   }
 

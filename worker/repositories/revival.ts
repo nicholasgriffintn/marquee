@@ -295,13 +295,15 @@ export type RightsRow = {
   director: string | null;
   rightsBasis: RevivalRightsBasis;
   imdbId: string | null;
+  wikidataId: string | null;
 };
 
 export async function readUncheckedRights(db: D1Database, limit = 60) {
   const rows = await db
     .prepare(
       `SELECT w.id, w.source, w.year, w.director, w.rights_basis AS rightsBasis,
-              t.imdb_id AS imdbId
+              t.imdb_id AS imdbId,
+              json_extract(t.payload, '$.externalIds.wikidataId') AS wikidataId
        FROM revival_works AS w
        LEFT JOIN catalog_titles AS t ON t.id = w.title_id
        WHERE w.status <> 'rejected'

@@ -20,6 +20,7 @@ export type RightsSubject = {
   director: string | null;
   rightsBasis: RevivalRightsBasis;
   imdbId: string | null;
+  wikidataId: string | null;
 };
 
 export function currentUkYear(now = new Date()) {
@@ -110,11 +111,12 @@ export async function checkRevivalRights(env: Bindings, limit = 60) {
     return { checked: 0, cleared: 0 };
   }
 
-  const imdbIds = pending.flatMap((row) => (row.imdbId ? [row.imdbId] : []));
   let authors = new Map<string, FilmAuthors>();
 
   try {
-    authors = await readFilmAuthors(imdbIds);
+    authors = await readFilmAuthors(
+      pending.map((row) => ({ key: row.id, wikidataId: row.wikidataId, imdbId: row.imdbId })),
+    );
   } catch (error) {
     logError("revival_rights_lookup_failed", error, { area: "revival" });
   }
@@ -122,7 +124,7 @@ export async function checkRevivalRights(env: Bindings, limit = 60) {
   let cleared = 0;
 
   for (const row of pending) {
-    const verdict = assessUk(row, row.imdbId ? (authors.get(row.imdbId) ?? null) : null);
+    const verdict = assessUk(row, authors.get(row.id) ?? null);
 
     // oxlint-disable-next-line no-await-in-loop
     await storeUkRights(env.DB, row.id, verdict);
