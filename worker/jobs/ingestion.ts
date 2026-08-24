@@ -108,19 +108,27 @@ async function syncRevivalSource(
   env: Bindings,
   job: IngestionJob & { type: "sync-revival-source" },
 ) {
-  if (job.source === "loc") {
-    await syncScreeningRoom(env);
+  const collection =
+    job.source === "europeana"
+      ? (job.collection ?? "United Kingdom")
+      : (job.collection ?? "feature_films");
+  const run =
+    job.source === "loc"
+      ? await syncScreeningRoom(env)
+      : job.source === "europeana"
+        ? await syncEuropeanaCountry(env, collection)
+        : await syncArchiveCollection(env, collection);
 
+  if (!job.chain || run.exhausted) {
     return;
   }
 
-  if (job.source === "europeana") {
-    await syncEuropeanaCountry(env, job.collection ?? "United Kingdom");
-
-    return;
-  }
-
-  await syncArchiveCollection(env, job.collection ?? "feature_films");
+  await env.REVIVAL_QUEUE.send({
+    type: "sync-revival-source",
+    source: job.source,
+    ...(job.source === "loc" ? {} : { collection }),
+    chain: true,
+  });
 }
 
 export async function executeIngestionJob(env: Bindings, job: IngestionJob) {

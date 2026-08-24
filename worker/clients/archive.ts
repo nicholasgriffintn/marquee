@@ -18,6 +18,7 @@ const METADATA_ENDPOINT = "https://archive.org/metadata";
 const DOWNLOAD_ORIGIN = "https://archive.org/download";
 const TIMEOUT_MS = 20_000;
 const PAGE_SIZE = 25;
+const MAX_OFFSET = 10_000;
 
 const PLAYABLE_FORMATS = ["h.264 ia", "h.264", "mpeg4", "512kb mpeg4", "ogg video"];
 
@@ -53,6 +54,7 @@ export type ArchiveCandidate = {
   rightsBasis: RevivalRightsBasis;
   rightsNote: string;
   rightsUrl: string | null;
+  popularity: number | null;
   tags: RevivalTag[];
 };
 
@@ -61,7 +63,22 @@ type SearchDocument = {
   title?: unknown;
   year?: unknown;
   licenseurl?: unknown;
+  downloads?: unknown;
 };
+
+export type ArchiveEntry = { identifier: string; downloads: number | null };
+
+export function archivePopularity(downloads: number | null) {
+  if (downloads === null || downloads <= 0) {
+    return null;
+  }
+
+  return Math.max(1, Math.min(1_000, Math.round(Math.log10(downloads + 1) * 160)));
+}
+
+export function archivePageCap() {
+  return Math.floor(MAX_OFFSET / PAGE_SIZE);
+}
 
 async function readJson(url: string) {
   const response = await upstreamFetch(url, { timeoutMs: TIMEOUT_MS, cacheTtl: CACHE_TTL });
@@ -74,6 +91,7 @@ async function readJson(url: string) {
 }
 
 export async function searchArchiveCollection(collection: string, page: number, cutoff: number) {
+  const capped = Math.min(Math.max(1, page), archivePageCap());
   const url = new URL(SEARCH_ENDPOINT);
 
   url.searchParams.set(
@@ -81,24 +99,24 @@ export async function searchArchiveCollection(collection: string, page: number, 
     `collection:(${collection}) AND mediatype:(movies) AND (licenseurl:(*publicdomain*) OR year:[1 TO ${cutoff}])`,
   );
   url.searchParams.set("rows", String(PAGE_SIZE));
-  url.searchParams.set("page", String(Math.max(1, page)));
+  url.searchParams.set("page", String(capped));
   url.searchParams.set("sort[]", "downloads desc");
   url.searchParams.set("output", "json");
 
-  for (const field of ["identifier", "title", "year", "licenseurl"]) {
+  for (const field of ["identifier", "title", "year", "licenseurl", "downloads"]) {
     url.searchParams.append("fl[]", field);
   }
 
   const payload = await readJson(url.toString());
   const response = isRecord(payload) && isRecord(payload.response) ? payload.response : null;
   const docs = Array.isArray(response?.docs) ? (response.docs as SearchDocument[]) : [];
-  const total = typeof response?.numFound === "number" ? response.numFound : 0;
+  const found = typeof response?.numFound === "number" ? response.numFound : 0;
 
   return {
-    total,
-    identifiers: docs.flatMap((doc) =>
+    total: Math.min(found, MAX_OFFSET),
+    entries: docs.flatMap<ArchiveEntry>((doc) =>
       typeof doc.identifier === "string" && /^[\w.-]{1,120}$/u.test(doc.identifier)
-        ? [doc.identifier]
+        ? [{ identifier: doc.identifier, downloads: numberOrNull(doc.downloads) }]
         : [],
     ),
   };
@@ -181,7 +199,10 @@ function kindFor(collections: string[], seconds: number | null): RevivalKind {
   return seconds !== null && seconds <= SHORT_MAX_SECONDS ? "short" : "feature";
 }
 
-export async function readArchiveItem(identifier: string): Promise<ArchiveCandidate | null> {
+export async function readArchiveItem(
+  identifier: string,
+  downloads: number | null = null,
+): Promise<ArchiveCandidate | null> {
   const payload = await readJson(`${METADATA_ENDPOINT}/${encodeURIComponent(identifier)}`);
 
   if (!isRecord(payload) || payload.is_dark === true || !isRecord(payload.metadata)) {
@@ -237,6 +258,7 @@ export async function readArchiveItem(identifier: string): Promise<ArchiveCandid
       ? `An Internet Archive uploader tagged this ${licenseUrl}, which is a claim rather than a release`
       : "No public domain marker on the Internet Archive item",
     rightsUrl: licenseUrl || null,
+    popularity: archivePopularity(downloads),
     tags: [
       ...tagList("subject", splitSubjects(metadata.subject)),
       ...tagList(

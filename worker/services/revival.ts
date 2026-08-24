@@ -7,6 +7,8 @@ import type {
 } from "../../src/domain/revival.ts";
 import {
   ARCHIVE_COLLECTIONS,
+  archivePageCap,
+  archivePopularity,
   readArchiveItem,
   searchArchiveCollection,
   type ArchiveCandidate,
@@ -25,6 +27,8 @@ import {
   readWork,
   recordMatch,
   recordSourceRun,
+  refreshPopularity,
+  selectKnownSourceIds,
   selectArchiveForRecheck,
   selectUnmatched,
   touchWork,
@@ -40,6 +44,8 @@ const HOME_NATIONS = new Set(["United Kingdom", "Ireland"]);
 const ARCHIVE_LANES = 5;
 const ARCHIVE_BUDGET_MS = 45_000;
 const ARCHIVE_PAGE = 25;
+const CURATED_POPULARITY = 550;
+const KNOWN_FRESH_DAYS = 30;
 const SHELF_LIMIT = 40;
 const MAX_SHELVES = 18;
 const GENRE_SHELVES = 5;
@@ -96,27 +102,50 @@ export async function syncArchiveCollection(env: Bindings, collection: string) {
   const cutoff = usPublicDomainCutoff();
   const cursor = parseCursor(await readSourceCursor(env.DB, "archive"));
   const page = cursor[collection] ?? 1;
-  const { identifiers, total } = await searchArchiveCollection(collection, page, cutoff);
-  const counts = { seen: 0, accepted: 0, rejected: 0 };
+  const { entries, total } = await searchArchiveCollection(collection, page, cutoff);
+  const counts = { seen: 0, accepted: 0, rejected: 0, skipped: 0 };
   const deadline = Date.now() + ARCHIVE_BUDGET_MS;
+
+  await refreshPopularity(
+    env.DB,
+    "archive",
+    entries.map((entry) => ({
+      sourceId: entry.identifier,
+      popularity: archivePopularity(entry.downloads),
+    })),
+  );
+
+  const known = await selectKnownSourceIds(
+    env.DB,
+    "archive",
+    entries.map((entry) => entry.identifier),
+    KNOWN_FRESH_DAYS,
+  );
+  const pending = entries.filter((entry) => !known.has(entry.identifier));
+
+  counts.skipped = entries.length - pending.length;
+
   let cut = false;
 
-  for (let index = 0; index < identifiers.length; index += ARCHIVE_LANES) {
+  for (let index = 0; index < pending.length; index += ARCHIVE_LANES) {
     if (Date.now() > deadline) {
       cut = true;
 
       break;
     }
 
-    const lane = identifiers.slice(index, index + ARCHIVE_LANES);
+    const lane = pending.slice(index, index + ARCHIVE_LANES);
 
     // oxlint-disable-next-line no-await-in-loop
     const items = await Promise.all(
-      lane.map(async (identifier) => {
+      lane.map(async (entry) => {
         try {
-          return await readArchiveItem(identifier);
+          return await readArchiveItem(entry.identifier, entry.downloads);
         } catch (error) {
-          logError("revival_archive_item_failed", error, { area: "revival", identifier });
+          logError("revival_archive_item_failed", error, {
+            area: "revival",
+            identifier: entry.identifier,
+          });
 
           return null;
         }
@@ -146,8 +175,8 @@ export async function syncArchiveCollection(env: Bindings, collection: string) {
     }
   }
 
-  const exhausted = identifiers.length === 0 || page * ARCHIVE_PAGE >= total;
-  const next = cut ? page : exhausted ? 1 : page + 1;
+  const drained = entries.length === 0 || page >= archivePageCap() || page * ARCHIVE_PAGE >= total;
+  const next = cut ? page : drained ? 1 : page + 1;
 
   await recordSourceRun(
     env.DB,
@@ -156,7 +185,7 @@ export async function syncArchiveCollection(env: Bindings, collection: string) {
     counts,
   );
 
-  return { collection, page, ...counts };
+  return { collection, page, exhausted: drained && !cut, ...counts };
 }
 
 export async function syncScreeningRoom(env: Bindings) {
@@ -169,7 +198,7 @@ export async function syncScreeningRoom(env: Bindings) {
     const status = decideStatus(candidate);
 
     // oxlint-disable-next-line no-await-in-loop
-    await upsertWork(env.DB, "loc", candidate, status);
+    await upsertWork(env.DB, "loc", { ...candidate, popularity: CURATED_POPULARITY }, status);
 
     if (status === "approved") {
       counts.accepted += 1;
@@ -180,12 +209,12 @@ export async function syncScreeningRoom(env: Bindings) {
 
   await recordSourceRun(env.DB, "loc", JSON.stringify({ nsr: hasMore ? page + 1 : 1 }), counts);
 
-  return { page, ...counts };
+  return { page, exhausted: !hasMore, ...counts };
 }
 
 export async function syncEuropeanaCountry(env: Bindings, country: string) {
   if (!env.EUROPEANA_API_KEY) {
-    return { country, seen: 0, accepted: 0, rejected: 0 };
+    return { country, exhausted: true, seen: 0, accepted: 0, rejected: 0 };
   }
 
   const cursor = parseCursor(await readSourceCursor(env.DB, "europeana"));
@@ -197,7 +226,7 @@ export async function syncEuropeanaCountry(env: Bindings, country: string) {
     const status = decideStatus({ ...candidate, runtimeSeconds: MIN_RUNTIME_SECONDS });
 
     // oxlint-disable-next-line no-await-in-loop
-    await upsertWork(env.DB, "europeana", candidate, status);
+    await upsertWork(env.DB, "europeana", { ...candidate, popularity: CURATED_POPULARITY }, status);
 
     if (status === "approved") {
       counts.accepted += 1;
@@ -215,23 +244,29 @@ export async function syncEuropeanaCountry(env: Bindings, country: string) {
     counts,
   );
 
-  return { country, page, ...counts };
+  return { country, page, exhausted, ...counts };
 }
 
 export async function queueRevivalSources(env: Bindings) {
   const jobs = [
-    { body: { type: "sync-revival-source" as const, source: "loc" as const } },
+    { body: { type: "sync-revival-source" as const, source: "loc" as const, chain: true } },
     ...(env.EUROPEANA_API_KEY
       ? EUROPEANA_COUNTRIES.map((country) => ({
           body: {
             type: "sync-revival-source" as const,
             source: "europeana" as const,
             collection: country,
+            chain: true,
           },
         }))
       : []),
     ...ARCHIVE_COLLECTIONS.map((collection) => ({
-      body: { type: "sync-revival-source" as const, source: "archive" as const, collection },
+      body: {
+        type: "sync-revival-source" as const,
+        source: "archive" as const,
+        collection,
+        chain: true,
+      },
     })),
   ];
 

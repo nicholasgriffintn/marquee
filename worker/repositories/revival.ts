@@ -31,6 +31,7 @@ export type RevivalCandidate = {
   rightsBasis: RevivalRightsBasis;
   rightsNote: string;
   rightsUrl: string | null;
+  popularity?: number | null;
   tags?: RevivalTag[];
 };
 
@@ -77,6 +78,8 @@ const WORK_COLUMNS = `w.id, w.source, w.source_url AS sourceUrl, w.title, w.year
    json_extract(t.payload, '$.posterUrl') AS cataloguePoster`;
 
 const WORK_FROM = `FROM revival_works AS w LEFT JOIN catalog_titles AS t ON t.id = w.title_id`;
+
+const UNSCORED_POPULARITY = 550;
 
 const ID_PATTERN = /^(archive|loc|europeana)\.[\w.-]{1,120}$/u;
 
@@ -211,9 +214,9 @@ export async function upsertWork(
       `INSERT INTO revival_works (
          id, source, source_id, source_url, title, sort_title, year, director, synopsis,
          kind, runtime_seconds, still_url, stream_url, stream_bytes, stream_type,
-         width, height, country, rights_basis, rights_note, rights_url, status
+         width, height, country, rights_basis, rights_note, rights_url, popularity, status
        )
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(source, source_id) DO UPDATE SET
          source_url = excluded.source_url,
          title = excluded.title,
@@ -233,6 +236,7 @@ export async function upsertWork(
          rights_basis = excluded.rights_basis,
          rights_note = excluded.rights_note,
          rights_url = excluded.rights_url,
+         popularity = COALESCE(excluded.popularity, revival_works.popularity),
          status = CASE
            WHEN revival_works.reviewed_at IS NOT NULL THEN revival_works.status
            ELSE excluded.status
@@ -261,6 +265,7 @@ export async function upsertWork(
       candidate.rightsBasis,
       candidate.rightsNote,
       candidate.rightsUrl,
+      candidate.popularity ?? null,
       status,
     )
     .run();
@@ -325,7 +330,7 @@ export async function readApprovedWorks(db: D1Database, limit = 400) {
       `SELECT ${WORK_COLUMNS}
        ${WORK_FROM}
        WHERE w.status = 'approved'
-       ORDER BY w.plays DESC, w.sort_title
+       ORDER BY w.plays DESC, COALESCE(w.popularity, ${UNSCORED_POPULARITY}) DESC, w.sort_title
        LIMIT ?`,
     )
     .bind(Math.min(limit, 800))
@@ -350,7 +355,7 @@ export async function searchApproved(db: D1Database, query: string, limit = 60) 
              WHERE g.work_id = w.id AND g.label LIKE ?1
            )
          )
-       ORDER BY w.sort_title
+       ORDER BY COALESCE(w.popularity, ${UNSCORED_POPULARITY}) DESC, w.sort_title
        LIMIT ?2`,
     )
     .bind(like, Math.min(limit, 120))
@@ -534,6 +539,58 @@ export async function recordMatch(
     )
     .bind(titleId, confidence, id)
     .run();
+}
+
+export async function selectKnownSourceIds(
+  db: D1Database,
+  source: RevivalSource,
+  sourceIds: string[],
+  freshDays = 30,
+) {
+  if (sourceIds.length === 0) {
+    return new Set<string>();
+  }
+
+  const slots = sourceIds.map(() => "?").join(", ");
+  const rows = await db
+    .prepare(
+      `SELECT source_id AS sourceId
+       FROM revival_works
+       WHERE source = ?
+         AND source_id IN (${slots})
+         AND updated_at > datetime('now', ?)`,
+    )
+    .bind(source, ...sourceIds, `-${Math.max(1, Math.trunc(freshDays))} days`)
+    .all<{ sourceId: string }>();
+
+  return new Set(rows.results.map((row) => row.sourceId));
+}
+
+export async function refreshPopularity(
+  db: D1Database,
+  source: RevivalSource,
+  entries: { sourceId: string; popularity: number | null }[],
+) {
+  const scored = entries.filter(
+    (entry): entry is { sourceId: string; popularity: number } => entry.popularity !== null,
+  );
+
+  if (scored.length === 0) {
+    return 0;
+  }
+
+  await db.batch(
+    scored.map((entry) =>
+      db
+        .prepare(
+          `UPDATE revival_works SET popularity = ?
+           WHERE source = ? AND source_id = ?`,
+        )
+        .bind(entry.popularity, source, entry.sourceId),
+    ),
+  );
+
+  return scored.length;
 }
 
 export async function selectUnmirrored(db: D1Database, limit = 5) {

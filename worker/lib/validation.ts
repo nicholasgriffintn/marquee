@@ -71,6 +71,10 @@ export function isIngestionJob(value: unknown): value is IngestionJob {
       return false;
     }
 
+    if (value.chain !== undefined && typeof value.chain !== "boolean") {
+      return false;
+    }
+
     if (value.collection === undefined) {
       return true;
     }

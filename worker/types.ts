@@ -112,6 +112,7 @@ export type IngestionJob =
       type: "sync-revival-source";
       source: "archive" | "loc" | "europeana";
       collection?: string;
+      chain?: boolean;
     }
   | { type: "match-revival-works" }
   | { type: "check-revival-rights" }
