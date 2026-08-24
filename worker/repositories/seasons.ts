@@ -58,6 +58,8 @@ function parseEpisodes(payload: string, seasonNumber: number): Episode[] {
         stillUrl: stringAt(value, "stillUrl"),
         tmdbScore: numberAt(value, "tmdbScore"),
         tmdbVoteCount: numberAt(value, "tmdbVoteCount") ?? 0,
+        imdbId: stringAt(value, "imdbId"),
+        imdbScore: numberAt(value, "imdbScore"),
       },
     ];
   });

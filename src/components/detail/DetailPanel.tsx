@@ -36,6 +36,7 @@ const DETAIL_TABS = ["overview", "episodes"] as const;
 const PEOPLE_SHOWN = 5;
 const KEYWORDS_SHOWN = 8;
 const STUDIOS_SHOWN = 2;
+const COUNTRIES_SHOWN = 2;
 
 type DetailTab = (typeof DETAIL_TABS)[number];
 
@@ -94,6 +95,7 @@ export function DetailPanel({
   const reels = useTitleReels(item.id, item.mediaType, item.tmdbId);
   const collection = useCollection(item.collection?.id);
   const spokenIn = languageLabel(item.originalLanguage);
+  const madeIn = item.countries?.slice(0, COUNTRIES_SHOWN).join(", ") ?? "";
   const { exit, leaveVia, report, dismiss } = useExitWarning(item.id);
 
   const resumeWatching = () => {
@@ -173,10 +175,11 @@ export function DetailPanel({
           {item.originalTitle && item.originalTitle !== item.title && (
             <p className="detail-original">Original title · {item.originalTitle}</p>
           )}
-          {(item.studios?.length || spokenIn) && (
+          {(item.studios?.length || spokenIn || madeIn) && (
             <p className="detail-original">
               {[
                 item.studios?.slice(0, STUDIOS_SHOWN).join(", "),
+                madeIn ? `From ${madeIn}` : null,
                 spokenIn ? `In ${spokenIn}` : null,
               ]
                 .filter(Boolean)

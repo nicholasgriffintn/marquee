@@ -117,6 +117,8 @@ export type MediaTitle = {
   status?: string | null;
   collection?: { id: number; name: string } | null;
   studios?: string[];
+  countries?: string[];
+  languages?: string[];
   revenue?: number | null;
   budget?: number | null;
   episodeCount?: number | null;

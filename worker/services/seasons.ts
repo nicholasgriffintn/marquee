@@ -6,9 +6,12 @@ import {
   type SeasonSummary,
   type ShowProgress,
 } from "../../src/domain/seasons.ts";
+import { getOmdbSeason, type OmdbEpisode } from "../clients/omdb.ts";
 import { getTmdbSeason, getTmdbSeasonSummaries } from "../clients/tmdb.ts";
+import { withRateLimitPause } from "../jobs/sources.ts";
 import { logError } from "../lib/logging.ts";
 import { databaseDate } from "../lib/values.ts";
+import { claimBudget } from "../repositories/budgets.ts";
 import {
   readEpisodeEntries,
   readWatchedEpisodes,
@@ -92,6 +95,67 @@ export async function getSeasonIndex(env: Bindings, titleId: string) {
   }
 }
 
+async function imdbIdOf(env: Bindings, titleId: string) {
+  const row = await env.DB.prepare(`SELECT imdb_id AS imdbId FROM catalog_titles WHERE id = ?`)
+    .bind(titleId)
+    .first<{ imdbId: string | null }>();
+
+  return row?.imdbId ?? null;
+}
+
+async function omdbEpisodes(env: Bindings, imdbId: string, seasonNumber: number) {
+  try {
+    const attempt = await withRateLimitPause(env, "omdb", () =>
+      getOmdbSeason(env, imdbId, seasonNumber),
+    );
+
+    return new Map(
+      attempt.limited ? [] : attempt.value.map((episode) => [episode.episodeNumber, episode]),
+    );
+  } catch (error) {
+    logError("season_imdb_ratings_failed", error, { area: "seasons" });
+
+    return new Map<number, OmdbEpisode>();
+  }
+}
+
+async function withImdbRatings<T extends SeasonSummary & { episodes: Episode[] }>(
+  env: Bindings,
+  titleId: string,
+  season: T,
+): Promise<T> {
+  if (!env.OMDB_API_KEY || season.episodes.length === 0) {
+    return season;
+  }
+
+  const imdbId = await imdbIdOf(env, titleId);
+
+  if (!imdbId || !(await claimBudget(env, "omdb"))) {
+    return season;
+  }
+
+  const rated = await omdbEpisodes(env, imdbId, season.seasonNumber);
+
+  if (rated.size === 0) {
+    return season;
+  }
+
+  return {
+    ...season,
+    episodes: season.episodes.map((episode) => {
+      const found = rated.get(episode.episodeNumber);
+
+      return found
+        ? {
+            ...episode,
+            imdbId: found.imdbId,
+            imdbScore: found.imdbScore,
+          }
+        : episode;
+    }),
+  };
+}
+
 export async function getSeason(
   env: Bindings,
   titleId: string,
@@ -111,7 +175,11 @@ export async function getSeason(
   }
 
   try {
-    const season = await getTmdbSeason(env, tmdbIdOf(titleId), seasonNumber);
+    const season = await withImdbRatings(
+      env,
+      titleId,
+      await getTmdbSeason(env, tmdbIdOf(titleId), seasonNumber),
+    );
 
     await writeSeasonEpisodes(env.DB, titleId, season);
 

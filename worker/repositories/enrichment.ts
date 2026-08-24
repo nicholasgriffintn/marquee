@@ -4,8 +4,27 @@ import { logEvent } from "../lib/logging.ts";
 import type { Bindings, EnrichmentSource } from "../types.ts";
 import { readRawItems } from "./catalog-reader.ts";
 
+type OmdbFields = Pick<MediaTitle, "ratings"> &
+  Partial<
+    Pick<
+      MediaTitle,
+      | "certification"
+      | "runtimeMinutes"
+      | "genres"
+      | "releaseDate"
+      | "year"
+      | "overview"
+      | "people"
+      | "studios"
+      | "countries"
+      | "languages"
+      | "numberOfSeasons"
+      | "posterUrl"
+    >
+  >;
+
 type FieldsFor<S extends EnrichmentSource> = S extends "omdb"
-  ? Pick<MediaTitle, "ratings">
+  ? OmdbFields
   : S extends "anilist"
     ? Pick<MediaTitle, "keywords" | "ratings" | "anime">
     : Pick<MediaTitle, "externalIds">;

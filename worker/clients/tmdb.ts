@@ -308,10 +308,16 @@ export async function getTmdbSeason(env: Bindings, tmdbId: number, seasonNumber:
   return season;
 }
 
-export async function findByTitle(env: Bindings, name: string, year: number | null) {
-  const response = await requestTmdb(env, "/search/movie", {
+export async function findByTitle(
+  env: Bindings,
+  name: string,
+  year: number | null,
+  mediaType: MediaType = "movie",
+) {
+  const yearKey = mediaType === "tv" ? "first_air_date_year" : "primary_release_year";
+  const response = await requestTmdb(env, `/search/${mediaType}`, {
     query: name.slice(0, 120),
-    ...(year ? { primary_release_year: String(year) } : {}),
+    ...(year ? { [yearKey]: String(year) } : {}),
   });
 
   if (!isRecord(response)) {
@@ -321,7 +327,7 @@ export async function findByTitle(env: Bindings, name: string, year: number | nu
   const [match] = records(response.results);
   const tmdbId = match ? numberAt(match, "id") : null;
 
-  return tmdbId ? `movie:${tmdbId}` : null;
+  return tmdbId ? `${mediaType}:${tmdbId}` : null;
 }
 
 export async function findByImdbId(env: Bindings, imdbId: string) {

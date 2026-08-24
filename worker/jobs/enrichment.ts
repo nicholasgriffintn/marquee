@@ -1,6 +1,11 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
 import { getAnilistDetails } from "../clients/anilist.ts";
-import { getOmdbRatings, searchOmdb } from "../clients/omdb.ts";
+import {
+  getOmdbTitle,
+  searchOmdb,
+  type OmdbRecord,
+  type OmdbSearchResult,
+} from "../clients/omdb.ts";
 import { logEvent } from "../lib/logging.ts";
 import { enqueue } from "../lib/queue.ts";
 import { comparableTitle, imdbIdFrom } from "../lib/text.ts";
@@ -14,9 +19,10 @@ import {
   storeImdbId,
 } from "../repositories/enrichment.ts";
 import type { Bindings, EnrichmentSource, IngestionJob } from "../types.ts";
-import { withRateLimitPause } from "./sources.ts";
+import { withRateLimitPause, type SourceAttempt } from "./sources.ts";
 
 const ANILIST_KEYWORD_LIMIT = 60;
+const YEAR_SLACK = 2;
 
 const ENRICHERS = [
   { source: "omdb", job: "enrich-ratings", maxAgeDays: 30, perRun: 3_000, budgetGated: true },
@@ -102,35 +108,159 @@ export async function queueEnrichment(env: Bindings) {
   }
 }
 
-async function recoverImdbId(env: Bindings, title: MediaTitle) {
-  if (!title.year || !(await claimBudget(env, "omdb"))) {
-    return null;
+function searchNames(title: MediaTitle) {
+  const names = [title.title];
+
+  if (
+    title.originalTitle &&
+    comparableTitle(title.originalTitle) !== comparableTitle(title.title)
+  ) {
+    names.push(title.originalTitle);
   }
 
-  const attempt = await withRateLimitPause(env, "omdb", () => searchOmdb(env, title.title));
+  return names;
+}
 
-  if (attempt.limited) {
-    return null;
+function comparableNames(title: MediaTitle) {
+  return new Set(searchNames(title).map((name) => comparableTitle(name)));
+}
+
+function yearMatches(wanted: number | null, found: number | null) {
+  return !wanted || !found || Math.abs(found - wanted) <= YEAR_SLACK;
+}
+
+function yearGap(wanted: number | null, found: number | null) {
+  return wanted && found ? Math.abs(found - wanted) : YEAR_SLACK;
+}
+
+async function lookup(
+  env: Bindings,
+  run: () => Promise<OmdbRecord | null>,
+): Promise<SourceAttempt<OmdbRecord | null>> {
+  if (!(await claimBudget(env, "omdb"))) {
+    logEvent("budget_exhausted", { source: "omdb" });
+
+    return { limited: true };
   }
 
-  const wanted = comparableTitle(title.title);
-  const expected = title.mediaType === "tv" ? "series" : "movie";
-  const match = attempt.value.find(
-    (result) =>
-      result.omdbType === expected &&
-      result.year === title.year &&
-      comparableTitle(result.title) === wanted,
+  return withRateLimitPause(env, "omdb", run);
+}
+
+async function findByName(
+  env: Bindings,
+  title: MediaTitle,
+): Promise<SourceAttempt<OmdbRecord | null>> {
+  const attempt = await lookup(env, () =>
+    getOmdbTitle(env, { title: title.title, year: title.year, mediaType: title.mediaType }),
   );
 
-  if (!match) {
-    return null;
+  if (attempt.limited) {
+    return attempt;
   }
 
-  await storeImdbId(env.DB, title.id, match.imdbId);
+  const record = attempt.value;
+  const named = record?.imdbId ? comparableNames(title).has(comparableTitle(record.title)) : false;
 
-  logEvent("imdb_id_recovered", { titleId: title.id, imdbId: match.imdbId });
+  return { limited: false, value: named ? record : null };
+}
 
-  return match.imdbId;
+function bestMatch(title: MediaTitle, results: OmdbSearchResult[]) {
+  const names = comparableNames(title);
+  const named = results.filter(
+    (result) => names.has(comparableTitle(result.title)) && yearMatches(title.year, result.year),
+  );
+
+  return named.reduce<OmdbSearchResult | null>(
+    (best, result) =>
+      !best || yearGap(title.year, result.year) < yearGap(title.year, best.year) ? result : best,
+    null,
+  );
+}
+
+async function searchFor(
+  env: Bindings,
+  title: MediaTitle,
+  query: string,
+): Promise<SourceAttempt<OmdbSearchResult | null>> {
+  if (!(await claimBudget(env, "omdb"))) {
+    return { limited: true };
+  }
+
+  const attempt = await withRateLimitPause(env, "omdb", () =>
+    searchOmdb(env, query, { mediaType: title.mediaType }),
+  );
+
+  return attempt.limited ? attempt : { limited: false, value: bestMatch(title, attempt.value) };
+}
+
+async function findBySearch(
+  env: Bindings,
+  title: MediaTitle,
+): Promise<SourceAttempt<OmdbRecord | null>> {
+  let found: OmdbSearchResult | null = null;
+
+  for (const name of searchNames(title)) {
+    // oxlint-disable-next-line no-await-in-loop
+    const attempt = await searchFor(env, title, name);
+
+    if (attempt.limited) {
+      return attempt;
+    }
+
+    if (attempt.value) {
+      found = attempt.value;
+
+      break;
+    }
+  }
+
+  const match = found;
+
+  if (!match) {
+    return { limited: false, value: null };
+  }
+
+  return lookup(env, () => getOmdbTitle(env, { imdbId: match.imdbId }));
+}
+
+async function resolveOmdbRecord(env: Bindings, title: MediaTitle) {
+  const known = imdbIdFrom(title.imdbUrl);
+
+  if (known) {
+    return lookup(env, () => getOmdbTitle(env, { imdbId: known }));
+  }
+
+  const named = await findByName(env, title);
+
+  if (named.limited || named.value) {
+    return named;
+  }
+
+  return findBySearch(env, title);
+}
+
+function omdbFields(title: MediaTitle, record: OmdbRecord) {
+  const facts = record.facts;
+
+  return {
+    ratings: { ...record.ratings, anilistScore: title.ratings?.anilistScore ?? null },
+    ...(title.certification || !facts.certification ? {} : { certification: facts.certification }),
+    ...(title.runtimeMinutes || !facts.runtimeMinutes
+      ? {}
+      : { runtimeMinutes: facts.runtimeMinutes }),
+    ...(title.genres.length > 0 || facts.genres.length === 0 ? {} : { genres: facts.genres }),
+    ...(title.releaseDate || !facts.releaseDate ? {} : { releaseDate: facts.releaseDate }),
+    ...(title.year || !record.year ? {} : { year: record.year }),
+    ...(title.overview.trim() || !facts.plot ? {} : { overview: facts.plot }),
+    ...(title.people?.length || facts.people.length === 0 ? {} : { people: facts.people }),
+    ...(title.studios?.length || facts.studios.length === 0 ? {} : { studios: facts.studios }),
+    ...(facts.countries.length > 0 ? { countries: facts.countries } : {}),
+    ...(facts.languages.length > 0 ? { languages: facts.languages } : {}),
+    ...(title.numberOfSeasons || !facts.numberOfSeasons
+      ? {}
+      : { numberOfSeasons: facts.numberOfSeasons }),
+    ...(title.posterUrl || !facts.posterUrl ? {} : { posterUrl: facts.posterUrl }),
+  };
 }
 
 export async function enrichRatings(env: Bindings, titleId: string) {
@@ -146,35 +276,27 @@ export async function enrichRatings(env: Bindings, titleId: string) {
     return;
   }
 
-  const imdbId = imdbIdFrom(title.imdbUrl) ?? (await recoverImdbId(env, title));
-
-  if (!imdbId) {
-    await storeEnrichmentMiss(env, titleId, "omdb", "no-imdb-id");
-
-    return;
-  }
-
-  if (!(await claimBudget(env, "omdb"))) {
-    logEvent("budget_exhausted", { source: "omdb", titleId });
-
-    return;
-  }
-
-  const attempt = await withRateLimitPause(env, "omdb", () => getOmdbRatings(env, imdbId));
+  const attempt = await resolveOmdbRecord(env, title);
 
   if (attempt.limited) {
     return;
   }
 
-  if (!attempt.value) {
+  const record = attempt.value;
+
+  if (!record) {
     await storeEnrichmentMiss(env, titleId, "omdb", "no-omdb-record");
 
     return;
   }
 
-  await storeEnrichment(env, titleId, "omdb", {
-    ratings: { ...attempt.value, anilistScore: title.ratings?.anilistScore ?? null },
-  });
+  if (record.imdbId && !imdbIdFrom(title.imdbUrl)) {
+    await storeImdbId(env.DB, titleId, record.imdbId);
+
+    logEvent("imdb_id_recovered", { titleId, imdbId: record.imdbId });
+  }
+
+  await storeEnrichment(env, titleId, "omdb", omdbFields(title, record));
 }
 
 function anilistSchedule(

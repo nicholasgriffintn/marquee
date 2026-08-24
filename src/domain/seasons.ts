@@ -19,6 +19,8 @@ export type Episode = {
   stillUrl: string | null;
   tmdbScore: number | null;
   tmdbVoteCount: number;
+  imdbId?: string | null;
+  imdbScore?: number | null;
 };
 
 export type SeasonDetail = SeasonSummary & {

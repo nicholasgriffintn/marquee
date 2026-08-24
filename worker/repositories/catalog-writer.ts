@@ -61,6 +61,18 @@ function mergeWithStored(fresh: MediaTitle, stored: MediaTitle | null): MediaTit
 
   return {
     ...fresh,
+    overview: fresh.overview.trim() ? fresh.overview : stored.overview,
+    releaseDate: fresh.releaseDate ?? stored.releaseDate,
+    year: fresh.year ?? stored.year,
+    runtimeMinutes: fresh.runtimeMinutes ?? stored.runtimeMinutes,
+    numberOfSeasons: fresh.numberOfSeasons ?? stored.numberOfSeasons,
+    genres: fresh.genres.length > 0 ? fresh.genres : stored.genres,
+    certification: fresh.certification ?? stored.certification,
+    posterUrl: fresh.posterUrl ?? stored.posterUrl,
+    people: fresh.people?.length ? fresh.people : stored.people,
+    studios: fresh.studios?.length ? fresh.studios : stored.studios,
+    countries: fresh.countries?.length ? fresh.countries : stored.countries,
+    languages: fresh.languages?.length ? fresh.languages : stored.languages,
     providers: mergeProviders(fresh, stored),
     watchLink: fresh.watchLink ?? stored.watchLink,
     keywords: [...new Set([...(fresh.keywords ?? []), ...(stored.keywords ?? [])])].slice(

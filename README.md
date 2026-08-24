@@ -188,7 +188,7 @@ partial setup runs; it just knows less.
 | -------------------------------------- | -------------------------------------------------- |
 | `TMDB_API_TOKEN`                       | Titles, images, credits, providers — the catalogue |
 | `GITHUB_CLIENT_ID` / `_SECRET`         | Sign-in                                            |
-| `OMDB_API_KEY`                         | Awards, box office, search beyond the catalogue    |
+| `OMDB_API_KEY`                         | Ratings, awards, box office, episodes, search      |
 | `TRAKT_CLIENT_ID` / `_SECRET`          | Importing a viewer's history                       |
 | `EUROPEANA_API_KEY`                    | British and European prints for the revival house  |
 | `CLOUDFLARE_ACCOUNT_ID` / `_API_TOKEN` | AI Gateway                                         |
