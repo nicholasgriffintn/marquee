@@ -1243,6 +1243,18 @@ h2 em {
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
+.detail-similar-head {
+  align-items: baseline;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+.detail-similar-more {
+  color: var(--acid-ink);
+  text-decoration: underline;
+  text-transform: none;
+  white-space: nowrap;
+}
 .detail-similar-track {
   display: grid;
   gap: 12px;

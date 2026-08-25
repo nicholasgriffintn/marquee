@@ -104,6 +104,44 @@ export async function readProfileSummary(db: D1Database, viewerId: string) {
   };
 }
 
+export async function readProviderPreferences(db: D1Database, viewerId: string) {
+  const row = await db
+    .prepare(
+      `SELECT selected_provider_ids AS selectedProviderIds FROM viewer_preferences WHERE viewer_id = ?`,
+    )
+    .bind(viewerId)
+    .first<{ selectedProviderIds: string }>();
+
+  if (!row) {
+    return null;
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(row.selectedProviderIds);
+
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function saveProviderPreferences(
+  db: D1Database,
+  viewerId: string,
+  providerIds: string[],
+) {
+  await db
+    .prepare(
+      `INSERT INTO viewer_preferences (viewer_id, selected_provider_ids)
+       VALUES (?, ?)
+       ON CONFLICT(viewer_id) DO UPDATE SET
+         selected_provider_ids = excluded.selected_provider_ids,
+         updated_at = CURRENT_TIMESTAMP`,
+    )
+    .bind(viewerId, JSON.stringify(providerIds))
+    .run();
+}
+
 export async function readViewingEntry(db: D1Database, viewerId: string, titleId: string) {
   const row = await db
     .prepare(
