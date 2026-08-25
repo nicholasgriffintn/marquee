@@ -252,9 +252,11 @@ export async function recordFilmMatch(
 }
 
 async function screeningId(cinemaId: string, source: string, screening: SourceScreening) {
-  return hashState(
-    `${cinemaId}:${source}:${screening.filmId}:${screening.businessDay}:${screening.startsAt ?? ""}`,
-  );
+  const key = screening.sourceEventId
+    ? `${cinemaId}:${source}:event:${screening.sourceEventId}`
+    : `${cinemaId}:${source}:${screening.filmId}:${screening.businessDay}:${screening.startsAt ?? ""}`;
+
+  return hashState(key);
 }
 
 export async function replaceScreenings(

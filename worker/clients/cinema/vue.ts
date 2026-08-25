@@ -108,6 +108,7 @@ async function harvest(cinema: SourceCinema, horizon: number): Promise<SourceHar
       screenings.push({
         siteId: cinema.siteId,
         filmId: film.filmId,
+        sourceEventId: null,
         startsAt: null,
         businessDay: today,
         precision: "listing",
@@ -125,6 +126,7 @@ async function harvest(cinema: SourceCinema, horizon: number): Promise<SourceHar
       screenings.push({
         siteId: cinema.siteId,
         filmId: film.filmId,
+        sourceEventId: null,
         startsAt: null,
         businessDay: day,
         precision: "day",
