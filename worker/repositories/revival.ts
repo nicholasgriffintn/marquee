@@ -146,7 +146,7 @@ function toWork(row: WorkRow): RevivalWork {
     ukExpiresYear: row.ukExpiresYear,
     mirrored: row.mirrorState === "mirrored",
     delivery: row.ukClear === 1 ? "mirror" : "source",
-    reelUrl: row.ukClear === 1 ? reelPath(row.id) : row.streamUrl,
+    reelUrl: row.ukClear === 1 ? reelPath(row.id) : null,
     plays: row.plays,
     popularity: row.popularity,
     downloads: row.downloads,
@@ -398,7 +398,7 @@ export async function readShelfPage(
     .prepare(
       `SELECT ${WORK_COLUMNS}
        ${WORK_FROM}
-       WHERE w.status = 'approved' AND w.group_primary = 1 AND ${where}
+       WHERE w.status = 'approved' AND w.group_primary = 1 AND w.uk_clear = 1 AND ${where}
        ORDER BY ${BY_STANDING}
        LIMIT ? OFFSET ?`,
     )
@@ -414,7 +414,7 @@ export async function countShelf(db: D1Database, selector: ShelfSelector) {
     .prepare(
       `SELECT COUNT(*) AS total
        FROM revival_works AS w
-       WHERE w.status = 'approved' AND w.group_primary = 1 AND ${where}`,
+       WHERE w.status = 'approved' AND w.group_primary = 1 AND w.uk_clear = 1 AND ${where}`,
     )
     .bind(...binds)
     .first<{ total: number }>();
@@ -427,7 +427,7 @@ export async function readVaultPage(db: D1Database, limit: number, offset = 0) {
     .prepare(
       `SELECT ${WORK_COLUMNS}
        ${WORK_FROM}
-       WHERE w.status = 'approved' AND w.group_primary = 1
+       WHERE w.status = 'approved' AND w.group_primary = 1 AND w.uk_clear = 1
        ORDER BY ${BY_STANDING}
        LIMIT ? OFFSET ?`,
     )
@@ -450,7 +450,7 @@ export async function readTagGroups(
       `SELECT g.slug, MIN(g.label) AS label, COUNT(*) AS size
        FROM revival_tags AS g
        JOIN revival_works AS w
-         ON w.id = g.work_id AND w.status = 'approved' AND w.group_primary = 1
+         ON w.id = g.work_id AND w.status = 'approved' AND w.group_primary = 1 AND w.uk_clear = 1
        WHERE g.kind = ?
        GROUP BY g.slug
        HAVING COUNT(*) >= ?
@@ -468,7 +468,7 @@ export async function readCountryGroups(db: D1Database, limit: number, minimum: 
     .prepare(
       `SELECT country AS slug, country AS label, COUNT(*) AS size
        FROM revival_works
-       WHERE status = 'approved' AND group_primary = 1
+       WHERE status = 'approved' AND group_primary = 1 AND uk_clear = 1
          AND country IS NOT NULL AND country <> ''
        GROUP BY country
        HAVING COUNT(*) >= ?
@@ -486,7 +486,7 @@ export async function readDecadeGroups(db: D1Database, limit: number, minimum: n
     .prepare(
       `SELECT (year / 10) * 10 AS slug, (year / 10) * 10 AS label, COUNT(*) AS size
        FROM revival_works
-       WHERE status = 'approved' AND group_primary = 1
+       WHERE status = 'approved' AND group_primary = 1 AND uk_clear = 1
          AND kind = 'feature' AND year IS NOT NULL
        GROUP BY slug
        HAVING COUNT(*) >= ?
@@ -564,6 +564,7 @@ export async function readGroupPrints(db: D1Database, groupId: string, excludeId
       `SELECT ${WORK_COLUMNS}
        ${WORK_FROM}
        WHERE w.status = 'approved'
+         AND w.uk_clear = 1
          AND w.group_id = ?
          AND w.id <> ?
        ORDER BY w.group_primary DESC, COALESCE(w.popularity, 0) DESC
@@ -580,7 +581,7 @@ export async function countApproved(db: D1Database) {
     .prepare(
       `SELECT COUNT(*) AS total
        FROM revival_works
-       WHERE status = 'approved' AND group_primary = 1`,
+       WHERE status = 'approved' AND group_primary = 1 AND uk_clear = 1`,
     )
     .first<{ total: number }>();
 
@@ -599,6 +600,7 @@ export async function readAlsoShowing(
        ${WORK_FROM}
        WHERE w.status = 'approved'
          AND w.group_primary = 1
+         AND w.uk_clear = 1
          AND w.kind = ?
          AND w.id <> ?
        ORDER BY ${BY_STANDING}
@@ -618,6 +620,7 @@ export async function countSearch(db: D1Database, query: string) {
        FROM revival_works AS w
        WHERE w.status = 'approved'
          AND w.group_primary = 1
+         AND w.uk_clear = 1
          AND (
            w.title LIKE ?1
            OR w.sort_title LIKE ?1
@@ -642,6 +645,7 @@ export async function searchApproved(db: D1Database, query: string, limit = 60, 
        ${WORK_FROM}
        WHERE w.status = 'approved'
          AND w.group_primary = 1
+         AND w.uk_clear = 1
          AND (
            w.title LIKE ?1
            OR w.sort_title LIKE ?1
@@ -662,7 +666,9 @@ export async function searchApproved(db: D1Database, query: string, limit = 60, 
 
 export async function readWork(db: D1Database, id: string) {
   const row = await db
-    .prepare(`SELECT ${WORK_COLUMNS} ${WORK_FROM} WHERE w.id = ? AND w.status = 'approved'`)
+    .prepare(
+      `SELECT ${WORK_COLUMNS} ${WORK_FROM} WHERE w.id = ? AND w.status = 'approved' AND w.uk_clear = 1`,
+    )
     .bind(id)
     .first<WorkRow>();
 
@@ -680,7 +686,7 @@ export async function readWorksForTitle(db: D1Database, titleId: string) {
     .prepare(
       `SELECT ${WORK_COLUMNS}
        ${WORK_FROM}
-       WHERE w.title_id = ? AND w.status = 'approved'
+       WHERE w.title_id = ? AND w.status = 'approved' AND w.uk_clear = 1
        ORDER BY w.mirror_state = 'mirrored' DESC, w.runtime_seconds DESC
        LIMIT 4`,
     )
@@ -714,7 +720,9 @@ export async function readReelTarget(db: D1Database, id: string) {
 
 export async function readStillSource(db: D1Database, id: string) {
   const row = await db
-    .prepare(`SELECT still_url AS stillUrl FROM revival_works WHERE id = ? AND status = 'approved'`)
+    .prepare(
+      `SELECT still_url AS stillUrl FROM revival_works WHERE id = ? AND status = 'approved' AND uk_clear = 1`,
+    )
     .bind(id)
     .first<{ stillUrl: string | null }>();
 
@@ -923,7 +931,7 @@ export async function readMirrorRow(db: D1Database, id: string) {
               mirror_upload_id AS mirrorUploadId, mirror_parts AS mirrorParts,
               mirror_offset AS mirrorOffset
        FROM revival_works
-       WHERE id = ? AND status = 'approved'`,
+       WHERE id = ? AND status = 'approved' AND uk_clear = 1`,
     )
     .bind(id)
     .first<MirrorRow>();
@@ -1030,6 +1038,7 @@ export async function readWorksByIds(db: D1Database, ids: string[]) {
       `SELECT ${WORK_COLUMNS}
        ${WORK_FROM}
        WHERE w.status = 'approved'
+         AND w.uk_clear = 1
          AND w.id IN (${wanted.map(() => "?").join(", ")})`,
     )
     .bind(...wanted)
@@ -1050,7 +1059,7 @@ export async function readViewerProgress(db: D1Database, viewerId: string, limit
        FROM revival_progress AS p
        JOIN revival_works AS w ON w.id = p.work_id
        WHERE p.viewer_id = ? AND p.finished = 0 AND p.position_seconds > 30
-         AND w.status = 'approved'
+         AND w.status = 'approved' AND w.uk_clear = 1
        ORDER BY p.updated_at DESC
        LIMIT ?`,
     )

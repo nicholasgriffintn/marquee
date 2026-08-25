@@ -46,7 +46,7 @@ export type RevivalWork = {
   ukExpiresYear: number | null;
   mirrored: boolean;
   delivery: "mirror" | "source";
-  reelUrl: string;
+  reelUrl: string | null;
   plays: number;
   popularity: number | null;
   downloads: number | null;
@@ -286,7 +286,7 @@ export function workMeta(work: RevivalCard) {
 
 export function rightsSummary(work: RevivalWork) {
   if (work.rightsBasis === "uk-expired" && work.ukExpiresYear) {
-    return `UK copyright expired in ${work.ukExpiresYear}`;
+    return `UK copyright expired in ${work.ukExpiresYear - 1}`;
   }
 
   if (work.rightsBasis === "eu-institution" || work.rightsBasis === "cc0") {

@@ -112,6 +112,23 @@ export function ReelPlayer({
   const still = stillFailed ? null : work.stillUrl;
   const resuming = startAt >= RESUME_FLOOR_SECONDS;
 
+  if (!work.reelUrl) {
+    return (
+      <div className="revival-player">
+        <div className="revival-player-frame">
+          {still ? (
+            <img src={still} alt="" loading="eager" onError={() => setStillFailed(true)} />
+          ) : (
+            <ArtPlaceholder seed={work.id} label={work.title} wide />
+          )}
+        </div>
+        <p className="revival-error" role="alert">
+          This print is not cleared to show yet. Check back once it has finished the vault.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="revival-player">
       <div className={`revival-player-frame${started ? " is-running" : ""}`}>
