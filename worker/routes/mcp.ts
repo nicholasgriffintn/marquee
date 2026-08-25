@@ -51,7 +51,10 @@ const TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        titleId: { type: "string", description: "A Marquee id such as movie:550." },
+        titleId: {
+          type: "string",
+          description: "A Marquee id such as movie:550.",
+        },
         limit: { type: "integer", minimum: 1, maximum: 25 },
       },
       required: ["titleId"],
@@ -78,7 +81,10 @@ const TOOLS = [
       type: "object",
       properties: {
         titleId: { type: "string" },
-        status: { type: "string", enum: ["watchlist", "watching", "watched", "dropped"] },
+        status: {
+          type: "string",
+          enum: ["watchlist", "watching", "watched", "dropped"],
+        },
         rating: { type: "integer", minimum: 1, maximum: 5 },
         thoughts: { type: "string" },
       },
@@ -97,7 +103,10 @@ const TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        days: { type: "number", description: "How far ahead to look, 1 to 60. Defaults to 7." },
+        days: {
+          type: "number",
+          description: "How far ahead to look, 1 to 60. Defaults to 7.",
+        },
       },
     },
   },
@@ -107,7 +116,10 @@ const TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        name: { type: "string", description: "A credited name, e.g. Tilda Swinton" },
+        name: {
+          type: "string",
+          description: "A credited name, e.g. Tilda Swinton",
+        },
         limit: { type: "number" },
       },
       required: ["name"],
@@ -166,6 +178,14 @@ async function callTool(
   origin: string,
 ) {
   if (name === "search_catalogue") {
+    const { success } = await env.SEARCH_MEMBER_RATE_LIMITER.limit({
+      key: user.id,
+    });
+
+    if (!success) {
+      return textResult({ error: "Too many searches. Wait a minute." }, true);
+    }
+
     const results = await retrieveTitles(env, {
       text: typeof input.query === "string" ? input.query.slice(0, 300) : "",
       mediaType:
@@ -190,7 +210,9 @@ async function callTool(
     const limit = typeof input.limit === "number" ? Math.min(25, input.limit) : 10;
     const neighbours = (await similarTo(env, input.titleId, limit + 1)).slice(0, limit);
 
-    return textResult({ results: compact(await readRanked(env.DB, neighbours)) });
+    return textResult({
+      results: compact(await readRanked(env.DB, neighbours)),
+    });
   }
 
   if (name === "get_title") {
@@ -204,7 +226,12 @@ async function callTool(
       return textResult({ error: "Unknown title" }, true);
     }
 
-    const insight = await getTitleInsight(env, title.id).catch(() => null);
+    const { success: canGenerate } = await env.CURATOR_RATE_LIMITER.limit({
+      key: user.id,
+    });
+    const insight = await getTitleInsight(env, title.id, {
+      generate: canGenerate,
+    }).catch(() => null);
 
     return textResult({
       ...compact([title])[0],
@@ -262,7 +289,10 @@ async function callTool(
   if (name === "whats_on_this_week") {
     const days = typeof input.days === "number" ? clamp(Math.round(input.days), 1, 60) : 7;
 
-    return textResult({ days, entries: await readWeekAhead(env, user.id, days) });
+    return textResult({
+      days,
+      entries: await readWeekAhead(env, user.id, days),
+    });
   }
 
   if (name === "titles_by_person") {
@@ -300,7 +330,9 @@ async function callTool(
 
 mcpRoutes.all("/", async (context) => {
   if (context.req.method !== "POST") {
-    return context.json({ error: "Use POST with JSON-RPC" }, 405, { allow: "POST" });
+    return context.json({ error: "Use POST with JSON-RPC" }, 405, {
+      allow: "POST",
+    });
   }
 
   const user = await bearerUser(context.env, context.req.raw);
