@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 
 import type { MediaTitle } from "../domain/catalog";
 import type { UsherMoment } from "../domain/usher";
@@ -8,10 +8,24 @@ import { UsherCard } from "./usher/UsherCard";
 import { UsherMark } from "./usher/UsherMark";
 
 function MissingTitle({ onClose }: { onClose: () => void }) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+
+  useLayoutEffect(() => {
+    dialogRef.current?.showModal();
+    closeRef.current?.focus();
+  }, []);
+
   return (
     <div className="detail-backdrop" role="presentation" onMouseDown={onClose}>
-      <dialog open className="detail-panel detail-panel-missing" aria-modal="true">
-        <button type="button" className="detail-close" onClick={onClose} aria-label="Close details">
+      <dialog ref={dialogRef} className="detail-panel detail-panel-missing" aria-modal="true">
+        <button
+          ref={closeRef}
+          type="button"
+          className="detail-close"
+          onClick={onClose}
+          aria-label="Close details"
+        >
           ×
         </button>
         <div className="detail-copy search-empty lost">
@@ -25,10 +39,24 @@ function MissingTitle({ onClose }: { onClose: () => void }) {
 }
 
 function LoadingTitle({ onClose }: { onClose: () => void }) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+
+  useLayoutEffect(() => {
+    dialogRef.current?.showModal();
+    closeRef.current?.focus();
+  }, []);
+
   return (
     <div className="detail-backdrop" role="presentation" onMouseDown={onClose}>
-      <dialog open className="detail-panel detail-panel-missing" aria-modal="true">
-        <button type="button" className="detail-close" onClick={onClose} aria-label="Close details">
+      <dialog ref={dialogRef} className="detail-panel detail-panel-missing" aria-modal="true">
+        <button
+          ref={closeRef}
+          type="button"
+          className="detail-close"
+          onClick={onClose}
+          aria-label="Close details"
+        >
           ×
         </button>
         <div className="detail-copy">

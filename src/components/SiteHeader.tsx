@@ -84,7 +84,7 @@ export function SiteHeader({
             aria-current={currentPath === item.to ? "page" : undefined}
           >
             {item.label}
-            {item.to === "/shelf" && <sup>{shelvedCount}</sup>}
+            {item.to === "/shelf" && shelvedCount > 0 && <sup>{shelvedCount}</sup>}
           </Link>
         ))}
       </nav>

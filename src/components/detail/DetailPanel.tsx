@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { mergeAnimeProviders } from "../../domain/anime";
@@ -135,6 +135,10 @@ export function DetailPanel({
     track("title_view", { titleId: item.id });
   }, [item.id]);
 
+  useLayoutEffect(() => {
+    panelRef.current?.showModal();
+  }, []);
+
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
 
@@ -194,7 +198,6 @@ export function DetailPanel({
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
       <dialog
-        open
         ref={panelRef}
         className="detail-panel"
         aria-modal="true"
