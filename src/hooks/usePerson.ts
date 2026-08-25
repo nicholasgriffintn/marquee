@@ -40,7 +40,8 @@ export function usePerson(name: string, isSignedIn: boolean) {
   return {
     data: person.data,
     following,
-    error: saveError || person.error,
+    error: person.error,
+    saveError,
     isLoading: person.isLoading,
     toggleFollow,
   };
