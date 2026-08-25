@@ -67,7 +67,7 @@ export async function noteHunches(env: Bindings, viewerId: string): Promise<Beli
       timeoutMs: 20_000,
       maxTokens: 260,
       json: true,
-      metadata: { feature: "note_hunches", viewer: viewerId },
+      metadata: { feature: "note_hunches" },
     });
     const json = response.content?.match(/\{[\s\S]*\}/u)?.[0];
     const parsed: unknown = json ? JSON.parse(json) : null;

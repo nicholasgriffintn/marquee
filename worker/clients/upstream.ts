@@ -1,10 +1,10 @@
 export class UpstreamError extends Error {
-  constructor(
-    message: string,
-    readonly status = 502,
-  ) {
+  readonly status: number;
+
+  constructor(message: string, status = 502) {
     super(message);
     this.name = "UpstreamError";
+    this.status = status;
   }
 }
 

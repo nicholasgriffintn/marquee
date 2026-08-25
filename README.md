@@ -210,6 +210,19 @@ A name only reaches `env` if it is listed under `secrets.required` in `wrangler.
 list switches off Wrangler's inference from `.dev.vars`, so anything you add to `.dev.vars` and not
 to the list is silently absent at runtime. Add the name in both places.
 
+### Privacy and observability
+
+Personal recommendations send prompts, shelf notes and viewing context through Cloudflare AI
+Gateway, but Marquee disables Gateway prompt logging on every request. Gateway metadata is limited
+at runtime to a fixed feature name and, for curator requests, a bounded generation round; it never
+includes a viewer ID or free-form value.
+
+Search and curator Analytics Engine events contain no viewer ID or free-form text. They retain only
+search result counts and a coarse, capped input-length bucket. Other first-party product events may
+retain the authenticated viewer ID to correlate a journey, but their public route accepts only
+event-specific identifiers, positions and fixed operational values; client-supplied `detail` is
+discarded.
+
 ## Running it locally
 
 ```bash

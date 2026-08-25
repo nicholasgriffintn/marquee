@@ -229,7 +229,7 @@ export async function pickToOrder(
       timeoutMs: 18_000,
       maxTokens: 320,
       json: true,
-      metadata: { feature: "usher_order", viewer: viewerId },
+      metadata: { feature: "usher_order" },
     });
     const json = response.content?.match(/\{[\s\S]*\}/u)?.[0];
     const parsed: unknown = json ? JSON.parse(json) : null;

@@ -30,6 +30,7 @@ export type MarqueeEvent = {
   titleId?: string;
   detail?: string;
   value?: number;
+  inputLength?: number;
   journeyId?: string;
   source?: string;
   position?: number;
@@ -55,9 +56,55 @@ export function recordEvent(env: Bindings, event: MarqueeEvent) {
         event.providerId ?? "",
         event.monetization ?? "",
       ],
-      doubles: [event.value ?? 1, event.position ?? -1],
+      doubles: [event.value ?? 1, event.position ?? -1, event.inputLength ?? -1],
     });
   } catch {
     return;
   }
+}
+
+function coarseInputLength(input: string) {
+  const length = input.length;
+
+  if (length === 0) {
+    return 0;
+  }
+
+  if (length <= 25) {
+    return 25;
+  }
+
+  if (length <= 100) {
+    return 100;
+  }
+
+  if (length <= 250) {
+    return 250;
+  }
+
+  if (length <= 500) {
+    return 500;
+  }
+
+  return 1_000;
+}
+
+export function recordInputMetric(
+  env: Bindings,
+  event: Omit<MarqueeEvent, "detail" | "inputLength">,
+  input: string,
+) {
+  recordEvent(env, {
+    ...event,
+    detail: undefined,
+    inputLength: coarseInputLength(input),
+  });
+}
+
+export function recordSearchMetric(env: Bindings, query: string, resultCount: number) {
+  recordInputMetric(env, { name: "search", value: resultCount }, query);
+}
+
+export function recordCuratorMetric(env: Bindings, prompt: string) {
+  recordInputMetric(env, { name: "curator_ask" }, prompt);
 }

@@ -198,7 +198,7 @@ export async function pickOne(
       timeoutMs: 15_000,
       maxTokens: 160,
       json: true,
-      metadata: { feature: "usher_pick", viewer: viewerId },
+      metadata: { feature: "usher_pick" },
     });
     const json = response.content?.match(/\{[\s\S]*\}/u)?.[0];
     const parsed: unknown = json ? JSON.parse(json) : null;

@@ -5,10 +5,7 @@ import type {
   ProviderAvailability,
   TitleCredits,
 } from "../../src/domain/catalog.ts";
-import {
-  findRegistryProviderForOffer,
-  type ProviderOfferKind,
-} from "../../src/domain/providers.ts";
+import { findRegistryProviderForOffer, providerOfferKind } from "../../src/domain/providers.ts";
 import type { Episode, SeasonDetail, SeasonSummary } from "../../src/domain/seasons.ts";
 import { httpsUrl } from "./urls.ts";
 import {
@@ -61,7 +58,7 @@ function parseAvailability(details: Record<string, unknown>): {
         continue;
       }
 
-      const registry = findRegistryProviderForOffer(name, offerKind(label));
+      const registry = findRegistryProviderForOffer(name, providerOfferKind(label));
       const providerId = registry?.id ?? `tmdb:${id}`;
       const existing = providers.get(providerId);
 
@@ -110,26 +107,6 @@ function parseCertification(mediaType: MediaType, details: Record<string, unknow
   const country = region ? stringAt(region, "iso_3166_1") : null;
 
   return rating ? [country, rating].filter(Boolean).join(" ") : null;
-}
-
-function offerKind(label: string): ProviderOfferKind {
-  if (label === "Subscription") {
-    return "subscription";
-  }
-
-  if (label === "Free" || label === "Free with ads") {
-    return "free";
-  }
-
-  if (label === "Rent") {
-    return "rent";
-  }
-
-  if (label === "Buy") {
-    return "buy";
-  }
-
-  return "other";
 }
 
 function imageUrl(path: string | null, size: string) {

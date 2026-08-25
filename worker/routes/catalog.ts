@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { requireAuthentication, sessionPrincipal, type AuthVariables } from "../auth/session.ts";
 import { refreshTitleAvailability } from "../jobs/availability.ts";
 import { edgeCache } from "../lib/cache.ts";
-import { recordEvent } from "../lib/events.ts";
+import { recordEvent, recordSearchMetric } from "../lib/events.ts";
 import { edgeOrigin } from "../lib/geo.ts";
 import { logError } from "../lib/logging.ts";
 import { pathInteger, queryInteger, queryList, queryText } from "../lib/params.ts";
@@ -94,8 +94,6 @@ catalogRoutes.get("/search", async (context) => {
     return context.json({ items: [], query: "", source: "Marquee catalogue", fetchedAt: "" });
   }
 
-  const principal = await sessionPrincipal(context.env, context.req.raw);
-
   try {
     context.header("cache-control", "no-store");
 
@@ -103,12 +101,7 @@ catalogRoutes.get("/search", async (context) => {
       ? await searchCatalogueHybrid(context.env, query, providerIds)
       : await searchCatalogue(context.env, query, providerIds);
 
-    recordEvent(context.env, {
-      name: "search",
-      viewerId: principal?.user.id,
-      detail: query,
-      value: results.items.length,
-    });
+    recordSearchMetric(context.env, query, results.items.length);
 
     return context.json(results);
   } catch (error) {

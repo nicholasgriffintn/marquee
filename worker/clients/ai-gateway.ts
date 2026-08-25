@@ -1,7 +1,8 @@
-import { parseAssistantMessage, type ChatMessage } from "../lib/curator-payload.ts";
+import { parseAssistantMessage, type ChatMessage } from "../lib/ai-completion-payload.ts";
 import { logEvent } from "../lib/logging.ts";
 import { isRecord } from "../lib/values.ts";
 import type { Bindings } from "../types.ts";
+import { aiGatewayPrivacyHeaders, type AiGatewayMetadata } from "./ai-gateway-privacy.ts";
 import { upstreamError } from "./upstream.ts";
 
 export const AiGatewayError = upstreamError("AiGatewayError");
@@ -54,7 +55,7 @@ export async function requestAiCompletion(
     maxTokens?: number;
     json?: boolean;
     toolChoice?: "auto" | "required" | "none";
-    metadata?: Record<string, string>;
+    metadata?: AiGatewayMetadata;
     cacheSeconds?: number;
   } = {},
 ) {
@@ -94,12 +95,19 @@ async function completeOnce(
     maxTokens?: number;
     json?: boolean;
     toolChoice?: "auto" | "required" | "none";
-    metadata?: Record<string, string>;
+    metadata?: AiGatewayMetadata;
     cacheSeconds?: number;
   },
   model: string,
 ) {
   const timeoutMs = options.timeoutMs ?? 16_000;
+  const cacheSeconds =
+    options.metadata?.feature === "insight" &&
+    Number.isInteger(options.cacheSeconds) &&
+    Number(options.cacheSeconds) >= 60 &&
+    Number(options.cacheSeconds) <= 86_400
+      ? Number(options.cacheSeconds)
+      : null;
 
   const response = await fetch(
     `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/ai/v1/chat/completions`,
@@ -108,14 +116,11 @@ async function completeOnce(
       headers: {
         accept: "application/json",
         authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
-        "cf-aig-collect-log": "true",
+        ...aiGatewayPrivacyHeaders(options.metadata),
         "cf-aig-gateway-id": env.AI_GATEWAY_ID,
         "cf-aig-request-timeout": String(timeoutMs - 1_000),
-        "cf-aig-skip-cache": "false",
-        ...(options.cacheSeconds ? { "cf-aig-cache-ttl": String(options.cacheSeconds) } : {}),
-        ...(options.metadata
-          ? { "cf-aig-metadata": JSON.stringify(options.metadata).slice(0, 1_000) }
-          : {}),
+        "cf-aig-skip-cache": cacheSeconds ? "false" : "true",
+        ...(cacheSeconds ? { "cf-aig-cache-ttl": String(cacheSeconds) } : {}),
         "content-type": "application/json",
       },
       body: JSON.stringify({
@@ -169,9 +174,10 @@ export async function* streamAiCompletion(env: Bindings, messages: ChatMessage[]
       headers: {
         accept: "text/event-stream",
         authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
-        "cf-aig-collect-log": "false",
+        ...aiGatewayPrivacyHeaders(),
         "cf-aig-gateway-id": env.AI_GATEWAY_ID,
         "cf-aig-request-timeout": "30000",
+        "cf-aig-skip-cache": "true",
         "content-type": "application/json",
       },
       body: JSON.stringify({

@@ -11,6 +11,23 @@ export type ProviderIntegration = "feed" | "direct" | "marker";
 export type ProviderStatus = "feed" | "link" | "marker";
 export type ProviderOfferKind = "subscription" | "free" | "rent" | "buy" | "other";
 
+const PROVIDER_OFFER_KINDS: ReadonlyMap<string, ProviderOfferKind> = new Map([
+  ["Subscription", "subscription"],
+  ["Free", "free"],
+  ["Free with ads", "free"],
+  ["Rent", "rent"],
+  ["Buy", "buy"],
+  ["Other", "other"],
+]);
+
+export function knownProviderOfferKind(label: unknown) {
+  return typeof label === "string" ? PROVIDER_OFFER_KINDS.get(label) : undefined;
+}
+
+export function providerOfferKind(label: string): ProviderOfferKind {
+  return knownProviderOfferKind(label) ?? "other";
+}
+
 export type ProviderRegistryEntry = {
   id: string;
   mark: string;

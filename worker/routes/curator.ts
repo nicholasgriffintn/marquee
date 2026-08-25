@@ -8,7 +8,7 @@ import {
   requireViewer,
   type ViewerVariables,
 } from "../auth/session.ts";
-import { recordEvent } from "../lib/events.ts";
+import { recordCuratorMetric, recordEvent } from "../lib/events.ts";
 import { jsonResponse, readJsonObject } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
 import { isKnownTitle, validProviderIds } from "../lib/validation.ts";
@@ -60,11 +60,7 @@ curatorRoutes.post("/", async (context) => {
     Array.isArray(body.providerIds) ? body.providerIds : [],
   ).slice(0, 24);
 
-  recordEvent(context.env, {
-    name: "curator_ask",
-    viewerId: identity.viewerId || undefined,
-    detail: prompt,
-  });
+  recordCuratorMetric(context.env, prompt);
 
   const session = context.env.CURATOR_SESSION.get(
     context.env.CURATOR_SESSION.idFromName(identity.sessionKey),

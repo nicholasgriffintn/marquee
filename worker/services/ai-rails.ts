@@ -2,7 +2,7 @@ import type { CatalogSection, MediaTitle } from "../../src/domain/catalog.ts";
 import { CURATOR_TOOLS, executeCuratorTool } from "../ai/curator-tools.ts";
 import { fastModel, requestAiCompletion } from "../clients/ai-gateway.ts";
 import type { ChatMessage } from "../lib/curator-payload.ts";
-import { logError, logEvent } from "../lib/logging.ts";
+import { logAiGeneration, logError, logEvent } from "../lib/logging.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { isRecord, parseJson } from "../lib/values.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
@@ -447,7 +447,7 @@ export async function buildOneRail(
       timeoutMs: 25_000,
       maxTokens: 500,
       toolChoice: "auto",
-      metadata: { feature: "rails", angle: angle.id, viewer: viewerId },
+      metadata: { feature: "rails" },
     });
 
     if (response.tool_calls?.length) {
@@ -475,11 +475,10 @@ export async function buildOneRail(
       return { ...rail, angle: angle.id };
     }
 
-    logEvent("rail_retry", {
+    logAiGeneration("rail_retry", {
       angle: angle.id,
       round,
       available: availableIds.size,
-      raw: response.content?.slice(0, 160),
     });
     messages.push(response, { role: "user", content: nudge() });
   }
@@ -489,15 +488,14 @@ export async function buildOneRail(
     timeoutMs: 20_000,
     maxTokens: 300,
     json: true,
-    metadata: { feature: "rails", angle: angle.id, viewer: viewerId },
+    metadata: { feature: "rails" },
   });
   const rail = parseRail(response.content, availableIds);
 
-  logEvent("rail_final", {
+  logAiGeneration("rail_final", {
     angle: angle.id,
     ok: Boolean(rail),
     available: availableIds.size,
-    raw: rail ? undefined : response.content?.slice(0, 200),
   });
 
   return rail ? { ...rail, angle: angle.id } : null;

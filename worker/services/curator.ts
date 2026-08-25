@@ -3,7 +3,7 @@ import { CURATOR_TOOLS, executeCuratorTool } from "../ai/curator-tools.ts";
 import { USHER_VOICE } from "../ai/usher-voice.ts";
 import { fastModel, requestAiCompletion, streamAiCompletion } from "../clients/ai-gateway.ts";
 import { parseCuratorResult, type ChatMessage } from "../lib/curator-payload.ts";
-import { logError } from "../lib/logging.ts";
+import { logAiError } from "../lib/logging.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
 import { readViewerContext } from "../repositories/viewer-context.ts";
 import type { Bindings, ViewerContext } from "../types.ts";
@@ -58,7 +58,6 @@ async function runCurator(
   prompt: string,
   viewer: ViewerContext,
   turns: CuratorTurn[],
-  viewerId: string,
   summary = "",
   showingBrief = "",
 ) {
@@ -84,7 +83,7 @@ async function runCurator(
       model: fastModel(env),
       timeoutMs: 25_000,
       toolChoice: availableIds.size === 0 ? "required" : "auto",
-      metadata: { feature: "curator", round: String(round), viewer: viewerId || "guest" },
+      metadata: { feature: "curator", round },
     });
 
     if (!response.tool_calls?.length) {
@@ -131,7 +130,7 @@ async function runCurator(
     model: fastModel(env),
     timeoutMs: 25_000,
     json: true,
-    metadata: { feature: "curator", round: "final", viewer: viewerId || "guest" },
+    metadata: { feature: "curator", round: "final" },
   });
   const result = response.content ? parseCuratorResult(response.content, availableIds) : null;
 
@@ -170,7 +169,6 @@ export async function* curateStream(
       : prompt,
     viewer,
     turns,
-    viewerId,
     tasteLine,
     showing.brief,
   );
@@ -193,7 +191,7 @@ export async function* curateStream(
       yield { type: "delta", text: delta };
     }
   } catch (error) {
-    logError("curator_narration_failed", error, { viewerId: viewerId || "guest" });
+    logAiError("curator_narration_failed", error);
     summary = "";
   }
 
