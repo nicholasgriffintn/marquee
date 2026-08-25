@@ -88,6 +88,13 @@ export function CreditsBlock({ titleId }: { titleId: string }) {
           ))}
         </div>
       )}
+      {jobs.length === 0 && cast.length === 0 && (
+        <p className="detail-credits-empty">
+          {season === null
+            ? "Not read yet."
+            : "Not read for this season yet — open it under Episodes and it will fill in."}
+        </p>
+      )}
       {jobs.length > 0 && (
         <dl className="detail-crew">
           {jobs.map(([job, names]) => (
