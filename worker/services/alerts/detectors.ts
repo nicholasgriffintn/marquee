@@ -185,12 +185,13 @@ const people: Detector = {
   async find(env) {
     try {
       const rows = await env.DB.prepare(
-        `SELECT b.viewer_id AS viewerId, t.id AS titleId, t.title AS title,
-                p.person AS person
+        `SELECT DISTINCT b.viewer_id AS viewerId, t.id AS titleId, t.title AS title,
+                cp.name AS person
            FROM viewer_beliefs AS b
-           JOIN catalog_person_titles AS p
-             ON p.person = replace(replace(b.key, 'rule:person:', ''), 'person:', '')
-           JOIN catalog_titles AS t ON t.id = p.title_id
+           JOIN catalog_people AS cp
+             ON lower(cp.name) = replace(replace(b.key, 'rule:person:', ''), 'person:', '')
+           JOIN catalog_credits AS cr ON cr.person_id = cp.person_id
+           JOIN catalog_titles AS t ON t.id = cr.title_id
           WHERE (b.key LIKE 'rule:person:%' OR b.key LIKE 'person:%')
             AND b.revoked_at IS NULL
             AND (b.suspended_until IS NULL OR julianday(b.suspended_until) < julianday('now'))
