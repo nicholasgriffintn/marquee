@@ -1,6 +1,6 @@
 import { clamp } from "../lib/numbers.ts";
 import { isRecord, parseJson } from "../lib/values.ts";
-import { rebuildPersonTitles } from "./people.ts";
+import { PERSON_CREDITS, rebuildPersonTitles } from "./people.ts";
 
 export type UsherRecord = {
   status: "new" | "in-progress" | "done" | "dismissed";
@@ -205,11 +205,10 @@ export async function rebuildPeopleIndex(db: D1Database) {
   await db.prepare(`DELETE FROM catalog_people`).run();
   await db
     .prepare(
-      `INSERT INTO catalog_people (name, titles)
-       SELECT json_each.value AS name, count(*) AS titles
-       FROM catalog_titles, json_each(payload, '$.people')
-       WHERE json_valid(payload)
-       GROUP BY json_each.value
+      `INSERT INTO catalog_people (person_id, name, titles)
+       SELECT personId, max(personName), count(*) AS titles
+       FROM (${PERSON_CREDITS})
+       GROUP BY personId
        HAVING titles >= 2
        ORDER BY titles DESC
        LIMIT 40000`,

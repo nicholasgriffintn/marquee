@@ -274,7 +274,7 @@ async function callTool(
     }
 
     const limit = typeof input.limit === "number" ? Math.min(48, input.limit) : 20;
-    const ids = await readPersonTitleIds(env.DB, person.name, limit);
+    const ids = await readPersonTitleIds(env.DB, person.personId, limit);
 
     return textResult({
       person: person.name,

@@ -227,11 +227,11 @@ catalogRoutes.get("/people/:name", async (context) => {
 
     const principal = await sessionPrincipal(context.env, context.req.raw);
     const [items, shelf] = await Promise.all([
-      readPersonTitleIds(context.env.DB, person.name, PERSON_LIMIT).then((ids) =>
+      readPersonTitleIds(context.env.DB, person.personId, PERSON_LIMIT).then((ids) =>
         readItems(context.env.DB, ids, PERSON_LIMIT),
       ),
       principal?.user
-        ? readPersonShelf(context.env.DB, principal.user.id, person.name)
+        ? readPersonShelf(context.env.DB, principal.user.id, person.personId)
         : Promise.resolve({ shelved: 0, watched: 0 }),
     ]);
 

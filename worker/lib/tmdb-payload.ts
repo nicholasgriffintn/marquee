@@ -227,11 +227,22 @@ function parseKeywords(details: Record<string, unknown>) {
     .slice(0, KEYWORD_LIMIT);
 }
 
+function billed(value: unknown, limit: number) {
+  return records(value)
+    .flatMap((member) => {
+      const name = stringAt(member, "name");
+      const id = numberAt(member, "id");
+
+      return name && id ? [{ id, name }] : [];
+    })
+    .slice(0, limit);
+}
+
 function parsePeople(mediaType: MediaType, details: Record<string, unknown>) {
   const credits = recordAt(details, mediaType === "movie" ? "credits" : "aggregate_credits");
   const directors = credits
-    ? records(credits.crew)
-        .filter((member) => {
+    ? billed(
+        records(credits.crew).filter((member) => {
           const job = stringAt(member, "job");
 
           return (
@@ -239,15 +250,21 @@ function parsePeople(mediaType: MediaType, details: Record<string, unknown>) {
             job === "Creator" ||
             records(member.jobs).some((entry) => stringAt(entry, "job") === "Director")
           );
-        })
-        .map((member) => stringAt(member, "name"))
-        .filter((name): name is string => Boolean(name))
-        .slice(0, 3)
+        }),
+        3,
+      )
     : [];
-  const creators = names(details.created_by, 3);
-  const cast = credits ? names(credits.cast, CAST_LIMIT) : [];
+  const creators = billed(details.created_by, 3);
+  const cast = credits ? billed(credits.cast, CAST_LIMIT) : [];
+  const seen = new Map<number, { id: number; name: string }>();
 
-  return [...new Set([...directors, ...creators, ...cast])].slice(0, 10);
+  for (const person of [...directors, ...creators, ...cast]) {
+    if (!seen.has(person.id)) {
+      seen.set(person.id, person);
+    }
+  }
+
+  return [...seen.values()].slice(0, 10);
 }
 
 const STUDIO_LIMIT = 4;
@@ -299,6 +316,7 @@ export function parseTmdbTitle(mediaType: MediaType, value: unknown): MediaTitle
   const { providers, watchLink } = parseAvailability(value);
   const externalIds = recordAt(value, "external_ids");
   const imdbId = externalIds ? stringAt(externalIds, "imdb_id") : null;
+  const credits = parsePeople(mediaType, value);
   const episodeRunTimes = Array.isArray(value.episode_run_time)
     ? value.episode_run_time.filter((item): item is number => typeof item === "number" && item > 0)
     : [];
@@ -331,7 +349,8 @@ export function parseTmdbTitle(mediaType: MediaType, value: unknown): MediaTitle
     imdbUrl: imdbId && /^tt\d+$/u.test(imdbId) ? `https://www.imdb.com/title/${imdbId}/` : null,
     externalIds: parseExternalIds(externalIds, imdbId),
     keywords: parseKeywords(value),
-    people: parsePeople(mediaType, value),
+    people: credits.map((person) => person.name),
+    credits,
     trailerKey: parseTrailer(value),
     videos: parseVideos(value),
     originalLanguage: stringAt(value, "original_language"),

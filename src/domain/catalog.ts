@@ -130,6 +130,7 @@ export type MediaTitle = {
   keywords?: string[];
   anime?: AnimeDetails;
   people?: string[];
+  credits?: { id: number; name: string }[];
   trailerKey?: string | null;
   videos?: { key: string; name: string; type: string }[];
   pending?: boolean;
