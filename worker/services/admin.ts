@@ -54,9 +54,9 @@ const QUEUED_JOBS: Partial<Record<AdminAction, IngestionJob>> = {
   buzz: { type: "sync-buzz" },
   providers: { type: "sync-providers" },
   sections: { type: "build-sections" },
-  "revival-match": { type: "match-revival-works" },
+  "revival-match": { type: "match-revival-works", chain: true },
   "revival-rights": { type: "check-revival-rights" },
-  "revival-recheck": { type: "recheck-revival-works" },
+  "revival-recheck": { type: "recheck-revival-works", chain: true },
 };
 
 type CountRow = Record<string, number>;
