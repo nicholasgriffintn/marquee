@@ -6,10 +6,10 @@ import {
   type OmdbRecord,
   type OmdbSearchResult,
 } from "../clients/omdb.ts";
-import { logEvent } from "../lib/logging.ts";
+import { logError, logEvent } from "../lib/logging.ts";
 import { enqueue } from "../lib/queue.ts";
 import { comparableTitle, imdbIdFrom } from "../lib/text.ts";
-import { claimBudget, isUpstreamDown, readBudgetPace } from "../repositories/budgets.ts";
+import { claimBudget, isRateLimited, isRefused, readBudgetPace } from "../repositories/budgets.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
 import {
   selectAnimeCandidates,
@@ -325,7 +325,16 @@ export async function enrichRatings(env: Bindings, titleId: string) {
     return;
   }
 
-  const attempt = await resolveOmdbRecord(env, title);
+  let attempt: SourceAttempt<OmdbRecord | null>;
+
+  try {
+    attempt = await resolveOmdbRecord(env, title);
+  } catch (error) {
+    logError("omdb_lookup_failed", error, { titleId });
+    await storeEnrichmentTransient(env, titleId, "omdb", "upstream-error");
+
+    return;
+  }
 
   if (attempt.limited) {
     await storeEnrichmentTransient(env, titleId, "omdb", "rate-limited");
@@ -375,9 +384,11 @@ export async function enrichAnime(env: Bindings, titleId: string) {
     try {
       return await getJikanDetails(malId);
     } catch (error) {
-      if (!isUpstreamDown(error)) {
+      if (isRefused(error) || isRateLimited(error)) {
         throw error;
       }
+
+      logError("jikan_lookup_failed", error, { titleId });
 
       return "unavailable" as const;
     }
