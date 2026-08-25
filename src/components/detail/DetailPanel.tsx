@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { Link } from "react-router-dom";
 
 import { mergeAnimeProviders } from "../../domain/anime";
@@ -53,6 +53,7 @@ type DetailView = {
 
 export function DetailPanel({
   item,
+  panelRef,
   availabilityEnabled,
   canSave,
   onClose,
@@ -69,6 +70,7 @@ export function DetailPanel({
   onUpdateDraft,
 }: {
   item: MediaTitle;
+  panelRef: RefObject<HTMLDialogElement | null>;
   entryState: ProfileEntryState;
   selectedProviderIds: string[];
   usherSlot?: ReactNode;
@@ -86,13 +88,15 @@ export function DetailPanel({
 }) {
   const isSeries = item.mediaType === "tv";
   const entry = entryState.status === "loaded" ? entryState.entry : null;
-  const [view, setView] = useState<DetailView>({ titleId: item.id, tab: "overview", jump: null });
+  const [view, setView] = useState<DetailView>({
+    titleId: item.id,
+    tab: "overview",
+    jump: null,
+  });
   const live = view.titleId === item.id ? view : null;
   const tab = live?.tab ?? "overview";
   const jump = live?.jump ?? null;
   const setTab = (next: DetailTab) => setView({ titleId: item.id, tab: next, jump });
-  const closeRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLDialogElement>(null);
   const tracker = useEpisodeEntries(item.id, canSave);
   const progress = tracker.progress;
   const continueAt = isSeries && progress && progress.watched > 0 ? progress.upNext : null;
@@ -139,15 +143,11 @@ export function DetailPanel({
     return () => {
       panel.style.overflow = previous;
     };
-  }, [exit]);
+  }, [exit, panelRef]);
 
   useEffect(() => {
     track("title_view", { titleId: item.id });
   }, [item.id]);
-
-  useLayoutEffect(() => {
-    panelRef.current?.showModal();
-  }, []);
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -187,231 +187,208 @@ export function DetailPanel({
 
     document.body.style.overflow = "hidden";
     document.addEventListener("keydown", onKeyDown);
-    closeRef.current?.focus();
 
     return () => {
       document.body.style.overflow = previousOverflow;
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [onClose]);
+  }, [onClose, panelRef]);
 
   return (
-    <div
-      className="detail-backdrop"
-      role="presentation"
-      onMouseDown={(event) => event.target === event.currentTarget && onClose()}
-    >
-      {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
-      <dialog
-        ref={panelRef}
-        className="detail-panel"
-        aria-modal="true"
-        aria-labelledby="detail-title"
-        onMouseDown={(event) => event.target === event.currentTarget && onClose()}
-      >
-        <button
-          ref={closeRef}
-          type="button"
-          className="detail-close"
-          onClick={onClose}
-          aria-label="Close details"
-        >
-          ×
-        </button>
-        <Poster item={item} wide />
-        <div className="detail-copy">
-          <h2 id="detail-title">{item.title}</h2>
-          <p className="detail-meta">
-            {item.mediaType === "movie" ? "Film" : "Television"} · {detailMeta(item)}
+    <>
+      <Poster item={item} wide />
+      <div className="detail-copy">
+        <h2 id="detail-title">{item.title}</h2>
+        <p className="detail-meta">
+          {item.mediaType === "movie" ? "Film" : "Television"} · {detailMeta(item)}
+        </p>
+        {item.originalTitle && item.originalTitle !== item.title && (
+          <p className="detail-original">Original title · {item.originalTitle}</p>
+        )}
+        {(item.studios?.length || spokenIn || madeIn) && (
+          <p className="detail-original">
+            {[
+              item.studios?.slice(0, STUDIOS_SHOWN).join(", "),
+              madeIn ? `From ${madeIn}` : null,
+              spokenIn ? `In ${spokenIn}` : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </p>
-          {item.originalTitle && item.originalTitle !== item.title && (
-            <p className="detail-original">Original title · {item.originalTitle}</p>
-          )}
-          {(item.studios?.length || spokenIn || madeIn) && (
-            <p className="detail-original">
-              {[
-                item.studios?.slice(0, STUDIOS_SHOWN).join(", "),
-                madeIn ? `From ${madeIn}` : null,
-                spokenIn ? `In ${spokenIn}` : null,
-              ]
-                .filter(Boolean)
-                .join(" · ")}
+        )}
+        {item.tagline && <p className="detail-tagline">{item.tagline}</p>}
+        {isSeries && (
+          <div className="detail-tabs" role="tablist" aria-label="Overview or episodes">
+            {DETAIL_TABS.map((name) => (
+              <button
+                type="button"
+                key={name}
+                role="tab"
+                id={`detail-tab-${name}`}
+                aria-selected={tab === name}
+                aria-controls={`detail-panel-${name}`}
+                className={`detail-tab${tab === name ? " selected" : ""}`}
+                onClick={() => setTab(name)}
+              >
+                {name === "overview" ? "Overview" : "Episodes"}
+                {name === "episodes" && item.episodeCount ? <em>{item.episodeCount}</em> : null}
+              </button>
+            ))}
+          </div>
+        )}
+        <div
+          className="detail-tab-panel"
+          id="detail-panel-overview"
+          role={isSeries ? "tabpanel" : undefined}
+          aria-labelledby={isSeries ? "detail-tab-overview" : undefined}
+          hidden={isSeries && tab !== "overview"}
+        >
+          <p className="detail-synopsis">{item.overview || "No synopsis available."}</p>
+          {item.anime?.background && (
+            <p className="detail-background">
+              {item.anime.background}
+              <small className="detail-credit">Background from MyAnimeList</small>
             </p>
           )}
-          {item.tagline && <p className="detail-tagline">{item.tagline}</p>}
-          {isSeries && (
-            <div className="detail-tabs" role="tablist" aria-label="Overview or episodes">
-              {DETAIL_TABS.map((name) => (
-                <button
-                  type="button"
-                  key={name}
-                  role="tab"
-                  id={`detail-tab-${name}`}
-                  aria-selected={tab === name}
-                  aria-controls={`detail-panel-${name}`}
-                  className={`detail-tab${tab === name ? " selected" : ""}`}
-                  onClick={() => setTab(name)}
-                >
-                  {name === "overview" ? "Overview" : "Episodes"}
-                  {name === "episodes" && item.episodeCount ? <em>{item.episodeCount}</em> : null}
+          <MarqueeRead insight={insight} isLoading={isInsightLoading} />
+          {canSave && (
+            <ErrorBoundary label="The shelf card">
+              {entryState.status === "idle" || entryState.status === "loading" ? (
+                <p className="availability-empty" aria-live="polite">
+                  <i className="availability-spinner" aria-hidden="true" />
+                  Checking your shelf…
+                </p>
+              ) : entryState.status === "error" ? (
+                <div className="availability-empty" role="alert">
+                  <p>Your saved shelf entry could not be checked. No changes have been made.</p>
+                  {entryState.retryable && (
+                    <button type="button" className="save-button" onClick={onRetryEntry}>
+                      Try again
+                    </button>
+                  )}
+                </div>
+              ) : entryState.entry ? (
+                <ShelfForm
+                  entry={entryState.entry}
+                  title={item.title}
+                  isSeries={isSeries}
+                  confirmRemove={() => window.confirm(removalDisclosure(isSeries))}
+                  onRemove={onRemove}
+                  onSave={onSaveEntry}
+                  onStatus={onStatus}
+                  onUpdateDraft={onUpdateDraft}
+                />
+              ) : (
+                <button type="button" className="save-button" onClick={() => onSave(item)}>
+                  <PlusIcon /> Save to my shelf
                 </button>
+              )}
+            </ErrorBoundary>
+          )}
+          <AirLine item={item} nextEpisode={nextEpisode} />
+          <WatchOrder label="Before this" entries={watchOrder.before} onOpen={onOpen} />
+          <ErrorBoundary label="Where to watch">
+            <WatchBlock
+              providers={watchProviders}
+              fallbackHref={item.watchLink}
+              selectedProviderIds={selectedProviderIds}
+              hideIfEmpty={reels.length > 0}
+              isRefreshing={isRefreshing}
+              onLeave={leaveVia}
+            />
+          </ErrorBoundary>
+          <WatchOrder label="After this" entries={watchOrder.after} onOpen={onOpen} />
+          <WatchOrder label="Related" entries={watchOrder.related} onOpen={onOpen} />
+          {continueAt && (
+            <button type="button" className="detail-continue" onClick={resumeWatching}>
+              <span>
+                Continue S{continueAt.season} E{continueAt.episode}
+              </span>
+              <ArrowIcon />
+            </button>
+          )}
+          <ErrorBoundary label="The revival house">
+            <RevivalBlock works={reels} />
+          </ErrorBoundary>
+          <ErrorBoundary label="Local showings">
+            <ShowingsBlock
+              listings={showings.listings}
+              isLoading={showings.isLoading}
+              error={showings.error}
+              placeLabel={showings.origin?.label ?? null}
+              onLeave={leaveVia}
+            />
+          </ErrorBoundary>
+          <ErrorBoundary label="The trailer">
+            <TrailerBlock item={item} />
+          </ErrorBoundary>
+          <ThemeSongs item={item} />
+          {usherSlot}
+          <ScoreRow item={item} />
+          {item.buzz && <BuzzNote buzz={item.buzz} />}
+          <ErrorBoundary label="The credits">
+            <CreditsBlock key={item.id} titleId={item.id} />
+          </ErrorBoundary>
+          {item.keywords?.length ? (
+            <div className="detail-chips">
+              {item.keywords.slice(0, KEYWORDS_SHOWN).map((keyword) => (
+                <Link
+                  key={keyword}
+                  to={`/listings?type=${item.mediaType}&keywords=${encodeURIComponent(keyword)}`}
+                  className="detail-chip"
+                >
+                  {keyword}
+                </Link>
               ))}
             </div>
+          ) : null}
+          <WatchNext pairs={pairs} onOpen={onOpen} />
+          {item.collection && collection.items.length > 1 && (
+            <TitleTrack
+              label={item.collection.name}
+              items={collection.items}
+              currentId={item.id}
+              caption={collectionCaption}
+              onOpen={onOpen}
+              footer={
+                collection.hasMore ? (
+                  <Link className="detail-similar-more" to={collectionPath(item.collection.id)}>
+                    See the whole collection
+                  </Link>
+                ) : undefined
+              }
+            />
           )}
+          <TitleTrack
+            label="More like this"
+            items={similar}
+            caption={similarCaption}
+            onOpen={onOpen}
+          />
+          <SourceLinks item={item} onLeave={leaveVia} />
+        </div>
+        {isSeries && (
           <div
             className="detail-tab-panel"
-            id="detail-panel-overview"
-            role={isSeries ? "tabpanel" : undefined}
-            aria-labelledby={isSeries ? "detail-tab-overview" : undefined}
-            hidden={isSeries && tab !== "overview"}
+            id="detail-panel-episodes"
+            role="tabpanel"
+            aria-labelledby="detail-tab-episodes"
+            hidden={tab !== "episodes"}
           >
-            <p className="detail-synopsis">{item.overview || "No synopsis available."}</p>
-            {item.anime?.background && (
-              <p className="detail-background">
-                {item.anime.background}
-                <small className="detail-credit">Background from MyAnimeList</small>
-              </p>
-            )}
-            <MarqueeRead insight={insight} isLoading={isInsightLoading} />
-            {canSave && (
-              <ErrorBoundary label="The shelf card">
-                {entryState.status === "idle" || entryState.status === "loading" ? (
-                  <p className="availability-empty" aria-live="polite">
-                    <i className="availability-spinner" aria-hidden="true" />
-                    Checking your shelf…
-                  </p>
-                ) : entryState.status === "error" ? (
-                  <div className="availability-empty" role="alert">
-                    <p>Your saved shelf entry could not be checked. No changes have been made.</p>
-                    {entryState.retryable && (
-                      <button type="button" className="save-button" onClick={onRetryEntry}>
-                        Try again
-                      </button>
-                    )}
-                  </div>
-                ) : entryState.entry ? (
-                  <ShelfForm
-                    entry={entryState.entry}
-                    title={item.title}
-                    isSeries={isSeries}
-                    confirmRemove={() => window.confirm(removalDisclosure(isSeries))}
-                    onRemove={onRemove}
-                    onSave={onSaveEntry}
-                    onStatus={onStatus}
-                    onUpdateDraft={onUpdateDraft}
-                  />
-                ) : (
-                  <button type="button" className="save-button" onClick={() => onSave(item)}>
-                    <PlusIcon /> Save to my shelf
-                  </button>
-                )}
-              </ErrorBoundary>
-            )}
-            <AirLine item={item} nextEpisode={nextEpisode} />
-            <WatchOrder label="Before this" entries={watchOrder.before} onOpen={onOpen} />
-            <ErrorBoundary label="Where to watch">
-              <WatchBlock
-                providers={watchProviders}
-                fallbackHref={item.watchLink}
-                selectedProviderIds={selectedProviderIds}
-                hideIfEmpty={reels.length > 0}
-                isRefreshing={isRefreshing}
-                onLeave={leaveVia}
+            <ErrorBoundary label="The episode guide">
+              <SeasonsBlock
+                item={item}
+                canTrack={canSave}
+                shelved={Boolean(entry)}
+                tracker={tracker}
+                jumpTo={jump}
+                onTracked={entry ? undefined : onTracked}
               />
             </ErrorBoundary>
-            <WatchOrder label="After this" entries={watchOrder.after} onOpen={onOpen} />
-            <WatchOrder label="Related" entries={watchOrder.related} onOpen={onOpen} />
-            {continueAt && (
-              <button type="button" className="detail-continue" onClick={resumeWatching}>
-                <span>
-                  Continue S{continueAt.season} E{continueAt.episode}
-                </span>
-                <ArrowIcon />
-              </button>
-            )}
-            <ErrorBoundary label="The revival house">
-              <RevivalBlock works={reels} />
-            </ErrorBoundary>
-            <ErrorBoundary label="Local showings">
-              <ShowingsBlock
-                listings={showings.listings}
-                isLoading={showings.isLoading}
-                error={showings.error}
-                placeLabel={showings.origin?.label ?? null}
-                onLeave={leaveVia}
-              />
-            </ErrorBoundary>
-            <ErrorBoundary label="The trailer">
-              <TrailerBlock item={item} />
-            </ErrorBoundary>
-            <ThemeSongs item={item} />
-            {usherSlot}
-            <ScoreRow item={item} />
-            {item.buzz && <BuzzNote buzz={item.buzz} />}
-            <ErrorBoundary label="The credits">
-              <CreditsBlock key={item.id} titleId={item.id} />
-            </ErrorBoundary>
-            {item.keywords?.length ? (
-              <div className="detail-chips">
-                {item.keywords.slice(0, KEYWORDS_SHOWN).map((keyword) => (
-                  <Link
-                    key={keyword}
-                    to={`/listings?type=${item.mediaType}&keywords=${encodeURIComponent(keyword)}`}
-                    className="detail-chip"
-                  >
-                    {keyword}
-                  </Link>
-                ))}
-              </div>
-            ) : null}
-            <WatchNext pairs={pairs} onOpen={onOpen} />
-            {item.collection && collection.items.length > 1 && (
-              <TitleTrack
-                label={item.collection.name}
-                items={collection.items}
-                currentId={item.id}
-                caption={collectionCaption}
-                onOpen={onOpen}
-                footer={
-                  collection.hasMore ? (
-                    <Link className="detail-similar-more" to={collectionPath(item.collection.id)}>
-                      See the whole collection
-                    </Link>
-                  ) : undefined
-                }
-              />
-            )}
-            <TitleTrack
-              label="More like this"
-              items={similar}
-              caption={similarCaption}
-              onOpen={onOpen}
-            />
-            <SourceLinks item={item} onLeave={leaveVia} />
           </div>
-          {isSeries && (
-            <div
-              className="detail-tab-panel"
-              id="detail-panel-episodes"
-              role="tabpanel"
-              aria-labelledby="detail-tab-episodes"
-              hidden={tab !== "episodes"}
-            >
-              <ErrorBoundary label="The episode guide">
-                <SeasonsBlock
-                  item={item}
-                  canTrack={canSave}
-                  shelved={Boolean(entry)}
-                  tracker={tracker}
-                  jumpTo={jump}
-                  onTracked={entry ? undefined : onTracked}
-                />
-              </ErrorBoundary>
-            </div>
-          )}
-        </div>
-        {exit && <ExitDoor exit={exit} onLeave={() => report(exit)} onClose={dismiss} />}
-      </dialog>
-    </div>
+        )}
+      </div>
+      {exit && <ExitDoor exit={exit} onLeave={() => report(exit)} onClose={dismiss} />}
+    </>
   );
 }
