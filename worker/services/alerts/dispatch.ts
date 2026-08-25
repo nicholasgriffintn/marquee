@@ -16,6 +16,7 @@ import type { AlertCandidate } from "./types.ts";
 const WEEKLY_CAP = 8;
 const PER_EMAIL_CAP = 6;
 const PER_KIND_CAP = 2;
+const VIEWER_CONCURRENCY = 15;
 
 export async function previewAlerts(env: Bindings, origin: string) {
   return runAlerts(env, origin, { send: false });
@@ -66,97 +67,25 @@ async function runAlerts(env: Bindings, origin: string, options: { send: boolean
   let emails = 0;
   let feeds = 0;
 
-  for (const [viewerId, entries] of byViewer) {
-    const contact = contacts.get(viewerId);
-
-    if (!contact && !subscribers.has(viewerId)) {
-      continue;
-    }
-
-    const [muted, recent] = await Promise.all([
-      mutedKinds(env.DB, viewerId),
-      sentThisWeek(env.DB, viewerId),
-    ]);
-    const budget = Math.max(0, WEEKLY_CAP - recent);
-
-    if (budget === 0) {
-      continue;
-    }
-
-    const kinds = [...new Set(entries.map((entry) => entry.candidate.kind))];
+  for (const chunk of chunked([...byViewer.entries()], VIEWER_CONCURRENCY)) {
     // oxlint-disable-next-line no-await-in-loop
-    const history = await Promise.all(
-      kinds.map(async (kind) => [kind, await alreadySent(env.DB, viewerId, kind)] as const),
-    );
-    const seen = new Map(history);
-    const ordered = entries.filter(
-      (entry) =>
-        !muted.has(entry.candidate.kind) &&
-        !seen.get(entry.candidate.kind)?.has(entry.candidate.key),
-    );
-    const perKind = new Map<string, number>();
-    const fresh = ordered
-      .slice()
-      .sort((left, right) => left.priority - right.priority)
-      .filter((entry) => {
-        const used = perKind.get(entry.candidate.kind) ?? 0;
-
-        if (used >= PER_KIND_CAP) {
-          return false;
-        }
-
-        perKind.set(entry.candidate.kind, used + 1);
-
-        return true;
-      })
-      .slice(0, Math.min(budget, PER_EMAIL_CAP))
-      .map((entry) => entry.candidate);
-
-    if (fresh.length === 0) {
-      continue;
-    }
-
-    if (!options.send) {
-      emails += contact ? 1 : 0;
-      feeds += contact ? 0 : 1;
-
-      continue;
-    }
-
-    try {
-      if (contact) {
-        // oxlint-disable-next-line no-await-in-loop
-        await sendAlertEmail(
+    const results = await Promise.all(
+      chunk.map(([viewerId, entries]) =>
+        dispatchToViewer(
           env,
-          contact.email,
-          fresh.map((candidate) => ({
-            headline: candidate.headline,
-            detail: candidate.detail,
-            url: `${origin}${candidate.path}`,
-          })),
-        );
-      }
-
-      // oxlint-disable-next-line no-await-in-loop
-      await recordSent(
-        env.DB,
-        fresh.map((candidate) => ({
+          origin,
+          options,
           viewerId,
-          kind: candidate.kind,
-          key: candidate.key,
-          titleId: candidate.titleId,
-          detail: candidate.detail,
-          channel: contact ? ("email" as const) : ("feed" as const),
-        })),
-      );
+          entries,
+          contacts.get(viewerId),
+          subscribers.has(viewerId),
+        ),
+      ),
+    );
 
-      if (contact) {
-        emails += 1;
-      } else {
-        feeds += 1;
-      }
-    } catch (error) {
-      logError("alert_dispatch_failed", error, { viewerId });
+    for (const result of results) {
+      emails += result.emails;
+      feeds += result.feeds;
     }
   }
 
@@ -167,4 +96,110 @@ async function runAlerts(env: Bindings, origin: string, options: { send: boolean
   logEvent("alerts_dispatched", { candidates: flat.length, emails, feeds });
 
   return { candidates: flat.length, emails, feeds };
+}
+
+type ViewerEntry = { candidate: AlertCandidate; priority: number };
+type ViewerContact = { email: string; name: string };
+
+async function dispatchToViewer(
+  env: Bindings,
+  origin: string,
+  options: { send: boolean },
+  viewerId: string,
+  entries: ViewerEntry[],
+  contact: ViewerContact | undefined,
+  isSubscriber: boolean,
+): Promise<{ emails: number; feeds: number }> {
+  const none = { emails: 0, feeds: 0 };
+
+  if (!contact && !isSubscriber) {
+    return none;
+  }
+
+  const [muted, recent] = await Promise.all([
+    mutedKinds(env.DB, viewerId),
+    sentThisWeek(env.DB, viewerId),
+  ]);
+  const budget = Math.max(0, WEEKLY_CAP - recent);
+
+  if (budget === 0) {
+    return none;
+  }
+
+  const kinds = [...new Set(entries.map((entry) => entry.candidate.kind))];
+  const history = await Promise.all(
+    kinds.map(async (kind) => [kind, await alreadySent(env.DB, viewerId, kind)] as const),
+  );
+  const seen = new Map(history);
+  const ordered = entries.filter(
+    (entry) =>
+      !muted.has(entry.candidate.kind) && !seen.get(entry.candidate.kind)?.has(entry.candidate.key),
+  );
+  const perKind = new Map<string, number>();
+  const fresh = ordered
+    .slice()
+    .sort((left, right) => left.priority - right.priority)
+    .filter((entry) => {
+      const used = perKind.get(entry.candidate.kind) ?? 0;
+
+      if (used >= PER_KIND_CAP) {
+        return false;
+      }
+
+      perKind.set(entry.candidate.kind, used + 1);
+
+      return true;
+    })
+    .slice(0, Math.min(budget, PER_EMAIL_CAP))
+    .map((entry) => entry.candidate);
+
+  if (fresh.length === 0) {
+    return none;
+  }
+
+  if (!options.send) {
+    return contact ? { emails: 1, feeds: 0 } : { emails: 0, feeds: 1 };
+  }
+
+  try {
+    if (contact) {
+      await sendAlertEmail(
+        env,
+        contact.email,
+        fresh.map((candidate) => ({
+          headline: candidate.headline,
+          detail: candidate.detail,
+          url: `${origin}${candidate.path}`,
+        })),
+      );
+    }
+
+    await recordSent(
+      env.DB,
+      fresh.map((candidate) => ({
+        viewerId,
+        kind: candidate.kind,
+        key: candidate.key,
+        titleId: candidate.titleId,
+        detail: candidate.detail,
+        channel: contact ? ("email" as const) : ("feed" as const),
+      })),
+    );
+
+    return contact ? { emails: 1, feeds: 0 } : { emails: 0, feeds: 1 };
+  } catch (error) {
+    logError("alert_dispatch_failed", error, { viewerId });
+
+    return none;
+  }
+}
+
+function chunked<T>(items: T[], size: number) {
+  const groups: T[][] = [];
+
+  for (let index = 0; index < items.length; index += size) {
+    groups.push(items.slice(index, index + size));
+  }
+
+  return groups;
 }
