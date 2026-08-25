@@ -4,6 +4,7 @@
   --ink: #11130f;
   --ink-soft: #191c18;
   --muted: #8f9389;
+  --muted-on-paper: #5c5f57;
   --line: #3b3f39;
   --paper-line: #c9c5b9;
   --acid: #c9f35d;
@@ -2509,7 +2510,7 @@ h2 em {
   margin: 0;
 }
 .detail-meta {
-  color: #6f726a;
+  color: var(--muted-on-paper);
   font: 10px var(--mono);
   margin: 14px 0 28px;
   text-transform: uppercase;
@@ -3546,7 +3547,7 @@ h2 em {
 }
 
 .detail-original {
-  color: var(--muted);
+  color: var(--muted-on-paper);
   font: 10px var(--mono);
   letter-spacing: 0.1em;
   margin: 6px 0 0;
@@ -3713,6 +3714,31 @@ h2 em {
   position: absolute;
   white-space: nowrap;
   width: 1px;
+}
+
+.skip-link {
+  background: var(--acid);
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  color: var(--ink);
+  font: 700 13px var(--sans);
+  height: 1px;
+  left: 12px;
+  overflow: hidden;
+  padding: 12px 18px;
+  position: absolute;
+  top: 12px;
+  white-space: nowrap;
+  width: 1px;
+  z-index: 100;
+}
+.skip-link:focus {
+  clip: auto;
+  clip-path: none;
+  height: auto;
+  outline: 3px solid var(--ink);
+  outline-offset: 3px;
+  width: auto;
 }
 
 .hero-shell {

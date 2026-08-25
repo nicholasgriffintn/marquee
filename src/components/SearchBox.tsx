@@ -100,6 +100,12 @@ export function SearchBox({
           aria-label="Search films and television"
           aria-expanded={showPanel}
           aria-controls="search-suggestions"
+          aria-autocomplete="list"
+          aria-activedescendant={
+            active >= 0 && suggestions[active]
+              ? `search-option-${suggestions[active].id}`
+              : undefined
+          }
           role="combobox"
           autoComplete="off"
         />
@@ -111,6 +117,7 @@ export function SearchBox({
             <button
               type="button"
               key={item.id}
+              id={`search-option-${item.id}`}
               ref={(node) => {
                 optionRefs.current[index] = node;
               }}
