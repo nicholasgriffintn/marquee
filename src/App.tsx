@@ -622,6 +622,7 @@ export function App() {
             title={openDetails.title}
             isMissing={openDetails.isMissing}
             isLoading={openDetails.isLoading}
+            titleError={openDetails.error}
             canSave={isSignedIn}
             entryState={profile.entryStates[openTitleId]}
             selectedProviderIds={selectedProviderIds}
@@ -635,6 +636,7 @@ export function App() {
             onUpdateDraft={profile.updateDraft}
             onTracked={profile.refresh}
             onLoadEntry={profile.loadEntry}
+            onRetryTitle={openDetails.reload}
           />
         </ErrorBoundary>
       )}
