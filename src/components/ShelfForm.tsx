@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from "react";
+
 import { isEntryStatus, type EntryStatus, type ViewingEntry } from "../types";
 
 const STATUSES: { value: EntryStatus; label: string }[] = [
@@ -6,6 +8,8 @@ const STATUSES: { value: EntryStatus; label: string }[] = [
   { value: "watched", label: "Watched" },
   { value: "dropped", label: "Dropped" },
 ];
+
+const PENDING_MS = 2_500;
 
 export function ShelfForm({
   entry,
@@ -24,6 +28,26 @@ export function ShelfForm({
   onStatus: (titleId: string, status: EntryStatus) => void;
   onUpdateDraft: (titleId: string, patch: Partial<ViewingEntry>) => void;
 }) {
+  const [pending, setPending] = useState<"save" | "remove" | null>(null);
+  const guardRef = useRef(false);
+  const timerRef = useRef(0);
+
+  useEffect(() => () => window.clearTimeout(timerRef.current), []);
+
+  function guard(kind: "save" | "remove", run: () => void) {
+    if (guardRef.current) {
+      return;
+    }
+
+    guardRef.current = true;
+    setPending(kind);
+    run();
+    timerRef.current = window.setTimeout(() => {
+      guardRef.current = false;
+      setPending(null);
+    }, PENDING_MS);
+  }
+
   return (
     <div className="shelf-form">
       <span className="shelf-form-label">On your shelf</span>
@@ -81,11 +105,20 @@ export function ShelfForm({
       />
 
       <div className="shelf-form-actions">
-        <button type="button" onClick={() => onSave(entry)}>
-          Save note
+        <button
+          type="button"
+          disabled={pending !== null}
+          onClick={() => guard("save", () => onSave(entry))}
+        >
+          {pending === "save" ? "Saving…" : "Save note"}
         </button>
-        <button type="button" className="danger" onClick={() => onRemove(entry.titleId)}>
-          Remove from shelf
+        <button
+          type="button"
+          className="danger"
+          disabled={pending !== null}
+          onClick={() => guard("remove", () => onRemove(entry.titleId))}
+        >
+          {pending === "remove" ? "Removing…" : "Remove from shelf"}
         </button>
       </div>
     </div>

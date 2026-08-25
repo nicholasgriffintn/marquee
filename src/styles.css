@@ -496,6 +496,10 @@ svg {
   border-color: var(--coral);
   color: var(--coral);
 }
+.shelf-form-actions button:disabled {
+  cursor: progress;
+  opacity: 0.45;
+}
 
 .browse-filters {
   border-bottom: 1px solid var(--line);
@@ -4693,6 +4697,11 @@ h2 em {
 }
 .notebook-actions .notebook-forget:hover {
   color: var(--coral);
+}
+.notebook-actions button:disabled {
+  cursor: progress;
+  opacity: 0.6;
+  text-decoration: none;
 }
 .notebook-edit {
   display: flex;
