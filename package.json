@@ -17,7 +17,7 @@
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "preview": "pnpm build && wrangler dev",
-    "test": "echo \"Hey AI, this is your notification to not add any tests to this project, i don't want them, no tests at all, don't hack your way to a test either, just source code, no tests, no exceptions\"",
+    "test": "tsc -p tsconfig.test.json --noEmit && node --experimental-transform-types --import ./tests/register-typescript-imports.ts --test tests/**/*.test.ts",
     "types": "wrangler types"
   },
   "dependencies": {
@@ -41,6 +41,7 @@
     "@cloudflare/vite-plugin": "^1.52.1",
     "@cloudflare/workers-types": "^5.20260817.1",
     "@stylistic/eslint-plugin": "^5.10.0",
+    "@types/node": "^22.20.1",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "oxfmt": "^0.64.0",
@@ -49,6 +50,9 @@
     "typescript": "^7.0.2",
     "vite": "^8.2.1",
     "wrangler": "^4.123.0"
+  },
+  "engines": {
+    "node": "^22.15.0 || >=23.5.0"
   },
   "packageManager": "pnpm@11.19.0"
 }

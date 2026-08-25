@@ -7,7 +7,7 @@ import { isEuropeanaCountry } from "../clients/europeana.ts";
 import { isPartitionId } from "../repositories/discover.ts";
 import { isRevivalId, isRevivalSource } from "../repositories/revival.ts";
 import type { IngestionJob, ViewingContext } from "../types.ts";
-import { isRecord } from "./values.ts";
+import { boundedString, calendarDate, isRecord } from "./values.ts";
 
 export { isEntryStatus };
 
@@ -29,6 +29,20 @@ export function validProviderIds(value: unknown) {
 
 export function isKnownTitle(value: unknown): value is string {
   return typeof value === "string" && /^(movie|tv):[1-9]\d{0,9}$/u.test(value);
+}
+
+export function isHttpOrigin(value: unknown): value is string {
+  if (typeof value !== "string") {
+    return false;
+  }
+
+  try {
+    const url = new URL(value);
+
+    return (url.protocol === "http:" || url.protocol === "https:") && url.origin === value;
+  } catch {
+    return false;
+  }
 }
 
 export function isIngestionJob(value: unknown): value is IngestionJob {
@@ -58,9 +72,7 @@ export function isIngestionJob(value: unknown): value is IngestionJob {
   if (
     value.type === "sync-schedule" ||
     value.type === "sync-buzz" ||
-    value.type === "match-revival-works" ||
     value.type === "check-revival-rights" ||
-    value.type === "recheck-revival-works" ||
     value.type === "build-sections"
   ) {
     return true;
@@ -105,8 +117,7 @@ export function isIngestionJob(value: unknown): value is IngestionJob {
       typeof value.viewerId === "string" &&
       value.viewerId.length > 0 &&
       value.viewerId.length <= 128 &&
-      typeof value.origin === "string" &&
-      value.origin.startsWith("http")
+      isHttpOrigin(value.origin)
     );
   }
 
@@ -124,11 +135,27 @@ export function isIngestionJob(value: unknown): value is IngestionJob {
   }
 
   if (value.type === "import-diary-row") {
+    const yearOk =
+      value.year === null ||
+      (typeof value.year === "number" &&
+        Number.isInteger(value.year) &&
+        value.year >= 1871 &&
+        value.year <= 2099);
+    const ratingOk =
+      value.rating === null ||
+      (typeof value.rating === "number" &&
+        Number.isInteger(value.rating) &&
+        value.rating >= 1 &&
+        value.rating <= 5);
+
     return (
       typeof value.viewerId === "string" &&
-      typeof value.name === "string" &&
-      value.name.length > 0 &&
-      value.name.length <= 160
+      value.viewerId.length > 0 &&
+      value.viewerId.length <= 128 &&
+      boundedString(value.name, 160) !== null &&
+      yearOk &&
+      ratingOk &&
+      (value.watchedAt === "" || calendarDate(value.watchedAt) !== null)
     );
   }
 
