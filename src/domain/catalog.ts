@@ -247,6 +247,10 @@ export function titlePath(item: Pick<MediaTitle, "mediaType" | "tmdbId" | "title
   return `/${item.mediaType}/${item.tmdbId}/${titleSlug(item.title)}`;
 }
 
+export function collectionPath(collectionId: number) {
+  return `/collection/${collectionId}`;
+}
+
 const PERSONAL_SPACING = 3;
 
 export function weaveSections(

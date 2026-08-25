@@ -286,7 +286,6 @@ async function syncShelfProgress(db: D1Database, viewerId: string, titleId: stri
     readStoredSeasons(db, titleId),
   ]);
   const counted = watched.filter((entry) => entry.season > 0);
-  const furthest = counted[0] ?? null;
   const aired = stored
     .filter((season) => season.seasonNumber > 0)
     .reduce((total, season) => total + airedCount(season), 0);
@@ -295,25 +294,16 @@ async function syncShelfProgress(db: D1Database, viewerId: string, titleId: stri
 
   await db
     .prepare(
-      `INSERT INTO viewing_entries (id, viewer_id, title_id, status, season, episode)
-       VALUES (?, ?, ?, ?, ?, ?)
+      `INSERT INTO viewing_entries (id, viewer_id, title_id, status)
+       VALUES (?, ?, ?, ?)
        ON CONFLICT(viewer_id, title_id) DO UPDATE SET
-         season = excluded.season,
-         episode = excluded.episode,
          status = CASE
            WHEN viewing_entries.status IN ('watchlist', 'watching') THEN excluded.status
            ELSE viewing_entries.status
          END,
          updated_at = CURRENT_TIMESTAMP`,
     )
-    .bind(
-      crypto.randomUUID(),
-      viewerId,
-      titleId,
-      status,
-      furthest?.season ?? null,
-      furthest?.episode ?? null,
-    )
+    .bind(crypto.randomUUID(), viewerId, titleId, status)
     .run();
 }
 

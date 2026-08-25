@@ -1,4 +1,7 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+
+import { jsonRequest, requestJson } from "../lib/api";
+import { useResource } from "./useResource";
 
 const STORAGE_KEY = "marquee.selectedProviderIds";
 
@@ -14,18 +17,60 @@ function readStored(): string[] {
   }
 }
 
-export function useProviderPreferences() {
-  const [selectedProviderIds, setSelectedProviderIds] = useState<string[]>(readStored);
+function writeStored(ids: string[]) {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(ids));
+  } catch {
+    return;
+  }
+}
 
-  const selectProviders = useCallback((nextIds: string[]) => {
-    setSelectedProviderIds(nextIds);
+type ProviderPreferences = { selectedProviderIds: string[]; isSaved: boolean };
 
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextIds));
-    } catch {
+export function useProviderPreferences(isSignedIn: boolean) {
+  const [guestIds, setGuestIds] = useState<string[]>(readStored);
+  const [override, setOverride] = useState<string[] | null>(null);
+  const { data, isLoading, reload } = useResource<ProviderPreferences>("/api/profile/providers", {
+    enabled: isSignedIn,
+  });
+  const shouldMigrate = isSignedIn && data !== null && !data.isSaved && guestIds.length > 0;
+
+  useEffect(() => {
+    if (!shouldMigrate) {
       return;
     }
-  }, []);
 
-  return { selectedProviderIds, selectProviders };
+    void requestJson(
+      "/api/profile/providers",
+      jsonRequest("POST", { selectedProviderIds: guestIds }),
+    )
+      .then(reload)
+      .catch(() => undefined);
+  }, [shouldMigrate, guestIds, reload]);
+
+  const selectProviders = useCallback(
+    (nextIds: string[]) => {
+      if (!isSignedIn) {
+        setGuestIds(nextIds);
+        writeStored(nextIds);
+
+        return;
+      }
+
+      setOverride(nextIds);
+      requestJson(
+        "/api/profile/providers",
+        jsonRequest("POST", { selectedProviderIds: nextIds }),
+      ).catch(() => setOverride(null));
+    },
+    [isSignedIn],
+  );
+
+  const signedInIds = shouldMigrate ? guestIds : (override ?? data?.selectedProviderIds ?? []);
+
+  return {
+    selectedProviderIds: isSignedIn ? signedInIds : guestIds,
+    isResolved: !isSignedIn || !isLoading,
+    selectProviders,
+  };
 }

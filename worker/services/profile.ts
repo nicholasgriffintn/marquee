@@ -1,10 +1,12 @@
 import type { ShelfResponse } from "../../src/domain/shelf.ts";
-import { isEntryStatus, isKnownTitle } from "../lib/validation.ts";
+import { isEntryStatus, isKnownTitle, validProviderIds } from "../lib/validation.ts";
 import { deleteEpisodeEntries } from "../repositories/episode-entries.ts";
 import {
   deleteViewingEntry,
   readProfileSummary,
+  readProviderPreferences,
   readViewingEntry,
+  saveProviderPreferences,
   saveViewingEntry,
 } from "../repositories/profile.ts";
 import {
@@ -58,12 +60,6 @@ export async function getShelf(
   };
 }
 
-function countOrNull(value: unknown, limit: number) {
-  const parsed = Number(value);
-
-  return Number.isInteger(parsed) && parsed >= 1 && parsed <= limit ? parsed : null;
-}
-
 export async function updateProfile(
   db: D1Database,
   viewerId: string,
@@ -90,11 +86,27 @@ export async function updateProfile(
     status: input.status,
     rating,
     thoughts,
-    season: countOrNull(input.season, 100),
-    episode: countOrNull(input.episode, 500),
   });
 
   return { ok: true, payload: { entry } };
+}
+
+export async function getProviderPreferences(db: D1Database, viewerId: string) {
+  const selectedProviderIds = await readProviderPreferences(db, viewerId);
+
+  return { selectedProviderIds: selectedProviderIds ?? [], isSaved: selectedProviderIds !== null };
+}
+
+export async function updateProviderPreferences(
+  db: D1Database,
+  viewerId: string,
+  input: Record<string, unknown>,
+) {
+  const selectedProviderIds = validProviderIds(input.selectedProviderIds);
+
+  await saveProviderPreferences(db, viewerId, selectedProviderIds);
+
+  return { selectedProviderIds, isSaved: true };
 }
 
 export async function removeFromProfile(db: D1Database, viewerId: string, titleId: string) {
