@@ -8,6 +8,7 @@ export type LinkRow = {
   expiresAt: string | null;
   accountLabel: string | null;
   syncedAt: string | null;
+  brokenAt: string | null;
 };
 
 const STATE_TTL_SECONDS = 600;
@@ -57,7 +58,8 @@ export async function readLink(env: Bindings, viewerId: string, provider: LinkPr
             refresh_token AS refreshToken,
             expires_at AS expiresAt,
             account_label AS accountLabel,
-            synced_at AS syncedAt
+            synced_at AS syncedAt,
+            broken_at AS brokenAt
      FROM linked_accounts
      WHERE viewer_id = ? AND provider = ?`,
   )
@@ -69,7 +71,11 @@ export async function saveLink(
   env: Bindings,
   viewerId: string,
   provider: LinkProvider,
-  link: { accessToken: string; refreshToken: string | null; expiresAt: string | null },
+  link: {
+    accessToken: string;
+    refreshToken: string | null;
+    expiresAt: string | null;
+  },
   accountLabel: string | null,
 ) {
   await env.DB.prepare(
@@ -80,7 +86,8 @@ export async function saveLink(
        access_token = excluded.access_token,
        refresh_token = excluded.refresh_token,
        expires_at = excluded.expires_at,
-       account_label = COALESCE(excluded.account_label, linked_accounts.account_label)`,
+       account_label = COALESCE(excluded.account_label, linked_accounts.account_label),
+       broken_at = NULL`,
   )
     .bind(viewerId, provider, link.accessToken, link.refreshToken, link.expiresAt, accountLabel)
     .run();
@@ -89,6 +96,15 @@ export async function saveLink(
 export async function markLinkSynced(env: Bindings, viewerId: string, provider: LinkProvider) {
   await env.DB.prepare(
     `UPDATE linked_accounts SET synced_at = CURRENT_TIMESTAMP
+     WHERE viewer_id = ? AND provider = ?`,
+  )
+    .bind(viewerId, provider)
+    .run();
+}
+
+export async function markLinkBroken(env: Bindings, viewerId: string, provider: LinkProvider) {
+  await env.DB.prepare(
+    `UPDATE linked_accounts SET broken_at = COALESCE(broken_at, CURRENT_TIMESTAMP)
      WHERE viewer_id = ? AND provider = ?`,
   )
     .bind(viewerId, provider)

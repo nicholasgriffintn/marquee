@@ -8,6 +8,7 @@ export type AccountLink = {
   available: boolean;
   account: string | null;
   syncedAt: string | null;
+  needsReconnect: boolean;
 };
 
 export type ApiToken = {

@@ -18,6 +18,7 @@ import { isKnownTitle } from "../lib/validation.ts";
 import { databaseDate } from "../lib/values.ts";
 import { storeItems } from "../repositories/catalog-writer.ts";
 import {
+  markLinkBroken,
   markLinkPushed,
   markLinkSynced,
   readLink,
@@ -57,6 +58,10 @@ async function traktAccessToken(env: Bindings, viewerId: string, origin: string)
     return refreshed.accessToken;
   } catch (error) {
     logError("trakt_refresh_failed", error, { viewerId });
+
+    if (error instanceof TraktError && [400, 401, 403].includes(error.status)) {
+      await markLinkBroken(env, viewerId, "trakt");
+    }
 
     return link.accessToken;
   }
@@ -271,7 +276,10 @@ export async function exportTraktShelf(env: Bindings, viewerId: string, origin: 
     }
 
     if (row.status === "watched") {
-      history.push({ ...item, watchedAt: databaseDate(row.updatedAt).toISOString() });
+      history.push({
+        ...item,
+        watchedAt: databaseDate(row.updatedAt).toISOString(),
+      });
     } else if (row.status === "watchlist" || row.status === "watching") {
       watchlist.push(item);
     }
@@ -303,7 +311,11 @@ export async function traktPushPreview(env: Bindings, viewerId: string) {
      WHERE viewer_id = ?1 AND (?2 IS NULL OR updated_at > ?2)`,
   )
     .bind(viewerId, pushedAt)
-    .first<{ watched: number | null; listed: number | null; rated: number | null }>();
+    .first<{
+      watched: number | null;
+      listed: number | null;
+      rated: number | null;
+    }>();
 
   return {
     pushedAt,
