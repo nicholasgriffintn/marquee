@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { CatalogSection } from "../domain/catalog";
 import { requestJson } from "../lib/api";
@@ -9,6 +9,7 @@ type RailsResponse = {
 };
 
 const RETRY_DELAYS = [5_000, 10_000, 20_000, 30_000];
+const SHELF_CHANGE_DEBOUNCE_MS = 4_000;
 
 export function useAiRails(isSignedIn: boolean, savedKey: string) {
   const [sections, setSections] = useState<CatalogSection[]>([]);
@@ -17,6 +18,7 @@ export function useAiRails(isSignedIn: boolean, savedKey: string) {
     done: false,
     sections: [],
   });
+  const hasLoadedOnce = useRef(false);
 
   useEffect(() => {
     if (!isSignedIn) {
@@ -26,6 +28,9 @@ export function useAiRails(isSignedIn: boolean, savedKey: string) {
     const controller = new AbortController();
     let active = true;
     let timer = 0;
+    const kickoffDelay = hasLoadedOnce.current ? SHELF_CHANGE_DEBOUNCE_MS : 0;
+
+    hasLoadedOnce.current = true;
 
     async function load(attempt: number) {
       try {
@@ -64,10 +69,11 @@ export function useAiRails(isSignedIn: boolean, savedKey: string) {
       }
     }
 
-    void load(0);
+    const kickoff = window.setTimeout(() => void load(0), kickoffDelay);
 
     return () => {
       active = false;
+      window.clearTimeout(kickoff);
       window.clearTimeout(timer);
       controller.abort();
     };

@@ -155,6 +155,7 @@ export function AlertSettings({ isSignedIn }: { isSignedIn: boolean }) {
               <input
                 type="checkbox"
                 checked={row.enabled}
+                aria-label={KIND_COPY[row.kind]?.label ?? row.kind}
                 onChange={(event) => void toggle(row.kind, event.target.checked)}
               />
               <span>

@@ -258,6 +258,18 @@ export function TasteMap({ isSignedIn }: { isSignedIn: boolean }) {
   return (
     <div className="taste-map">
       <div className="taste-map-frame">
+        <div className="taste-map-readout">
+          {active ? (
+            <TasteMapCard
+              point={active}
+              axes={axes}
+              artReady={artId === active.titleId}
+              onPick={pickNeighbour}
+            />
+          ) : (
+            <MapSummary map={map} landed={landed} />
+          )}
+        </div>
         <svg
           viewBox={`0 0 ${SIZE} ${SIZE}`}
           role="group"
@@ -333,19 +345,6 @@ export function TasteMap({ isSignedIn }: { isSignedIn: boolean }) {
             );
           })}
         </svg>
-
-        <div className="taste-map-readout">
-          {active ? (
-            <TasteMapCard
-              point={active}
-              axes={axes}
-              artReady={artId === active.titleId}
-              onPick={pickNeighbour}
-            />
-          ) : (
-            <MapSummary map={map} landed={landed} />
-          )}
-        </div>
       </div>
 
       <ul className="taste-map-key">
