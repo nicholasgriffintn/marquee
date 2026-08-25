@@ -98,6 +98,13 @@ export function DigestPage({
               <h2>{digest.lead.item.title}</h2>
               <p className="programme-lead-meta">{mediaMeta(digest.lead.item)}</p>
               <blockquote>{digest.lead.line}</blockquote>
+              {digest.lead.facts.length > 0 && (
+                <ul className="usher-facts">
+                  {digest.lead.facts.map((fact) => (
+                    <li key={fact}>{fact}</li>
+                  ))}
+                </ul>
+              )}
               <button
                 type="button"
                 className="programme-lead-open"
