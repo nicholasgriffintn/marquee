@@ -42,7 +42,7 @@ function clauses(refs: FilmRef[]) {
 async function queryAuthors(refs: FilmRef[]) {
   const query = `SELECT ?film ?imdb ?person ?death WHERE {
   ${clauses(refs)}
-  VALUES ?prop { wdt:P57 wdt:P58 wdt:P86 wdt:P1040 }
+  VALUES ?prop { wdt:P57 wdt:P58 wdt:P86 }
   ?film ?prop ?person .
   OPTIONAL { ?person wdt:P570 ?death . }
 }`;

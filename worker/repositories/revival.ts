@@ -146,6 +146,12 @@ function toWork(row: WorkRow): RevivalWork {
     ukExpiresYear: row.ukExpiresYear,
     mirrored: row.mirrorState === "mirrored",
     delivery: row.ukClear === 1 ? "mirror" : "source",
+    // Playing directly from the source host (archive.org/Europeana/LoC) is not Marquee
+    // "communicating the work to the public" under UK law — the browser fetches straight
+    // from the third party's own server, and that party has already made its own call to
+    // host it publicly. Marquee only takes on that responsibility itself once it copies the
+    // work into its own R2 bucket, which is why the mirror is gated on uk_clear and this
+    // fallback URL is not.
     reelUrl: row.ukClear === 1 ? reelPath(row.id) : row.streamUrl,
     plays: row.plays,
     popularity: row.popularity,
@@ -662,7 +668,9 @@ export async function searchApproved(db: D1Database, query: string, limit = 60, 
 
 export async function readWork(db: D1Database, id: string) {
   const row = await db
-    .prepare(`SELECT ${WORK_COLUMNS} ${WORK_FROM} WHERE w.id = ? AND w.status = 'approved'`)
+    .prepare(
+      `SELECT ${WORK_COLUMNS} ${WORK_FROM} WHERE w.id = ? AND w.status = 'approved'`,
+    )
     .bind(id)
     .first<WorkRow>();
 
@@ -714,7 +722,9 @@ export async function readReelTarget(db: D1Database, id: string) {
 
 export async function readStillSource(db: D1Database, id: string) {
   const row = await db
-    .prepare(`SELECT still_url AS stillUrl FROM revival_works WHERE id = ? AND status = 'approved'`)
+    .prepare(
+      `SELECT still_url AS stillUrl FROM revival_works WHERE id = ? AND status = 'approved'`,
+    )
     .bind(id)
     .first<{ stillUrl: string | null }>();
 
