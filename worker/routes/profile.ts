@@ -216,6 +216,10 @@ profileRoutes.delete("/:titleId", async (context) => {
   const user = context.get("authenticatedUser");
   const titleId = context.req.param("titleId");
 
+  if (!isKnownTitle(titleId)) {
+    return jsonResponse({ error: "Unknown title" }, 400);
+  }
+
   try {
     const deleted = await removeFromProfile(context.env.DB, user.id, titleId);
 
