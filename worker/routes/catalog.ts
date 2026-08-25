@@ -341,10 +341,6 @@ catalogRoutes.get("/titles/:titleId/credits", edgeCache(3_600), async (context) 
         Math.max(0, page - 1) * CREDIT_PAGE,
       ),
       readCreditSeasons(context.env.DB, titleId),
-      // The "who made it" season switch shouldn't wait on a viewer having opened the
-      // Episodes tab first — that's what actually backfills per-season credit rows.
-      // The season index is a much cheaper, cached call, so merge it in to list every
-      // season up front; unbackfilled seasons just show zero credits until visited.
       titleId.startsWith("tv:") ? getSeasonIndex(context.env, titleId) : null,
     ]);
     const known = new Set(creditSeasons.map((entry) => entry.season));

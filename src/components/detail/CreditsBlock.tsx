@@ -48,9 +48,6 @@ export function CreditsBlock({ titleId }: { titleId: string }) {
   const [page, setPage] = useState(1);
   const { credits } = useTitleCredits(titleId, season, page);
   const { cast, crew, hasMore, total } = credits;
-  // useResource returns no data while a season switch is in flight, which would
-  // otherwise blank out credits.seasons and make the switcher itself disappear
-  // and reappear on every click — keep the last non-empty list on screen instead.
   const [seasons, setSeasons] = useState<CreditSeason[]>([]);
 
   if (credits.seasons.length > 0 && credits.seasons !== seasons) {
