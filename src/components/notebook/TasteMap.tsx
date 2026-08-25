@@ -7,7 +7,6 @@ import { TasteMapCard } from "./TasteMapCard";
 const SIZE = 560;
 const PAD = 34;
 const ART_SETTLE = 130;
-const MAX_PLOTTED_POINTS = 60;
 
 function radius(weight: number) {
   return 5 + Math.min(7, Math.abs(weight) * 5);
@@ -170,17 +169,7 @@ export function TasteMap({ isSignedIn }: { isSignedIn: boolean }) {
     [points],
   );
 
-  const plotted = useMemo(() => {
-    const all = points ?? [];
-
-    if (all.length <= MAX_PLOTTED_POINTS) {
-      return all;
-    }
-
-    return [...all]
-      .sort((left, right) => Math.abs(right.weight) - Math.abs(left.weight))
-      .slice(0, MAX_PLOTTED_POINTS);
-  }, [points]);
+  const plotted = points ?? [];
 
   const placed = useMemo(() => {
     const plot = SIZE - PAD * 2;
