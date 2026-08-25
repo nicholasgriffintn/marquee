@@ -22,7 +22,7 @@ type SaveResponse = { entry: EpisodeEntry | null; progress: ShowProgress };
 const NO_SEASONS: SeasonSummary[] = [];
 const NO_ENTRIES: EpisodeEntry[] = [];
 
-function firstOpenSeason(seasons: SeasonSummary[], progress: ShowProgress | null) {
+function defaultSeason(seasons: SeasonSummary[], progress: ShowProgress | null) {
   if (progress?.upNext) {
     return progress.upNext.season;
   }
@@ -31,9 +31,14 @@ function firstOpenSeason(seasons: SeasonSummary[], progress: ShowProgress | null
     return progress.furthest.season;
   }
 
-  const running = seasons.find((season) => season.seasonNumber > 0);
+  const running = seasons.filter((season) => season.seasonNumber > 0);
+  const latest = running.reduce<SeasonSummary | null>(
+    (latestSoFar, season) =>
+      !latestSoFar || season.seasonNumber > latestSoFar.seasonNumber ? season : latestSoFar,
+    null,
+  );
 
-  return running?.seasonNumber ?? seasons[0]?.seasonNumber ?? null;
+  return latest?.seasonNumber ?? seasons[0]?.seasonNumber ?? null;
 }
 
 export function useSeasons(item: MediaTitle, enabled: boolean, progress: ShowProgress | null) {
@@ -46,7 +51,7 @@ export function useSeasons(item: MediaTitle, enabled: boolean, progress: ShowPro
   const active = enabled && item.mediaType === "tv";
   const { tmdbId, id } = item;
   const seasons = index?.titleId === id ? index.seasons : NO_SEASONS;
-  const selected = chosen?.titleId === id ? chosen.season : firstOpenSeason(seasons, progress);
+  const selected = chosen?.titleId === id ? chosen.season : defaultSeason(seasons, progress);
 
   useEffect(() => {
     if (!active) {

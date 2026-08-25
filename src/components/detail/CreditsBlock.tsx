@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { useTitleCredits, type CreditSeason, type TitleCredit } from "../../hooks/useTitleCredits";
+import { Dropdown, type DropdownOption } from "../ui";
 
 const CREW_ORDER = [
   "Director",
@@ -64,29 +65,26 @@ export function CreditsBlock({ titleId }: { titleId: string }) {
     setPage(1);
   };
 
+  const seasonOptions: DropdownOption[] = [
+    { key: "series", selected: season === null, content: "The series" },
+    ...seasons.map((entry) => ({
+      key: String(entry.season),
+      selected: season === entry.season,
+      content: `Season ${entry.season}`,
+    })),
+  ];
+
   return (
     <section className="detail-credits" aria-labelledby="detail-credits-title">
       <h3 id="detail-credits-title">Who made it{total > 0 ? ` · ${total} credited` : ""}</h3>
       {seasons.length > 0 && (
-        <div className="detail-credit-seasons">
-          <button
-            type="button"
-            className={season === null ? "is-active" : ""}
-            onClick={() => choose(null)}
-          >
-            The series
-          </button>
-          {seasons.map((entry) => (
-            <button
-              key={entry.season}
-              type="button"
-              className={season === entry.season ? "is-active" : ""}
-              onClick={() => choose(entry.season)}
-            >
-              Season {entry.season}
-            </button>
-          ))}
-        </div>
+        <Dropdown
+          label="Choose a season"
+          className="credit-season-dropdown"
+          trigger={seasonOptions.find((option) => option.selected)?.content}
+          options={seasonOptions}
+          onSelect={(key) => choose(key === "series" ? null : Number(key))}
+        />
       )}
       {jobs.length === 0 && cast.length === 0 && (
         <p className="detail-credits-empty">

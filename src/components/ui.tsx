@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from "react";
+
 import type { MediaTitle, Provider, ProviderAvailability } from "../domain/catalog";
 import { providerLogo } from "../domain/provider-logos";
 import { providerMark } from "../domain/providers";
@@ -16,6 +18,136 @@ export function ChevronIcon({ back }: { back?: boolean }) {
     <svg viewBox="0 0 20 20" aria-hidden="true">
       <path d={back ? "M12 4l-6 6 6 6" : "M8 4l6 6-6 6"} />
     </svg>
+  );
+}
+
+export type DropdownOption = {
+  key: string;
+  selected: boolean;
+  content: React.ReactNode;
+};
+
+export function Dropdown({
+  label,
+  trigger,
+  options,
+  onSelect,
+  className,
+}: {
+  label: string;
+  trigger: React.ReactNode;
+  options: DropdownOption[];
+  onSelect: (key: string) => void;
+  className?: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [active, setActive] = useState(-1);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const optionRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const panelId = `${className ?? "dropdown"}-panel`;
+
+  useEffect(() => {
+    function onPointerDown(event: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", onPointerDown);
+
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      setActive(options.findIndex((option) => option.selected));
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen) {
+      optionRefs.current[active]?.scrollIntoView({ block: "nearest" });
+    }
+  }, [active, isOpen]);
+
+  function onKeyDown(event: React.KeyboardEvent<HTMLButtonElement>) {
+    if (event.key === "Escape") {
+      if (isOpen) {
+        event.preventDefault();
+        setIsOpen(false);
+      }
+
+      return;
+    }
+
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+
+      if (!isOpen) {
+        setIsOpen(true);
+
+        return;
+      }
+
+      setActive((current) => {
+        const next = event.key === "ArrowDown" ? current + 1 : current - 1;
+
+        return Math.min(Math.max(next, 0), options.length - 1);
+      });
+
+      return;
+    }
+
+    if (isOpen && (event.key === "Enter" || event.key === " ")) {
+      event.preventDefault();
+      const option = options[active];
+
+      if (option) {
+        onSelect(option.key);
+        setIsOpen(false);
+      }
+    }
+  }
+
+  return (
+    <div className={`dropdown${className ? ` ${className}` : ""}`} ref={wrapRef}>
+      <button
+        type="button"
+        className="dropdown-trigger"
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        aria-controls={panelId}
+        aria-label={label}
+        onClick={() => setIsOpen((current) => !current)}
+        onKeyDown={onKeyDown}
+      >
+        {trigger}
+        <ChevronIcon />
+      </button>
+      {isOpen && (
+        <div className="dropdown-panel" id={panelId} role="listbox" aria-label={label}>
+          {options.map((option, index) => (
+            <button
+              type="button"
+              key={option.key}
+              ref={(node) => {
+                optionRefs.current[index] = node;
+              }}
+              role="option"
+              aria-selected={option.selected}
+              className={`dropdown-option${option.selected ? " selected" : ""}${index === active ? " active" : ""}`}
+              onMouseEnter={() => setActive(index)}
+              onClick={() => {
+                onSelect(option.key);
+                setIsOpen(false);
+              }}
+            >
+              {option.content}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

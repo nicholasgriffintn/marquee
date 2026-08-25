@@ -16,7 +16,7 @@ import {
 } from "../domain/seasons";
 import { useSeasons, type EpisodePatch, type EpisodeTracker } from "../hooks/useSeasons";
 import { artwork, artworkSrcSet } from "../lib/media";
-import { ArrowIcon, ChevronIcon } from "./ui";
+import { ArrowIcon, ChevronIcon, Dropdown, type DropdownOption } from "./ui";
 
 const STARS = [1, 2, 3, 4, 5];
 
@@ -337,6 +337,22 @@ export function SeasonsBlock({
     0;
   const watchedHere = seasonStats?.watched ?? 0;
 
+  const seasonOptions: DropdownOption[] = seasons.map((tab) => {
+    const stats = progress?.seasons.find((row) => row.season === tab.seasonNumber) ?? null;
+    const done = stats && stats.aired > 0 && stats.watched >= stats.aired;
+
+    return {
+      key: String(tab.seasonNumber),
+      selected: tab.seasonNumber === selected,
+      content: (
+        <>
+          {tab.seasonNumber === 0 ? "Specials" : `Series ${tab.seasonNumber}`}
+          {stats && stats.watched > 0 ? <em>{done ? "✓" : stats.watched}</em> : null}
+        </>
+      ),
+    };
+  });
+
   return (
     <section className="seasons-block">
       <div className="seasons-top">
@@ -361,25 +377,13 @@ export function SeasonsBlock({
         {invite}
       </div>
 
-      <div className="season-tabs">
-        {seasons.map((tab) => {
-          const stats = progress?.seasons.find((row) => row.season === tab.seasonNumber) ?? null;
-          const done = stats && stats.aired > 0 && stats.watched >= stats.aired;
-
-          return (
-            <button
-              type="button"
-              key={tab.seasonNumber}
-              className={`season-tab${tab.seasonNumber === selected ? " selected" : ""}${done ? " done" : ""}`}
-              aria-pressed={tab.seasonNumber === selected}
-              onClick={() => selectSeason(tab.seasonNumber)}
-            >
-              {tab.seasonNumber === 0 ? "Specials" : `Series ${tab.seasonNumber}`}
-              {stats && stats.watched > 0 ? <em>{done ? "✓" : stats.watched}</em> : null}
-            </button>
-          );
-        })}
-      </div>
+      <Dropdown
+        label="Choose a series"
+        className="season-dropdown"
+        trigger={seasonOptions.find((option) => option.selected)?.content}
+        options={seasonOptions}
+        onSelect={(key) => selectSeason(Number(key))}
+      />
 
       {summary && (
         <SeasonHeader
