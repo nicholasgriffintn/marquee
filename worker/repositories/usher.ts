@@ -202,22 +202,11 @@ export async function popularPeople(db: D1Database, limit: number) {
 }
 
 export async function rebuildPeopleIndex(db: D1Database) {
-  await db
-    .prepare(
-      `UPDATE catalog_people
-       SET titles = (
-         SELECT count(DISTINCT title_id)
-         FROM catalog_credits
-         WHERE catalog_credits.person_id = catalog_people.person_id
-       )`,
-    )
-    .run();
+  await rebuildPersonTitles(db);
 
   const total = await db
     .prepare(`SELECT count(*) AS people FROM catalog_people`)
     .first<{ people: number }>();
-
-  await rebuildPersonTitles(db);
 
   return total?.people ?? 0;
 }
