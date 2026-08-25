@@ -13,7 +13,7 @@ import { DetailPanel } from "./detail/DetailPanel";
 import { UsherCard } from "./usher/UsherCard";
 import { UsherMark } from "./usher/UsherMark";
 
-function MissingTitle({ onClose }: { onClose: () => void }) {
+function MissingTitle({ onClose, onRetry }: { onClose: () => void; onRetry?: () => void }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
 
@@ -36,8 +36,21 @@ function MissingTitle({ onClose }: { onClose: () => void }) {
         </button>
         <div className="detail-copy search-empty lost">
           <UsherMark face="unimpressed" crop="head" />
-          <h2>Not in the building.</h2>
-          <p>I have no record of that one. It may never have been booked here.</p>
+          <h2>{onRetry ? "The programme slipped." : "Not in the building."}</h2>
+          <p>
+            {onRetry
+              ? "I could not check the catalogue just now. Nothing has been marked missing."
+              : "I have no record of that one. It may never have been booked here."}
+          </p>
+          {onRetry ? (
+            <button
+              type="button"
+              onMouseDown={(event) => event.stopPropagation()}
+              onClick={onRetry}
+            >
+              Try again
+            </button>
+          ) : null}
         </div>
       </dialog>
     </div>
@@ -85,6 +98,7 @@ export function TitleOverlay({
   title,
   isMissing,
   isLoading,
+  titleError,
   canSave,
   entryState,
   usherMoment,
@@ -101,12 +115,14 @@ export function TitleOverlay({
   onUpdateDraft,
   onTracked,
   onLoadEntry,
+  onRetryTitle,
   selectedProviderIds,
 }: {
   titleId: string;
   title: MediaTitle | null;
   isMissing: boolean;
   isLoading: boolean;
+  titleError: string;
   canSave: boolean;
   entryState?: ProfileEntryState;
   usherMoment: UsherMoment | null;
@@ -123,6 +139,7 @@ export function TitleOverlay({
   onUpdateDraft: (titleId: string, patch: Partial<ViewingEntry>) => void;
   onTracked: () => void;
   onLoadEntry: (titleId: string, signal: AbortSignal) => Promise<void>;
+  onRetryTitle: () => void;
   selectedProviderIds: string[];
 }) {
   const viewToken = useMemo(() => Symbol(titleId), [titleId]);
@@ -182,6 +199,10 @@ export function TitleOverlay({
   }, [isSaved, onUsherRequest, titleId]);
 
   if (!title) {
+    if (titleError) {
+      return <MissingTitle onClose={onClose} onRetry={onRetryTitle} />;
+    }
+
     if (isMissing) {
       return <MissingTitle onClose={onClose} />;
     }
