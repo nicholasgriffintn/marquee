@@ -1,7 +1,13 @@
 import { Hono } from "hono";
 
 import type { MarqueeUser } from "../auth/model.ts";
-import { attachViewer, guestIdentity, type ViewerVariables } from "../auth/session.ts";
+import {
+  attachViewer,
+  type AuthVariables,
+  guestIdentity,
+  requireViewer,
+  type ViewerVariables,
+} from "../auth/session.ts";
 import { recordEvent } from "../lib/events.ts";
 import { jsonResponse, readJsonObject } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
@@ -14,7 +20,10 @@ import { getTitleInsight } from "../services/title-insight.ts";
 import type { Bindings } from "../types.ts";
 import { viewerHour } from "./usher.ts";
 
-export const curatorRoutes = new Hono<{ Bindings: Bindings; Variables: ViewerVariables }>();
+export const curatorRoutes = new Hono<{
+  Bindings: Bindings;
+  Variables: ViewerVariables & AuthVariables;
+}>();
 
 curatorRoutes.use("*", attachViewer);
 
@@ -99,12 +108,8 @@ curatorRoutes.delete("/", async (context) => {
   return jsonResponse({ cleared: true });
 });
 
-curatorRoutes.get("/rails", async (context) => {
-  const user = context.get("viewer");
-
-  if (!user) {
-    return jsonResponse({ error: "Sign in required" }, 401);
-  }
+curatorRoutes.get("/rails", requireViewer, async (context) => {
+  const user = context.get("authenticatedUser");
 
   try {
     context.header("cache-control", "no-store");
@@ -133,12 +138,8 @@ curatorRoutes.get("/rails", async (context) => {
   }
 });
 
-curatorRoutes.get("/digest", async (context) => {
-  const user = context.get("viewer");
-
-  if (!user) {
-    return jsonResponse({ error: "Sign in required" }, 401);
-  }
+curatorRoutes.get("/digest", requireViewer, async (context) => {
+  const user = context.get("authenticatedUser");
 
   try {
     context.header("cache-control", "no-store");
@@ -233,13 +234,8 @@ curatorRoutes.get("/pinned", async (context) => {
   }
 });
 
-curatorRoutes.post("/pinned", async (context) => {
-  const user = context.get("viewer");
-
-  if (!user) {
-    return jsonResponse({ error: "Sign in to pin a shelf" }, 401);
-  }
-
+curatorRoutes.post("/pinned", requireViewer, async (context) => {
+  const user = context.get("authenticatedUser");
   const body = await readJsonObject(context.req.raw);
   const titleIds = Array.isArray(body?.titleIds)
     ? [...new Set(body.titleIds.filter(isKnownTitle))].slice(0, 12)
@@ -269,12 +265,8 @@ curatorRoutes.post("/pinned", async (context) => {
   }
 });
 
-curatorRoutes.delete("/pinned/:id", async (context) => {
-  const user = context.get("viewer");
-
-  if (!user) {
-    return jsonResponse({ error: "Sign in to unpin a shelf" }, 401);
-  }
+curatorRoutes.delete("/pinned/:id", requireViewer, async (context) => {
+  const user = context.get("authenticatedUser");
 
   try {
     const removed = await unpinShelf(context.env.DB, user.id, context.req.param("id"));

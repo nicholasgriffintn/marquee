@@ -120,3 +120,19 @@ function requirePrincipal(
 export const requireAuthentication = requirePrincipal();
 
 export const requireAdmin = requirePrincipal((user) => user.role === "admin");
+
+export const requireViewer: MiddlewareHandler<{
+  Bindings: Bindings;
+  Variables: ViewerVariables & AuthVariables;
+}> = async (context, next) => {
+  const viewer = context.get("viewer");
+
+  if (!viewer) {
+    return jsonResponse({ error: "Sign in required" }, 401);
+  }
+
+  context.set("authenticatedUser", viewer);
+  await next();
+
+  return context.res;
+};
