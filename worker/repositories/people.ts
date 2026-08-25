@@ -64,18 +64,20 @@ async function creditPage(
   return rows.results;
 }
 
-async function creditTotal(db: D1Database, titleId: string, scope: CreditScope) {
+async function creditTotals(db: D1Database, titleId: string, scope: CreditScope) {
   const { where, binds } = scopeClause(scope);
   const row = await db
     .prepare(
-      `SELECT count(*) AS total
+      `SELECT
+         sum(CASE WHEN c.department = 'Acting' THEN 1 ELSE 0 END) AS castTotal,
+         sum(CASE WHEN c.department <> 'Acting' THEN 1 ELSE 0 END) AS crewTotal
        FROM catalog_credits AS c
        WHERE c.title_id = ? AND ${where}`,
     )
     .bind(titleId, ...binds)
-    .first<{ total: number }>();
+    .first<{ castTotal: number | null; crewTotal: number | null }>();
 
-  return row?.total ?? 0;
+  return { castTotal: row?.castTotal ?? 0, crewTotal: row?.crewTotal ?? 0 };
 }
 
 export async function readTitleCredits(
@@ -85,13 +87,20 @@ export async function readTitleCredits(
   limit = 40,
   offset = 0,
 ) {
-  const [cast, crew, total] = await Promise.all([
+  const [cast, crew, { castTotal, crewTotal }] = await Promise.all([
     creditPage(db, titleId, scope, true, limit, offset),
     creditPage(db, titleId, scope, false, limit, offset),
-    creditTotal(db, titleId, scope),
+    creditTotals(db, titleId, scope),
   ]);
 
-  return { cast, crew, total, limit, offset, hasMore: offset + limit < total };
+  return {
+    cast,
+    crew,
+    total: castTotal + crewTotal,
+    limit,
+    offset,
+    hasMore: offset + limit < Math.max(castTotal, crewTotal),
+  };
 }
 
 export async function readCreditSeasons(db: D1Database, titleId: string) {
