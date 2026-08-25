@@ -46,7 +46,7 @@ function byJob(crew: TitleCredit[]) {
 export function CreditsBlock({ titleId }: { titleId: string }) {
   const [season, setSeason] = useState<number | null>(null);
   const [page, setPage] = useState(1);
-  const { credits } = useTitleCredits(titleId, season, page);
+  const { credits, isLoading } = useTitleCredits(titleId, season, page);
   const { cast, crew, hasMore, total } = credits;
   const [seasons, setSeasons] = useState<CreditSeason[]>([]);
 
@@ -90,9 +90,7 @@ export function CreditsBlock({ titleId }: { titleId: string }) {
       )}
       {jobs.length === 0 && cast.length === 0 && (
         <p className="detail-credits-empty">
-          {season === null
-            ? "Not read yet."
-            : "Not read for this season yet — open it under Episodes and it will fill in."}
+          {isLoading ? "Reading…" : "Not read yet."}
         </p>
       )}
       {jobs.length > 0 && (
