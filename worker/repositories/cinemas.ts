@@ -387,7 +387,7 @@ export async function readShowingTitles(
          AND cinema_id IN (${placeholders})
          AND business_day BETWEEN date('now') AND date('now', ?)
        GROUP BY title_id
-       ORDER BY cinemaCount DESC, nextStartsAt
+       ORDER BY cinemaCount DESC, nextStartsAt IS NULL, nextStartsAt
        LIMIT ?`,
     )
     .bind(...cinemaIds, `+${Math.max(1, horizonDays)} days`, limit)
