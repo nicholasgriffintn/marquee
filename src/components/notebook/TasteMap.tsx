@@ -7,6 +7,7 @@ import { TasteMapCard } from "./TasteMapCard";
 const SIZE = 560;
 const PAD = 34;
 const ART_SETTLE = 130;
+const MAX_PLOTTED_POINTS = 60;
 
 function radius(weight: number) {
   return 5 + Math.min(7, Math.abs(weight) * 5);
@@ -169,6 +170,18 @@ export function TasteMap({ isSignedIn }: { isSignedIn: boolean }) {
     [points],
   );
 
+  const plotted = useMemo(() => {
+    const all = points ?? [];
+
+    if (all.length <= MAX_PLOTTED_POINTS) {
+      return all;
+    }
+
+    return [...all]
+      .sort((left, right) => Math.abs(right.weight) - Math.abs(left.weight))
+      .slice(0, MAX_PLOTTED_POINTS);
+  }, [points]);
+
   const placed = useMemo(() => {
     const plot = SIZE - PAD * 2;
 
@@ -315,17 +328,21 @@ export function TasteMap({ isSignedIn }: { isSignedIn: boolean }) {
             />
           ))}
 
-          {map.points.map((point) => (
-            <TastePoint
-              key={point.titleId}
-              point={point}
-              cx={placed.get(point.titleId)?.cx ?? 0}
-              cy={placed.get(point.titleId)?.cy ?? 0}
-              active={activeId === point.titleId}
-              pinned={pinned?.titleId === point.titleId}
-              handlers={handlers}
-            />
-          ))}
+          {plotted.map((point) => {
+            const spot = placed.get(point.titleId);
+
+            return (
+              <TastePoint
+                key={point.titleId}
+                point={point}
+                cx={spot?.cx ?? 0}
+                cy={spot?.cy ?? 0}
+                active={activeId === point.titleId}
+                pinned={pinned?.titleId === point.titleId}
+                handlers={handlers}
+              />
+            );
+          })}
         </svg>
 
         <div className="taste-map-readout">
