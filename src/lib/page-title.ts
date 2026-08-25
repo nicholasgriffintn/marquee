@@ -26,6 +26,7 @@ export function titleForItem(item: MediaTitle) {
 const PREFIX_TITLES: [string, string][] = [
   ["/revival/", "The revival house · Marquee"],
   ["/person/", "People · Marquee"],
+  ["/collection/", "Collection · Marquee"],
 ];
 
 export function titleForRoute(pathname: string, query: string) {

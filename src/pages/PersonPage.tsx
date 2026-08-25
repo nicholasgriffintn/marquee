@@ -23,9 +23,12 @@ export function PersonPage({
 }) {
   const params = useParams();
   const name = decodeURIComponent(params.name ?? "");
-  const { data, following, error, isLoading, toggleFollow } = usePerson(name, isSignedIn);
+  const { data, following, error, isLoading, hasMore, loadMore, toggleFollow } = usePerson(
+    name,
+    isSignedIn,
+  );
 
-  if (error || (!isLoading && !data)) {
+  if (!data && (error || !isLoading)) {
     return (
       <section className="page-section">
         <div className="notebook-head">
@@ -68,6 +71,12 @@ export function PersonPage({
         </div>
       </div>
 
+      {error && (
+        <p className="auth-message" role="alert">
+          {error}
+        </p>
+      )}
+
       {data && data.items.length > 0 && (
         <ErrorBoundary label="This filmography">
           <div className="results-grid">
@@ -78,13 +87,21 @@ export function PersonPage({
         </ErrorBoundary>
       )}
 
-      {isLoading && (
+      {isLoading && (!data || data.items.length === 0) && (
         <div className="results-grid" aria-hidden="true">
           {[0, 1, 2, 3, 4, 5].map((card) => (
             <div className="rail-card" key={card}>
               <span className="skeleton skeleton-poster" />
             </div>
           ))}
+        </div>
+      )}
+
+      {hasMore && (
+        <div className="browse-more">
+          <button type="button" onClick={loadMore} disabled={isLoading}>
+            {isLoading ? "Loading…" : "Show more"}
+          </button>
         </div>
       )}
     </section>

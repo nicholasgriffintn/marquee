@@ -156,7 +156,12 @@ export async function readPerson(db: D1Database, name: string): Promise<PersonRe
   }
 }
 
-export async function readPersonTitleIds(db: D1Database, personId: number, limit = 48) {
+export async function readPersonTitleIds(
+  db: D1Database,
+  personId: number,
+  limit = 48,
+  offset = 0,
+) {
   try {
     const rows = await db
       .prepare(
@@ -166,9 +171,9 @@ export async function readPersonTitleIds(db: D1Database, personId: number, limit
           WHERE p.person_id = ?1
           GROUP BY p.title_id
           ORDER BY COALESCE(t.year, 0) DESC, t.popularity DESC
-          LIMIT ?2`,
+          LIMIT ?2 OFFSET ?3`,
       )
-      .bind(personId, clamp(limit, 1, 96))
+      .bind(personId, clamp(limit, 1, 96), Math.max(0, offset))
       .all<{ titleId: string }>();
 
     return rows.results.map((row) => row.titleId);
