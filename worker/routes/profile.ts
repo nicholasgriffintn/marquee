@@ -13,10 +13,12 @@ import { recentExitFor, recordSignal } from "../repositories/signals.ts";
 import { importDiary } from "../services/import-letterboxd.ts";
 import {
   getProfile,
+  getProviderPreferences,
   getShelf,
   getViewingEntry,
   removeFromProfile,
   updateProfile,
+  updateProviderPreferences,
 } from "../services/profile.ts";
 import type { Bindings } from "../types.ts";
 
@@ -80,6 +82,39 @@ profileRoutes.get("/shelf", async (context) => {
     logError("shelf_read_failed", error);
 
     return jsonResponse({ error: "Your shelf is out of reach for a moment." }, 503);
+  }
+});
+
+profileRoutes.get("/providers", async (context) => {
+  const user = context.get("authenticatedUser");
+
+  try {
+    const preferences = await getProviderPreferences(context.env.DB, user.id);
+
+    return jsonResponse(preferences);
+  } catch (error) {
+    logError("provider_preferences_read_failed", error);
+
+    return jsonResponse({ error: "Could not load your providers" }, 500);
+  }
+});
+
+profileRoutes.post("/providers", async (context) => {
+  const user = context.get("authenticatedUser");
+  const body = await readJsonObject(context.req.raw);
+
+  if (!body) {
+    return jsonResponse({ error: "Invalid or oversized JSON" }, 400);
+  }
+
+  try {
+    const preferences = await updateProviderPreferences(context.env.DB, user.id, body);
+
+    return jsonResponse(preferences);
+  } catch (error) {
+    logError("provider_preferences_write_failed", error);
+
+    return jsonResponse({ error: "Could not save your providers" }, 500);
   }
 });
 

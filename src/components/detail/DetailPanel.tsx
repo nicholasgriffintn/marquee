@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { mergeAnimeProviders } from "../../domain/anime";
-import type { MediaTitle } from "../../domain/catalog";
+import { collectionPath, type MediaTitle } from "../../domain/catalog";
 import { useAvailability } from "../../hooks/useAvailability";
 import { useCollection } from "../../hooks/useCollection";
 import { useRecommendations } from "../../hooks/useRecommendations";
@@ -301,13 +301,20 @@ export function DetailPanel({
               </div>
             ) : null}
             <WatchNext pairs={pairs} onOpen={onOpen} />
-            {item.collection && collection.length > 1 && (
+            {item.collection && collection.items.length > 1 && (
               <TitleTrack
                 label={item.collection.name}
-                items={collection}
+                items={collection.items}
                 currentId={item.id}
                 caption={collectionCaption}
                 onOpen={onOpen}
+                footer={
+                  collection.hasMore ? (
+                    <Link className="detail-similar-more" to={collectionPath(item.collection.id)}>
+                      See the whole collection
+                    </Link>
+                  ) : undefined
+                }
               />
             )}
             <TitleTrack
