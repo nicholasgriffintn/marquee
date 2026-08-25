@@ -109,15 +109,23 @@ export function Dropdown({
     }
   }
 
+  function onBlur(event: React.FocusEvent<HTMLDivElement>) {
+    if (!wrapRef.current?.contains(event.relatedTarget)) {
+      setIsOpen(false);
+    }
+  }
+
   return (
-    <div className={`dropdown${className ? ` ${className}` : ""}`} ref={wrapRef}>
+    <div className={`dropdown${className ? ` ${className}` : ""}`} ref={wrapRef} onBlur={onBlur}>
       <button
         type="button"
+        role="combobox"
         className="dropdown-trigger"
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         aria-controls={panelId}
         aria-label={label}
+        aria-activedescendant={isOpen && active >= 0 ? `${panelId}-option-${active}` : undefined}
         onClick={() => setIsOpen((current) => !current)}
         onKeyDown={onKeyDown}
       >
@@ -130,6 +138,8 @@ export function Dropdown({
             <button
               type="button"
               key={option.key}
+              id={`${panelId}-option-${index}`}
+              tabIndex={-1}
               ref={(node) => {
                 optionRefs.current[index] = node;
               }}
