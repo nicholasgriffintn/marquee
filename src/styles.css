@@ -2491,6 +2491,7 @@ h2 em {
   min-height: 0;
   position: sticky;
   top: 0;
+  transform: translateZ(0);
 }
 .detail-panel .poster-wide > img {
   object-fit: cover;
