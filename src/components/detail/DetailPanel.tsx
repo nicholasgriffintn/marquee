@@ -197,11 +197,16 @@ export function DetailPanel({
       role="presentation"
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
+      {/* showModal() moves the dialog's native ::backdrop above .detail-backdrop, so
+          clicks on it target the dialog itself — this is the standard light-dismiss
+          pattern for native <dialog>, not a stray handler on inert content. */}
+      {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
       <dialog
         ref={panelRef}
         className="detail-panel"
         aria-modal="true"
         aria-labelledby="detail-title"
+        onMouseDown={(event) => event.target === event.currentTarget && onClose()}
       >
         <button
           ref={closeRef}
