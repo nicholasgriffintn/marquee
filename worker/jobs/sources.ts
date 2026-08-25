@@ -12,6 +12,10 @@ import type { Bindings, EnrichmentSource } from "../types.ts";
 // refused: the source blocked us outright (401/403). Long and flat -
 // a block rarely clears itself within a day, so escalating further buys
 // nothing.
+//
+// omdb and poster share the OMDb budget: claimBudget is the real guard
+// against the daily limit, so a 429 there means throttle, not exhaustion -
+// their base pause is shorter than the rest.
 const BACKOFF: Record<EnrichmentSource, { rateLimited: BackoffPolicy; refused: BackoffPolicy }> = {
   jikan: {
     rateLimited: { baseMinutes: 60, capMinutes: 60 * 12 },
@@ -22,7 +26,7 @@ const BACKOFF: Record<EnrichmentSource, { rateLimited: BackoffPolicy; refused: B
     refused: { baseMinutes: 60 * 24 * 7, capMinutes: 60 * 24 * 7 },
   },
   omdb: {
-    rateLimited: { baseMinutes: 30, capMinutes: 60 * 6 },
+    rateLimited: { baseMinutes: 10, capMinutes: 60 * 6 },
     refused: { baseMinutes: 60 * 24 * 7, capMinutes: 60 * 24 * 7 },
   },
   tmdb: {
@@ -30,7 +34,7 @@ const BACKOFF: Record<EnrichmentSource, { rateLimited: BackoffPolicy; refused: B
     refused: { baseMinutes: 60 * 24 * 7, capMinutes: 60 * 24 * 7 },
   },
   poster: {
-    rateLimited: { baseMinutes: 30, capMinutes: 60 * 6 },
+    rateLimited: { baseMinutes: 10, capMinutes: 60 * 6 },
     refused: { baseMinutes: 60 * 24 * 7, capMinutes: 60 * 24 * 7 },
   },
 };
