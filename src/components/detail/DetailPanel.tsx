@@ -311,6 +311,7 @@ export function DetailPanel({
               <ShowingsBlock
                 listings={showings.listings}
                 isLoading={showings.isLoading}
+                error={showings.error}
                 placeLabel={showings.origin?.label ?? null}
                 onLeave={leaveVia}
               />

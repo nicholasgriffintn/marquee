@@ -8,7 +8,6 @@ import { ArtPlaceholder } from "../ArtPlaceholder";
 const FINISHED_RATIO = 0.97;
 const RESUME_FLOOR_SECONDS = 5;
 const RESUME_TAIL_SECONDS = 10;
-const CURTAIN_MS = 460;
 
 export function ReelPlayer({
   work,
@@ -73,19 +72,17 @@ export function ReelPlayer({
     track("reel_play", { detail: work.id });
 
     if (video) {
-      void video.play().catch(() => undefined);
+      void video.play().catch(() => {
+        setError("That print will not thread. Try the source record below.");
+      });
     }
   }, [work.id]);
 
-  useEffect(() => {
-    if (!raising) {
-      return undefined;
-    }
-
-    const timer = window.setTimeout(() => setStarted(true), CURTAIN_MS);
-
-    return () => window.clearTimeout(timer);
-  }, [raising]);
+  const onPlaying = useCallback(() => {
+    raise();
+    setError("");
+    setStarted(true);
+  }, [raise]);
 
   const onTimeUpdate = useCallback(
     (event: { currentTarget: HTMLVideoElement }) => report(event.currentTarget.currentTime, false),
@@ -122,8 +119,11 @@ export function ReelPlayer({
           preload="metadata"
           src={work.reelUrl}
           poster={still ?? undefined}
-          onCanPlay={() => setReady(true)}
-          onPlaying={raise}
+          onCanPlay={() => {
+            setReady(true);
+            setError("");
+          }}
+          onPlaying={onPlaying}
           onTimeUpdate={onTimeUpdate}
           onEnded={onEnded}
           onPause={onPause}

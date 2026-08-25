@@ -165,11 +165,13 @@ function optionLabel(listing: CinemaListing) {
 export function ShowingsBlock({
   listings,
   isLoading,
+  error,
   placeLabel,
   onLeave,
 }: {
   listings: CinemaListing[];
   isLoading: boolean;
+  error?: string;
   placeLabel: string | null;
   onLeave: (exit: Exit) => (event: MouseEvent<HTMLAnchorElement>) => void;
 }) {
@@ -185,6 +187,15 @@ export function ShowingsBlock({
   }
 
   if (listings.length === 0) {
+    if (error) {
+      return (
+        <div className="showings">
+          <span className="showings-eyebrow">On round here</span>
+          <p className="showings-empty">Couldn't check local showings.</p>
+        </div>
+      );
+    }
+
     return null;
   }
 

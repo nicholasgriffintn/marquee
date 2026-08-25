@@ -6,7 +6,7 @@ const NO_LISTINGS: TitleShowings["listings"] = [];
 
 export function useShowings(item: MediaTitle, enabled: boolean) {
   const isAvailable = enabled && item.mediaType === "movie";
-  const { data, isLoading } = useResource<TitleShowings>(
+  const { data, isLoading, error } = useResource<TitleShowings>(
     `/api/cinema/titles/${item.mediaType}/${item.tmdbId}`,
     { enabled: isAvailable },
   );
@@ -16,6 +16,7 @@ export function useShowings(item: MediaTitle, enabled: boolean) {
     listings,
     origin: data?.origin ?? null,
     isLoading: isLoading && listings.length === 0,
+    error,
     isAvailable,
   };
 }

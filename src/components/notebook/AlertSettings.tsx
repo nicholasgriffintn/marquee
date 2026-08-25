@@ -69,7 +69,7 @@ export function AlertSettings({ isSignedIn }: { isSignedIn: boolean }) {
     void load();
 
     return () => controller.abort();
-  }, [isSignedIn, confirmation]);
+  }, [isSignedIn]);
 
   if (!isSignedIn || !config) {
     return null;

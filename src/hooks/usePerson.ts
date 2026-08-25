@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import type { MediaTitle } from "../domain/catalog";
-import { isAbortError, jsonRequest, requestJson } from "../lib/api";
+import { ApiError, isAbortError, jsonRequest, requestJson } from "../lib/api";
 import { useResource } from "./useResource";
 
 export type PersonResponse = {
@@ -55,7 +55,13 @@ export function usePerson(name: string, isSignedIn: boolean) {
       } catch (caught) {
         if (alive && !isAbortError(caught)) {
           if (page === 0) {
-            setLoadError("I have nobody by that name in the book.");
+            const notFound = caught instanceof ApiError && caught.status === 404;
+
+            setLoadError(
+              notFound
+                ? "I have nobody by that name in the book."
+                : "Could not load this page. Try again.",
+            );
             setPerson(null);
             setItems(NO_ITEMS);
           } else {
