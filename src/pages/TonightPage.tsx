@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { ContentRail } from "../components/ContentRail";
 import { ErrorBoundary } from "../components/ErrorBoundary";
@@ -138,6 +138,16 @@ export function TonightPage({
   const featured = isHeroReady ? heroSections.flatMap((section) => section.items)[0] : undefined;
   const filterableProviders = providers.filter(
     (provider) => provider.status === "feed" && Boolean(provider.tmdbProviderIds?.length),
+  );
+
+  const trendingSection = useMemo(
+    () => ({
+      id: "trending",
+      title: "Trending now",
+      description: "Wikipedia readers this week against last",
+      items: trending,
+    }),
+    [trending],
   );
 
   function toggleProvider(id: string) {
@@ -337,16 +347,7 @@ export function TonightPage({
         <div className="rails-section">
           {trending.length > 1 && (
             <ErrorBoundary label="The trending shelf">
-              <ContentRail
-                section={{
-                  id: "trending",
-                  title: "Trending now",
-                  description: "Wikipedia readers this week against last",
-                  items: trending,
-                }}
-                ranked
-                onOpen={onOpen}
-              />
+              <ContentRail section={trendingSection} ranked onOpen={onOpen} />
             </ErrorBoundary>
           )}
           {episodes.length > 0 && (
