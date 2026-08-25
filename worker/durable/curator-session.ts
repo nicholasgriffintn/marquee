@@ -40,7 +40,11 @@ export class CuratorSession extends DurableObject<Bindings> {
             isWeekend: body.isWeekend,
           })) {
             if (event.type === "turn") {
-              await this.ctx.storage.put("turns", [...turns, event.turn].slice(-MAX_TURNS));
+              await this.ctx.storage.transaction(async (txn) => {
+                const latest = (await txn.get<CuratorTurn[]>("turns")) ?? [];
+
+                await txn.put("turns", [...latest, event.turn].slice(-MAX_TURNS));
+              });
               await this.ctx.storage.setAlarm(Date.now() + IDLE_MINUTES * 60_000);
               continue;
             }
