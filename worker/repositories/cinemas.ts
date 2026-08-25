@@ -256,15 +256,19 @@ export async function replaceScreenings(
   cinemaId: string,
   screenings: SourceScreening[],
 ) {
-  await db
-    .prepare(`DELETE FROM cinema_screenings WHERE cinema_id = ? AND source = ?`)
-    .bind(cinemaId, source)
-    .run();
-
   if (screenings.length === 0) {
+    await db
+      .prepare(`DELETE FROM cinema_screenings WHERE cinema_id = ? AND source = ?`)
+      .bind(cinemaId, source)
+      .run();
+
     return 0;
   }
 
+  // Insert the new sync's rows (tagged with a fresh sync_id) before deleting the
+  // previous sync's rows, so a mid-sync failure or a concurrent read never sees
+  // a gap - only a brief overlap between old and new data.
+  const syncId = crypto.randomUUID();
   const chunks: SourceScreening[][] = [];
 
   for (let index = 0; index < screenings.length; index += 50) {
@@ -279,11 +283,11 @@ export async function replaceScreenings(
           .prepare(
             `INSERT INTO cinema_screenings
                (id, cinema_id, source, source_film_id, title_id, starts_at,
-                business_day, precision, attributes, booking_url)
+                business_day, precision, attributes, booking_url, sync_id)
              VALUES (
                ?, ?, ?, ?,
                (SELECT title_id FROM cinema_films WHERE source = ? AND source_film_id = ?),
-               ?, ?, ?, ?, ?
+               ?, ?, ?, ?, ?, ?
              )`,
           )
           .bind(
@@ -298,10 +302,19 @@ export async function replaceScreenings(
             screening.precision,
             JSON.stringify(screening.attributes),
             screening.bookingUrl,
+            syncId,
           ),
       ),
     );
   }
+
+  await db
+    .prepare(
+      `DELETE FROM cinema_screenings
+       WHERE cinema_id = ? AND source = ? AND (sync_id IS NULL OR sync_id != ?)`,
+    )
+    .bind(cinemaId, source, syncId)
+    .run();
 
   return screenings.length;
 }
