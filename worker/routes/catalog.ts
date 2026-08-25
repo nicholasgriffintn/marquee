@@ -221,6 +221,7 @@ catalogRoutes.get("/items", edgeCache(900), async (context) => {
 const PERSON_LIMIT = 48;
 const COLLECTION_LIMIT = 24;
 const MAX_PERSON_PAGE = 200;
+const MAX_COLLECTION_PAGE = 200;
 
 catalogRoutes.get("/people/:name", async (context) => {
   const name = decodeURIComponent(context.req.param("name")).slice(0, 120);
@@ -258,12 +259,21 @@ catalogRoutes.get("/collections/:id", edgeCache(3_600), async (context) => {
     return context.json({ error: "Unknown collection" }, 400);
   }
 
+  const page = queryInteger(context, "page", 0, 0, MAX_COLLECTION_PAGE);
+
   try {
-    const ids = await readCollectionTitleIds(context.env.DB, collectionId, COLLECTION_LIMIT);
+    const ids = await readCollectionTitleIds(
+      context.env.DB,
+      collectionId,
+      COLLECTION_LIMIT + 1,
+      page * COLLECTION_LIMIT,
+    );
+    const hasMore = ids.length > COLLECTION_LIMIT;
+    const items = await readItems(context.env.DB, ids.slice(0, COLLECTION_LIMIT), COLLECTION_LIMIT);
 
     context.header("cache-control", "public, max-age=3600");
 
-    return context.json({ items: await readItems(context.env.DB, ids, COLLECTION_LIMIT) });
+    return context.json({ items, hasMore, page });
   } catch (error) {
     logError("catalogue_read_failed", error, { area: "collection" });
 

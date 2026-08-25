@@ -25,6 +25,7 @@ import { useUsher } from "./hooks/useUsher";
 import { titleForItem, titleForRoute } from "./lib/page-title";
 import { AdminPage } from "./pages/AdminPage";
 import { BrowsePage, type BrowsePreset } from "./pages/BrowsePage";
+import { CollectionPage } from "./pages/CollectionPage";
 import { DigestPage } from "./pages/DigestPage";
 import { LibraryPage } from "./pages/LibraryPage";
 import { NotebookPage } from "./pages/NotebookPage";
@@ -496,6 +497,8 @@ export function App() {
             path="/person/:name"
             element={<PersonPage isSignedIn={isSignedIn} onOpen={openTitle} />}
           />
+
+          <Route path="/collection/:id" element={<CollectionPage onOpen={openTitle} />} />
 
           <Route
             path="/sources"
