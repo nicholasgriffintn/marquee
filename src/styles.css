@@ -3570,11 +3570,23 @@ h2 em {
 }
 .detail-awards {
   border-left: 2px solid var(--acid);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 16px 0 0;
+  padding: 2px 0 2px 12px;
+}
+.detail-awards > span {
+  color: #6f7268;
+  font: 800 9px var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.detail-awards p {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.5;
-  margin: 16px 0 0;
-  padding-left: 12px;
+  margin: 0;
 }
 .detail-buzz {
   border-left: 3px solid var(--acid);

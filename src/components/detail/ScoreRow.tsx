@@ -53,12 +53,15 @@ export function ScoreRow({ item }: { item: MediaTitle }) {
         )}
       </div>
       {ratings?.awards && (
-        <p className="detail-awards">
-          {ratings.awards}
-          {ratings.awardWins
-            ? ` · ${ratings.awardWins} win${ratings.awardWins === 1 ? "" : "s"}`
-            : ""}
-        </p>
+        <div className="detail-awards">
+          <span>Awards</span>
+          <p>
+            {ratings.awards}
+            {ratings.awardWins
+              ? ` · ${ratings.awardWins} win${ratings.awardWins === 1 ? "" : "s"}`
+              : ""}
+          </p>
+        </div>
       )}
     </>
   );
