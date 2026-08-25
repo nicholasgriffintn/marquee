@@ -148,6 +148,14 @@ Everything unresolved sits in a queue on `/admin` for a person, including the la
 genuinely free in America and unprovable here. That is the right way round to be wrong, and it does
 mean the shelf fills slowly.
 
+What plays and what gets copied are two separate questions. Clearing the American term is enough to
+list a print and let it stream straight from wherever it already lives — the browser talks directly
+to archive.org, Europeana or the Library of Congress, and Marquee is pointing at a copy someone else
+chose to publish rather than making one of its own, which isn't an act this building has to answer
+for under UK law. The UK term is the stricter, independently-checked question, and clearing it earns
+something more: a permanent copy in Marquee's own room, so the print no longer depends on someone
+else's server staying up. Until that check lands, it keeps playing from the source.
+
 Three places supply it. European archives through **Europeana**, filtered to things they have
 published outright as Public Domain Mark or CC0 and that they serve as an actual file rather than a
 landing page — a European institution releasing its own holding is the strongest signal available

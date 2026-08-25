@@ -46,7 +46,7 @@ export type RevivalWork = {
   ukExpiresYear: number | null;
   mirrored: boolean;
   delivery: "mirror" | "source";
-  reelUrl: string | null;
+  reelUrl: string;
   plays: number;
   popularity: number | null;
   downloads: number | null;
