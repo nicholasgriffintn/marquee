@@ -103,7 +103,7 @@ export type IngestionJob =
   | { type: "match-revival-works"; chain?: boolean }
   | { type: "group-revival-prints" }
   | { type: "check-revival-rights" }
-  | { type: "recheck-revival-works" }
+  | { type: "recheck-revival-works"; chain?: boolean }
   | { type: "mirror-revival-work"; workId: string }
   | { type: "build-sections" };
 

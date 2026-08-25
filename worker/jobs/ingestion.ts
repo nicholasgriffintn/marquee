@@ -259,7 +259,11 @@ export async function executeIngestionJob(env: Bindings, job: IngestionJob) {
     }
 
     case "recheck-revival-works": {
-      await recheckArchiveWorks(env);
+      const run = await recheckArchiveWorks(env);
+
+      if (job.chain && !run.exhausted) {
+        await env.REVIVAL_QUEUE.send({ type: "recheck-revival-works", chain: true });
+      }
 
       return;
     }

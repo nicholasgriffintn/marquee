@@ -34,7 +34,6 @@ import {
   selectKnownSourceIds,
   selectArchiveForRecheck,
   selectUnmatched,
-  touchWork,
   upsertWork,
   type RevivalCandidate,
   type ShelfGroup,
@@ -285,9 +284,10 @@ export async function queueRevivalSources(env: Bindings) {
 }
 
 export async function recheckArchiveWorks(env: Bindings, limit = 80) {
+  const cutoff = usPublicDomainCutoff();
   const pending = await selectArchiveForRecheck(env.DB, limit);
   const deadline = Date.now() + ARCHIVE_BUDGET_MS;
-  const counts = { checked: 0, removed: 0, skipped: 0 };
+  const counts = { checked: 0, removed: 0, skipped: 0, refreshed: 0 };
 
   for (let index = 0; index < pending.length; index += ARCHIVE_LANES) {
     if (Date.now() > deadline) {
@@ -317,8 +317,11 @@ export async function recheckArchiveWorks(env: Bindings, limit = 80) {
       }
 
       if (verdict.item) {
+        const candidate = withUsExpiredBasis(verdict.item, cutoff);
+
         // oxlint-disable-next-line no-await-in-loop
-        await touchWork(env.DB, verdict.row.id);
+        await upsertWork(env.DB, "archive", candidate, decideStatus(candidate));
+        counts.refreshed += 1;
 
         continue;
       }
@@ -330,7 +333,7 @@ export async function recheckArchiveWorks(env: Bindings, limit = 80) {
     }
   }
 
-  return counts;
+  return { ...counts, exhausted: pending.length < limit };
 }
 
 export async function matchRevivalWorks(env: Bindings, limit = MATCH_BATCH) {
