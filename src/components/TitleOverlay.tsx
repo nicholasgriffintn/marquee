@@ -24,10 +24,33 @@ function MissingTitle({ onClose }: { onClose: () => void }) {
   );
 }
 
+function LoadingTitle({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="detail-backdrop" role="presentation" onMouseDown={onClose}>
+      <dialog open className="detail-panel detail-panel-missing" aria-modal="true">
+        <button type="button" className="detail-close" onClick={onClose} aria-label="Close details">
+          ×
+        </button>
+        <div className="detail-copy">
+          <span className="visually-hidden">Loading title details…</span>
+          <div className="hero-skeleton" aria-hidden="true">
+            <span className="skeleton skeleton-title" />
+            <span className="skeleton skeleton-meta" />
+            <span className="skeleton skeleton-line" />
+            <span className="skeleton skeleton-line short" />
+            <span className="skeleton skeleton-button" />
+          </div>
+        </div>
+      </dialog>
+    </div>
+  );
+}
+
 export function TitleOverlay({
   titleId,
   title,
   isMissing,
+  isLoading,
   canSave,
   entries,
   usherMoment,
@@ -49,6 +72,7 @@ export function TitleOverlay({
   titleId: string;
   title: MediaTitle | null;
   isMissing: boolean;
+  isLoading: boolean;
   canSave: boolean;
   entries: Record<string, ViewingEntry>;
   usherMoment: UsherMoment | null;
@@ -80,7 +104,11 @@ export function TitleOverlay({
   }, [isSaved, onUsherRequest, titleId]);
 
   if (!title) {
-    return isMissing ? <MissingTitle onClose={onClose} /> : null;
+    if (isMissing) {
+      return <MissingTitle onClose={onClose} />;
+    }
+
+    return isLoading ? <LoadingTitle onClose={onClose} /> : null;
   }
 
   return (
