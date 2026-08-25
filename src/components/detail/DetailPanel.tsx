@@ -197,11 +197,13 @@ export function DetailPanel({
       role="presentation"
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
+      {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
       <dialog
         ref={panelRef}
         className="detail-panel"
         aria-modal="true"
         aria-labelledby="detail-title"
+        onMouseDown={(event) => event.target === event.currentTarget && onClose()}
       >
         <button
           ref={closeRef}

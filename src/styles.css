@@ -2448,14 +2448,20 @@ h2 em {
   display: grid;
   grid-template-columns: minmax(280px, 0.75fr) minmax(420px, 1.25fr);
   height: 100dvh;
+  inset-block: 0;
+  left: auto;
   margin: 0;
   max-height: 100dvh;
   max-width: 1060px;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 0;
-  position: relative;
+  position: fixed;
+  right: 0;
   width: min(92vw, 1060px);
+}
+.detail-panel::backdrop {
+  background: transparent;
 }
 .detail-panel-missing {
   grid-template-columns: 1fr;
