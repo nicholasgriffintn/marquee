@@ -14,6 +14,7 @@ import type { Bindings, IngestionJob } from "../types.ts";
 import { titleParts, withRateLimitPause } from "./sources.ts";
 
 const AVAILABILITY_PER_RUN = 600;
+const INTERACTIVE_BUDGET_RESERVE = 5_000;
 
 export async function queueStaleAvailability(env: Bindings, alreadyQueued: string[] = []) {
   const room = await readBudgetRoom(env, "justwatch");
@@ -70,7 +71,7 @@ export async function queueAvailability(env: Bindings, titleIds: string[]) {
   );
 }
 
-export async function enrichTitleAvailability(env: Bindings, titleId: string) {
+export async function enrichTitleAvailability(env: Bindings, titleId: string, budgetReserve = 0) {
   const parts = titleParts(titleId);
 
   if (!parts) {
@@ -86,7 +87,7 @@ export async function enrichTitleAvailability(env: Bindings, titleId: string) {
     return;
   }
 
-  if (!(await claimBudget(env, "justwatch"))) {
+  if (!(await claimBudget(env, "justwatch", budgetReserve))) {
     logEvent("budget_exhausted", { source: "justwatch", titleId });
 
     return;
@@ -104,7 +105,13 @@ export async function enrichTitleAvailability(env: Bindings, titleId: string) {
 }
 
 export async function refreshTitleAvailability(env: Bindings, titleId: string) {
-  await enrichTitleAvailability(env, titleId);
+  const current = await readAvailability(env.DB, titleId);
+
+  if (!current || current.checked) {
+    return current;
+  }
+
+  await enrichTitleAvailability(env, titleId, INTERACTIVE_BUDGET_RESERVE);
 
   return readAvailability(env.DB, titleId);
 }

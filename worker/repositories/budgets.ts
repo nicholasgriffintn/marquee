@@ -134,9 +134,10 @@ export async function readBudgetPace(env: Bindings, source: EnrichmentSource) {
   return Math.floor(row.room / sweeps);
 }
 
-export async function claimBudget(env: Bindings, source: EnrichmentSource) {
+export async function claimBudget(env: Bindings, source: EnrichmentSource, reserve = 0) {
   const resolved = budgetSource(source);
   const expression = windowExpression(SOURCE_BUDGETS[resolved].windowKind);
+  const protectedCalls = Math.max(0, Math.trunc(reserve));
   const claim = () =>
     env.DB.prepare(
       `UPDATE source_budgets
@@ -148,9 +149,20 @@ export async function claimBudget(env: Bindings, source: EnrichmentSource) {
            updated_at = CURRENT_TIMESTAMP
        WHERE source = ?
          AND (paused_until IS NULL OR paused_until <= CURRENT_TIMESTAMP)
-         AND (window_started_at <= datetime('now', ?) OR used < call_limit)`,
+         AND (
+           (window_started_at <= datetime('now', ?) AND call_limit > ?)
+           OR (window_started_at > datetime('now', ?) AND used < max(0, call_limit - ?))
+         )`,
     )
-      .bind(expression, expression, resolved, expression)
+      .bind(
+        expression,
+        expression,
+        resolved,
+        expression,
+        protectedCalls,
+        expression,
+        protectedCalls,
+      )
       .run();
   const claimed = await claim();
 

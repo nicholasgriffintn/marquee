@@ -5,6 +5,7 @@ export type Bindings = {
   ASSETS: Fetcher;
   DB: D1Database;
   AUTH_RATE_LIMITER: RateLimit;
+  AVAILABILITY_RATE_LIMITER: RateLimit;
   CURATOR_RATE_LIMITER: RateLimit;
   CURATOR_FREE_RATE_LIMITER: RateLimit;
   INSIGHT_RATE_LIMITER: RateLimit;

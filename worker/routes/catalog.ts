@@ -450,25 +450,40 @@ catalogRoutes.get("/:mediaType/:tmdbId/availability", edgeCache(900), async (con
   }
 });
 
-catalogRoutes.post("/:mediaType/:tmdbId/availability/refresh", async (context) => {
-  const mediaType = context.req.param("mediaType");
-  const tmdbId = pathInteger(context, "tmdbId", 1, MAX_TMDB_ID);
+catalogRoutes.post(
+  "/:mediaType/:tmdbId/availability/refresh",
+  requireAuthentication,
+  async (context) => {
+    const mediaType = context.req.param("mediaType");
+    const tmdbId = pathInteger(context, "tmdbId", 1, MAX_TMDB_ID);
 
-  if ((mediaType !== "movie" && mediaType !== "tv") || tmdbId === null) {
-    return context.json({ error: "Unknown title" }, 404);
-  }
-
-  try {
-    const availability = await refreshTitleAvailability(context.env, `${mediaType}:${tmdbId}`);
-
-    if (!availability) {
+    if ((mediaType !== "movie" && mediaType !== "tv") || tmdbId === null) {
       return context.json({ error: "Unknown title" }, 404);
     }
 
-    return context.json(availability);
-  } catch (error) {
-    logError("catalogue_refresh_failed", error, { area: "availability" });
+    const user = context.get("authenticatedUser");
+    const { success } = await context.env.AVAILABILITY_RATE_LIMITER.limit({
+      key: user.id,
+    });
 
-    return context.json({ error: "Availability is unavailable" }, 500);
-  }
-});
+    if (!success) {
+      return context.json({ error: "Give the listings a minute to catch up." }, 429, {
+        "retry-after": "60",
+      });
+    }
+
+    try {
+      const availability = await refreshTitleAvailability(context.env, `${mediaType}:${tmdbId}`);
+
+      if (!availability) {
+        return context.json({ error: "Unknown title" }, 404);
+      }
+
+      return context.json(availability);
+    } catch (error) {
+      logError("catalogue_refresh_failed", error, { area: "availability" });
+
+      return context.json({ error: "Availability is unavailable" }, 500);
+    }
+  },
+);
