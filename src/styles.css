@@ -8289,7 +8289,7 @@ a.showtime:hover small {
 }
 .revival-print-list a:hover strong,
 .revival-print-list a:focus-visible strong {
-  color: var(--accent);
+  color: var(--acid);
 }
 .revival-print-list small {
   color: var(--muted);
@@ -8343,7 +8343,7 @@ a.showtime:hover small {
 .detail-crew a:focus-visible,
 .detail-cast a:hover strong,
 .detail-cast a:focus-visible strong {
-  color: var(--accent);
+  color: var(--acid-ink);
 }
 .detail-cast {
   display: grid;
@@ -8383,11 +8383,11 @@ a.showtime:hover small {
 }
 .detail-credit-seasons button:hover,
 .detail-credit-pager button:not(:disabled):hover {
-  color: var(--fg);
+  color: var(--ink);
 }
 .detail-credit-seasons button.is-active {
-  border-color: var(--accent);
-  color: var(--accent);
+  border-color: var(--acid-ink);
+  color: var(--acid-ink);
 }
 .detail-credit-pager {
   align-items: center;
