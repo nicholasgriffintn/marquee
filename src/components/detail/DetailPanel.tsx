@@ -25,6 +25,7 @@ import { ExitDoor } from "../usher/ExitDoor";
 import { WatchBlock } from "../WatchBlock";
 import { AirLine } from "./AirLine";
 import { BuzzNote } from "./BuzzNote";
+import { CreditsBlock } from "./CreditsBlock";
 import { MarqueeRead } from "./MarqueeRead";
 import { ScoreRow } from "./ScoreRow";
 import { SourceLinks } from "./SourceLinks";
@@ -36,7 +37,6 @@ import { WatchOrder } from "./WatchOrder";
 
 const SIMILAR_LIMIT = 12;
 const DETAIL_TABS = ["overview", "episodes"] as const;
-const PEOPLE_SHOWN = 5;
 const KEYWORDS_SHOWN = 8;
 const STUDIOS_SHOWN = 2;
 const COUNTRIES_SHOWN = 2;
@@ -284,19 +284,9 @@ export function DetailPanel({
             {usherSlot}
             <ScoreRow item={item} />
             {item.buzz && <BuzzNote buzz={item.buzz} />}
-            {item.people?.length ? (
-              <div className="detail-chips">
-                {item.people.slice(0, PEOPLE_SHOWN).map((person) => (
-                  <Link
-                    key={person}
-                    to={`/person/${encodeURIComponent(person)}`}
-                    className="detail-chip detail-chip-person"
-                  >
-                    {person}
-                  </Link>
-                ))}
-              </div>
-            ) : null}
+            <ErrorBoundary label="The credits">
+              <CreditsBlock titleId={item.id} />
+            </ErrorBoundary>
             {item.keywords?.length ? (
               <div className="detail-chips">
                 {item.keywords.slice(0, KEYWORDS_SHOWN).map((keyword) => (

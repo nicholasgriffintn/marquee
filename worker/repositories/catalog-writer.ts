@@ -173,15 +173,19 @@ export async function storeCredits(db: D1Database, credits: TitleCredits[]) {
         db
           .prepare(
             `INSERT INTO catalog_credits
-               (credit_id, title_id, person_id, department, job, character, billing)
-             VALUES (?, ?, ?, ?, ?, ?, ?)
+               (credit_id, title_id, person_id, department, job, character, billing,
+                season_number, episode_number, episode_count)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
              ON CONFLICT(credit_id) DO UPDATE SET
                title_id = excluded.title_id,
                person_id = excluded.person_id,
                department = excluded.department,
                job = excluded.job,
                character = excluded.character,
-               billing = excluded.billing`,
+               billing = excluded.billing,
+               season_number = excluded.season_number,
+               episode_number = excluded.episode_number,
+               episode_count = excluded.episode_count`,
           )
           .bind(
             entry.creditId,
@@ -191,6 +195,9 @@ export async function storeCredits(db: D1Database, credits: TitleCredits[]) {
             entry.job,
             entry.character,
             entry.billing,
+            entry.seasonNumber,
+            entry.episodeNumber,
+            entry.episodeCount,
           ),
       ),
     );

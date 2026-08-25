@@ -8,9 +8,15 @@ import { edgeOrigin } from "../lib/geo.ts";
 import { logError } from "../lib/logging.ts";
 import { pathInteger, queryInteger, queryList, queryText } from "../lib/params.ts";
 import { canonicalOrigin } from "../lib/security.ts";
-import { validProviderIds } from "../lib/validation.ts";
+import { isKnownTitle, validProviderIds } from "../lib/validation.ts";
 import { readCollectionTitleIds, readItems } from "../repositories/catalog-reader.ts";
-import { readPerson, readPersonShelf, readPersonTitleIds } from "../repositories/people.ts";
+import {
+  readCreditSeasons,
+  readPerson,
+  readPersonShelf,
+  readPersonTitleIds,
+  readTitleCredits,
+} from "../repositories/people.ts";
 import {
   browseCatalogue,
   getCatalogue,
@@ -278,6 +284,50 @@ catalogRoutes.get("/providers", edgeCache(300), async (context) => {
     logError("catalogue_read_failed", error, { area: "providers" });
 
     return context.json({ error: "Provider catalogue is unavailable" }, 500);
+  }
+});
+
+const CREDIT_PAGE = 40;
+
+function creditNumber(raw: string | undefined) {
+  const value = Number(raw);
+
+  return raw !== undefined && Number.isInteger(value) && value >= 0 && value <= 10_000
+    ? value
+    : null;
+}
+
+catalogRoutes.get("/titles/:titleId/credits", edgeCache(3_600), async (context) => {
+  const titleId = context.req.param("titleId");
+  const empty = { cast: [], crew: [], seasons: [], total: 0, hasMore: false };
+
+  if (!isKnownTitle(titleId)) {
+    return context.json(empty);
+  }
+
+  const page = creditNumber(context.req.query("page")) ?? 1;
+  const scope = {
+    season: creditNumber(context.req.query("season")),
+    episode: creditNumber(context.req.query("episode")),
+  };
+
+  try {
+    const [credits, seasons] = await Promise.all([
+      readTitleCredits(
+        context.env.DB,
+        titleId,
+        scope,
+        CREDIT_PAGE,
+        Math.max(0, page - 1) * CREDIT_PAGE,
+      ),
+      readCreditSeasons(context.env.DB, titleId),
+    ]);
+
+    return context.json({ ...credits, page, seasons });
+  } catch (error) {
+    logError("title_credits_failed", error, { area: "catalogue", titleId });
+
+    return context.json(empty);
   }
 });
 

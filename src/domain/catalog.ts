@@ -104,6 +104,9 @@ export type TitleCredit = {
   job: string | null;
   character: string | null;
   billing: number | null;
+  seasonNumber: number | null;
+  episodeNumber: number | null;
+  episodeCount: number | null;
 };
 
 export type TitleCredits = { titleId: string; entries: TitleCredit[] };

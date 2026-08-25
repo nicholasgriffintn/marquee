@@ -257,6 +257,33 @@ function person(member: Record<string, unknown>) {
     : null;
 }
 
+const CREDITED_CAST = 60;
+
+const KEY_CREW = new Set([
+  "Director",
+  "Co-Director",
+  "Writer",
+  "Screenplay",
+  "Story",
+  "Novel",
+  "Characters",
+  "Adaptation",
+  "Author",
+  "Creator",
+  "Producer",
+  "Executive Producer",
+  "Casting",
+  "Director of Photography",
+  "Editor",
+  "Original Music Composer",
+  "Music",
+  "Production Design",
+  "Art Direction",
+  "Costume Design",
+  "Makeup Designer",
+  "Visual Effects Supervisor",
+]);
+
 export function parseTmdbCredits(mediaType: MediaType, value: unknown): TitleCredits | null {
   if (!isRecord(value)) {
     return null;
@@ -269,23 +296,28 @@ export function parseTmdbCredits(mediaType: MediaType, value: unknown): TitleCre
     return null;
   }
 
-  const cast = records(credits.cast).flatMap((member, index) => {
-    const who = person(member);
-    const creditId = stringAt(member, "credit_id") ?? firstJobCreditId(member);
+  const cast = records(credits.cast)
+    .slice(0, CREDITED_CAST)
+    .flatMap((member, index) => {
+      const who = person(member);
+      const creditId = stringAt(member, "credit_id") ?? firstJobCreditId(member);
 
-    return who && creditId
-      ? [
-          {
-            creditId,
-            person: who,
-            department: "Acting",
-            job: null,
-            character: stringAt(member, "character") ?? firstCharacter(member),
-            billing: numberAt(member, "order") ?? index,
-          },
-        ]
-      : [];
-  });
+      return who && creditId
+        ? [
+            {
+              creditId,
+              person: who,
+              department: "Acting",
+              job: null,
+              character: stringAt(member, "character") ?? firstCharacter(member),
+              billing: numberAt(member, "order") ?? index,
+              seasonNumber: null,
+              episodeNumber: null,
+              episodeCount: numberAt(member, "total_episode_count") ?? episodesOf(member),
+            },
+          ]
+        : [];
+    });
   const crew = records(credits.crew).flatMap((member) => {
     const who = person(member);
     const jobs = records(member.jobs);
@@ -297,16 +329,20 @@ export function parseTmdbCredits(mediaType: MediaType, value: unknown): TitleCre
     if (jobs.length > 0) {
       return jobs.flatMap((entry) => {
         const creditId = stringAt(entry, "credit_id");
+        const job = stringAt(entry, "job");
 
-        return creditId
+        return creditId && job && KEY_CREW.has(job)
           ? [
               {
                 creditId,
                 person: who,
                 department: stringAt(member, "department") ?? "Crew",
-                job: stringAt(entry, "job"),
+                job,
                 character: null,
                 billing: null,
+                seasonNumber: null,
+                episodeNumber: null,
+                episodeCount: numberAt(entry, "episode_count"),
               },
             ]
           : [];
@@ -314,22 +350,95 @@ export function parseTmdbCredits(mediaType: MediaType, value: unknown): TitleCre
     }
 
     const creditId = stringAt(member, "credit_id");
+    const job = stringAt(member, "job");
 
-    return creditId
+    return creditId && job && KEY_CREW.has(job)
       ? [
           {
             creditId,
             person: who,
             department: stringAt(member, "department") ?? "Crew",
-            job: stringAt(member, "job"),
+            job,
             character: null,
             billing: null,
+            seasonNumber: null,
+            episodeNumber: null,
+            episodeCount: null,
           },
         ]
       : [];
   });
 
   return { titleId: `${mediaType}:${tmdbId}`, entries: [...cast, ...crew] };
+}
+
+function episodesOf(member: Record<string, unknown>) {
+  const roles = records(member.roles);
+
+  return roles.length > 0
+    ? roles.reduce((sum, role) => sum + (numberAt(role, "episode_count") ?? 0), 0)
+    : null;
+}
+
+export function parseTmdbSeasonCredits(titleId: string, value: unknown): TitleCredits | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const entries = records(value.episodes).flatMap((episode) => {
+    const seasonNumber = numberAt(episode, "season_number");
+    const episodeNumber = numberAt(episode, "episode_number");
+
+    if (seasonNumber === null || episodeNumber === null) {
+      return [];
+    }
+
+    const crew = records(episode.crew).flatMap((member) => {
+      const who = person(member);
+      const creditId = stringAt(member, "credit_id");
+      const job = stringAt(member, "job");
+
+      return who && creditId && job && KEY_CREW.has(job)
+        ? [
+            {
+              creditId,
+              person: who,
+              department: stringAt(member, "department") ?? "Crew",
+              job,
+              character: null,
+              billing: null,
+              seasonNumber,
+              episodeNumber,
+              episodeCount: null,
+            },
+          ]
+        : [];
+    });
+    const guests = records(episode.guest_stars).flatMap((member, index) => {
+      const who = person(member);
+      const creditId = stringAt(member, "credit_id");
+
+      return who && creditId
+        ? [
+            {
+              creditId,
+              person: who,
+              department: "Acting",
+              job: null,
+              character: stringAt(member, "character"),
+              billing: numberAt(member, "order") ?? index,
+              seasonNumber,
+              episodeNumber,
+              episodeCount: null,
+            },
+          ]
+        : [];
+    });
+
+    return [...crew, ...guests];
+  });
+
+  return entries.length > 0 ? { titleId, entries } : null;
 }
 
 function firstCharacter(member: Record<string, unknown>) {
