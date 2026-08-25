@@ -242,10 +242,6 @@ export type BrowseTrendingFilter = {
 
 type TrendingRow = PayloadRow & { id: string };
 
-// Titles with a live buzz score are a tiny slice of the catalogue (title_buzz
-// is keyed off Wikipedia pageviews, not the full title set), so this drives
-// off that small table instead of scanning every catalog_titles row to sort
-// by a per-row buzz subquery.
 async function trendingCandidates(db: D1Database, filter: BrowseTrendingFilter) {
   const conditions = [`b.article <> ''`, `b.views >= ${MIN_TRENDING_VIEWS}`];
   const bindings: unknown[] = [];

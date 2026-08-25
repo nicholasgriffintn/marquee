@@ -64,14 +64,10 @@ function blend(terms: RatingTerm[], pick: (term: RatingTerm) => number) {
   return total / weight;
 }
 
-// Stored on catalog_titles.blended_rating at write time — keep in sync with
-// the `blended_rating` expression in migrations/0054_catalog_rating_columns.sql.
 export function computeBlendedRating(item: MediaTitle) {
   return blend(ratingTerms(item), (term) => term.value);
 }
 
-// Stored on catalog_titles.weighted_rating at write time — keep in sync with
-// the `weighted_rating` expression in migrations/0054_catalog_rating_columns.sql.
 export function computeWeightedRating(item: MediaTitle) {
   const [tmdb, ...rest] = ratingTerms(item);
 
