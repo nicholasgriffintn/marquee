@@ -94,9 +94,19 @@ const LISTINGS: BrowsePreset = {
 export function App() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [query, setQuery] = useState(
-    () => new URLSearchParams(window.location.search).get("q") ?? "",
+  const [query, setQuery] = useState(() =>
+    location.pathname === "/search" ? (new URLSearchParams(location.search).get("q") ?? "") : "",
   );
+  const [queryLocationKey, setQueryLocationKey] = useState(location.key);
+
+  if (queryLocationKey !== location.key) {
+    setQueryLocationKey(location.key);
+
+    if (location.pathname === "/search") {
+      setQuery(new URLSearchParams(location.search).get("q") ?? "");
+    }
+  }
+
   const session = useSession();
   const isSignedIn = Boolean(session.user);
   const profile = useProfile(isSignedIn);
