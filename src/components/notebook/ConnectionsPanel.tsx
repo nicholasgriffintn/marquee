@@ -29,6 +29,23 @@ export function ConnectionsPanel({ isSignedIn }: { isSignedIn: boolean }) {
         <strong>Trakt</strong>
         {trakt?.available === false ? (
           <small>Not configured on this deployment.</small>
+        ) : trakt?.connected && trakt.needsReconnect ? (
+          <>
+            <small>
+              {trakt.account ? `${trakt.account} needs reconnecting` : "Needs reconnecting"} · Trakt
+              stopped accepting our access, so syncing is paused.
+            </small>
+            <span className="spacer" />
+            <a
+              className="link-button link-button-primary"
+              href="/api/links/trakt/start?returnTo=/notebook"
+            >
+              Reconnect Trakt
+            </a>
+            <button type="button" onClick={() => void connections.unlinkTrakt()}>
+              Unlink
+            </button>
+          </>
         ) : trakt?.connected ? (
           <>
             <small>
@@ -40,9 +57,7 @@ export function ConnectionsPanel({ isSignedIn }: { isSignedIn: boolean }) {
                 : ""}
               {connections.pushStatus === "running" ? " · sending your shelf over…" : ""}
               {connections.pushStatus === "done" ? " · sent" : ""}
-              {connections.pushStatus === "timeout"
-                ? " · still sending, check back shortly"
-                : ""}
+              {connections.pushStatus === "timeout" ? " · still sending, check back shortly" : ""}
             </small>
             <span className="spacer" />
             <button

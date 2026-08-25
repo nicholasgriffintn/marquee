@@ -15,7 +15,10 @@ import {
 import { traktPushPreview, traktRedirectUri } from "../services/trakt.ts";
 import type { Bindings } from "../types.ts";
 
-export const linkRoutes = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
+export const linkRoutes = new Hono<{
+  Bindings: Bindings;
+  Variables: AuthVariables;
+}>();
 
 linkRoutes.use("*", requireAuthentication);
 
@@ -33,6 +36,7 @@ linkRoutes.get("/", async (context) => {
           available: Boolean(context.env.TRAKT_CLIENT_ID && context.env.TRAKT_CLIENT_SECRET),
           account: trakt?.accountLabel ?? null,
           syncedAt: trakt?.syncedAt ?? null,
+          needsReconnect: Boolean(trakt?.brokenAt),
         },
       ],
     });
