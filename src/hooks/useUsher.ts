@@ -281,10 +281,10 @@ export function useUsher(isSignedIn: boolean) {
   );
 
   const rejectPick = useCallback(
-    async (providerIds: string[]) => {
+    async (providerIds: string[], scope?: "never") => {
       if (pick.item) {
         rejected.current = [...rejected.current, pick.item.id].slice(-REJECTED_MEMORY);
-        void remember(pick.item.id, "pick", { providerIds });
+        void remember(pick.item.id, "pick", { providerIds, ...(scope ? { scope } : {}) });
       }
 
       await askForPick(providerIds);

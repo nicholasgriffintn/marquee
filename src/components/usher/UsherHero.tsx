@@ -34,7 +34,7 @@ export function UsherHero({
   onClear: () => void;
   onOpen: (item: MediaTitle) => void;
   onPin: () => void;
-  onReject: () => void;
+  onReject: (scope?: "never") => void;
 }) {
   const [selection, setSelection] = useState({ prompt: "", id: "" });
 
@@ -150,9 +150,14 @@ export function UsherHero({
                 <span className="play-icon">↗</span> See where to watch
               </button>
               {isPick ? (
-                <button type="button" className="usher-pin" onClick={onReject}>
-                  Not that
-                </button>
+                <>
+                  <button type="button" className="usher-pin" onClick={() => onReject()}>
+                    Not that
+                  </button>
+                  <button type="button" className="usher-quiet" onClick={() => onReject("never")}>
+                    Never suggest this again
+                  </button>
+                </>
               ) : (
                 curator.items.length > 1 && (
                   <button
