@@ -181,11 +181,6 @@ instead: frosted glass, a name painted on it, a note that has said _back in ten 
 He is not in. He is never in. Nor is the projectionist, who runs the sweeps and the long nights of
 ingestion, and who gets a note of his own on the admin page.
 
-Live availability refreshes are limited to signed-in viewers and twelve titles per minute. A title
-that has already been checked is served from the catalogue instead of spending another JustWatch
-call, and interactive refreshes stop before the final 5,000 calls in the daily budget so scheduled
-catalogue upkeep can still run.
-
 ---
 
 ## What it runs on

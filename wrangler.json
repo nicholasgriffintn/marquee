@@ -35,14 +35,6 @@
   ],
   "ratelimits": [
     {
-      "name": "AVAILABILITY_RATE_LIMITER",
-      "namespace_id": "764226",
-      "simple": {
-        "limit": 12,
-        "period": 60
-      }
-    },
-    {
       "name": "AUTH_RATE_LIMITER",
       "namespace_id": "764216",
       "simple": {

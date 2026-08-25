@@ -2,7 +2,12 @@ import { getJustwatchAvailability } from "../clients/justwatch.ts";
 import { logEvent } from "../lib/logging.ts";
 import { enqueue } from "../lib/queue.ts";
 import { isKnownTitle } from "../lib/validation.ts";
-import { enrichAvailability, markAvailabilityChecked } from "../repositories/availability.ts";
+import {
+  claimAvailabilityRefresh,
+  enrichAvailability,
+  markAvailabilityChecked,
+  releaseAvailabilityClaim,
+} from "../repositories/availability.ts";
 import { claimBudget, readBudgetRoom } from "../repositories/budgets.ts";
 import { readAvailability, readItems } from "../repositories/catalog-reader.ts";
 import {
@@ -111,7 +116,15 @@ export async function refreshTitleAvailability(env: Bindings, titleId: string) {
     return current;
   }
 
-  await enrichTitleAvailability(env, titleId, INTERACTIVE_BUDGET_RESERVE);
+  if (!(await claimAvailabilityRefresh(env.DB, titleId))) {
+    return current;
+  }
+
+  try {
+    await enrichTitleAvailability(env, titleId, INTERACTIVE_BUDGET_RESERVE);
+  } finally {
+    await releaseAvailabilityClaim(env.DB, titleId);
+  }
 
   return readAvailability(env.DB, titleId);
 }
