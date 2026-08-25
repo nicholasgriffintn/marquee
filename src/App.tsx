@@ -253,7 +253,7 @@ export function App() {
       }
 
       if (moment.kind === "search-rescue" && actionId === "rescue") {
-        void usher.dismiss("once");
+        void usher.dismiss("acknowledged");
         void askCurator(query);
 
         return;
@@ -271,7 +271,7 @@ export function App() {
         }
       }
 
-      void usher.dismiss("once");
+      void usher.dismiss("acknowledged");
     },
     [askCurator, profile, query, usher],
   );

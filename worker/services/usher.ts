@@ -273,12 +273,16 @@ export async function nextMoment(
     readAnswers(env.DB, viewerId),
   ]);
 
-  if (record.status === "dismissed" || isFuture(record.snoozedUntil)) {
+  if (isFuture(record.snoozedUntil)) {
     return null;
   }
 
   const seen = new Set([...record.asked, ...answers.keys()]);
   const muted = (kind: string) => isFuture(record.muted[kind] ?? null);
+
+  if (surface === "first-run" && record.status === "dismissed") {
+    return null;
+  }
 
   if (surface === "search-empty" && context.query && !muted("search-rescue")) {
     return {
@@ -540,7 +544,7 @@ export async function dismissMoment(
   env: Bindings,
   viewerId: string,
   kind: string,
-  scope: "once" | "kind" | "all",
+  scope: "once" | "kind" | "all" | "acknowledged",
 ) {
   const record = await readUsherRecord(env.DB, viewerId);
 
@@ -554,6 +558,15 @@ export async function dismissMoment(
     await writeUsherRecord(env.DB, viewerId, {
       muted: { ...record.muted, [kind]: daysFromNow(30) },
       ignored: 0,
+    });
+
+    return;
+  }
+
+  if (scope === "acknowledged") {
+    await writeUsherRecord(env.DB, viewerId, {
+      ignored: 0,
+      lastPromptedAt: new Date().toISOString(),
     });
 
     return;
