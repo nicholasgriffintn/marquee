@@ -1,3 +1,4 @@
+import { escalate, type BackoffPolicy } from "../lib/backoff.ts";
 import { logEvent } from "../lib/logging.ts";
 import type { Bindings, EnrichmentSource } from "../types.ts";
 
@@ -7,6 +8,7 @@ type BudgetRow = {
   used: number;
   windowStartedAt: string;
   pausedUntil: string | null;
+  consecutivePauses: number;
 };
 
 export type BudgetSource = Exclude<EnrichmentSource, "poster">;
@@ -165,16 +167,35 @@ export async function claimBudget(env: Bindings, source: EnrichmentSource) {
   return (await claim()).meta.changes > 0;
 }
 
-export async function pauseSource(env: Bindings, source: EnrichmentSource, minutes: number) {
+export async function pauseSource(env: Bindings, source: EnrichmentSource, policy: BackoffPolicy) {
+  const resolved = budgetSource(source);
+  const current = await env.DB.prepare(
+    `SELECT consecutive_pauses AS consecutivePauses FROM source_budgets WHERE source = ?`,
+  )
+    .bind(resolved)
+    .first<{ consecutivePauses: number }>();
+  const consecutive = current?.consecutivePauses ?? 0;
+  const minutes = escalate(policy, consecutive);
+
   await env.DB.prepare(
     `UPDATE source_budgets
-     SET paused_until = datetime('now', ?), updated_at = CURRENT_TIMESTAMP
+     SET paused_until = datetime('now', ?),
+         consecutive_pauses = consecutive_pauses + 1,
+         updated_at = CURRENT_TIMESTAMP
      WHERE source = ?`,
   )
-    .bind(`+${Math.max(1, Math.trunc(minutes))} minutes`, budgetSource(source))
+    .bind(`+${Math.max(1, Math.trunc(minutes))} minutes`, resolved)
     .run();
 
-  logEvent("source_paused", { source, minutes });
+  logEvent("source_paused", { source, minutes, consecutive: consecutive + 1 });
+}
+
+export async function resetBackoff(env: Bindings, source: EnrichmentSource) {
+  await env.DB.prepare(
+    `UPDATE source_budgets SET consecutive_pauses = 0 WHERE source = ? AND consecutive_pauses <> 0`,
+  )
+    .bind(budgetSource(source))
+    .run();
 }
 
 export async function resumeSource(env: Bindings, source: EnrichmentSource) {
@@ -211,7 +232,8 @@ export async function readBudgets(env: Bindings) {
   const configured = Object.keys(SOURCE_BUDGETS);
   const rows = await env.DB.prepare(
     `SELECT source, window_kind AS windowKind, call_limit AS callLimit, used,
-            window_started_at AS windowStartedAt, paused_until AS pausedUntil
+            window_started_at AS windowStartedAt, paused_until AS pausedUntil,
+            consecutive_pauses AS consecutivePauses
      FROM source_budgets
      WHERE source IN (${configured.map(() => "?").join(",")})
      ORDER BY source`,
@@ -228,6 +250,7 @@ export async function readBudgets(env: Bindings) {
       used: 0,
       windowStartedAt: "",
       pausedUntil: null,
+      consecutivePauses: 0,
     }));
 
   return [...rows.results, ...missing].sort((left, right) =>

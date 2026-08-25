@@ -16,6 +16,7 @@ import {
   selectUnenriched,
   storeEnrichment,
   storeEnrichmentMiss,
+  storeEnrichmentTransient,
   storeImdbId,
 } from "../repositories/enrichment.ts";
 import type { Bindings, EnrichmentSource, IngestionJob } from "../types.ts";
@@ -327,6 +328,8 @@ export async function enrichRatings(env: Bindings, titleId: string) {
   const attempt = await resolveOmdbRecord(env, title);
 
   if (attempt.limited) {
+    await storeEnrichmentTransient(env, titleId, "omdb", "rate-limited");
+
     return;
   }
 
@@ -381,13 +384,15 @@ export async function enrichAnime(env: Bindings, titleId: string) {
   });
 
   if (attempt.limited) {
+    await storeEnrichmentTransient(env, titleId, "jikan", "rate-limited");
+
     return;
   }
 
   const details = attempt.value;
 
   if (details === "unavailable") {
-    await storeEnrichmentMiss(env, titleId, "jikan", "mal-unavailable");
+    await storeEnrichmentTransient(env, titleId, "jikan", "mal-unavailable");
 
     return;
   }

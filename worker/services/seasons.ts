@@ -12,6 +12,7 @@ import { withRateLimitPause } from "../jobs/sources.ts";
 import { logError } from "../lib/logging.ts";
 import { databaseDate } from "../lib/values.ts";
 import { claimBudget } from "../repositories/budgets.ts";
+import { storeCredits } from "../repositories/catalog-writer.ts";
 import {
   readEpisodeEntries,
   readWatchedEpisodes,
@@ -175,13 +176,14 @@ export async function getSeason(
   }
 
   try {
-    const season = await withImdbRatings(
-      env,
-      titleId,
-      await getTmdbSeason(env, tmdbIdOf(titleId), seasonNumber),
-    );
+    const fetched = await getTmdbSeason(env, tmdbIdOf(titleId), seasonNumber);
+    const season = await withImdbRatings(env, titleId, fetched.season);
 
     await writeSeasonEpisodes(env.DB, titleId, season);
+
+    if (fetched.credits) {
+      await storeCredits(env.DB, [fetched.credits]);
+    }
 
     return { ...season, source: "TMDB", fetchedAt: new Date().toISOString() };
   } catch (error) {

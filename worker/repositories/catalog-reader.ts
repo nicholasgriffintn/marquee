@@ -261,7 +261,16 @@ export async function readCatalog(db: D1Database, query: string, providerIds: st
 export async function readAvailability(db: D1Database, titleId: string) {
   const [title] = await readItems(db, [titleId]);
 
-  return title?.providers ?? null;
+  if (!title) {
+    return null;
+  }
+
+  const row = await db
+    .prepare(`SELECT enriched_at AS enrichedAt FROM catalog_titles WHERE id = ?`)
+    .bind(titleId)
+    .first<{ enrichedAt: string | null }>();
+
+  return { providers: title.providers, checked: Boolean(row?.enrichedAt) };
 }
 
 async function readSearchResults(db: D1Database, query: string, providerIds: string[]) {

@@ -9,6 +9,8 @@ import {
   CONDITION_LABELS,
   CONDITION_NOTES,
   deliveryNote,
+  printMeta,
+  revivalPath,
   rightsSummary,
   SOURCE_LABELS,
   ukStanding,
@@ -119,6 +121,27 @@ export function RevivalScreenPage({ isSignedIn }: { isSignedIn: boolean }) {
           </div>
         )}
       </dl>
+
+      {screening.prints.length > 0 && (
+        <section className="revival-prints" aria-labelledby="revival-prints-title">
+          <div className="rail-heading">
+            <div>
+              <span>{screening.prints.length + 1} copies of this survive in the archives.</span>
+              <h2 id="revival-prints-title">Other prints</h2>
+            </div>
+          </div>
+          <ul className="revival-print-list">
+            {screening.prints.map((print) => (
+              <li key={print.id}>
+                <Link to={revivalPath(print)}>
+                  <strong>{print.title}</strong>
+                  <small>{printMeta(print)}</small>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {screening.alsoShowing.length > 0 && (
         <section className="content-rail">

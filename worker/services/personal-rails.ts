@@ -5,7 +5,7 @@ import { titleCase } from "../lib/text.ts";
 import { readFollowedPeople } from "../repositories/beliefs.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
 import { readNearbyCinemas, readShowingTitles } from "../repositories/cinemas.ts";
-import { readPersonTitleIds } from "../repositories/people.ts";
+import { readPerson, readPersonTitleIds } from "../repositories/people.ts";
 import type { Bindings } from "../types.ts";
 
 const MIN_RAIL = 3;
@@ -28,7 +28,8 @@ async function peopleRails(env: Bindings, viewerId: string): Promise<CatalogSect
 
   const rails = await Promise.all(
     names.map(async (name) => {
-      const ids = await readPersonTitleIds(env.DB, name, RAIL_SIZE * 2);
+      const person = await readPerson(env.DB, name);
+      const ids = person ? await readPersonTitleIds(env.DB, person.personId, RAIL_SIZE * 2) : [];
       const items = (await readItems(env.DB, ids, RAIL_SIZE)).slice(0, RAIL_SIZE);
       const label = titleCase(name);
 

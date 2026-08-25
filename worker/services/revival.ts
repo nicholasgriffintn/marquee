@@ -1,4 +1,4 @@
-import { assertsPublicDomain, RUNTIME_BANDS, toCard } from "../../src/domain/revival.ts";
+import { assertsPublicDomain, RUNTIME_BANDS, toCard, toPrint } from "../../src/domain/revival.ts";
 import type { RevivalStatus, RevivalWork } from "../../src/domain/revival.ts";
 import {
   ARCHIVE_COLLECTIONS,
@@ -20,6 +20,7 @@ import {
   readAlsoShowing,
   readCountryGroups,
   readDecadeGroups,
+  readGroupPrints,
   readProgress,
   readShelfPage,
   readTagGroups,
@@ -33,7 +34,6 @@ import {
   selectKnownSourceIds,
   selectArchiveForRecheck,
   selectUnmatched,
-  touchWork,
   upsertWork,
   type RevivalCandidate,
   type ShelfGroup,
@@ -284,9 +284,10 @@ export async function queueRevivalSources(env: Bindings) {
 }
 
 export async function recheckArchiveWorks(env: Bindings, limit = 80) {
+  const cutoff = usPublicDomainCutoff();
   const pending = await selectArchiveForRecheck(env.DB, limit);
   const deadline = Date.now() + ARCHIVE_BUDGET_MS;
-  const counts = { checked: 0, removed: 0, skipped: 0 };
+  const counts = { checked: 0, removed: 0, skipped: 0, refreshed: 0 };
 
   for (let index = 0; index < pending.length; index += ARCHIVE_LANES) {
     if (Date.now() > deadline) {
@@ -316,8 +317,11 @@ export async function recheckArchiveWorks(env: Bindings, limit = 80) {
       }
 
       if (verdict.item) {
+        const candidate = withUsExpiredBasis(verdict.item, cutoff);
+
         // oxlint-disable-next-line no-await-in-loop
-        await touchWork(env.DB, verdict.row.id);
+        await upsertWork(env.DB, "archive", candidate, decideStatus(candidate));
+        counts.refreshed += 1;
 
         continue;
       }
@@ -329,7 +333,7 @@ export async function recheckArchiveWorks(env: Bindings, limit = 80) {
     }
   }
 
-  return counts;
+  return { ...counts, exhausted: pending.length < limit };
 }
 
 export async function matchRevivalWorks(env: Bindings, limit = MATCH_BATCH) {
@@ -670,12 +674,13 @@ export async function getScreening(env: Bindings, id: string, viewerId: string |
     return null;
   }
 
-  const [progress, alsoShowing] = await Promise.all([
+  const [progress, alsoShowing, prints] = await Promise.all([
     viewerId
       ? readProgress(env.DB, viewerId, id)
       : Promise.resolve({ positionSeconds: 0, finished: false }),
     readAlsoShowing(env.DB, work.id, work.kind),
+    work.groupId ? readGroupPrints(env.DB, work.groupId, work.id) : Promise.resolve([]),
   ]);
 
-  return { work, ...progress, alsoShowing };
+  return { work, ...progress, alsoShowing, prints: prints.map(toPrint) };
 }

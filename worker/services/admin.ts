@@ -38,6 +38,7 @@ export const ADMIN_ACTIONS = [
   "revival-recheck",
   "revival-mirror",
   "anime-ids",
+  "revival-group",
 ] as const;
 
 const RUN_WINDOW_HOURS = 24;
@@ -53,9 +54,9 @@ const QUEUED_JOBS: Partial<Record<AdminAction, IngestionJob>> = {
   buzz: { type: "sync-buzz" },
   providers: { type: "sync-providers" },
   sections: { type: "build-sections" },
-  "revival-match": { type: "match-revival-works" },
+  "revival-match": { type: "match-revival-works", chain: true },
   "revival-rights": { type: "check-revival-rights" },
-  "revival-recheck": { type: "recheck-revival-works" },
+  "revival-recheck": { type: "recheck-revival-works", chain: true },
 };
 
 type CountRow = Record<string, number>;
@@ -88,7 +89,7 @@ async function catalogueStats(env: Bindings) {
          (SELECT count(*) FROM catalog_seasons) AS seasons,
          (SELECT count(*) FROM title_insights) AS insights,
          (SELECT count(*) FROM catalog_titles
-           WHERE json_extract(payload, '$.externalIds.anilistId') IS NOT NULL) AS animeIds,
+           WHERE json_extract(payload, '$.externalIds.malId') IS NOT NULL) AS animeIds,
          (SELECT count(*) FROM catalog_titles
            WHERE json_extract(payload, '$.anime') IS NOT NULL) AS animeDetails,
          (SELECT count(*) FROM revival_works) AS revivalWorks,
@@ -104,18 +105,112 @@ async function catalogueStats(env: Bindings) {
   return { ...row, workingSet: working.titles, availabilityFresh: working.fresh };
 }
 
-async function enrichmentStats(env: Bindings) {
-  const rows = await env.DB.prepare(
-    `SELECT source,
-            sum(CASE WHEN miss = 0 THEN 1 ELSE 0 END) AS titles,
-            sum(CASE WHEN miss = 1 THEN 1 ELSE 0 END) AS misses,
-            max(fetched_at) AS newest
-     FROM title_enrichment
-     GROUP BY source
-     ORDER BY source`,
-  ).all<{ source: string; titles: number; misses: number; newest: string }>();
+const JOB_TYPE_SOURCE: Record<string, string> = {
+  "enrich-anime": "jikan",
+  "enrich-anilist": "jikan",
+  "enrich-ratings": "omdb",
+  "cache-poster": "poster",
+  "enrich-availability": "justwatch",
+};
 
-  return rows.results;
+async function enrichmentStats(env: Bindings) {
+  const [enriched, justwatch, attempted, recent, recentJustwatch] = await Promise.all([
+    env.DB.prepare(
+      `SELECT source,
+              sum(CASE WHEN miss = 0 THEN 1 ELSE 0 END) AS titles,
+              sum(CASE WHEN miss = 1 THEN 1 ELSE 0 END) AS misses,
+              sum(CASE WHEN miss = 2 THEN 1 ELSE 0 END) AS pending,
+              max(fetched_at) AS newest
+       FROM title_enrichment
+       GROUP BY source
+       ORDER BY source`,
+    ).all<{ source: string; titles: number; misses: number; pending: number; newest: string }>(),
+    env.DB.prepare(
+      `SELECT
+         sum(CASE WHEN json_array_length(COALESCE(json_extract(payload, '$.providers'), json('[]'))) > 0 THEN 1 ELSE 0 END) AS titles,
+         sum(CASE WHEN json_array_length(COALESCE(json_extract(payload, '$.providers'), json('[]'))) = 0 THEN 1 ELSE 0 END) AS misses,
+         max(enriched_at) AS newest
+       FROM catalog_titles
+       WHERE enriched_at IS NOT NULL`,
+    ).first<{ titles: number; misses: number; newest: string }>(),
+    env.DB.prepare(
+      `SELECT job_type AS jobType, count(*) AS attempted
+       FROM ingestion_runs
+       WHERE job_type IN ('enrich-anime', 'enrich-anilist', 'enrich-ratings', 'cache-poster', 'enrich-availability')
+         AND started_at > datetime('now', ?)
+       GROUP BY job_type`,
+    )
+      .bind(`-${RUN_WINDOW_HOURS} hours`)
+      .all<{ jobType: string; attempted: number }>(),
+    env.DB.prepare(
+      `SELECT source,
+              sum(CASE WHEN miss = 0 THEN 1 ELSE 0 END) AS titles,
+              sum(CASE WHEN miss = 1 THEN 1 ELSE 0 END) AS misses
+       FROM title_enrichment
+       WHERE fetched_at > datetime('now', ?)
+       GROUP BY source`,
+    )
+      .bind(`-${RUN_WINDOW_HOURS} hours`)
+      .all<{ source: string; titles: number; misses: number }>(),
+    env.DB.prepare(
+      `SELECT
+         sum(CASE WHEN json_array_length(COALESCE(json_extract(payload, '$.providers'), json('[]'))) > 0 THEN 1 ELSE 0 END) AS titles,
+         sum(CASE WHEN json_array_length(COALESCE(json_extract(payload, '$.providers'), json('[]'))) = 0 THEN 1 ELSE 0 END) AS misses
+       FROM catalog_titles
+       WHERE enriched_at > datetime('now', ?)`,
+    )
+      .bind(`-${RUN_WINDOW_HOURS} hours`)
+      .first<{ titles: number; misses: number }>(),
+  ]);
+
+  const attemptedBySource = new Map<string, number>();
+
+  for (const row of attempted.results) {
+    const source = JOB_TYPE_SOURCE[row.jobType];
+
+    if (source) {
+      attemptedBySource.set(source, (attemptedBySource.get(source) ?? 0) + row.attempted);
+    }
+  }
+
+  const recentBySource = new Map(recent.results.map((row) => [row.source, row]));
+
+  if (recentJustwatch) {
+    recentBySource.set("justwatch", { source: "justwatch", ...recentJustwatch });
+  }
+
+  const withAttempts = (row: {
+    source: string;
+    titles: number;
+    misses: number;
+    pending: number;
+    newest: string;
+  }) => {
+    const windowAttempted = attemptedBySource.get(row.source) ?? 0;
+    const windowRow = recentBySource.get(row.source);
+    const silentFailures = Math.max(
+      0,
+      windowAttempted - (windowRow?.titles ?? 0) - (windowRow?.misses ?? 0),
+    );
+
+    return { ...row, attempted: windowAttempted, silentFailures };
+  };
+
+  const justwatchRow = justwatch
+    ? [
+        withAttempts({
+          source: "justwatch",
+          titles: justwatch.titles,
+          misses: justwatch.misses,
+          pending: 0,
+          newest: justwatch.newest,
+        }),
+      ]
+    : [];
+
+  return [...enriched.results.map(withAttempts), ...justwatchRow].sort((left, right) =>
+    left.source.localeCompare(right.source),
+  );
 }
 
 export async function readAdminOverview(env: Bindings) {
@@ -267,6 +362,12 @@ export async function runAdminAction(env: Bindings, action: AdminAction) {
       queued: frontier.pages,
       detail: `Queued ${frontier.pages} discover pages and ${frontier.measuring} window measurements`,
     };
+  }
+
+  if (action === "revival-group") {
+    await env.REVIVAL_QUEUE.send({ type: "group-revival-prints" });
+
+    return { queued: 1, detail: "Grouping the duplicate prints" };
   }
 
   if (action === "anime-ids") {

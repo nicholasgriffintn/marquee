@@ -126,9 +126,9 @@ export async function getProviderCatalogue(db: D1Database) {
 }
 
 export async function getTitleAvailability(env: Bindings, titleId: string) {
-  const providers = await readAvailability(env.DB, titleId);
+  const availability = await readAvailability(env.DB, titleId);
 
-  if (!providers) {
+  if (!availability) {
     return null;
   }
 
@@ -137,7 +137,8 @@ export async function getTitleAvailability(env: Bindings, titleId: string) {
     : null;
 
   return {
-    providers,
+    providers: availability.providers,
+    checked: availability.checked,
     nextEpisode,
     source: "Marquee catalogue",
     fetchedAt: new Date().toISOString(),

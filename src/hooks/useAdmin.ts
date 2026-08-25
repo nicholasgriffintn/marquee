@@ -31,7 +31,15 @@ export type AdminAction =
 
 export type AdminOverview = {
   catalogue: Record<string, number>;
-  enrichment: { source: string; titles: number; misses: number; newest: string }[];
+  enrichment: {
+    source: string;
+    titles: number;
+    misses: number;
+    pending: number;
+    newest: string;
+    attempted: number;
+    silentFailures: number;
+  }[];
   backfill: {
     mediaType: string;
     status: string;
@@ -60,6 +68,7 @@ export type AdminOverview = {
     used: number;
     windowKind: string;
     pausedUntil: string | null;
+    consecutivePauses: number;
   }[];
   cinemas: {
     source: string;

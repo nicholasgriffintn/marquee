@@ -4,14 +4,14 @@ import { enqueue } from "../lib/queue.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { enrichAvailability, markAvailabilityChecked } from "../repositories/availability.ts";
 import { claimBudget, readBudgetRoom } from "../repositories/budgets.ts";
-import { readItems } from "../repositories/catalog-reader.ts";
+import { readAvailability, readItems } from "../repositories/catalog-reader.ts";
 import {
   countStaleWorkingSet,
   DEMAND_MAX_AGE_DAYS,
   selectStaleWorkingSet,
 } from "../repositories/working-set.ts";
 import type { Bindings, IngestionJob } from "../types.ts";
-import { titleParts } from "./sources.ts";
+import { titleParts, withRateLimitPause } from "./sources.ts";
 
 const AVAILABILITY_PER_RUN = 600;
 
@@ -92,7 +92,19 @@ export async function enrichTitleAvailability(env: Bindings, titleId: string) {
     return;
   }
 
-  const availability = await getJustwatchAvailability(parts.mediaType, parts.tmdbId, title.title);
+  const attempt = await withRateLimitPause(env, "justwatch", () =>
+    getJustwatchAvailability(parts.mediaType, parts.tmdbId, title.title),
+  );
 
-  await enrichAvailability(env.DB, titleId, availability ?? []);
+  if (attempt.limited) {
+    return;
+  }
+
+  await enrichAvailability(env.DB, titleId, attempt.value ?? []);
+}
+
+export async function refreshTitleAvailability(env: Bindings, titleId: string) {
+  await enrichTitleAvailability(env, titleId);
+
+  return readAvailability(env.DB, titleId);
 }

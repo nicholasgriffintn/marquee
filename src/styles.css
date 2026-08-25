@@ -732,7 +732,8 @@ svg {
   display: block;
 }
 @media (prefers-reduced-motion: reduce) {
-  .skeleton {
+  .skeleton,
+  .availability-spinner {
     animation: none;
   }
   .hero-actions .hero-play,
@@ -1913,7 +1914,8 @@ h2 em {
   margin-left: auto;
 }
 .status-input {
-  color: var(--muted);
+  align-items: center;
+  color: var(--ink);
   display: flex !important;
   gap: 10px;
 }
@@ -2585,8 +2587,25 @@ h2 em {
   opacity: 0.75;
 }
 .availability-empty {
+  align-items: center;
   color: #696b62;
+  display: flex;
   font-size: 11px;
+  gap: 8px;
+}
+.availability-spinner {
+  animation: availability-spin 0.8s linear infinite;
+  border: 2px solid #d8d5c8;
+  border-radius: 50%;
+  border-top-color: #696b62;
+  display: inline-block;
+  height: 12px;
+  width: 12px;
+}
+@keyframes availability-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 .watch-grid {
   display: grid;
@@ -8208,4 +8227,143 @@ a.showtime:hover small {
 .admin-search:focus-visible {
   border-color: var(--acid);
   outline: none;
+}
+
+.revival-prints {
+  margin-block: 40px;
+}
+.revival-print-list {
+  border-top: 1px solid var(--line);
+  display: grid;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.revival-print-list > li {
+  border-bottom: 1px solid var(--line);
+}
+.revival-print-list a {
+  align-items: baseline;
+  color: inherit;
+  display: grid;
+  gap: 4px 20px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding-block: 14px;
+  text-decoration: none;
+}
+.revival-print-list a:hover strong,
+.revival-print-list a:focus-visible strong {
+  color: var(--accent);
+}
+.revival-print-list small {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+}
+@media (max-width: 640px) {
+  .revival-print-list a {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.detail-credits {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 18px;
+  margin-block: 24px 0;
+  padding-block-start: 20px;
+}
+.detail-credits h3 {
+  font-size: 0.75rem;
+  font-family: var(--mono);
+  letter-spacing: 0.08em;
+  margin: 0;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.detail-crew {
+  display: grid;
+  gap: 10px 24px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  margin: 0;
+}
+.detail-crew dt {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.detail-crew dd {
+  margin: 2px 0 0;
+}
+.detail-crew a,
+.detail-cast a {
+  color: inherit;
+  text-decoration: none;
+}
+.detail-crew a:hover,
+.detail-crew a:focus-visible,
+.detail-cast a:hover strong,
+.detail-cast a:focus-visible strong {
+  color: var(--accent);
+}
+.detail-cast {
+  display: grid;
+  gap: 8px 24px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.detail-cast strong {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.detail-cast small {
+  color: var(--muted);
+  display: block;
+  font-size: 0.75rem;
+}
+
+.detail-credit-seasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.detail-credit-seasons button,
+.detail-credit-pager button {
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  padding: 5px 10px;
+  text-transform: uppercase;
+}
+.detail-credit-seasons button:hover,
+.detail-credit-pager button:not(:disabled):hover {
+  color: var(--fg);
+}
+.detail-credit-seasons button.is-active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.detail-credit-pager {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+}
+.detail-credit-pager span {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.7rem;
+}
+.detail-credit-pager button:disabled {
+  cursor: default;
+  opacity: 0.4;
 }

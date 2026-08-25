@@ -86,7 +86,27 @@ export async function storeEnrichmentMiss(
     .run();
 }
 
+export async function storeEnrichmentTransient(
+  env: Bindings,
+  titleId: string,
+  source: EnrichmentSource,
+  reason: string,
+) {
+  await env.DB.prepare(
+    `INSERT INTO title_enrichment (title_id, source, payload, miss, attempts)
+     VALUES (?, ?, ?, 2, 1)
+     ON CONFLICT(title_id, source) DO UPDATE SET
+       payload = excluded.payload,
+       miss = 2,
+       attempts = title_enrichment.attempts + 1,
+       fetched_at = CURRENT_TIMESTAMP`,
+  )
+    .bind(titleId, source, JSON.stringify({ transient: reason }))
+    .run();
+}
+
 const MISS_BACKOFF_CAP_DAYS = 120;
+const TRANSIENT_RETRY_HOURS = 1;
 
 export type EnrichmentWindow = { maxAgeDays: number; missBackoffDays: number };
 
@@ -97,7 +117,8 @@ function dueForEnrichment(window: EnrichmentWindow) {
            AND e.fetched_at < datetime(
              'now',
              '-' || min(e.attempts * ${window.missBackoffDays}, ${MISS_BACKOFF_CAP_DAYS}) || ' days'
-           ))`;
+           ))
+       OR (e.miss = 2 AND e.fetched_at < datetime('now', '-${TRANSIENT_RETRY_HOURS} hours'))`;
 }
 
 export async function storeAnimeIds(db: D1Database, mappings: AnimeMapping[]) {

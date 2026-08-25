@@ -3,6 +3,7 @@ import type {
   MediaTitle,
   MediaType,
   ProviderAvailability,
+  TitleCredits,
 } from "../../src/domain/catalog.ts";
 import {
   findRegistryProviderForOffer,
@@ -18,6 +19,7 @@ import {
   recordAt,
   records,
   stringAt,
+  stringList,
 } from "./values.ts";
 
 const IMAGE_BASE = "https://image.tmdb.org/t/p";
@@ -227,11 +229,235 @@ function parseKeywords(details: Record<string, unknown>) {
     .slice(0, KEYWORD_LIMIT);
 }
 
+function billed(value: unknown, limit: number) {
+  return records(value)
+    .flatMap((member) => {
+      const name = stringAt(member, "name");
+      const id = numberAt(member, "id");
+
+      return name && id ? [{ id, name }] : [];
+    })
+    .slice(0, limit);
+}
+
+function person(member: Record<string, unknown>) {
+  const id = numberAt(member, "id");
+  const name = stringAt(member, "name");
+
+  return id && name
+    ? {
+        id,
+        name,
+        originalName: stringAt(member, "original_name"),
+        knownFor: stringAt(member, "known_for_department"),
+        gender: numberAt(member, "gender"),
+        profilePath: stringAt(member, "profile_path"),
+        popularity: numberAt(member, "popularity"),
+      }
+    : null;
+}
+
+const CREDITED_CAST = 60;
+
+const KEY_CREW = new Set([
+  "Director",
+  "Co-Director",
+  "Writer",
+  "Screenplay",
+  "Story",
+  "Novel",
+  "Characters",
+  "Adaptation",
+  "Author",
+  "Creator",
+  "Producer",
+  "Executive Producer",
+  "Casting",
+  "Director of Photography",
+  "Editor",
+  "Original Music Composer",
+  "Music",
+  "Production Design",
+  "Art Direction",
+  "Costume Design",
+  "Makeup Designer",
+  "Visual Effects Supervisor",
+]);
+
+export function parseTmdbCredits(mediaType: MediaType, value: unknown): TitleCredits | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const tmdbId = numberAt(value, "id");
+  const credits = recordAt(value, mediaType === "movie" ? "credits" : "aggregate_credits");
+
+  if (!tmdbId || !credits) {
+    return null;
+  }
+
+  const cast = records(credits.cast)
+    .slice(0, CREDITED_CAST)
+    .flatMap((member, index) => {
+      const who = person(member);
+      const creditId = stringAt(member, "credit_id") ?? firstJobCreditId(member);
+
+      return who && creditId
+        ? [
+            {
+              creditId,
+              person: who,
+              department: "Acting",
+              job: null,
+              character: stringAt(member, "character") ?? firstCharacter(member),
+              billing: numberAt(member, "order") ?? index,
+              seasonNumber: null,
+              episodeNumber: null,
+              episodeCount: numberAt(member, "total_episode_count") ?? episodesOf(member),
+            },
+          ]
+        : [];
+    });
+  const crew = records(credits.crew).flatMap((member) => {
+    const who = person(member);
+    const jobs = records(member.jobs);
+
+    if (!who) {
+      return [];
+    }
+
+    if (jobs.length > 0) {
+      return jobs.flatMap((entry) => {
+        const creditId = stringAt(entry, "credit_id");
+        const job = stringAt(entry, "job");
+
+        return creditId && job && KEY_CREW.has(job)
+          ? [
+              {
+                creditId,
+                person: who,
+                department: stringAt(member, "department") ?? "Crew",
+                job,
+                character: null,
+                billing: null,
+                seasonNumber: null,
+                episodeNumber: null,
+                episodeCount: numberAt(entry, "episode_count"),
+              },
+            ]
+          : [];
+      });
+    }
+
+    const creditId = stringAt(member, "credit_id");
+    const job = stringAt(member, "job");
+
+    return creditId && job && KEY_CREW.has(job)
+      ? [
+          {
+            creditId,
+            person: who,
+            department: stringAt(member, "department") ?? "Crew",
+            job,
+            character: null,
+            billing: null,
+            seasonNumber: null,
+            episodeNumber: null,
+            episodeCount: null,
+          },
+        ]
+      : [];
+  });
+
+  return { titleId: `${mediaType}:${tmdbId}`, entries: [...cast, ...crew] };
+}
+
+function episodesOf(member: Record<string, unknown>) {
+  const roles = records(member.roles);
+
+  return roles.length > 0
+    ? roles.reduce((sum, role) => sum + (numberAt(role, "episode_count") ?? 0), 0)
+    : null;
+}
+
+export function parseTmdbSeasonCredits(titleId: string, value: unknown): TitleCredits | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const entries = records(value.episodes).flatMap((episode) => {
+    const seasonNumber = numberAt(episode, "season_number");
+    const episodeNumber = numberAt(episode, "episode_number");
+
+    if (seasonNumber === null || episodeNumber === null) {
+      return [];
+    }
+
+    const crew = records(episode.crew).flatMap((member) => {
+      const who = person(member);
+      const creditId = stringAt(member, "credit_id");
+      const job = stringAt(member, "job");
+
+      return who && creditId && job && KEY_CREW.has(job)
+        ? [
+            {
+              creditId,
+              person: who,
+              department: stringAt(member, "department") ?? "Crew",
+              job,
+              character: null,
+              billing: null,
+              seasonNumber,
+              episodeNumber,
+              episodeCount: null,
+            },
+          ]
+        : [];
+    });
+    const guests = records(episode.guest_stars).flatMap((member, index) => {
+      const who = person(member);
+      const creditId = stringAt(member, "credit_id");
+
+      return who && creditId
+        ? [
+            {
+              creditId,
+              person: who,
+              department: "Acting",
+              job: null,
+              character: stringAt(member, "character"),
+              billing: numberAt(member, "order") ?? index,
+              seasonNumber,
+              episodeNumber,
+              episodeCount: null,
+            },
+          ]
+        : [];
+    });
+
+    return [...crew, ...guests];
+  });
+
+  return entries.length > 0 ? { titleId, entries } : null;
+}
+
+function firstCharacter(member: Record<string, unknown>) {
+  const [role] = records(member.roles);
+
+  return role ? stringAt(role, "character") : null;
+}
+
+function firstJobCreditId(member: Record<string, unknown>) {
+  const [role] = records(member.roles);
+
+  return role ? stringAt(role, "credit_id") : null;
+}
+
 function parsePeople(mediaType: MediaType, details: Record<string, unknown>) {
   const credits = recordAt(details, mediaType === "movie" ? "credits" : "aggregate_credits");
   const directors = credits
-    ? records(credits.crew)
-        .filter((member) => {
+    ? billed(
+        records(credits.crew).filter((member) => {
           const job = stringAt(member, "job");
 
           return (
@@ -239,15 +465,21 @@ function parsePeople(mediaType: MediaType, details: Record<string, unknown>) {
             job === "Creator" ||
             records(member.jobs).some((entry) => stringAt(entry, "job") === "Director")
           );
-        })
-        .map((member) => stringAt(member, "name"))
-        .filter((name): name is string => Boolean(name))
-        .slice(0, 3)
+        }),
+        3,
+      )
     : [];
-  const creators = names(details.created_by, 3);
-  const cast = credits ? names(credits.cast, CAST_LIMIT) : [];
+  const creators = billed(details.created_by, 3);
+  const cast = credits ? billed(credits.cast, CAST_LIMIT) : [];
+  const seen = new Map<number, { id: number; name: string }>();
 
-  return [...new Set([...directors, ...creators, ...cast])].slice(0, 10);
+  for (const person of [...directors, ...creators, ...cast]) {
+    if (!seen.has(person.id)) {
+      seen.set(person.id, person);
+    }
+  }
+
+  return [...seen.values()].slice(0, 10);
 }
 
 const STUDIO_LIMIT = 4;
@@ -299,6 +531,7 @@ export function parseTmdbTitle(mediaType: MediaType, value: unknown): MediaTitle
   const { providers, watchLink } = parseAvailability(value);
   const externalIds = recordAt(value, "external_ids");
   const imdbId = externalIds ? stringAt(externalIds, "imdb_id") : null;
+  const billing = parsePeople(mediaType, value);
   const episodeRunTimes = Array.isArray(value.episode_run_time)
     ? value.episode_run_time.filter((item): item is number => typeof item === "number" && item > 0)
     : [];
@@ -330,8 +563,19 @@ export function parseTmdbTitle(mediaType: MediaType, value: unknown): MediaTitle
     tmdbUrl: `https://www.themoviedb.org/${mediaType}/${tmdbId}`,
     imdbUrl: imdbId && /^tt\d+$/u.test(imdbId) ? `https://www.imdb.com/title/${imdbId}/` : null,
     externalIds: parseExternalIds(externalIds, imdbId),
+    homepage: httpsUrl(stringAt(value, "homepage")),
+    originCountries: stringList(value.origin_country, { limit: 6, itemLength: 8 }),
+    productionCountries: records(value.production_countries)
+      .flatMap((entry) => [stringAt(entry, "name")].filter(Boolean))
+      .slice(0, 6) as string[],
+    spokenLanguages: records(value.spoken_languages)
+      .flatMap((entry) =>
+        [stringAt(entry, "english_name") ?? stringAt(entry, "name")].filter(Boolean),
+      )
+      .slice(0, 8) as string[],
     keywords: parseKeywords(value),
-    people: parsePeople(mediaType, value),
+    people: billing.map((person) => person.name),
+    credits: parseTmdbCredits(mediaType, value)?.entries ?? [],
     trailerKey: parseTrailer(value),
     videos: parseVideos(value),
     originalLanguage: stringAt(value, "original_language"),

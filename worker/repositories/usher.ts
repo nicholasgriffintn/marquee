@@ -202,17 +202,14 @@ export async function popularPeople(db: D1Database, limit: number) {
 }
 
 export async function rebuildPeopleIndex(db: D1Database) {
-  await db.prepare(`DELETE FROM catalog_people`).run();
   await db
     .prepare(
-      `INSERT INTO catalog_people (name, titles)
-       SELECT json_each.value AS name, count(*) AS titles
-       FROM catalog_titles, json_each(payload, '$.people')
-       WHERE json_valid(payload)
-       GROUP BY json_each.value
-       HAVING titles >= 2
-       ORDER BY titles DESC
-       LIMIT 40000`,
+      `UPDATE catalog_people
+       SET titles = (
+         SELECT count(DISTINCT title_id)
+         FROM catalog_credits
+         WHERE catalog_credits.person_id = catalog_people.person_id
+       )`,
     )
     .run();
 

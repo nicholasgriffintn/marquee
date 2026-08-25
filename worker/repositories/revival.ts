@@ -63,6 +63,7 @@ type WorkRow = {
   contentNotice: string | null;
   popularity: number | null;
   downloads: number | null;
+  groupId: string | null;
   posterKey: string | null;
   catalogueBackdrop: string | null;
   cataloguePoster: string | null;
@@ -75,7 +76,7 @@ const WORK_COLUMNS = `w.id, w.source, w.source_url AS sourceUrl, w.title, w.year
    w.title_id AS titleId, w.country, w.uk_clear AS ukClear,
    w.uk_expires_year AS ukExpiresYear, w.stream_url AS streamUrl,
    w.mirror_state AS mirrorState, w.plays, w.content_notice AS contentNotice,
-   w.popularity, w.downloads,
+   w.popularity, w.downloads, w.group_id AS groupId,
    w.stream_bytes AS streamBytes, w.width, w.height,
    t.poster_key AS posterKey,
    json_extract(t.payload, '$.backdropUrl') AS catalogueBackdrop,
@@ -149,6 +150,9 @@ function toWork(row: WorkRow): RevivalWork {
     plays: row.plays,
     popularity: row.popularity,
     downloads: row.downloads,
+    groupId: row.groupId,
+    streamBytes: row.streamBytes,
+    height: row.height,
     condition: printCondition(row.streamBytes, row.runtimeSeconds, row.height),
     contentNotice: row.contentNotice ?? contentNoticeFor(row.title, row.synopsis),
     tags: [],
@@ -394,7 +398,7 @@ export async function readShelfPage(
     .prepare(
       `SELECT ${WORK_COLUMNS}
        ${WORK_FROM}
-       WHERE w.status = 'approved' AND ${where}
+       WHERE w.status = 'approved' AND w.group_primary = 1 AND ${where}
        ORDER BY ${BY_STANDING}
        LIMIT ? OFFSET ?`,
     )
@@ -410,7 +414,7 @@ export async function countShelf(db: D1Database, selector: ShelfSelector) {
     .prepare(
       `SELECT COUNT(*) AS total
        FROM revival_works AS w
-       WHERE w.status = 'approved' AND ${where}`,
+       WHERE w.status = 'approved' AND w.group_primary = 1 AND ${where}`,
     )
     .bind(...binds)
     .first<{ total: number }>();
@@ -423,7 +427,7 @@ export async function readVaultPage(db: D1Database, limit: number, offset = 0) {
     .prepare(
       `SELECT ${WORK_COLUMNS}
        ${WORK_FROM}
-       WHERE w.status = 'approved'
+       WHERE w.status = 'approved' AND w.group_primary = 1
        ORDER BY ${BY_STANDING}
        LIMIT ? OFFSET ?`,
     )
@@ -445,7 +449,8 @@ export async function readTagGroups(
     .prepare(
       `SELECT g.slug, MIN(g.label) AS label, COUNT(*) AS size
        FROM revival_tags AS g
-       JOIN revival_works AS w ON w.id = g.work_id AND w.status = 'approved'
+       JOIN revival_works AS w
+         ON w.id = g.work_id AND w.status = 'approved' AND w.group_primary = 1
        WHERE g.kind = ?
        GROUP BY g.slug
        HAVING COUNT(*) >= ?
@@ -463,7 +468,8 @@ export async function readCountryGroups(db: D1Database, limit: number, minimum: 
     .prepare(
       `SELECT country AS slug, country AS label, COUNT(*) AS size
        FROM revival_works
-       WHERE status = 'approved' AND country IS NOT NULL AND country <> ''
+       WHERE status = 'approved' AND group_primary = 1
+         AND country IS NOT NULL AND country <> ''
        GROUP BY country
        HAVING COUNT(*) >= ?
        ORDER BY size DESC, country
@@ -480,7 +486,8 @@ export async function readDecadeGroups(db: D1Database, limit: number, minimum: n
     .prepare(
       `SELECT (year / 10) * 10 AS slug, (year / 10) * 10 AS label, COUNT(*) AS size
        FROM revival_works
-       WHERE status = 'approved' AND kind = 'feature' AND year IS NOT NULL
+       WHERE status = 'approved' AND group_primary = 1
+         AND kind = 'feature' AND year IS NOT NULL
        GROUP BY slug
        HAVING COUNT(*) >= ?
        ORDER BY size DESC, slug DESC
@@ -502,9 +509,79 @@ export async function drawFromShelf(db: D1Database, selector: ShelfSelector, off
   return work ?? null;
 }
 
+export type GroupCandidate = {
+  id: string;
+  sortTitle: string;
+  year: number | null;
+  runtimeSeconds: number | null;
+  popularity: number | null;
+  streamBytes: number | null;
+  height: number | null;
+  plays: number;
+};
+
+export async function readGroupCandidates(db: D1Database) {
+  const rows = await db
+    .prepare(
+      `SELECT id, sort_title AS sortTitle, year, runtime_seconds AS runtimeSeconds,
+              popularity, stream_bytes AS streamBytes, height, plays
+       FROM revival_works
+       WHERE status = 'approved'
+       ORDER BY sort_title, runtime_seconds`,
+    )
+    .all<GroupCandidate>();
+
+  return rows.results;
+}
+
+export async function storeGroups(
+  db: D1Database,
+  assignments: { id: string; groupId: string; primary: boolean }[],
+) {
+  if (assignments.length === 0) {
+    return 0;
+  }
+
+  const written = await db.batch(
+    assignments.map((entry) =>
+      db
+        .prepare(
+          `UPDATE revival_works
+           SET group_id = ?, group_primary = ?
+           WHERE id = ?
+             AND (group_id IS NOT ? OR group_primary IS NOT ?)`,
+        )
+        .bind(entry.groupId, entry.primary ? 1 : 0, entry.id, entry.groupId, entry.primary ? 1 : 0),
+    ),
+  );
+
+  return written.reduce((sum, result) => sum + (result.meta.changes ?? 0), 0);
+}
+
+export async function readGroupPrints(db: D1Database, groupId: string, excludeId: string) {
+  const rows = await db
+    .prepare(
+      `SELECT ${WORK_COLUMNS}
+       ${WORK_FROM}
+       WHERE w.status = 'approved'
+         AND w.group_id = ?
+         AND w.id <> ?
+       ORDER BY w.group_primary DESC, COALESCE(w.popularity, 0) DESC
+       LIMIT 8`,
+    )
+    .bind(groupId, excludeId)
+    .all<WorkRow>();
+
+  return rows.results.map(toWork);
+}
+
 export async function countApproved(db: D1Database) {
   const row = await db
-    .prepare(`SELECT COUNT(*) AS total FROM revival_works WHERE status = 'approved'`)
+    .prepare(
+      `SELECT COUNT(*) AS total
+       FROM revival_works
+       WHERE status = 'approved' AND group_primary = 1`,
+    )
     .first<{ total: number }>();
 
   return row?.total ?? 0;
@@ -521,6 +598,7 @@ export async function readAlsoShowing(
       `SELECT ${WORK_COLUMNS}
        ${WORK_FROM}
        WHERE w.status = 'approved'
+         AND w.group_primary = 1
          AND w.kind = ?
          AND w.id <> ?
        ORDER BY ${BY_STANDING}
@@ -539,6 +617,7 @@ export async function countSearch(db: D1Database, query: string) {
       `SELECT COUNT(*) AS total
        FROM revival_works AS w
        WHERE w.status = 'approved'
+         AND w.group_primary = 1
          AND (
            w.title LIKE ?1
            OR w.sort_title LIKE ?1
@@ -562,6 +641,7 @@ export async function searchApproved(db: D1Database, query: string, limit = 60, 
       `SELECT ${WORK_COLUMNS}
        ${WORK_FROM}
        WHERE w.status = 'approved'
+         AND w.group_primary = 1
          AND (
            w.title LIKE ?1
            OR w.sort_title LIKE ?1

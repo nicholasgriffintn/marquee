@@ -19,7 +19,7 @@ import { queueCinemaDirectories, queueCinemaScreenings } from "../services/cinem
 import { advanceDiscoverFrontier } from "../services/discover.ts";
 import { queueRevivalMirrors } from "../services/revival-mirror.ts";
 import { checkRevivalRights } from "../services/revival-rights.ts";
-import { queueRevivalSources, recheckArchiveWorks } from "../services/revival.ts";
+import { queueRevivalSources } from "../services/revival.ts";
 import { syncSchedule } from "../services/schedule.ts";
 import { buildSections } from "../services/sections.ts";
 import type { Bindings, CatalogSweepParameters } from "../types.ts";
@@ -118,13 +118,21 @@ export class CatalogSweep extends WorkflowEntrypoint<Bindings, CatalogSweepParam
       return true;
     });
 
+    await step.do("group public domain prints", { retries: RETRIES }, async () => {
+      await this.env.REVIVAL_QUEUE.send({ type: "group-revival-prints" });
+
+      return true;
+    });
+
     await step.do("check public domain rights", { retries: RETRIES }, async () =>
       checkRevivalRights(this.env),
     );
 
-    await step.do("recheck print suitability", { retries: RETRIES }, async () =>
-      recheckArchiveWorks(this.env),
-    );
+    await step.do("recheck print suitability", { retries: RETRIES }, async () => {
+      await this.env.REVIVAL_QUEUE.send({ type: "recheck-revival-works", chain: true });
+
+      return true;
+    });
 
     await step.do("queue reel mirrors", { retries: RETRIES }, async () =>
       queueRevivalMirrors(this.env),

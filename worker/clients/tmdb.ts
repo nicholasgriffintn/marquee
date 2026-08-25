@@ -8,6 +8,7 @@ import { clamp } from "../lib/numbers.ts";
 import {
   parseTmdbProviders,
   parseTmdbSeason,
+  parseTmdbSeasonCredits,
   parseTmdbSeasonSummaries,
   parseTmdbSummaries,
   parseTmdbTitle,
@@ -305,7 +306,7 @@ export async function getTmdbSeason(env: Bindings, tmdbId: number, seasonNumber:
     throw new TmdbError("TMDB returned an incomplete season");
   }
 
-  return season;
+  return { season, credits: parseTmdbSeasonCredits(`tv:${tmdbId}`, payload) };
 }
 
 export async function findByTitle(

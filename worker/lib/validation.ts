@@ -132,6 +132,14 @@ export function isIngestionJob(value: unknown): value is IngestionJob {
     );
   }
 
+  if (value.type === "recheck-revival-works") {
+    return value.chain === undefined || typeof value.chain === "boolean";
+  }
+
+  if (value.type === "group-revival-prints") {
+    return true;
+  }
+
   if (value.type === "match-revival-works") {
     return value.chain === undefined || typeof value.chain === "boolean";
   }

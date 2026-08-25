@@ -2,6 +2,8 @@ import type {
   CatalogResponse,
   MediaTitle,
   ProviderAvailability,
+  TitleCredit,
+  TitleCredits,
 } from "../../src/domain/catalog.ts";
 import { readRawItems } from "./catalog-reader.ts";
 
@@ -70,6 +72,7 @@ function mergeWithStored(fresh: MediaTitle, stored: MediaTitle | null): MediaTit
     certification: fresh.certification ?? stored.certification,
     posterUrl: fresh.posterUrl ?? stored.posterUrl,
     people: fresh.people?.length ? fresh.people : stored.people,
+    credits: fresh.credits?.length ? fresh.credits : stored.credits,
     studios: fresh.studios?.length ? fresh.studios : stored.studios,
     countries: fresh.countries?.length ? fresh.countries : stored.countries,
     languages: fresh.languages?.length ? fresh.languages : stored.languages,
@@ -81,6 +84,10 @@ function mergeWithStored(fresh: MediaTitle, stored: MediaTitle | null): MediaTit
     ),
     ratings: stored.ratings ?? fresh.ratings,
     externalIds: mergeExternalIds(fresh, stored),
+    status: fresh.status ?? stored.status,
+    lastAirDate: fresh.lastAirDate ?? stored.lastAirDate,
+    trailerKey: fresh.trailerKey ?? stored.trailerKey,
+    anime: fresh.anime ?? stored.anime,
   };
 }
 
@@ -108,6 +115,95 @@ export async function storeCatalog(db: D1Database, catalogue: CatalogResponse) {
   await storeItems(db, titles, catalogue.fetchedAt);
 
   return titles;
+}
+
+const CREDIT_CHUNK = 60;
+
+export async function storeCredits(db: D1Database, credits: TitleCredits[]) {
+  const entries = credits.flatMap((title) =>
+    title.entries.map((entry) => ({ titleId: title.titleId, entry })),
+  );
+
+  if (entries.length === 0) {
+    return 0;
+  }
+
+  const people = new Map<number, TitleCredit["person"]>();
+
+  for (const { entry } of entries) {
+    people.set(entry.person.id, entry.person);
+  }
+
+  const roster = [...people.values()];
+
+  for (let index = 0; index < roster.length; index += CREDIT_CHUNK) {
+    // oxlint-disable-next-line no-await-in-loop
+    await db.batch(
+      roster.slice(index, index + CREDIT_CHUNK).map((who) =>
+        db
+          .prepare(
+            `INSERT INTO catalog_people
+               (person_id, name, original_name, known_for, gender, profile_path, popularity)
+             VALUES (?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(person_id) DO UPDATE SET
+               name = excluded.name,
+               original_name = excluded.original_name,
+               known_for = excluded.known_for,
+               gender = excluded.gender,
+               profile_path = excluded.profile_path,
+               popularity = excluded.popularity`,
+          )
+          .bind(
+            who.id,
+            who.name,
+            who.originalName,
+            who.knownFor,
+            who.gender,
+            who.profilePath,
+            who.popularity,
+          ),
+      ),
+    );
+  }
+
+  for (let index = 0; index < entries.length; index += CREDIT_CHUNK) {
+    // oxlint-disable-next-line no-await-in-loop
+    await db.batch(
+      entries.slice(index, index + CREDIT_CHUNK).map(({ titleId, entry }) =>
+        db
+          .prepare(
+            `INSERT INTO catalog_credits
+               (credit_id, title_id, person_id, department, job, character, billing,
+                season_number, episode_number, episode_count)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(credit_id) DO UPDATE SET
+               title_id = excluded.title_id,
+               person_id = excluded.person_id,
+               department = excluded.department,
+               job = excluded.job,
+               character = excluded.character,
+               billing = excluded.billing,
+               season_number = excluded.season_number,
+               episode_number = excluded.episode_number,
+               episode_count = excluded.episode_count`,
+          )
+          .bind(
+            entry.creditId,
+            titleId,
+            entry.person.id,
+            entry.department,
+            entry.job,
+            entry.character,
+            entry.billing,
+            entry.seasonNumber,
+            entry.episodeNumber,
+            entry.episodeCount,
+          ),
+      ),
+    );
+  }
+
+  return entries.length;
 }
 
 export async function storeItems(db: D1Database, items: MediaTitle[], sourceUpdatedAt: string) {
@@ -139,6 +235,19 @@ export async function storeItems(db: D1Database, items: MediaTitle[], sourceUpda
         .map((title) => upsertTitle(db, title, sourceUpdatedAt)),
     );
   }
+
+  await storeCredits(
+    db,
+    changed.flatMap((title) =>
+      title.credits?.length ? [{ titleId: title.id, entries: title.credits }] : [],
+    ),
+  );
+}
+
+function withoutCredits(title: MediaTitle) {
+  const { credits: _credits, ...rest } = title;
+
+  return rest;
 }
 
 function upsertTitle(db: D1Database, title: MediaTitle, sourceUpdatedAt: string) {
@@ -170,7 +279,7 @@ function upsertTitle(db: D1Database, title: MediaTitle, sourceUpdatedAt: string)
       title.year,
       title.popularity,
       JSON.stringify(title.providers.map((provider) => provider.id)),
-      JSON.stringify(title),
+      JSON.stringify(withoutCredits(title)),
       sourceUpdatedAt,
       title.imdbUrl ? (/\/(tt\d+)/u.exec(title.imdbUrl)?.[1] ?? null) : null,
     );

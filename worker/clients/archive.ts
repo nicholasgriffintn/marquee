@@ -148,6 +148,7 @@ function bestDerivative(files: unknown) {
       {
         name: file.name,
         rank,
+        original: firstString(file.source).toLowerCase() === "original",
         bytes: positiveNumber(file.size),
         seconds: durationSeconds(firstString(file.length)),
         width: positiveNumber(file.width),
@@ -157,7 +158,12 @@ function bestDerivative(files: unknown) {
     ];
   });
 
-  playable.sort((left, right) => left.rank - right.rank || (right.bytes ?? 0) - (left.bytes ?? 0));
+  playable.sort(
+    (left, right) =>
+      Number(left.original) - Number(right.original) ||
+      left.rank - right.rank ||
+      (right.bytes ?? 0) - (left.bytes ?? 0),
+  );
 
   return playable[0] ?? null;
 }

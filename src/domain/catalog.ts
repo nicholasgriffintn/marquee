@@ -87,6 +87,30 @@ export type AnimeDetails = {
   links?: AnimeLink[];
 };
 
+export type CreditPerson = {
+  id: number;
+  name: string;
+  originalName: string | null;
+  knownFor: string | null;
+  gender: number | null;
+  profilePath: string | null;
+  popularity: number | null;
+};
+
+export type TitleCredit = {
+  creditId: string;
+  person: CreditPerson;
+  department: string;
+  job: string | null;
+  character: string | null;
+  billing: number | null;
+  seasonNumber: number | null;
+  episodeNumber: number | null;
+  episodeCount: number | null;
+};
+
+export type TitleCredits = { titleId: string; entries: TitleCredit[] };
+
 export type ExternalIds = {
   imdbId?: string | null;
   tvdbId?: number | null;
@@ -130,6 +154,11 @@ export type MediaTitle = {
   keywords?: string[];
   anime?: AnimeDetails;
   people?: string[];
+  credits?: TitleCredit[];
+  homepage?: string | null;
+  originCountries?: string[];
+  productionCountries?: string[];
+  spokenLanguages?: string[];
   trailerKey?: string | null;
   videos?: { key: string; name: string; type: string }[];
   pending?: boolean;
