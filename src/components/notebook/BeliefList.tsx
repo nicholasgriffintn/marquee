@@ -107,38 +107,43 @@ export function BeliefList({
                         {suspended ? (
                           <button
                             type="button"
+                            disabled={busy === belief.id}
                             onClick={() => onAct(belief, { action: "restore" })}
                           >
-                            Put it back
+                            {busy === belief.id ? "Putting it back…" : "Put it back"}
                           </button>
                         ) : (
                           <>
                             <button
                               type="button"
+                              disabled={busy === belief.id}
                               onClick={() => setEditing({ id: belief.id, value: belief.value })}
                             >
                               Rewrite
                             </button>
                             <button
                               type="button"
+                              disabled={busy === belief.id}
                               onClick={() => onAct(belief, { action: "suspend", scope: "tonight" })}
                             >
-                              Not tonight
+                              {busy === belief.id ? "Setting aside…" : "Not tonight"}
                             </button>
                             <button
                               type="button"
+                              disabled={busy === belief.id}
                               onClick={() => onAct(belief, { action: "suspend", scope: "week" })}
                             >
-                              Not this week
+                              {busy === belief.id ? "Setting aside…" : "Not this week"}
                             </button>
                           </>
                         )}
                         <button
                           type="button"
                           className="notebook-forget"
+                          disabled={busy === belief.id}
                           onClick={() => onAct(belief, { action: "forget" })}
                         >
-                          Forget it
+                          {busy === belief.id ? "Forgetting…" : "Forget it"}
                         </button>
                       </div>
                     </>

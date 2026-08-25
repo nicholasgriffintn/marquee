@@ -496,6 +496,10 @@ svg {
   border-color: var(--coral);
   color: var(--coral);
 }
+.shelf-form-actions button:disabled {
+  cursor: progress;
+  opacity: 0.45;
+}
 
 .browse-filters {
   border-bottom: 1px solid var(--line);
@@ -2856,6 +2860,14 @@ h2 em {
     gap: 0;
     height: 48px;
     margin-inline: -18px;
+    mask-image: linear-gradient(to right, transparent, black 20px, black calc(100% - 20px), transparent);
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent,
+      black 20px,
+      black calc(100% - 20px),
+      transparent
+    );
   }
   .site-header nav a,
   .site-header nav button {
@@ -4706,6 +4718,11 @@ h2 em {
 .notebook-actions .notebook-forget:hover {
   color: var(--coral);
 }
+.notebook-actions button:disabled {
+  cursor: progress;
+  opacity: 0.6;
+  text-decoration: none;
+}
 .notebook-edit {
   display: flex;
   flex-wrap: wrap;
@@ -5102,6 +5119,10 @@ h2 em {
 }
 .notebook-import:hover {
   border-color: var(--acid);
+}
+.notebook-import.busy {
+  cursor: progress;
+  opacity: 0.6;
 }
 .notebook-import input {
   color: var(--muted);
