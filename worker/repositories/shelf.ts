@@ -42,6 +42,14 @@ const ORDER_BY: Record<ShelfSort, string> = {
           t.title COLLATE NOCASE`,
 };
 
+const FURTHEST_EPISODE = `viewing_episode_entries
+       WHERE viewer_id = e.viewer_id AND title_id = e.title_id
+         AND scope = 'episode' AND watched = 1 AND season_number > 0
+       ORDER BY season_number DESC, episode_number DESC LIMIT 1`;
+
+const PROGRESS_COLUMNS = `(SELECT season_number FROM ${FURTHEST_EPISODE}) AS season,
+                (SELECT episode_number FROM ${FURTHEST_EPISODE}) AS episode`;
+
 function conditions(query: ShelfPageQuery) {
   const where = ["e.viewer_id = ?"];
   const bindings: unknown[] = [];
@@ -92,7 +100,7 @@ export async function readShelfPage(db: D1Database, viewerId: string, query: She
     db
       .prepare(
         `SELECT e.id, e.title_id AS titleId, e.status, e.rating, e.thoughts,
-                e.season, e.episode, e.updated_at AS updatedAt,
+                ${PROGRESS_COLUMNS}, e.updated_at AS updatedAt,
                 t.payload, t.poster_key AS posterKey
            FROM viewing_entries AS e
            JOIN catalog_titles AS t ON t.id = e.title_id
@@ -152,7 +160,7 @@ export async function readLostProperty(
   const rows = await db
     .prepare(
       `SELECT e.id, e.title_id AS titleId, e.status, e.rating, e.thoughts,
-              e.season, e.episode, e.updated_at AS updatedAt,
+              ${PROGRESS_COLUMNS}, e.updated_at AS updatedAt,
               t.payload, t.poster_key AS posterKey
          FROM viewing_entries AS e
          JOIN catalog_titles AS t ON t.id = e.title_id
