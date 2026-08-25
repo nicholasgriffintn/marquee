@@ -105,17 +105,26 @@ async function catalogueStats(env: Bindings) {
   return { ...row, workingSet: working.titles, availabilityFresh: working.fresh };
 }
 
+const JOB_TYPE_SOURCE: Record<string, string> = {
+  "enrich-anime": "jikan",
+  "enrich-anilist": "jikan",
+  "enrich-ratings": "omdb",
+  "cache-poster": "poster",
+  "enrich-availability": "justwatch",
+};
+
 async function enrichmentStats(env: Bindings) {
-  const [enriched, justwatch] = await Promise.all([
+  const [enriched, justwatch, attempted, recent, recentJustwatch] = await Promise.all([
     env.DB.prepare(
       `SELECT source,
               sum(CASE WHEN miss = 0 THEN 1 ELSE 0 END) AS titles,
               sum(CASE WHEN miss = 1 THEN 1 ELSE 0 END) AS misses,
+              sum(CASE WHEN miss = 2 THEN 1 ELSE 0 END) AS pending,
               max(fetched_at) AS newest
        FROM title_enrichment
        GROUP BY source
        ORDER BY source`,
-    ).all<{ source: string; titles: number; misses: number; newest: string }>(),
+    ).all<{ source: string; titles: number; misses: number; pending: number; newest: string }>(),
     env.DB.prepare(
       `SELECT
          sum(CASE WHEN json_array_length(COALESCE(json_extract(payload, '$.providers'), json('[]'))) > 0 THEN 1 ELSE 0 END) AS titles,
@@ -124,20 +133,82 @@ async function enrichmentStats(env: Bindings) {
        FROM catalog_titles
        WHERE enriched_at IS NOT NULL`,
     ).first<{ titles: number; misses: number; newest: string }>(),
+    env.DB.prepare(
+      `SELECT job_type AS jobType, count(*) AS attempted
+       FROM ingestion_runs
+       WHERE job_type IN ('enrich-anime', 'enrich-anilist', 'enrich-ratings', 'cache-poster', 'enrich-availability')
+         AND started_at > datetime('now', ?)
+       GROUP BY job_type`,
+    )
+      .bind(`-${RUN_WINDOW_HOURS} hours`)
+      .all<{ jobType: string; attempted: number }>(),
+    env.DB.prepare(
+      `SELECT source,
+              sum(CASE WHEN miss = 0 THEN 1 ELSE 0 END) AS titles,
+              sum(CASE WHEN miss = 1 THEN 1 ELSE 0 END) AS misses
+       FROM title_enrichment
+       WHERE fetched_at > datetime('now', ?)
+       GROUP BY source`,
+    )
+      .bind(`-${RUN_WINDOW_HOURS} hours`)
+      .all<{ source: string; titles: number; misses: number }>(),
+    env.DB.prepare(
+      `SELECT
+         sum(CASE WHEN json_array_length(COALESCE(json_extract(payload, '$.providers'), json('[]'))) > 0 THEN 1 ELSE 0 END) AS titles,
+         sum(CASE WHEN json_array_length(COALESCE(json_extract(payload, '$.providers'), json('[]'))) = 0 THEN 1 ELSE 0 END) AS misses
+       FROM catalog_titles
+       WHERE enriched_at > datetime('now', ?)`,
+    )
+      .bind(`-${RUN_WINDOW_HOURS} hours`)
+      .first<{ titles: number; misses: number }>(),
   ]);
+
+  const attemptedBySource = new Map<string, number>();
+
+  for (const row of attempted.results) {
+    const source = JOB_TYPE_SOURCE[row.jobType];
+
+    if (source) {
+      attemptedBySource.set(source, (attemptedBySource.get(source) ?? 0) + row.attempted);
+    }
+  }
+
+  const recentBySource = new Map(recent.results.map((row) => [row.source, row]));
+
+  if (recentJustwatch) {
+    recentBySource.set("justwatch", { source: "justwatch", ...recentJustwatch });
+  }
+
+  const withAttempts = (row: {
+    source: string;
+    titles: number;
+    misses: number;
+    pending: number;
+    newest: string;
+  }) => {
+    const windowAttempted = attemptedBySource.get(row.source) ?? 0;
+    const windowRow = recentBySource.get(row.source);
+    const silentFailures = Math.max(
+      0,
+      windowAttempted - (windowRow?.titles ?? 0) - (windowRow?.misses ?? 0),
+    );
+
+    return { ...row, attempted: windowAttempted, silentFailures };
+  };
 
   const justwatchRow = justwatch
     ? [
-        {
+        withAttempts({
           source: "justwatch",
           titles: justwatch.titles,
           misses: justwatch.misses,
+          pending: 0,
           newest: justwatch.newest,
-        },
+        }),
       ]
     : [];
 
-  return [...enriched.results, ...justwatchRow].sort((left, right) =>
+  return [...enriched.results.map(withAttempts), ...justwatchRow].sort((left, right) =>
     left.source.localeCompare(right.source),
   );
 }
