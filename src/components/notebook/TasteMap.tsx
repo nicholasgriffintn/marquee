@@ -169,6 +169,8 @@ export function TasteMap({ isSignedIn }: { isSignedIn: boolean }) {
     [points],
   );
 
+  const plotted = points ?? [];
+
   const placed = useMemo(() => {
     const plot = SIZE - PAD * 2;
 
@@ -315,17 +317,21 @@ export function TasteMap({ isSignedIn }: { isSignedIn: boolean }) {
             />
           ))}
 
-          {map.points.map((point) => (
-            <TastePoint
-              key={point.titleId}
-              point={point}
-              cx={placed.get(point.titleId)?.cx ?? 0}
-              cy={placed.get(point.titleId)?.cy ?? 0}
-              active={activeId === point.titleId}
-              pinned={pinned?.titleId === point.titleId}
-              handlers={handlers}
-            />
-          ))}
+          {plotted.map((point) => {
+            const spot = placed.get(point.titleId);
+
+            return (
+              <TastePoint
+                key={point.titleId}
+                point={point}
+                cx={spot?.cx ?? 0}
+                cy={spot?.cy ?? 0}
+                active={activeId === point.titleId}
+                pinned={pinned?.titleId === point.titleId}
+                handlers={handlers}
+              />
+            );
+          })}
         </svg>
 
         <div className="taste-map-readout">
