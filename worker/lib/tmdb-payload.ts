@@ -3,6 +3,7 @@ import type {
   MediaTitle,
   MediaType,
   ProviderAvailability,
+  TitleCredits,
 } from "../../src/domain/catalog.ts";
 import {
   findRegistryProviderForOffer,
@@ -18,6 +19,7 @@ import {
   recordAt,
   records,
   stringAt,
+  stringList,
 } from "./values.ts";
 
 const IMAGE_BASE = "https://image.tmdb.org/t/p";
@@ -238,6 +240,110 @@ function billed(value: unknown, limit: number) {
     .slice(0, limit);
 }
 
+function person(member: Record<string, unknown>) {
+  const id = numberAt(member, "id");
+  const name = stringAt(member, "name");
+
+  return id && name
+    ? {
+        id,
+        name,
+        originalName: stringAt(member, "original_name"),
+        knownFor: stringAt(member, "known_for_department"),
+        gender: numberAt(member, "gender"),
+        profilePath: stringAt(member, "profile_path"),
+        popularity: numberAt(member, "popularity"),
+      }
+    : null;
+}
+
+export function parseTmdbCredits(mediaType: MediaType, value: unknown): TitleCredits | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const tmdbId = numberAt(value, "id");
+  const credits = recordAt(value, mediaType === "movie" ? "credits" : "aggregate_credits");
+
+  if (!tmdbId || !credits) {
+    return null;
+  }
+
+  const cast = records(credits.cast).flatMap((member, index) => {
+    const who = person(member);
+    const creditId = stringAt(member, "credit_id") ?? firstJobCreditId(member);
+
+    return who && creditId
+      ? [
+          {
+            creditId,
+            person: who,
+            department: "Acting",
+            job: null,
+            character: stringAt(member, "character") ?? firstCharacter(member),
+            billing: numberAt(member, "order") ?? index,
+          },
+        ]
+      : [];
+  });
+  const crew = records(credits.crew).flatMap((member) => {
+    const who = person(member);
+    const jobs = records(member.jobs);
+
+    if (!who) {
+      return [];
+    }
+
+    if (jobs.length > 0) {
+      return jobs.flatMap((entry) => {
+        const creditId = stringAt(entry, "credit_id");
+
+        return creditId
+          ? [
+              {
+                creditId,
+                person: who,
+                department: stringAt(member, "department") ?? "Crew",
+                job: stringAt(entry, "job"),
+                character: null,
+                billing: null,
+              },
+            ]
+          : [];
+      });
+    }
+
+    const creditId = stringAt(member, "credit_id");
+
+    return creditId
+      ? [
+          {
+            creditId,
+            person: who,
+            department: stringAt(member, "department") ?? "Crew",
+            job: stringAt(member, "job"),
+            character: null,
+            billing: null,
+          },
+        ]
+      : [];
+  });
+
+  return { titleId: `${mediaType}:${tmdbId}`, entries: [...cast, ...crew] };
+}
+
+function firstCharacter(member: Record<string, unknown>) {
+  const [role] = records(member.roles);
+
+  return role ? stringAt(role, "character") : null;
+}
+
+function firstJobCreditId(member: Record<string, unknown>) {
+  const [role] = records(member.roles);
+
+  return role ? stringAt(role, "credit_id") : null;
+}
+
 function parsePeople(mediaType: MediaType, details: Record<string, unknown>) {
   const credits = recordAt(details, mediaType === "movie" ? "credits" : "aggregate_credits");
   const directors = credits
@@ -316,7 +422,7 @@ export function parseTmdbTitle(mediaType: MediaType, value: unknown): MediaTitle
   const { providers, watchLink } = parseAvailability(value);
   const externalIds = recordAt(value, "external_ids");
   const imdbId = externalIds ? stringAt(externalIds, "imdb_id") : null;
-  const credits = parsePeople(mediaType, value);
+  const billing = parsePeople(mediaType, value);
   const episodeRunTimes = Array.isArray(value.episode_run_time)
     ? value.episode_run_time.filter((item): item is number => typeof item === "number" && item > 0)
     : [];
@@ -348,9 +454,19 @@ export function parseTmdbTitle(mediaType: MediaType, value: unknown): MediaTitle
     tmdbUrl: `https://www.themoviedb.org/${mediaType}/${tmdbId}`,
     imdbUrl: imdbId && /^tt\d+$/u.test(imdbId) ? `https://www.imdb.com/title/${imdbId}/` : null,
     externalIds: parseExternalIds(externalIds, imdbId),
+    homepage: httpsUrl(stringAt(value, "homepage")),
+    originCountries: stringList(value.origin_country, { limit: 6, itemLength: 8 }),
+    productionCountries: records(value.production_countries)
+      .flatMap((entry) => [stringAt(entry, "name")].filter(Boolean))
+      .slice(0, 6) as string[],
+    spokenLanguages: records(value.spoken_languages)
+      .flatMap((entry) =>
+        [stringAt(entry, "english_name") ?? stringAt(entry, "name")].filter(Boolean),
+      )
+      .slice(0, 8) as string[],
     keywords: parseKeywords(value),
-    people: credits.map((person) => person.name),
-    credits,
+    people: billing.map((person) => person.name),
+    credits: parseTmdbCredits(mediaType, value)?.entries ?? [],
     trailerKey: parseTrailer(value),
     videos: parseVideos(value),
     originalLanguage: stringAt(value, "original_language"),
