@@ -21,6 +21,7 @@ import {
   updateProviderPreferences,
 } from "../services/profile.ts";
 import type { Bindings } from "../types.ts";
+import { profileEntryResponse } from "./profile-entry-response.ts";
 
 const IMPORT_BATCH = 100;
 const MAX_SHELF_PAGE = 500;
@@ -48,17 +49,9 @@ profileRoutes.get("/", async (context) => {
 profileRoutes.get("/entry/:titleId", async (context) => {
   const user = context.get("authenticatedUser");
 
-  try {
-    const entry = await getViewingEntry(context.env.DB, user.id, context.req.param("titleId"));
-
-    context.header("cache-control", "private, no-store");
-
-    return jsonResponse({ entry });
-  } catch (error) {
-    logError("profile_entry_read_failed", error);
-
-    return jsonResponse({ entry: null });
-  }
+  return profileEntryResponse(() =>
+    getViewingEntry(context.env.DB, user.id, context.req.param("titleId")),
+  );
 });
 
 profileRoutes.get("/shelf", async (context) => {

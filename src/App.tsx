@@ -623,7 +623,7 @@ export function App() {
             isMissing={openDetails.isMissing}
             isLoading={openDetails.isLoading}
             canSave={isSignedIn}
-            entries={profile.entries}
+            entryState={profile.entryStates[openTitleId]}
             selectedProviderIds={selectedProviderIds}
             availabilityEnabled={catalog.providerSources.length > 0}
             onClose={closeDetails}
