@@ -29,6 +29,7 @@ export function ImportPanel({ onImported }: { onImported: () => void }) {
 
       let matched = 0;
       let queued = 0;
+      let failedBatches = 0;
 
       for (let index = 0; index < rows.length; index += BATCH) {
         setStatus(`Reading ${Math.min(index + BATCH, rows.length)} of ${rows.length}…`);
@@ -42,14 +43,14 @@ export function ImportPanel({ onImported }: { onImported: () => void }) {
           matched += outcome.matched;
           queued += outcome.queued;
         } catch {
-          setStatus("That stopped partway. Try the rest again in a moment.");
+          failedBatches += 1;
         }
       }
 
       setStatus(
         `${matched} of ${rows.length} seated straight away.${
           queued > 0 ? ` ${queued} I have sent for — they will turn up over the next hour.` : ""
-        }`,
+        }${failedBatches > 0 ? " Some rows didn't make it through — try the file again in a moment." : ""}`,
       );
       onImported();
     } finally {
