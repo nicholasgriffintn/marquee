@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate, Route, Routes, useLocation, useMatch, useNavigate } from "react-router-dom";
 
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -23,21 +23,39 @@ import { useTonight } from "./hooks/useTonight";
 import { useTrending } from "./hooks/useTrending";
 import { useUsher } from "./hooks/useUsher";
 import { titleForItem, titleForRoute } from "./lib/page-title";
-import { AdminPage } from "./pages/AdminPage";
 import { BrowsePage, type BrowsePreset } from "./pages/BrowsePage";
 import { DigestPage } from "./pages/DigestPage";
 import { LibraryPage } from "./pages/LibraryPage";
-import { NotebookPage } from "./pages/NotebookPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { PersonPage } from "./pages/PersonPage";
-import { RevivalPage } from "./pages/RevivalPage";
-import { RevivalScreenPage } from "./pages/RevivalScreenPage";
 import { SearchPage } from "./pages/SearchPage";
 import { SignedOutShelf } from "./pages/SignedOutShelf";
 import { SignInPage } from "./pages/SignInPage";
 import { SourcesPage } from "./pages/SourcesPage";
 import { TonightPage } from "./pages/TonightPage";
 import { UsherPage } from "./pages/UsherPage";
+
+const AdminPage = lazy(() => import("./pages/AdminPage").then((m) => ({ default: m.AdminPage })));
+const RevivalPage = lazy(() =>
+  import("./pages/RevivalPage").then((m) => ({ default: m.RevivalPage })),
+);
+const RevivalScreenPage = lazy(() =>
+  import("./pages/RevivalScreenPage").then((m) => ({ default: m.RevivalScreenPage })),
+);
+const NotebookPage = lazy(() =>
+  import("./pages/NotebookPage").then((m) => ({ default: m.NotebookPage })),
+);
+
+function RouteFallback() {
+  return (
+    <section className="page-section">
+      <p className="availability-empty">
+        <i className="availability-spinner" aria-hidden="true" />
+        Loading…
+      </p>
+    </section>
+  );
+}
 
 const TONIGHT_EPISODES = 16;
 const HOME_DRIP_DELAY_MS = 45_000;
@@ -417,21 +435,37 @@ export function App() {
 
           <Route path="/usher" element={<UsherPage />} />
 
-          <Route path="/revival" element={<RevivalPage isReady={isViewerReady} />} />
+          <Route
+            path="/revival"
+            element={
+              <Suspense fallback={<RouteFallback />}>
+                <RevivalPage isReady={isViewerReady} />
+              </Suspense>
+            }
+          />
 
-          <Route path="/revival/:workId" element={<RevivalScreenPage isSignedIn={isSignedIn} />} />
+          <Route
+            path="/revival/:workId"
+            element={
+              <Suspense fallback={<RouteFallback />}>
+                <RevivalScreenPage isSignedIn={isSignedIn} />
+              </Suspense>
+            }
+          />
 
           <Route
             path="/notebook"
             element={
-              <NotebookPage
-                isSignedIn={isSignedIn}
-                providers={catalog.providers}
-                providerError={catalog.providerError}
-                providerStats={catalog.providerStats}
-                selectedProviderIds={selectedProviderIds}
-                onSelectProviders={selectProviders}
-              />
+              <Suspense fallback={<RouteFallback />}>
+                <NotebookPage
+                  isSignedIn={isSignedIn}
+                  providers={catalog.providers}
+                  providerError={catalog.providerError}
+                  providerStats={catalog.providerStats}
+                  selectedProviderIds={selectedProviderIds}
+                  onSelectProviders={selectProviders}
+                />
+              </Suspense>
             }
           />
 
@@ -511,7 +545,13 @@ export function App() {
           <Route
             path="/admin"
             element={
-              session.user?.role === "admin" ? <AdminPage user={session.user} /> : <ManagersDoor />
+              session.user?.role === "admin" ? (
+                <Suspense fallback={<RouteFallback />}>
+                  <AdminPage user={session.user} />
+                </Suspense>
+              ) : (
+                <ManagersDoor />
+              )
             }
           />
 
