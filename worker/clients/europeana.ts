@@ -1,4 +1,5 @@
 import type { RevivalKind, RevivalRightsBasis, RevivalTag } from "../../src/domain/revival.ts";
+import { isTrustedRevivalSourceUrl } from "../lib/revival-source.ts";
 import { splitSubjects, tagList } from "../lib/revival-tags.ts";
 import { properTitle, tidySynopsis, tidyText } from "../lib/revival-text.ts";
 import { firstString, stripMarkup, yearFrom } from "../lib/text.ts";
@@ -68,7 +69,11 @@ function playableUrl(value: unknown) {
   }
 
   for (const entry of value) {
-    if (typeof entry === "string" && entry.startsWith("https://") && PLAYABLE.test(entry)) {
+    if (
+      typeof entry === "string" &&
+      isTrustedRevivalSourceUrl("europeana", entry) &&
+      PLAYABLE.test(entry)
+    ) {
       return entry;
     }
   }
@@ -155,7 +160,9 @@ export async function searchEuropeana(apiKey: string, country: string, page: num
         synopsis: tidySynopsis(stripMarkup(firstString(item.dcDescription))).slice(0, 1_200),
         kind: "ephemeral",
         runtimeSeconds: null,
-        stillUrl: firstString(item.edmPreview) || null,
+        stillUrl: isTrustedRevivalSourceUrl("europeana", firstString(item.edmPreview))
+          ? firstString(item.edmPreview)
+          : null,
         streamUrl: stream,
         streamBytes: null,
         streamType: mimeFor(stream),

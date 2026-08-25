@@ -1,5 +1,6 @@
 import { UPSTREAM_AGENT } from "../clients/fetch.ts";
 import { logError } from "../lib/logging.ts";
+import { fetchRevivalSource, revivalVideoContentType } from "../lib/revival-source.ts";
 import {
   completeMirror,
   failMirror,
@@ -17,6 +18,41 @@ const SINGLE_SHOT_MAX_BYTES = 96 * 1_024 * 1_024;
 const FETCH_TIMEOUT_MS = 60_000;
 
 type StoredPart = { partNumber: number; etag: string };
+
+async function readExactBody(response: Response, expectedBytes: number) {
+  if (!response.body) {
+    throw new Error("source returned no body");
+  }
+
+  const reader = response.body.getReader();
+  const body = new Uint8Array(expectedBytes);
+  let bytes = 0;
+
+  while (true) {
+    // The stream must be consumed in order so the byte ceiling can be enforced before buffering.
+    // oxlint-disable-next-line no-await-in-loop
+    const chunk = await reader.read();
+
+    if (chunk.done) {
+      break;
+    }
+
+    if (bytes + chunk.value.byteLength > expectedBytes) {
+      // oxlint-disable-next-line no-await-in-loop
+      await reader.cancel();
+      throw new Error("source returned more bytes than allowed");
+    }
+
+    body.set(chunk.value, bytes);
+    bytes += chunk.value.byteLength;
+  }
+
+  if (bytes !== expectedBytes) {
+    throw new Error("source returned an unexpected number of bytes");
+  }
+
+  return body;
+}
 
 export function reelKey(id: string) {
   return `reel/${id.replaceAll(/[^\w.-]/gu, "_")}.mp4`;
@@ -43,10 +79,9 @@ function parseParts(raw: string): StoredPart[] {
   }
 }
 
-async function probeSource(url: string) {
-  const response = await fetch(url, {
+async function probeSource(source: MirrorRow["source"], url: string, fallbackType: string) {
+  const response = await fetchRevivalSource(source, url, {
     method: "HEAD",
-    redirect: "follow",
     headers: { "user-agent": UPSTREAM_AGENT },
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
@@ -61,13 +96,18 @@ async function probeSource(url: string) {
   return {
     bytes: Number.isFinite(length) && length > 0 ? length : 0,
     ranged,
-    contentType: response.headers.get("content-type") ?? "video/mp4",
+    contentType: revivalVideoContentType(response.headers.get("content-type"), fallbackType),
   };
 }
 
-async function copyWholeObject(env: Bindings, id: string, url: string, contentType: string) {
-  const response = await fetch(url, {
-    redirect: "follow",
+async function copyWholeObject(
+  env: Bindings,
+  row: MirrorRow,
+  url: string,
+  contentType: string,
+  expectedBytes: number,
+) {
+  const response = await fetchRevivalSource(row.source, url, {
     headers: { "user-agent": UPSTREAM_AGENT },
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
@@ -76,18 +116,19 @@ async function copyWholeObject(env: Bindings, id: string, url: string, contentTy
     throw new Error(`source responded ${response.status}`);
   }
 
-  const body = await response.arrayBuffer();
+  const responseType = revivalVideoContentType(response.headers.get("content-type"), contentType);
+  const body = await readExactBody(response, expectedBytes);
 
   if (body.byteLength === 0) {
     throw new Error("source returned an empty body");
   }
 
-  const key = reelKey(id);
+  const key = reelKey(row.id);
 
-  await env.MEDIA.put(key, body, { httpMetadata: { contentType } });
-  await completeMirror(env.DB, id, key, body.byteLength);
+  await env.MEDIA.put(key, body, { httpMetadata: { contentType: responseType } });
+  await completeMirror(env.DB, row.id, key, body.byteLength);
 
-  return { id, bytes: body.byteLength, done: true };
+  return { id: row.id, bytes: body.byteLength, done: true };
 }
 
 export async function mirrorWork(env: Bindings, id: string) {
@@ -98,7 +139,7 @@ export async function mirrorWork(env: Bindings, id: string) {
   }
 
   try {
-    const source = await probeSource(row.streamUrl);
+    const source = await probeSource(row.source, row.streamUrl, row.streamType);
 
     if (source.bytes > MAX_OBJECT_BYTES) {
       await failMirror(env.DB, id, `source is ${source.bytes} bytes, over the mirror ceiling`);
@@ -106,14 +147,20 @@ export async function mirrorWork(env: Bindings, id: string) {
       return { id, bytes: 0, done: true };
     }
 
-    if (!source.ranged || source.bytes === 0) {
+    if (source.bytes === 0) {
+      await failMirror(env.DB, id, "source size is unavailable");
+
+      return { id, bytes: 0, done: true };
+    }
+
+    if (!source.ranged) {
       if (source.bytes > SINGLE_SHOT_MAX_BYTES) {
         await failMirror(env.DB, id, "source does not support range requests");
 
         return { id, bytes: 0, done: true };
       }
 
-      return await copyWholeObject(env, id, row.streamUrl, source.contentType);
+      return await copyWholeObject(env, row, row.streamUrl, source.contentType, source.bytes);
     }
 
     return await mirrorInParts(env, row, source.bytes, source.contentType);
@@ -144,8 +191,7 @@ async function mirrorInParts(
   for (let index = 0; index < PARTS_PER_RUN && offset < totalBytes; index += 1) {
     const end = Math.min(offset + PART_BYTES, totalBytes) - 1;
     // oxlint-disable-next-line no-await-in-loop
-    const response = await fetch(url, {
-      redirect: "follow",
+    const response = await fetchRevivalSource(row.source, url, {
       headers: { range: `bytes=${offset}-${end}`, "user-agent": UPSTREAM_AGENT },
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
@@ -154,12 +200,17 @@ async function mirrorInParts(
       throw new Error(`range request responded ${response.status}`);
     }
 
-    // oxlint-disable-next-line no-await-in-loop
-    const chunk = await response.arrayBuffer();
+    revivalVideoContentType(response.headers.get("content-type"), contentType);
 
-    if (chunk.byteLength === 0) {
-      throw new Error("range request returned no bytes");
+    const contentRange = response.headers.get("content-range");
+
+    if (contentRange !== `bytes ${offset}-${end}/${totalBytes}`) {
+      throw new Error("range response did not match the requested bytes");
     }
+
+    const expectedBytes = end - offset + 1;
+    // oxlint-disable-next-line no-await-in-loop
+    const chunk = await readExactBody(response, expectedBytes);
 
     // oxlint-disable-next-line no-await-in-loop
     const part = await upload.uploadPart(parts.length + 1, chunk);

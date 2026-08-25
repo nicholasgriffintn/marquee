@@ -3,6 +3,11 @@ import { Hono } from "hono";
 import { UPSTREAM_AGENT } from "../clients/fetch.ts";
 import { logError } from "../lib/logging.ts";
 import {
+  fetchRevivalSource,
+  revivalImageContentType,
+  revivalVideoContentType,
+} from "../lib/revival-source.ts";
+import {
   isRevivalId,
   readReelTarget,
   readStillSource,
@@ -59,7 +64,7 @@ function reelHeaders(contentType: string, etag?: string) {
   const headers = new Headers({
     "accept-ranges": "bytes",
     "cache-control": REEL_CACHE,
-    "content-type": contentType,
+    "content-type": revivalVideoContentType(contentType),
     "x-content-type-options": "nosniff",
   });
 
@@ -114,9 +119,13 @@ async function serveFromMirror(
   return new Response(object.body, { status: 206, headers });
 }
 
-async function serveFromSource(url: string, contentType: string, range: string | undefined) {
-  const upstream = await fetch(url, {
-    redirect: "follow",
+async function serveFromSource(
+  source: "archive" | "loc" | "europeana",
+  url: string,
+  contentType: string,
+  range: string | undefined,
+) {
+  const upstream = await fetchRevivalSource(source, url, {
     headers: range ? { range, "user-agent": UPSTREAM_AGENT } : { "user-agent": UPSTREAM_AGENT },
     signal: AbortSignal.timeout(30_000),
     cf: { cacheEverything: true, cacheTtl: 86_400 },
@@ -126,7 +135,9 @@ async function serveFromSource(url: string, contentType: string, range: string |
     return null;
   }
 
-  const headers = reelHeaders(upstream.headers.get("content-type") ?? contentType);
+  const headers = reelHeaders(
+    revivalVideoContentType(upstream.headers.get("content-type"), contentType),
+  );
 
   for (const name of ["content-length", "content-range"]) {
     const value = upstream.headers.get(name);
@@ -156,8 +167,7 @@ reelRoutes.get("/still/:workId", async (context) => {
   }
 
   try {
-    const upstream = await fetch(source, {
-      redirect: "follow",
+    const upstream = await fetchRevivalSource(source.source, source.url, {
       headers: { "user-agent": UPSTREAM_AGENT },
       signal: AbortSignal.timeout(12_000),
       cf: { cacheEverything: true, cacheTtl: 2_592_000 },
@@ -171,7 +181,7 @@ reelRoutes.get("/still/:workId", async (context) => {
       return new Response(upstream.body, {
         headers: {
           "cache-control": STILL_CACHE,
-          "content-type": upstream.headers.get("content-type") ?? "image/jpeg",
+          "content-type": revivalImageContentType(upstream.headers.get("content-type")),
           "x-content-type-options": "nosniff",
         },
       });
@@ -230,7 +240,12 @@ reelRoutes.get("/:workId", async (context) => {
       }
     }
 
-    const proxied = await serveFromSource(target.streamUrl, target.streamType, range);
+    const proxied = await serveFromSource(
+      target.source,
+      target.streamUrl,
+      target.streamType,
+      range,
+    );
 
     return proxied ?? context.json({ error: "The print is missing a reel" }, 502);
   } catch (error) {

@@ -11,6 +11,7 @@ import {
   type RevivalWork,
 } from "../../src/domain/revival.ts";
 import { contentNoticeFor } from "../lib/revival-notice.ts";
+import { isTrustedRevivalSourceUrl } from "../lib/revival-source.ts";
 
 export type RevivalCandidate = {
   sourceId: string;
@@ -126,9 +127,12 @@ function artFor(row: WorkRow) {
 }
 
 function toWork(row: WorkRow): RevivalWork {
+  const source = row.source as RevivalSource;
+  const trustedStream = isTrustedRevivalSourceUrl(source, row.streamUrl);
+
   return {
     id: row.id,
-    source: row.source as RevivalSource,
+    source,
     sourceUrl: row.sourceUrl,
     title: row.title,
     year: row.year,
@@ -152,7 +156,7 @@ function toWork(row: WorkRow): RevivalWork {
     // host it publicly. Marquee only takes on that responsibility itself once it copies the
     // work into its own R2 bucket, which is why the mirror is gated on uk_clear and this
     // fallback URL is not.
-    reelUrl: row.ukClear === 1 ? reelPath(row.id) : row.streamUrl,
+    reelUrl: trustedStream ? (row.ukClear === 1 ? reelPath(row.id) : row.streamUrl) : "",
     plays: row.plays,
     popularity: row.popularity,
     downloads: row.downloads,
@@ -225,7 +229,14 @@ export async function upsertWork(
   candidate: RevivalCandidate,
   status: RevivalStatus,
 ) {
+  if (!isTrustedRevivalSourceUrl(source, candidate.streamUrl)) {
+    throw new Error("Refusing to store an untrusted revival stream URL");
+  }
+
   const id = revivalId(source, candidate.sourceId);
+  const stillUrl = isTrustedRevivalSourceUrl(source, candidate.stillUrl)
+    ? candidate.stillUrl
+    : null;
 
   await db
     .prepare(
@@ -275,7 +286,7 @@ export async function upsertWork(
       candidate.synopsis,
       candidate.kind,
       candidate.runtimeSeconds,
-      candidate.stillUrl,
+      stillUrl,
       candidate.streamUrl,
       candidate.streamBytes,
       candidate.streamType,
@@ -700,6 +711,7 @@ export async function readWorksForTitle(db: D1Database, titleId: string) {
 
 export type ReelTarget = {
   id: string;
+  source: RevivalSource;
   streamUrl: string;
   streamType: string;
   mirrorKey: string | null;
@@ -709,7 +721,7 @@ export type ReelTarget = {
 export async function readReelTarget(db: D1Database, id: string) {
   const row = await db
     .prepare(
-      `SELECT id, stream_url AS streamUrl, stream_type AS streamType,
+      `SELECT id, source, stream_url AS streamUrl, stream_type AS streamType,
               mirror_key AS mirrorKey, mirror_state AS mirrorState
        FROM revival_works
        WHERE id = ? AND status = 'approved' AND uk_clear = 1`,
@@ -723,12 +735,13 @@ export async function readReelTarget(db: D1Database, id: string) {
 export async function readStillSource(db: D1Database, id: string) {
   const row = await db
     .prepare(
-      `SELECT still_url AS stillUrl FROM revival_works WHERE id = ? AND status = 'approved'`,
+      `SELECT source, still_url AS stillUrl
+       FROM revival_works WHERE id = ? AND status = 'approved'`,
     )
     .bind(id)
-    .first<{ stillUrl: string | null }>();
+    .first<{ source: RevivalSource; stillUrl: string | null }>();
 
-  return row?.stillUrl ?? null;
+  return row?.stillUrl ? { source: row.source, url: row.stillUrl } : null;
 }
 
 export async function selectArchiveForRecheck(db: D1Database, limit = 60) {
@@ -916,6 +929,7 @@ export async function selectUnmirrored(db: D1Database, limit = 5) {
 
 export type MirrorRow = {
   id: string;
+  source: RevivalSource;
   streamUrl: string;
   streamType: string;
   mirrorKey: string | null;
@@ -928,7 +942,7 @@ export type MirrorRow = {
 export async function readMirrorRow(db: D1Database, id: string) {
   const row = await db
     .prepare(
-      `SELECT id, stream_url AS streamUrl, stream_type AS streamType,
+      `SELECT id, source, stream_url AS streamUrl, stream_type AS streamType,
               mirror_key AS mirrorKey, mirror_state AS mirrorState,
               mirror_upload_id AS mirrorUploadId, mirror_parts AS mirrorParts,
               mirror_offset AS mirrorOffset

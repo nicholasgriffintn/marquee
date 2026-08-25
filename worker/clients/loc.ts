@@ -1,4 +1,5 @@
 import type { RevivalKind, RevivalRightsBasis, RevivalTag } from "../../src/domain/revival.ts";
+import { isTrustedRevivalSourceUrl } from "../lib/revival-source.ts";
 import { personName, splitSubjects, tagList } from "../lib/revival-tags.ts";
 import { properTitle, tidySynopsis, tidyText } from "../lib/revival-text.ts";
 import { firstString, yearFrom } from "../lib/text.ts";
@@ -41,11 +42,9 @@ function positiveNumber(value: unknown) {
 }
 
 function absoluteUrl(value: string) {
-  if (value.startsWith("//")) {
-    return `https:${value}`;
-  }
+  const url = value.startsWith("//") ? `https:${value}` : value;
 
-  return value.startsWith("https://") ? value : "";
+  return isTrustedRevivalSourceUrl("loc", url) ? url : "";
 }
 
 function itemIdFrom(url: string) {
@@ -81,7 +80,10 @@ function playableResource(resources: unknown) {
       continue;
     }
 
-    if (!resource.video.startsWith("https://") || !/\.(mp4|m4v)$/iu.test(resource.video)) {
+    if (
+      !isTrustedRevivalSourceUrl("loc", resource.video) ||
+      !/\.(mp4|m4v)$/iu.test(resource.video)
+    ) {
       continue;
     }
 
