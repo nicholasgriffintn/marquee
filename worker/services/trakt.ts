@@ -289,11 +289,15 @@ export async function exportTraktShelf(env: Bindings, viewerId: string, origin: 
     }
   }
 
-  const watched = await pushWaves(history, (wave) => pushTraktHistory(env, accessToken, wave));
   const rated = await pushWaves(ratings, (wave) => pushTraktRatings(env, accessToken, wave));
   const listed = await pushWaves(watchlist, (wave) => pushTraktWatchlist(env, accessToken, wave));
+  const watched = await pushWaves(history, (wave) => pushTraktHistory(env, accessToken, wave));
 
-  await markLinkPushed(env, viewerId, "trakt");
+  const maxUpdatedAt = rows.results.at(-1)?.updatedAt;
+
+  if (maxUpdatedAt) {
+    await markLinkPushed(env, viewerId, "trakt", maxUpdatedAt);
+  }
 
   logEvent("trakt_shelf_pushed", { watched, rated, listed });
 
