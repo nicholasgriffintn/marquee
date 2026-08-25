@@ -26,6 +26,8 @@ export type SourceFilm = {
 export type SourceScreening = {
   siteId: string;
   filmId: string;
+  /** The source's own id for this specific session, when it exposes one (distinguishes two showings that share a film, cinema and start time - different auditorium or format). */
+  sourceEventId: string | null;
   startsAt: string | null;
   businessDay: string;
   precision: ScreeningPrecision;
