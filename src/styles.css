@@ -1914,7 +1914,8 @@ h2 em {
   margin-left: auto;
 }
 .status-input {
-  color: var(--muted);
+  align-items: center;
+  color: var(--ink);
   display: flex !important;
   gap: 10px;
 }
