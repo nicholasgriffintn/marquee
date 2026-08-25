@@ -137,7 +137,45 @@ export function DetailPanel({
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
-    const onKeyDown = (event: KeyboardEvent) => event.key === "Escape" && onClose();
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+
+        return;
+      }
+
+      if (event.key !== "Tab" || exit) {
+        return;
+      }
+
+      const panel = panelRef.current;
+      const focusable = panel
+        ? [
+            ...panel.querySelectorAll<HTMLElement>(
+              'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+            ),
+          ].filter((element) => element.offsetParent !== null)
+        : [];
+
+      if (focusable.length === 0) {
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const isInside = panel?.contains(document.activeElement);
+
+      if (event.shiftKey) {
+        if (!isInside || document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        }
+      } else if (!isInside || document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
 
     document.body.style.overflow = "hidden";
     document.addEventListener("keydown", onKeyDown);
@@ -147,7 +185,7 @@ export function DetailPanel({
       document.body.style.overflow = previousOverflow;
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [onClose]);
+  }, [exit, onClose]);
 
   return (
     <div
