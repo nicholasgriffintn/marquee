@@ -13,6 +13,27 @@ export async function markAvailabilityChecked(db: D1Database, titleId: string) {
     .run();
 }
 
+export async function claimAvailabilityRefresh(db: D1Database, titleId: string) {
+  const result = await db
+    .prepare(
+      `UPDATE catalog_titles
+       SET availability_claimed_at = CURRENT_TIMESTAMP
+       WHERE id = ?
+         AND (availability_claimed_at IS NULL OR availability_claimed_at < datetime('now', '-30 seconds'))`,
+    )
+    .bind(titleId)
+    .run();
+
+  return result.meta.changes > 0;
+}
+
+export async function releaseAvailabilityClaim(db: D1Database, titleId: string) {
+  await db
+    .prepare(`UPDATE catalog_titles SET availability_claimed_at = NULL WHERE id = ?`)
+    .bind(titleId)
+    .run();
+}
+
 export async function enrichAvailability(
   db: D1Database,
   titleId: string,

@@ -2,7 +2,12 @@ import { getJustwatchAvailability } from "../clients/justwatch.ts";
 import { logEvent } from "../lib/logging.ts";
 import { enqueue } from "../lib/queue.ts";
 import { isKnownTitle } from "../lib/validation.ts";
-import { enrichAvailability, markAvailabilityChecked } from "../repositories/availability.ts";
+import {
+  claimAvailabilityRefresh,
+  enrichAvailability,
+  markAvailabilityChecked,
+  releaseAvailabilityClaim,
+} from "../repositories/availability.ts";
 import { claimBudget, readBudgetRoom } from "../repositories/budgets.ts";
 import { readAvailability, readItems } from "../repositories/catalog-reader.ts";
 import {
@@ -14,6 +19,7 @@ import type { Bindings, IngestionJob } from "../types.ts";
 import { titleParts, withRateLimitPause } from "./sources.ts";
 
 const AVAILABILITY_PER_RUN = 600;
+const INTERACTIVE_BUDGET_RESERVE = 5_000;
 
 export async function queueStaleAvailability(env: Bindings, alreadyQueued: string[] = []) {
   const room = await readBudgetRoom(env, "justwatch");
@@ -70,7 +76,7 @@ export async function queueAvailability(env: Bindings, titleIds: string[]) {
   );
 }
 
-export async function enrichTitleAvailability(env: Bindings, titleId: string) {
+export async function enrichTitleAvailability(env: Bindings, titleId: string, budgetReserve = 0) {
   const parts = titleParts(titleId);
 
   if (!parts) {
@@ -86,7 +92,7 @@ export async function enrichTitleAvailability(env: Bindings, titleId: string) {
     return;
   }
 
-  if (!(await claimBudget(env, "justwatch"))) {
+  if (!(await claimBudget(env, "justwatch", budgetReserve))) {
     logEvent("budget_exhausted", { source: "justwatch", titleId });
 
     return;
@@ -104,7 +110,21 @@ export async function enrichTitleAvailability(env: Bindings, titleId: string) {
 }
 
 export async function refreshTitleAvailability(env: Bindings, titleId: string) {
-  await enrichTitleAvailability(env, titleId);
+  const current = await readAvailability(env.DB, titleId);
+
+  if (!current || current.checked) {
+    return current;
+  }
+
+  if (!(await claimAvailabilityRefresh(env.DB, titleId))) {
+    return current;
+  }
+
+  try {
+    await enrichTitleAvailability(env, titleId, INTERACTIVE_BUDGET_RESERVE);
+  } finally {
+    await releaseAvailabilityClaim(env.DB, titleId);
+  }
 
   return readAvailability(env.DB, titleId);
 }
