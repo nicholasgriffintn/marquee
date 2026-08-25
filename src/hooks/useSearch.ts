@@ -36,6 +36,7 @@ export function useSearch(query: string, providerIds: string[]) {
   const [items, setItems] = useState<MediaTitle[]>([]);
   const [error, setError] = useState("");
   const [isSearching, setIsSearching] = useState(false);
+  const [isRefining, setIsRefining] = useState(false);
   const trimmed = query.trim();
   const providerKey = providerIds.join(",");
 
@@ -59,12 +60,18 @@ export function useSearch(query: string, providerIds: string[]) {
         if (active) {
           setItems((current) => mergeRefined(current, response.items));
         }
-      } catch {}
+      } catch {
+      } finally {
+        if (active) {
+          setIsRefining(false);
+        }
+      }
     }
 
     const timer = window.setTimeout(() => {
       async function run() {
         setIsSearching(true);
+        setIsRefining(false);
 
         try {
           const response = await requestJson<SearchResponse>(
@@ -77,6 +84,7 @@ export function useSearch(query: string, providerIds: string[]) {
             setError("");
 
             if (response.items.length < HYBRID_TRIGGER_MAX_ITEMS) {
+              setIsRefining(true);
               hybridTimer = window.setTimeout(() => void refine(), HYBRID_SETTLE_MS);
             }
           }
@@ -111,5 +119,6 @@ export function useSearch(query: string, providerIds: string[]) {
     items: isShort ? [] : items,
     error: isShort ? "" : error,
     isSearching: isShort ? false : isSearching,
+    isRefining: isShort ? false : isRefining,
   };
 }

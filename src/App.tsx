@@ -138,7 +138,11 @@ export function App() {
   }, [openDetails.title, openTitleId, pagePath, trimmedQuery]);
 
   const hasEmptySearch =
-    pagePath === "/search" && Boolean(trimmedQuery) && !search.isSearching && !search.items.length;
+    pagePath === "/search" &&
+    Boolean(trimmedQuery) &&
+    !search.isSearching &&
+    !search.isRefining &&
+    !search.items.length;
 
   useEffect(() => {
     if (hasEmptySearch) {
@@ -336,6 +340,7 @@ export function App() {
               query={query}
               results={search.items}
               isSearching={search.isSearching}
+              isRefining={search.isRefining}
               onQueryChange={setQuery}
               onOpen={openTitle}
               onSubmit={() => {
@@ -459,6 +464,7 @@ export function App() {
                 items={search.items}
                 error={search.error}
                 isSearching={search.isSearching}
+                isRefining={search.isRefining}
                 usherMoment={usher.moment?.surface === "search-empty" ? usher.moment : null}
                 onUsherAction={onUsherAction}
                 onUsherDismiss={(scope) => void usher.dismiss(scope)}
