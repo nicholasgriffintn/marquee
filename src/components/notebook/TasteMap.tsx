@@ -258,9 +258,6 @@ export function TasteMap({ isSignedIn }: { isSignedIn: boolean }) {
   return (
     <div className="taste-map">
       <div className="taste-map-frame">
-        {/* Comes before the svg in source order so a screen reader reaches "hover a
-            mark, or tab to one" before the interactive points themselves; CSS order
-            keeps it visually on the right, where it always was. */}
         <div className="taste-map-readout">
           {active ? (
             <TasteMapCard

@@ -9,9 +9,6 @@ type RailsResponse = {
 };
 
 const RETRY_DELAYS = [5_000, 10_000, 20_000, 30_000];
-// savedKey changes on every shelf mutation (rating, save, remove). Rating several
-// titles in a row would otherwise restart a full AI-rail regeneration on each one —
-// debounce follow-up regenerations so a burst of edits triggers one, not N.
 const SHELF_CHANGE_DEBOUNCE_MS = 4_000;
 
 export function useAiRails(isSignedIn: boolean, savedKey: string) {
