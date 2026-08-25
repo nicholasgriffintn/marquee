@@ -1,8 +1,7 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
-import { buzzScoreSql } from "../lib/buzz.ts";
+import { buzzScoreSql, MIN_TRENDING_VIEWS } from "../lib/buzz.ts";
 import { parseStoredTitle } from "../lib/catalog-payload.ts";
 import { clamp } from "../lib/numbers.ts";
-import { blendedRatingSql, weightedRatingSql } from "../lib/ratings.ts";
 import { isKnownTitle, validProviderIds } from "../lib/validation.ts";
 
 type PayloadRow = { payload: string; posterKey?: string | null };
@@ -14,8 +13,8 @@ export type SearchScope = "title" | "everything";
 const SCORE_SORT_MIN_VOTES = 50;
 const MAX_QUERY_TOKENS = 8;
 
-const WEIGHTED_RATING = weightedRatingSql("t.payload");
-const BLENDED_RATING = blendedRatingSql("t.payload");
+const WEIGHTED_RATING = "t.weighted_rating";
+const BLENDED_RATING = "t.blended_rating";
 
 const BUZZ_SCORE = buzzScoreSql("t.id");
 
@@ -88,7 +87,7 @@ export async function searchCatalogue(db: D1Database, search: CatalogueSearch) {
     .filter(Boolean)
     .slice(0, 10);
   const providerIds = validProviderIds(search.providerIds);
-  const excludedIds = [...new Set((search.excludeIds ?? []).filter(isKnownTitle))].slice(0, 300);
+  const excludedIds = [...new Set((search.excludeIds ?? []).filter(isKnownTitle))].slice(0, 2_000);
   const limit = clamp(Math.floor(search.limit ?? 12), 1, 60);
   const offset = clamp(Math.floor(search.offset ?? 0), 0, 2_000);
   const sort = search.sort ?? (match ? "relevance" : "popularity");
@@ -159,7 +158,7 @@ export async function searchCatalogue(db: D1Database, search: CatalogueSearch) {
       : 0;
 
   if (minVotes > 0) {
-    conditions.push("COALESCE(json_extract(t.payload, '$.tmdbVoteCount'), 0) >= ?");
+    conditions.push("t.vote_count >= ?");
     bindings.push(minVotes);
   }
 
@@ -231,6 +230,114 @@ export async function searchTitlesFirst(db: D1Database, search: CatalogueSearch)
   });
 
   return [...byTitle, ...rest.filter((title) => !found.has(title.id))].slice(0, limit);
+}
+
+export type BrowseTrendingFilter = {
+  mediaType?: "movie" | "tv";
+  genres: string[];
+  keywords: string[];
+  providerIds: string[];
+  minVotes: number;
+};
+
+type TrendingRow = PayloadRow & { id: string };
+
+async function trendingCandidates(db: D1Database, filter: BrowseTrendingFilter) {
+  const conditions = [`b.article <> ''`, `b.views >= ${MIN_TRENDING_VIEWS}`];
+  const bindings: unknown[] = [];
+
+  if (filter.mediaType === "movie" || filter.mediaType === "tv") {
+    conditions.push("t.media_type = ?");
+    bindings.push(filter.mediaType);
+  }
+
+  const genres = filter.genres
+    .map((genre) => genre.trim().toLowerCase())
+    .filter(Boolean)
+    .slice(0, 10);
+
+  if (genres.length) {
+    conditions.push(
+      `EXISTS (
+         SELECT 1 FROM json_each(t.payload, '$.genres')
+         WHERE lower(json_each.value) IN (${genres.map(() => "?").join(", ")})
+       )`,
+    );
+    bindings.push(...genres);
+  }
+
+  const keywords = filter.keywords
+    .map((keyword) => keyword.trim().toLowerCase())
+    .filter(Boolean)
+    .slice(0, 6);
+
+  if (keywords.length) {
+    conditions.push(
+      `EXISTS (
+         SELECT 1 FROM json_each(t.payload, '$.keywords')
+         WHERE lower(json_each.value) IN (${keywords.map(() => "?").join(", ")})
+       )`,
+    );
+    bindings.push(...keywords);
+  }
+
+  const providerIds = validProviderIds(filter.providerIds);
+
+  if (providerIds.length) {
+    conditions.push(
+      `EXISTS (
+         SELECT 1 FROM json_each(t.provider_ids)
+         WHERE json_each.value IN (SELECT value FROM json_each(?))
+       )`,
+    );
+    bindings.push(JSON.stringify(providerIds));
+  }
+
+  if (filter.minVotes > 0) {
+    conditions.push("t.vote_count >= ?");
+    bindings.push(filter.minVotes);
+  }
+
+  const rows = await db
+    .prepare(
+      `SELECT t.id, t.payload, t.poster_key AS posterKey
+       FROM title_buzz AS b
+       JOIN catalog_titles AS t ON t.id = b.title_id
+       WHERE ${conditions.join(" AND ")}
+       ORDER BY b.score DESC, t.popularity DESC`,
+    )
+    .bind(...bindings)
+    .all<TrendingRow>();
+
+  return rows.results;
+}
+
+export async function browseTrending(
+  db: D1Database,
+  filter: BrowseTrendingFilter,
+  limit: number,
+  offset: number,
+) {
+  const candidates = await trendingCandidates(db, filter);
+  const page = candidates.slice(offset, offset + limit);
+
+  if (page.length >= limit || offset + limit <= candidates.length) {
+    return hydrate(page);
+  }
+
+  const rest = await searchCatalogue(db, {
+    mediaType: filter.mediaType,
+    genres: filter.genres,
+    keywords: filter.keywords,
+    providerIds: filter.providerIds,
+    minVotes: filter.minVotes,
+    sort: "popularity",
+    excludeIds: candidates.map((row) => row.id),
+    limit: limit - page.length,
+    offset: Math.max(0, offset - candidates.length),
+  });
+
+  return [...hydrate(page), ...rest];
 }
 
 export async function readRanked(db: D1Database, ids: string[]) {

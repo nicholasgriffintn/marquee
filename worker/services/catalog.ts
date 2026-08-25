@@ -1,4 +1,5 @@
 import type { MediaTitle, TitleBuzz } from "../../src/domain/catalog.ts";
+import { readCachedValue, writeCachedValue } from "../lib/cache.ts";
 import { logError } from "../lib/logging.ts";
 import {
   includesProvider,
@@ -8,6 +9,7 @@ import {
   readTitlesByMalId,
 } from "../repositories/catalog-reader.ts";
 import {
+  browseTrending,
   readGenres,
   readKeywords,
   readRanked,
@@ -175,7 +177,7 @@ export type BrowseQuery = {
 const PAGE_SIZE = 24;
 const BROWSE_MIN_VOTES = 20;
 
-export async function browseCatalogue(env: Bindings, browse: BrowseQuery) {
+async function browseByPopularityOrScore(env: Bindings, browse: BrowseQuery, minVotes: number) {
   const search = {
     mediaType: browse.mediaType,
     genres: browse.genres,
@@ -183,13 +185,31 @@ export async function browseCatalogue(env: Bindings, browse: BrowseQuery) {
     providerIds: browse.providerIds,
     query: browse.query,
     sort: browse.query && browse.sort === "popularity" ? undefined : browse.sort,
-    minVotes: browse.sort === "recent" ? 0 : BROWSE_MIN_VOTES,
+    minVotes,
     limit: PAGE_SIZE + 1,
     offset: browse.page * PAGE_SIZE,
   };
-  const items = browse.query
-    ? await searchTitlesFirst(env.DB, search)
-    : await queryCatalogue(env.DB, search);
+
+  return browse.query ? searchTitlesFirst(env.DB, search) : queryCatalogue(env.DB, search);
+}
+
+export async function browseCatalogue(env: Bindings, browse: BrowseQuery) {
+  const minVotes = browse.sort === "recent" ? 0 : BROWSE_MIN_VOTES;
+  const items =
+    !browse.query && browse.sort === "trending"
+      ? await browseTrending(
+          env.DB,
+          {
+            mediaType: browse.mediaType,
+            genres: browse.genres,
+            keywords: browse.keywords,
+            providerIds: browse.providerIds,
+            minVotes,
+          },
+          PAGE_SIZE + 1,
+          browse.page * PAGE_SIZE,
+        )
+      : await browseByPopularityOrScore(env, browse, minVotes);
 
   return {
     items: await withBuzz(env.DB, items.slice(0, PAGE_SIZE)),
@@ -198,12 +218,36 @@ export async function browseCatalogue(env: Bindings, browse: BrowseQuery) {
   };
 }
 
+const FACET_CACHE_SECONDS = 3_600;
+
 export async function getGenres(env: Bindings, limit: number) {
-  return readGenres(env.DB, limit);
+  const cacheKey = `catalog-genres:${limit}`;
+  const cached = await readCachedValue<string[]>(cacheKey);
+
+  if (cached) {
+    return cached;
+  }
+
+  const genres = await readGenres(env.DB, limit);
+
+  await writeCachedValue(cacheKey, genres, FACET_CACHE_SECONDS);
+
+  return genres;
 }
 
 export async function getKeywords(env: Bindings, limit: number) {
-  return readKeywords(env.DB, limit);
+  const cacheKey = `catalog-keywords:${limit}`;
+  const cached = await readCachedValue<string[]>(cacheKey);
+
+  if (cached) {
+    return cached;
+  }
+
+  const keywords = await readKeywords(env.DB, limit);
+
+  await writeCachedValue(cacheKey, keywords, FACET_CACHE_SECONDS);
+
+  return keywords;
 }
 
 export async function getTonight(

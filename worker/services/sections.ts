@@ -1,7 +1,6 @@
 import type { SectionAudience } from "../../src/domain/catalog.ts";
 import { providerRegistryIds } from "../../src/domain/providers.ts";
 import { logError, logEvent } from "../lib/logging.ts";
-import { blendedRatingSql } from "../lib/ratings.ts";
 import { titleCase } from "../lib/text.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import type { Bindings } from "../types.ts";
@@ -26,8 +25,8 @@ type Section = {
   audience?: SectionAudience;
 };
 
-const SCORE = blendedRatingSql("payload");
-const VOTES = `COALESCE(json_extract(payload, '$.tmdbVoteCount'), 0)`;
+const SCORE = "blended_rating";
+const VOTES = "vote_count";
 const RUNTIME = `json_extract(payload, '$.runtimeMinutes')`;
 const SEASONS = `json_extract(payload, '$.numberOfSeasons')`;
 const CERT = `COALESCE(json_extract(payload, '$.certification'), '')`;
