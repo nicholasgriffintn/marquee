@@ -540,7 +540,7 @@ export async function dismissMoment(
   env: Bindings,
   viewerId: string,
   kind: string,
-  scope: "once" | "kind" | "all",
+  scope: "once" | "kind" | "all" | "acknowledged",
 ) {
   const record = await readUsherRecord(env.DB, viewerId);
 
@@ -554,6 +554,15 @@ export async function dismissMoment(
     await writeUsherRecord(env.DB, viewerId, {
       muted: { ...record.muted, [kind]: daysFromNow(30) },
       ignored: 0,
+    });
+
+    return;
+  }
+
+  if (scope === "acknowledged") {
+    await writeUsherRecord(env.DB, viewerId, {
+      ignored: 0,
+      lastPromptedAt: new Date().toISOString(),
     });
 
     return;

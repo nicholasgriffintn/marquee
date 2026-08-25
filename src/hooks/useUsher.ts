@@ -205,7 +205,7 @@ export function useUsher(isSignedIn: boolean) {
   );
 
   const dismiss = useCallback(
-    async (scope: "once" | "kind" | "all" = "once") => {
+    async (scope: "once" | "kind" | "all" | "acknowledged" = "once") => {
       const kind = momentRef.current?.kind ?? "";
 
       setMoment(null);
