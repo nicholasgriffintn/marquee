@@ -1,6 +1,14 @@
 import { isRecord } from "../lib/values.ts";
 import type { EntryStatus } from "../types.ts";
 
+const FURTHEST_EPISODE = `viewing_episode_entries
+       WHERE viewer_id = viewing_entries.viewer_id AND title_id = viewing_entries.title_id
+         AND scope = 'episode' AND watched = 1 AND season_number > 0
+       ORDER BY season_number DESC, episode_number DESC LIMIT 1`;
+
+const PROGRESS_COLUMNS = `(SELECT season_number FROM ${FURTHEST_EPISODE}) AS season,
+         (SELECT episode_number FROM ${FURTHEST_EPISODE}) AS episode`;
+
 export async function readProfile(db: D1Database, viewerId: string) {
   const entriesResult = await db
     .prepare(
@@ -10,8 +18,7 @@ export async function readProfile(db: D1Database, viewerId: string) {
          status,
          rating,
          thoughts,
-         season,
-         episode,
+         ${PROGRESS_COLUMNS},
          updated_at AS updatedAt
        FROM viewing_entries
        WHERE viewer_id = ?
@@ -35,33 +42,20 @@ export async function saveViewingEntry(
     status: EntryStatus;
     rating: number | null;
     thoughts: string;
-    season: number | null;
-    episode: number | null;
   },
 ) {
   await db
     .prepare(
       `INSERT INTO viewing_entries
-         (id, viewer_id, title_id, status, rating, thoughts, season, episode)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         (id, viewer_id, title_id, status, rating, thoughts)
+       VALUES (?, ?, ?, ?, ?, ?)
        ON CONFLICT(viewer_id, title_id) DO UPDATE SET
          status = excluded.status,
          rating = excluded.rating,
          thoughts = excluded.thoughts,
-         season = excluded.season,
-         episode = excluded.episode,
          updated_at = CURRENT_TIMESTAMP`,
     )
-    .bind(
-      crypto.randomUUID(),
-      viewerId,
-      entry.titleId,
-      entry.status,
-      entry.rating,
-      entry.thoughts,
-      entry.season,
-      entry.episode,
-    )
+    .bind(crypto.randomUUID(), viewerId, entry.titleId, entry.status, entry.rating, entry.thoughts)
     .run();
 
   return db
@@ -72,8 +66,7 @@ export async function saveViewingEntry(
          status,
          rating,
          thoughts,
-         season,
-         episode,
+         ${PROGRESS_COLUMNS},
          updated_at AS updatedAt
        FROM viewing_entries
        WHERE viewer_id = ? AND title_id = ?`,
@@ -114,7 +107,7 @@ export async function readProfileSummary(db: D1Database, viewerId: string) {
 export async function readViewingEntry(db: D1Database, viewerId: string, titleId: string) {
   const row = await db
     .prepare(
-      `SELECT id, title_id AS titleId, status, rating, thoughts, season, episode,
+      `SELECT id, title_id AS titleId, status, rating, thoughts, ${PROGRESS_COLUMNS},
               updated_at AS updatedAt
          FROM viewing_entries
         WHERE viewer_id = ?1 AND title_id = ?2`,
