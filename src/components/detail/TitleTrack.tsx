@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import type { MediaTitle } from "../../domain/catalog";
 import { mediaMeta } from "../../lib/media";
 import { TitleArt } from "../TitleArt";
@@ -8,12 +10,14 @@ export function TitleTrack({
   currentId,
   caption,
   onOpen,
+  footer,
 }: {
   label: string;
   items: MediaTitle[];
   currentId?: string;
   caption: (item: MediaTitle) => string;
   onOpen: (item: MediaTitle) => void;
+  footer?: ReactNode;
 }) {
   if (items.length === 0) {
     return null;
@@ -21,7 +25,10 @@ export function TitleTrack({
 
   return (
     <div className="detail-similar">
-      <span>{label}</span>
+      <span className={footer ? "detail-similar-head" : undefined}>
+        {label}
+        {footer}
+      </span>
       <div className="detail-similar-track">
         {items.map((item) => (
           <button
