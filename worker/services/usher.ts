@@ -273,12 +273,16 @@ export async function nextMoment(
     readAnswers(env.DB, viewerId),
   ]);
 
-  if (record.status === "dismissed" || isFuture(record.snoozedUntil)) {
+  if (isFuture(record.snoozedUntil)) {
     return null;
   }
 
   const seen = new Set([...record.asked, ...answers.keys()]);
   const muted = (kind: string) => isFuture(record.muted[kind] ?? null);
+
+  if (surface === "first-run" && record.status === "dismissed") {
+    return null;
+  }
 
   if (surface === "search-empty" && context.query && !muted("search-rescue")) {
     return {
