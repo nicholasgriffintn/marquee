@@ -46,8 +46,6 @@ const READ_CHUNK = 80;
 const MIN_VISIBLE_ITEMS = 3;
 const SECTION_ITEMS = 14;
 const MAX_VISIBLE_SECTIONS = 18;
-const BOUND_PARAM_BUDGET = 90;
-const PROVIDER_CHUNK = 30;
 
 async function matchingTitleIds(db: D1Database, ids: string[], providerIds: string[]) {
   const uniqueIds = [...new Set(ids.filter(isKnownTitle))];
@@ -56,42 +54,22 @@ async function matchingTitleIds(db: D1Database, ids: string[], providerIds: stri
     return new Set(uniqueIds);
   }
 
-  const keep = new Set<string>();
+  const rows = await db
+    .prepare(
+      `SELECT id FROM catalog_titles
+        WHERE id IN (SELECT value FROM json_each(?1))
+          AND (
+            json_array_length(provider_ids) = 0
+            OR EXISTS (
+              SELECT 1 FROM json_each(provider_ids)
+               WHERE json_each.value IN (SELECT value FROM json_each(?2))
+            )
+          )`,
+    )
+    .bind(JSON.stringify(uniqueIds), JSON.stringify(providerIds))
+    .all<{ id: string }>();
 
-  for (
-    let offset = 0;
-    offset < providerIds.length && keep.size < uniqueIds.length;
-    offset += PROVIDER_CHUNK
-  ) {
-    const providers = providerIds.slice(offset, offset + PROVIDER_CHUNK);
-    const pending = uniqueIds.filter((id) => !keep.has(id));
-    const idChunk = Math.max(1, BOUND_PARAM_BUDGET - providers.length);
-
-    for (let index = 0; index < pending.length; index += idChunk) {
-      const wave = pending.slice(index, index + idChunk);
-      // oxlint-disable-next-line no-await-in-loop
-      const rows = await db
-        .prepare(
-          `SELECT id FROM catalog_titles
-            WHERE id IN (${wave.map(() => "?").join(",")})
-              AND (
-                json_array_length(provider_ids) = 0
-                OR EXISTS (
-                  SELECT 1 FROM json_each(provider_ids)
-                   WHERE json_each.value IN (${providers.map(() => "?").join(",")})
-                )
-              )`,
-        )
-        .bind(...wave, ...providers)
-        .all<{ id: string }>();
-
-      for (const row of rows.results) {
-        keep.add(row.id);
-      }
-    }
-  }
-
-  return keep;
+  return new Set(rows.results.map((row) => row.id));
 }
 
 export async function readRawItems(db: D1Database, ids: string[]) {
