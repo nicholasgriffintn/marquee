@@ -82,8 +82,12 @@ export function App() {
   const session = useSession();
   const isSignedIn = Boolean(session.user);
   const profile = useProfile(isSignedIn);
-  const { selectedProviderIds, selectProviders } = useProviderPreferences();
-  const isViewerReady = !session.isLoading && profile.isLoaded;
+  const {
+    selectedProviderIds,
+    selectProviders,
+    isResolved: providersResolved,
+  } = useProviderPreferences(isSignedIn);
+  const isViewerReady = !session.isLoading && profile.isLoaded && providersResolved;
   const isHome = location.pathname === "/";
   const catalog = useCatalog(selectedProviderIds, isViewerReady && isHome);
   const search = useSearch(query, selectedProviderIds);
