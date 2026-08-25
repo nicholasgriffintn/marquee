@@ -4,7 +4,7 @@ import { logEvent } from "../lib/logging.ts";
 import { enqueue } from "../lib/queue.ts";
 import {
   addDays,
-  advancePartitionCursor,
+  advancePartitionCursors,
   claimPendingPartitions,
   countPartitions,
   daysBetween,
@@ -164,12 +164,8 @@ export async function advanceDiscoverFrontier(env: Bindings) {
     cursors.push({ id: partition.id, nextPage: partition.nextPage + take });
   }
 
+  await advancePartitionCursors(env.DB, cursors);
   await enqueue(env.INGESTION_QUEUE, jobs);
-
-  for (const cursor of cursors) {
-    // oxlint-disable-next-line no-await-in-loop
-    await advancePartitionCursor(env.DB, cursor.id, cursor.nextPage);
-  }
 
   const pages = PAGES_PER_SWEEP - remaining;
 

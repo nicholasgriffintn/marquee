@@ -167,18 +167,28 @@ export async function markPartitionSplit(db: D1Database, id: string, totalResult
     .run();
 }
 
-export async function advancePartitionCursor(db: D1Database, id: string, nextPage: number) {
-  await db
-    .prepare(
-      `UPDATE discover_partitions
-       SET next_page = ?,
-           status = CASE WHEN ? > total_pages THEN 'done' ELSE status END,
-           completed_at = CASE WHEN ? > total_pages THEN CURRENT_TIMESTAMP ELSE completed_at END,
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?`,
-    )
-    .bind(nextPage, nextPage, nextPage, id)
-    .run();
+export async function advancePartitionCursors(
+  db: D1Database,
+  cursors: { id: string; nextPage: number }[],
+) {
+  if (cursors.length === 0) {
+    return;
+  }
+
+  await db.batch(
+    cursors.map((cursor) =>
+      db
+        .prepare(
+          `UPDATE discover_partitions
+           SET next_page = ?,
+               status = CASE WHEN ? > total_pages THEN 'done' ELSE status END,
+               completed_at = CASE WHEN ? > total_pages THEN CURRENT_TIMESTAMP ELSE completed_at END,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = ?`,
+        )
+        .bind(cursor.nextPage, cursor.nextPage, cursor.nextPage, cursor.id),
+    ),
+  );
 }
 
 export async function recordPageDrained(db: D1Database, id: string) {
