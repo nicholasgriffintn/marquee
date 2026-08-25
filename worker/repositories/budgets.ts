@@ -96,6 +96,44 @@ export async function readBudgetRoom(env: Bindings, source: EnrichmentSource) {
   return row ? row.room : configured.callLimit;
 }
 
+const SWEEP_HOURS = 3;
+
+export async function readBudgetPace(env: Bindings, source: EnrichmentSource) {
+  const resolved = budgetSource(source);
+  const configured = SOURCE_BUDGETS[resolved];
+  const expression = windowExpression(configured.windowKind);
+  const windowHours = configured.windowKind === "day" ? 24 : 24 * 30;
+  const row = await env.DB.prepare(
+    `SELECT CASE
+              WHEN paused_until IS NOT NULL AND paused_until > CURRENT_TIMESTAMP THEN 0
+              WHEN window_started_at <= datetime('now', ?) THEN call_limit
+              ELSE max(0, call_limit - used)
+            END AS room,
+            CASE
+              WHEN window_started_at <= datetime('now', ?) THEN ?
+              ELSE (julianday(window_started_at, ?) - julianday('now')) * 24
+            END AS hoursLeft
+     FROM source_budgets
+     WHERE source = ?`,
+  )
+    .bind(
+      expression,
+      expression,
+      windowHours,
+      configured.windowKind === "day" ? "+1 day" : "+1 month",
+      resolved,
+    )
+    .first<{ room: number; hoursLeft: number }>();
+
+  if (!row) {
+    return Math.floor(configured.callLimit / Math.ceil(windowHours / SWEEP_HOURS));
+  }
+
+  const sweeps = Math.max(1, Math.ceil(row.hoursLeft / SWEEP_HOURS));
+
+  return Math.floor(row.room / sweeps);
+}
+
 export async function claimBudget(env: Bindings, source: EnrichmentSource) {
   const resolved = budgetSource(source);
   const expression = windowExpression(SOURCE_BUDGETS[resolved].windowKind);

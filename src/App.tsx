@@ -24,6 +24,7 @@ import { useTrending } from "./hooks/useTrending";
 import { useUsher } from "./hooks/useUsher";
 import { titleForItem, titleForRoute } from "./lib/page-title";
 import { BrowsePage, type BrowsePreset } from "./pages/BrowsePage";
+import { CollectionPage } from "./pages/CollectionPage";
 import { DigestPage } from "./pages/DigestPage";
 import { LibraryPage } from "./pages/LibraryPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
@@ -99,8 +100,12 @@ export function App() {
   const session = useSession();
   const isSignedIn = Boolean(session.user);
   const profile = useProfile(isSignedIn);
-  const { selectedProviderIds, selectProviders } = useProviderPreferences();
-  const isViewerReady = !session.isLoading && profile.isLoaded;
+  const {
+    selectedProviderIds,
+    selectProviders,
+    isResolved: providersResolved,
+  } = useProviderPreferences(isSignedIn);
+  const isViewerReady = !session.isLoading && profile.isLoaded && providersResolved;
   const isHome = location.pathname === "/";
   const catalog = useCatalog(selectedProviderIds, isViewerReady && isHome);
   const search = useSearch(query, selectedProviderIds);
@@ -534,6 +539,8 @@ export function App() {
             path="/person/:name"
             element={<PersonPage isSignedIn={isSignedIn} onOpen={openTitle} />}
           />
+
+          <Route path="/collection/:id" element={<CollectionPage onOpen={openTitle} />} />
 
           <Route
             path="/sources"

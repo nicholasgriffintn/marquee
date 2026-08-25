@@ -200,11 +200,11 @@
       },
       {
         "queue": "marquee-ratings",
-        "max_batch_size": 1,
+        "max_batch_size": 5,
         "max_batch_timeout": 5,
         "max_retries": 5,
         "dead_letter_queue": "marquee-ingestion-dead-letter",
-        "max_concurrency": 3,
+        "max_concurrency": 8,
         "retry_delay": 60
       },
       {
@@ -218,11 +218,11 @@
       },
       {
         "queue": "marquee-posters",
-        "max_batch_size": 3,
+        "max_batch_size": 5,
         "max_batch_timeout": 5,
         "max_retries": 5,
         "dead_letter_queue": "marquee-ingestion-dead-letter",
-        "max_concurrency": 3,
+        "max_concurrency": 6,
         "retry_delay": 30
       },
       {
