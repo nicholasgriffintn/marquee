@@ -1,8 +1,7 @@
 import type { ShelfResponse } from "../../src/domain/shelf.ts";
 import { isEntryStatus, isKnownTitle, validProviderIds } from "../lib/validation.ts";
-import { deleteEpisodeEntries } from "../repositories/episode-entries.ts";
+import { deleteProfileData } from "../repositories/profile-removal.ts";
 import {
-  deleteViewingEntry,
   readProfileSummary,
   readProviderPreferences,
   readViewingEntry,
@@ -114,8 +113,7 @@ export async function removeFromProfile(db: D1Database, viewerId: string, titleI
     return false;
   }
 
-  await deleteViewingEntry(db, viewerId, titleId);
-  await deleteEpisodeEntries(db, viewerId, titleId);
+  await deleteProfileData(db, viewerId, titleId);
 
   return true;
 }

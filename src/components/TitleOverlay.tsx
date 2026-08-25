@@ -1,6 +1,12 @@
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import type { MediaTitle } from "../domain/catalog";
+import {
+  entryStateForResolution,
+  initialEntryLoadState,
+  resolveEntryView,
+  type ProfileEntryState,
+} from "../domain/profile-entry";
 import type { UsherMoment } from "../domain/usher";
 import type { EntryStatus, ViewingEntry } from "../types";
 import { DetailPanel } from "./detail/DetailPanel";
@@ -80,7 +86,7 @@ export function TitleOverlay({
   isMissing,
   isLoading,
   canSave,
-  entries,
+  entryState,
   usherMoment,
   onUsherRequest,
   onUsherAction,
@@ -102,7 +108,7 @@ export function TitleOverlay({
   isMissing: boolean;
   isLoading: boolean;
   canSave: boolean;
-  entries: Record<string, ViewingEntry>;
+  entryState?: ProfileEntryState;
   usherMoment: UsherMoment | null;
   onUsherRequest: (titleId: string) => void;
   onUsherAction: (moment: UsherMoment, actionId: string) => void;
@@ -116,14 +122,58 @@ export function TitleOverlay({
   onStatus: (titleId: string, status: EntryStatus) => void;
   onUpdateDraft: (titleId: string, patch: Partial<ViewingEntry>) => void;
   onTracked: () => void;
-  onLoadEntry: (titleId: string) => Promise<void>;
+  onLoadEntry: (titleId: string, signal: AbortSignal) => Promise<void>;
   selectedProviderIds: string[];
 }) {
-  const isSaved = Boolean(entries[titleId]);
+  const viewToken = useMemo(() => Symbol(titleId), [titleId]);
+  const [resolvedViewToken, setResolvedViewToken] = useState<symbol | null>(null);
+  const currentViewToken = useRef(viewToken);
+  const retryController = useRef<AbortController | null>(null);
+  const resolvedEntryState = entryStateForResolution(
+    entryState ?? initialEntryLoadState,
+    resolvedViewToken === viewToken,
+  );
+  const isSaved = resolvedEntryState.status === "loaded" && Boolean(resolvedEntryState.entry);
+
+  useLayoutEffect(() => {
+    currentViewToken.current = viewToken;
+  }, [viewToken]);
 
   useEffect(() => {
-    void onLoadEntry(titleId);
-  }, [onLoadEntry, titleId]);
+    const controller = new AbortController();
+
+    retryController.current?.abort();
+    void resolveEntryView(
+      viewToken,
+      () => onLoadEntry(titleId, controller.signal),
+      (token) => currentViewToken.current === token && !controller.signal.aborted,
+      setResolvedViewToken,
+    );
+
+    return () => controller.abort();
+  }, [onLoadEntry, titleId, viewToken]);
+
+  const retryEntry = async () => {
+    const controller = new AbortController();
+    const token = viewToken;
+
+    retryController.current?.abort();
+    retryController.current = controller;
+    setResolvedViewToken(null);
+    await resolveEntryView(
+      token,
+      () => onLoadEntry(titleId, controller.signal),
+      (candidate) => currentViewToken.current === candidate && !controller.signal.aborted,
+      setResolvedViewToken,
+    );
+  };
+
+  useEffect(
+    () => () => {
+      retryController.current?.abort();
+    },
+    [],
+  );
 
   useEffect(() => {
     if (isSaved) {
@@ -143,7 +193,7 @@ export function TitleOverlay({
     <DetailPanel
       item={title}
       canSave={canSave}
-      entry={entries[title.id]}
+      entryState={resolvedEntryState}
       usherSlot={
         usherMoment ? (
           <UsherCard moment={usherMoment} onAction={onUsherAction} onDismiss={onUsherDismiss} />
@@ -158,6 +208,7 @@ export function TitleOverlay({
       onStatus={onStatus}
       onUpdateDraft={onUpdateDraft}
       onTracked={onTracked}
+      onRetryEntry={() => void retryEntry()}
       selectedProviderIds={selectedProviderIds}
     />
   );

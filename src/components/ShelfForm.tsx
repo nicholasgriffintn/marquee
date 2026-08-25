@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
+import { runConfirmedRemoval } from "../domain/profile-entry";
 import { isEntryStatus, type EntryStatus, type ViewingEntry } from "../types";
 
 const STATUSES: { value: EntryStatus; label: string }[] = [
@@ -15,6 +16,7 @@ export function ShelfForm({
   entry,
   title,
   isSeries = false,
+  confirmRemove,
   onRemove,
   onSave,
   onStatus,
@@ -23,6 +25,7 @@ export function ShelfForm({
   entry: ViewingEntry;
   title: string;
   isSeries?: boolean;
+  confirmRemove: () => boolean;
   onRemove: (titleId: string) => void;
   onSave: (entry: ViewingEntry) => void;
   onStatus: (titleId: string, status: EntryStatus) => void;
@@ -116,7 +119,9 @@ export function ShelfForm({
           type="button"
           className="danger"
           disabled={pending !== null}
-          onClick={() => guard("remove", () => onRemove(entry.titleId))}
+          onClick={() =>
+            runConfirmedRemoval(confirmRemove, () => guard("remove", () => onRemove(entry.titleId)))
+          }
         >
           {pending === "remove" ? "Removing…" : "Remove from shelf"}
         </button>

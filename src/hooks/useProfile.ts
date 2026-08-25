@@ -1,6 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { isAbortError, jsonRequest, requestJson } from "../lib/api";
+import {
+  beginEntryLoad,
+  createProfileEntryCoordinator,
+  entryLoadFailed,
+  entryLoadSucceeded,
+  isRetryableProfileError,
+  profileSaveSettlement,
+  runProfileMutation,
+  type ProfileEntryState,
+} from "../domain/profile-entry";
+import { ApiError, isAbortError, jsonRequest, requestJson } from "../lib/api";
+import { requestProfileEntry } from "../lib/profile-entry-request";
 import type { EntryStatus, ViewingEntry } from "../types";
 
 type ProfileSummary = {
@@ -14,6 +25,7 @@ const EMPTY_SUMMARY: ProfileSummary = { shelved: 0, unrated: 0, updatedAt: "" };
 const SUCCESS_HOLD_MS = 3_500;
 const ERROR_HOLD_MS = 8_000;
 const NO_ENTRIES: Record<string, ViewingEntry> = {};
+const NO_ENTRY_STATES: Record<string, ProfileEntryState> = {};
 
 const emptyEntry = (titleId: string): ViewingEntry => ({
   titleId,
@@ -25,9 +37,11 @@ const emptyEntry = (titleId: string): ViewingEntry => ({
 export function useProfile(isSignedIn: boolean) {
   const [summary, setSummary] = useState<ProfileSummary>(EMPTY_SUMMARY);
   const [entries, setEntries] = useState<Record<string, ViewingEntry>>({});
+  const [entryStates, setEntryStates] = useState<Record<string, ProfileEntryState>>({});
   const [message, setMessage] = useState("");
   const [isLoaded, setIsLoaded] = useState(false);
   const [version, setVersion] = useState(0);
+  const [operations] = useState(createProfileEntryCoordinator);
   const messageTimer = useRef(0);
   const announce = useCallback((text: string, holdMs = SUCCESS_HOLD_MS) => {
     window.clearTimeout(messageTimer.current);
@@ -72,15 +86,23 @@ export function useProfile(isSignedIn: boolean) {
   const refresh = useCallback(() => setVersion((current) => current + 1), []);
 
   const loadEntry = useCallback(
-    async (titleId: string) => {
+    async (titleId: string, signal?: AbortSignal) => {
       if (!isSignedIn) {
         return;
       }
 
+      const generation = operations.begin(titleId);
+
+      setEntryStates((current) => ({ ...current, [titleId]: beginEntryLoad() }));
+
       try {
-        const response = await requestJson<{ entry: ViewingEntry | null }>(
-          `/api/profile/entry/${encodeURIComponent(titleId)}`,
+        const response = await operations.enqueue(titleId, () =>
+          requestProfileEntry(titleId, signal),
         );
+
+        if (!operations.isCurrent(titleId, generation)) {
+          return;
+        }
 
         setEntries((current) => {
           const next = { ...current };
@@ -93,49 +115,82 @@ export function useProfile(isSignedIn: boolean) {
 
           return next;
         });
-      } catch {
-        return;
+        setEntryStates((current) => ({
+          ...current,
+          [titleId]: entryLoadSucceeded(response.entry),
+        }));
+      } catch (error) {
+        if (isAbortError(error) || !operations.isCurrent(titleId, generation)) {
+          return;
+        }
+
+        const status = error instanceof ApiError ? error.status : undefined;
+
+        setEntryStates((current) => ({
+          ...current,
+          [titleId]: entryLoadFailed(isRetryableProfileError(status)),
+        }));
       }
     },
-    [isSignedIn],
+    [isSignedIn, operations],
   );
 
   async function saveEntry(entry: ViewingEntry) {
-    const previous = entries[entry.titleId];
+    const generation = operations.begin(entry.titleId);
 
     setEntries((current) => ({ ...current, [entry.titleId]: entry }));
+    setEntryStates((current) => ({
+      ...current,
+      [entry.titleId]: entryLoadSucceeded(entry),
+    }));
     announce("Saving shelf…", 0);
-    refresh();
     try {
-      const payload = await requestJson<{ entry: ViewingEntry }>(
-        "/api/profile",
-        jsonRequest("POST", entry),
+      const payload = await runProfileMutation(
+        () =>
+          operations.enqueue(entry.titleId, () =>
+            requestJson<{ entry: ViewingEntry }>("/api/profile", jsonRequest("POST", entry)),
+          ),
+        refresh,
       );
 
+      const settlement = profileSaveSettlement(
+        "success",
+        operations.isCurrent(entry.titleId, generation),
+      );
+
+      announce(settlement.message);
+
+      if (!settlement.applyServerEntry) {
+        return true;
+      }
+
       setEntries((current) => ({ ...current, [entry.titleId]: payload.entry }));
-      announce("Shelf saved");
+      setEntryStates((current) => ({
+        ...current,
+        [entry.titleId]: entryLoadSucceeded(payload.entry),
+      }));
 
       return true;
     } catch {
-      setEntries((current) => {
-        const next = { ...current };
+      const settlement = profileSaveSettlement(
+        "failure",
+        operations.isCurrent(entry.titleId, generation),
+      );
 
-        if (previous) {
-          next[entry.titleId] = previous;
-        } else {
-          delete next[entry.titleId];
-        }
+      announce(settlement.message, ERROR_HOLD_MS);
 
-        return next;
-      });
-      announce("Shelf could not be saved. Try again.", ERROR_HOLD_MS);
+      if (!settlement.reconcile) {
+        return false;
+      }
+
+      await loadEntry(entry.titleId);
 
       return false;
     }
   }
 
   async function removeEntry(titleId: string) {
-    const previous = entries[titleId];
+    const generation = operations.begin(titleId);
 
     setEntries((current) => {
       const next = { ...current };
@@ -144,17 +199,29 @@ export function useProfile(isSignedIn: boolean) {
 
       return next;
     });
+    setEntryStates((current) => ({ ...current, [titleId]: entryLoadSucceeded(null) }));
     announce("Removing from shelf…", 0);
-    refresh();
     try {
-      await requestJson(`/api/profile/${encodeURIComponent(titleId)}`, jsonRequest("DELETE"));
+      await runProfileMutation(
+        () =>
+          operations.enqueue(titleId, () =>
+            requestJson(`/api/profile/${encodeURIComponent(titleId)}`, jsonRequest("DELETE")),
+          ),
+        refresh,
+      );
+
+      if (!operations.isCurrent(titleId, generation)) {
+        return;
+      }
+
       announce("Removed from shelf");
     } catch {
-      if (previous) {
-        setEntries((current) => ({ ...current, [titleId]: previous }));
+      if (!operations.isCurrent(titleId, generation)) {
+        return;
       }
 
       announce("Could not remove that title. Try again.", ERROR_HOLD_MS);
+      await loadEntry(titleId);
     }
   }
 
@@ -162,10 +229,11 @@ export function useProfile(isSignedIn: boolean) {
     titleId: string,
     patch: Partial<Pick<ViewingEntry, "thoughts" | "rating" | "status">>,
   ) {
-    setEntries((current) => ({
-      ...current,
-      [titleId]: { ...(current[titleId] ?? emptyEntry(titleId)), ...patch },
-    }));
+    const entry = { ...(entries[titleId] ?? emptyEntry(titleId)), ...patch };
+
+    operations.begin(titleId);
+    setEntries((current) => ({ ...current, [titleId]: entry }));
+    setEntryStates((current) => ({ ...current, [titleId]: entryLoadSucceeded(entry) }));
   }
 
   function setStatus(titleId: string, status: EntryStatus) {
@@ -176,6 +244,7 @@ export function useProfile(isSignedIn: boolean) {
 
   return {
     entries: isSignedIn ? entries : NO_ENTRIES,
+    entryStates: isSignedIn ? entryStates : NO_ENTRY_STATES,
     shelved: isSignedIn ? summary.shelved : 0,
     unrated: isSignedIn ? summary.unrated : 0,
     shelfKey: isSignedIn ? `${summary.shelved}:${summary.updatedAt}` : "",

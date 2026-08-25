@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import { mergeAnimeProviders } from "../../domain/anime";
 import { collectionPath, type MediaTitle } from "../../domain/catalog";
+import { removalDisclosure, type ProfileEntryState } from "../../domain/profile-entry";
 import { useAvailability } from "../../hooks/useAvailability";
 import { useCollection } from "../../hooks/useCollection";
 import { useRecommendations } from "../../hooks/useRecommendations";
@@ -57,16 +58,17 @@ export function DetailPanel({
   onOpen,
   onSave,
   onSaveEntry,
-  entry,
+  entryState,
   selectedProviderIds,
   usherSlot,
   onRemove,
+  onRetryEntry,
   onStatus,
   onTracked,
   onUpdateDraft,
 }: {
   item: MediaTitle;
-  entry?: ViewingEntry;
+  entryState: ProfileEntryState;
   selectedProviderIds: string[];
   usherSlot?: ReactNode;
   onRemove: (titleId: string) => void;
@@ -79,8 +81,10 @@ export function DetailPanel({
   onOpen: (item: MediaTitle) => void;
   onSave: (item: MediaTitle) => void;
   onSaveEntry: (entry: ViewingEntry) => void;
+  onRetryEntry: () => void;
 }) {
   const isSeries = item.mediaType === "tv";
+  const entry = entryState.status === "loaded" ? entryState.entry : null;
   const [view, setView] = useState<DetailView>({ titleId: item.id, tab: "overview", jump: null });
   const live = view.titleId === item.id ? view : null;
   const tab = live?.tab ?? "overview";
@@ -271,10 +275,26 @@ export function DetailPanel({
             <MarqueeRead insight={insight} isLoading={isInsightLoading} />
             {canSave && (
               <ErrorBoundary label="The shelf card">
-                {entry ? (
+                {entryState.status === "idle" || entryState.status === "loading" ? (
+                  <p className="availability-empty" aria-live="polite">
+                    <i className="availability-spinner" aria-hidden="true" />
+                    Checking your shelf…
+                  </p>
+                ) : entryState.status === "error" ? (
+                  <div className="availability-empty" role="alert">
+                    <p>Your saved shelf entry could not be checked. No changes have been made.</p>
+                    {entryState.retryable && (
+                      <button type="button" className="save-button" onClick={onRetryEntry}>
+                        Try again
+                      </button>
+                    )}
+                  </div>
+                ) : entryState.entry ? (
                   <ShelfForm
-                    entry={entry}
+                    entry={entryState.entry}
                     title={item.title}
+                    isSeries={isSeries}
+                    confirmRemove={() => window.confirm(removalDisclosure(isSeries))}
                     onRemove={onRemove}
                     onSave={onSaveEntry}
                     onStatus={onStatus}
