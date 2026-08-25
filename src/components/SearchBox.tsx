@@ -8,6 +8,7 @@ export function SearchBox({
   query,
   results,
   isSearching,
+  isRefining,
   onQueryChange,
   onOpen,
   onSubmit,
@@ -15,6 +16,7 @@ export function SearchBox({
   query: string;
   results: MediaTitle[];
   isSearching: boolean;
+  isRefining: boolean;
   onQueryChange: (value: string) => void;
   onOpen: (item: MediaTitle) => void;
   onSubmit: () => void;
@@ -139,7 +141,11 @@ export function SearchBox({
 
           {suggestions.length === 0 && (
             <p className="search-suggestion-empty">
-              {isSearching ? "Searching…" : "No matches yet."}
+              {isSearching
+                ? "Searching…"
+                : isRefining
+                  ? "Reading a little wider…"
+                  : "No matches yet."}
             </p>
           )}
 

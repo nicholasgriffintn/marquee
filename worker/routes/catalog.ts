@@ -25,6 +25,7 @@ import {
   getTonight,
   getTrending,
   searchCatalogue,
+  searchCatalogueHybrid,
   getAnimeWatchOrder,
   getCatalogueItems,
   getProviderCatalogue,
@@ -87,6 +88,7 @@ catalogRoutes.get("/rails", requireAuthentication, async (context) => {
 catalogRoutes.get("/search", async (context) => {
   const query = queryText(context, "query", QUERY_LIMIT);
   const providerIds = validProviderIds(queryList(context, "providers", PROVIDER_LIMIT));
+  const hybrid = context.req.query("mode") === "hybrid";
 
   if (!query) {
     return context.json({ items: [], query: "", source: "Marquee catalogue", fetchedAt: "" });
@@ -97,7 +99,9 @@ catalogRoutes.get("/search", async (context) => {
   try {
     context.header("cache-control", "no-store");
 
-    const results = await searchCatalogue(context.env, query, providerIds);
+    const results = hybrid
+      ? await searchCatalogueHybrid(context.env, query, providerIds)
+      : await searchCatalogue(context.env, query, providerIds);
 
     recordEvent(context.env, {
       name: "search",

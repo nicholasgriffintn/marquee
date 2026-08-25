@@ -13,6 +13,7 @@ export function SearchPage({
   items,
   error,
   isSearching,
+  isRefining,
   usherMoment,
   onOpen,
   onShowTonight,
@@ -23,6 +24,7 @@ export function SearchPage({
   items: MediaTitle[];
   error: string;
   isSearching: boolean;
+  isRefining: boolean;
   usherMoment: UsherMoment | null;
   onOpen: (item: MediaTitle) => void;
   onShowTonight: () => void;
@@ -32,7 +34,7 @@ export function SearchPage({
   const trimmed = query.trim();
   const isLookingForHim = /^(the\s+)?usher$/iu.test(trimmed);
   const pendingCount = items.filter((item) => item.pending).length;
-  const showSkeleton = isSearching && items.length === 0 && trimmed.length > 1;
+  const showSkeleton = (isSearching || isRefining) && items.length === 0 && trimmed.length > 1;
 
   return (
     <section className="page-section">
@@ -45,7 +47,7 @@ export function SearchPage({
               : trimmed
                 ? `${items.length} result${items.length === 1 ? "" : "s"}${
                     pendingCount ? ` · ${pendingCount} being fetched` : ""
-                  }`
+                  }${isRefining ? " · reading a little wider…" : ""}`
                 : "Type a film or show name to search."}
         </p>
       </PageTitle>
@@ -82,7 +84,7 @@ export function SearchPage({
         </div>
       )}
 
-      {!isSearching && trimmed.length > 1 && items.length === 0 && !error && (
+      {!isSearching && !isRefining && trimmed.length > 1 && items.length === 0 && !error && (
         <div className="search-empty">
           <h2>Nothing found for “{trimmed}”.</h2>
           <p>
