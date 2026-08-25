@@ -1,5 +1,4 @@
 import { useEffect, useId, useLayoutEffect, useRef } from "react";
-import { createPortal } from "react-dom";
 
 import { focusableElements } from "../../lib/focus";
 import { UsherMark } from "./UsherMark";
@@ -155,7 +154,7 @@ export function ExitDoor({
     onClose();
   }
 
-  return createPortal(
+  return (
     <div className="exit-shade">
       <button
         type="button"
@@ -204,7 +203,6 @@ export function ExitDoor({
           Stop telling me. I know where the door is.
         </label>
       </div>
-    </div>,
-    document.body,
+    </div>
   );
 }
