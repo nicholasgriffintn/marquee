@@ -8337,7 +8337,7 @@ a.showtime:hover small {
 }
 
 .detail-credits {
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--paper-line);
   display: grid;
   gap: 18px;
   margin-block: 24px 0;
@@ -8349,7 +8349,12 @@ a.showtime:hover small {
   letter-spacing: 0.08em;
   margin: 0;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--muted-on-paper);
+}
+.detail-credits-empty {
+  color: var(--muted-on-paper);
+  font-size: 0.85rem;
+  margin: 0;
 }
 .detail-crew {
   display: grid;

@@ -332,6 +332,10 @@ catalogRoutes.get("/titles/:titleId/credits", edgeCache(3_600), async (context) 
   };
 
   try {
+    if (titleId.startsWith("tv:") && scope.season !== null) {
+      await getSeason(context.env, titleId, scope.season);
+    }
+
     const [credits, creditSeasons, seasonIndex] = await Promise.all([
       readTitleCredits(
         context.env.DB,

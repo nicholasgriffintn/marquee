@@ -46,7 +46,7 @@ function byJob(crew: TitleCredit[]) {
 export function CreditsBlock({ titleId }: { titleId: string }) {
   const [season, setSeason] = useState<number | null>(null);
   const [page, setPage] = useState(1);
-  const { credits } = useTitleCredits(titleId, season, page);
+  const { credits, isLoading } = useTitleCredits(titleId, season, page);
   const { cast, crew, hasMore, total } = credits;
   const [seasons, setSeasons] = useState<CreditSeason[]>([]);
 
@@ -87,6 +87,11 @@ export function CreditsBlock({ titleId }: { titleId: string }) {
             </button>
           ))}
         </div>
+      )}
+      {jobs.length === 0 && cast.length === 0 && (
+        <p className="detail-credits-empty">
+          {isLoading ? "Reading…" : "Not read yet."}
+        </p>
       )}
       {jobs.length > 0 && (
         <dl className="detail-crew">
