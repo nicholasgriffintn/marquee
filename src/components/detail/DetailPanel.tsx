@@ -323,7 +323,7 @@ export function DetailPanel({
             <ScoreRow item={item} />
             {item.buzz && <BuzzNote buzz={item.buzz} />}
             <ErrorBoundary label="The credits">
-              <CreditsBlock titleId={item.id} />
+              <CreditsBlock key={item.id} titleId={item.id} />
             </ErrorBoundary>
             {item.keywords?.length ? (
               <div className="detail-chips">

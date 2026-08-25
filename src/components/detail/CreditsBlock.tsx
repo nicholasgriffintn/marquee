@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
-import { useTitleCredits, type TitleCredit } from "../../hooks/useTitleCredits";
+import { useTitleCredits, type CreditSeason, type TitleCredit } from "../../hooks/useTitleCredits";
 
 const CREW_ORDER = [
   "Director",
@@ -47,7 +47,15 @@ export function CreditsBlock({ titleId }: { titleId: string }) {
   const [season, setSeason] = useState<number | null>(null);
   const [page, setPage] = useState(1);
   const { credits } = useTitleCredits(titleId, season, page);
-  const { cast, crew, seasons, hasMore, total } = credits;
+  const { cast, crew, hasMore, total } = credits;
+  // useResource returns no data while a season switch is in flight, which would
+  // otherwise blank out credits.seasons and make the switcher itself disappear
+  // and reappear on every click — keep the last non-empty list on screen instead.
+  const [seasons, setSeasons] = useState<CreditSeason[]>([]);
+
+  if (credits.seasons.length > 0 && credits.seasons !== seasons) {
+    setSeasons(credits.seasons);
+  }
 
   if (cast.length === 0 && crew.length === 0 && seasons.length === 0) {
     return null;
