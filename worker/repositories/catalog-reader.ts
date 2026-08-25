@@ -34,7 +34,7 @@ function reaches(audience: string | null, mine: ReadonlySet<string>) {
   return gate.providerIds.some((id) => mine.has(id));
 }
 
-function includesProvider(title: MediaTitle, providerIds: string[]) {
+export function includesProvider(title: MediaTitle, providerIds: string[]) {
   return (
     providerIds.length === 0 ||
     title.providers.length === 0 ||
