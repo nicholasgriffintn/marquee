@@ -2,6 +2,7 @@ import type { Cinema, ScreeningPrecision } from "../../src/domain/cinema.ts";
 import type { SourceCinema, SourceFilm, SourceScreening } from "../clients/cinema/types.ts";
 import { boundingBox, haversineKm, interestCell } from "../lib/geo.ts";
 import { parseJson } from "../lib/values.ts";
+import { hashState } from "./links.ts";
 
 type CinemaRow = {
   id: string;
@@ -250,6 +251,12 @@ export async function recordFilmMatch(
     .run();
 }
 
+async function screeningId(cinemaId: string, source: string, screening: SourceScreening) {
+  return hashState(
+    `${cinemaId}:${source}:${screening.filmId}:${screening.businessDay}:${screening.startsAt ?? ""}`,
+  );
+}
+
 export async function replaceScreenings(
   db: D1Database,
   source: string,
@@ -265,33 +272,43 @@ export async function replaceScreenings(
     return 0;
   }
 
-  // Insert the new sync's rows (tagged with a fresh sync_id) before deleting the
-  // previous sync's rows, so a mid-sync failure or a concurrent read never sees
-  // a gap - only a brief overlap between old and new data.
-  const syncId = crypto.randomUUID();
-  const chunks: SourceScreening[][] = [];
+  const rows = await Promise.all(
+    screenings.map(async (screening) => ({
+      screening,
+      id: await screeningId(cinemaId, source, screening),
+    })),
+  );
+  const chunks: (typeof rows)[] = [];
 
-  for (let index = 0; index < screenings.length; index += 50) {
-    chunks.push(screenings.slice(index, index + 50));
+  for (let index = 0; index < rows.length; index += 50) {
+    chunks.push(rows.slice(index, index + 50));
   }
 
   for (const chunk of chunks) {
     // oxlint-disable-next-line no-await-in-loop
     await db.batch(
-      chunk.map((screening) =>
+      chunk.map(({ id, screening }) =>
         db
           .prepare(
             `INSERT INTO cinema_screenings
                (id, cinema_id, source, source_film_id, title_id, starts_at,
-                business_day, precision, attributes, booking_url, sync_id)
+                business_day, precision, attributes, booking_url)
              VALUES (
                ?, ?, ?, ?,
                (SELECT title_id FROM cinema_films WHERE source = ? AND source_film_id = ?),
-               ?, ?, ?, ?, ?, ?
-             )`,
+               ?, ?, ?, ?, ?
+             )
+             ON CONFLICT(id) DO UPDATE SET
+               title_id = excluded.title_id,
+               starts_at = excluded.starts_at,
+               business_day = excluded.business_day,
+               precision = excluded.precision,
+               attributes = excluded.attributes,
+               booking_url = excluded.booking_url,
+               fetched_at = CURRENT_TIMESTAMP`,
           )
           .bind(
-            crypto.randomUUID(),
+            id,
             cinemaId,
             source,
             screening.filmId,
@@ -302,7 +319,6 @@ export async function replaceScreenings(
             screening.precision,
             JSON.stringify(screening.attributes),
             screening.bookingUrl,
-            syncId,
           ),
       ),
     );
@@ -311,9 +327,10 @@ export async function replaceScreenings(
   await db
     .prepare(
       `DELETE FROM cinema_screenings
-       WHERE cinema_id = ? AND source = ? AND (sync_id IS NULL OR sync_id != ?)`,
+       WHERE cinema_id = ? AND source = ?
+         AND id NOT IN (SELECT value FROM json_each(?))`,
     )
-    .bind(cinemaId, source, syncId)
+    .bind(cinemaId, source, JSON.stringify(rows.map((row) => row.id)))
     .run();
 
   return screenings.length;
