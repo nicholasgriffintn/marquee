@@ -13,7 +13,6 @@ import {
 import { logError } from "../lib/logging.ts";
 import { isKnownTitle, validProviderIds } from "../lib/validation.ts";
 import { stringList } from "../lib/values.ts";
-import { readGenres } from "../repositories/catalog-search.ts";
 import {
   readAnswers,
   readUsherRecord,
@@ -22,6 +21,7 @@ import {
   writeUsherRecord,
 } from "../repositories/usher.ts";
 import type { Bindings } from "../types.ts";
+import { getGenres } from "./catalog.ts";
 
 const POPULAR_PROVIDER_IDS = [
   "netflix",
@@ -72,7 +72,7 @@ function isFuture(value: string | null) {
 
 async function genreOptions(env: Bindings) {
   try {
-    const genres = await readGenres(env.DB);
+    const genres = await getGenres(env, 100);
 
     return genres.slice(0, GENRE_CHOICES).map((genre) => ({ value: genre, label: genre }));
   } catch (error) {

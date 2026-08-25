@@ -6,7 +6,7 @@ import { logError, logEvent } from "../lib/logging.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { isRecord, parseJson } from "../lib/values.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
-import { readGenres, searchCatalogue } from "../repositories/catalog-search.ts";
+import { searchCatalogue } from "../repositories/catalog-search.ts";
 import { neverTitleIds } from "../repositories/signals.ts";
 import { readRailFeedback } from "../repositories/usher.ts";
 import {
@@ -17,6 +17,7 @@ import {
 import type { Bindings, ViewerContext } from "../types.ts";
 import { readAngleScores } from "./angle-scores.ts";
 import { viewerSummary } from "./beliefs.ts";
+import { getGenres } from "./catalog.ts";
 import { tasteVector } from "./taste.ts";
 import { preferenceSummary, readViewerPreferences, type ViewerPreferences } from "./usher.ts";
 
@@ -650,7 +651,7 @@ export async function prepareRails(
     tasteVector(env, viewer, preferences, { never: refused, summary }),
     readViewerAffinity(env.DB, viewerId),
     readShelfDetail(env.DB, viewerId),
-    readGenres(env.DB).catch((): string[] => []),
+    getGenres(env, 100).catch((): string[] => []),
     titlesInDislikedRails(env, viewerId),
   ]);
   const affinity: ViewerAffinity = {

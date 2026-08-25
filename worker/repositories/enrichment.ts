@@ -1,6 +1,7 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
 import type { AnimeMapping } from "../clients/fribb.ts";
 import { logEvent } from "../lib/logging.ts";
+import { computeBlendedRating, computeWeightedRating } from "../lib/ratings.ts";
 import type { Bindings, EnrichmentSource } from "../types.ts";
 import { readRawItems } from "./catalog-reader.ts";
 
@@ -48,9 +49,14 @@ export async function storeEnrichment<S extends EnrichmentSource>(
       ? [
           env.DB.prepare(
             `UPDATE catalog_titles
-             SET payload = ?, updated_at = CURRENT_TIMESTAMP
+             SET payload = ?, weighted_rating = ?, blended_rating = ?, updated_at = CURRENT_TIMESTAMP
              WHERE id = ?`,
-          ).bind(JSON.stringify(enrichedTitle), titleId),
+          ).bind(
+            JSON.stringify(enrichedTitle),
+            computeWeightedRating(enrichedTitle),
+            computeBlendedRating(enrichedTitle),
+            titleId,
+          ),
         ]
       : []),
     env.DB.prepare(

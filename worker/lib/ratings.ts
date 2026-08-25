@@ -1,84 +1,83 @@
+import type { MediaTitle } from "../../src/domain/catalog.ts";
 import { MEAN_SCORE, RATING_WEIGHTS, VOTE_PRIOR } from "../../src/domain/ratings.ts";
 
-type SqlRatingSource = { weight: number; guard: string; value: string; damped: string };
+type RatingTerm = { weight: number; present: boolean; value: number; damped: number };
 
-function damped(score: string, votes: string) {
-  return `((${votes} * COALESCE(${score}, 0) + ${VOTE_PRIOR} * ${MEAN_SCORE}) / (${votes} + ${VOTE_PRIOR}))`;
+function dampedValue(score: number | null, votes: number | null) {
+  const safeVotes = Math.max(0, votes ?? 0);
+
+  return (safeVotes * (score ?? 0) + VOTE_PRIOR * MEAN_SCORE) / (safeVotes + VOTE_PRIOR);
 }
 
-function ratingSources(payload: string): SqlRatingSource[] {
-  const at = (path: string) => `json_extract(${payload}, '$.${path}')`;
-  const tmdbScore = at("tmdbScore");
-  const tmdbVotes = `COALESCE(${at("tmdbVoteCount")}, 0)`;
-  const imdbScore = at("ratings.imdbScore");
-  const imdbVotes = `COALESCE(${at("ratings.imdbVotes")}, 0)`;
-  const rotten = at("ratings.rottenTomatoes");
-  const metascore = at("ratings.metascore");
-  const anime = at("ratings.animeScore");
-  const rottenValue = `(CAST(replace(COALESCE(${rotten}, '0'), '%', '') AS REAL) / 10.0)`;
+function rottenValue(value: string | null | undefined) {
+  const parsed = Number.parseFloat((value ?? "0").replace("%", ""));
+
+  return (Number.isFinite(parsed) ? parsed : 0) / 10;
+}
+
+function ratingTerms(item: MediaTitle): RatingTerm[] {
+  const ratings = item.ratings;
 
   return [
     {
       weight: RATING_WEIGHTS.tmdb,
-      guard: tmdbScore,
-      value: `COALESCE(${tmdbScore}, 0)`,
-      damped: damped(tmdbScore, tmdbVotes),
+      present: item.tmdbScore !== null,
+      value: item.tmdbScore ?? 0,
+      damped: dampedValue(item.tmdbScore, item.tmdbVoteCount),
     },
     {
       weight: RATING_WEIGHTS.imdb,
-      guard: imdbScore,
-      value: `COALESCE(${imdbScore}, 0)`,
-      damped: damped(imdbScore, imdbVotes),
+      present: ratings?.imdbScore != null,
+      value: ratings?.imdbScore ?? 0,
+      damped: dampedValue(ratings?.imdbScore ?? null, ratings?.imdbVotes ?? null),
     },
     {
       weight: RATING_WEIGHTS.rottenTomatoes,
-      guard: rotten,
-      value: rottenValue,
-      damped: rottenValue,
+      present: ratings?.rottenTomatoes != null,
+      value: rottenValue(ratings?.rottenTomatoes),
+      damped: rottenValue(ratings?.rottenTomatoes),
     },
     {
       weight: RATING_WEIGHTS.metascore,
-      guard: metascore,
-      value: `(COALESCE(${metascore}, 0) / 10.0)`,
-      damped: `(COALESCE(${metascore}, 0) / 10.0)`,
+      present: ratings?.metascore != null,
+      value: (ratings?.metascore ?? 0) / 10,
+      damped: (ratings?.metascore ?? 0) / 10,
     },
     {
       weight: RATING_WEIGHTS.mal,
-      guard: anime,
-      value: `COALESCE(${anime}, 0)`,
-      damped: `COALESCE(${anime}, 0)`,
+      present: ratings?.animeScore != null,
+      value: ratings?.animeScore ?? 0,
+      damped: ratings?.animeScore ?? 0,
     },
   ];
 }
 
-function blend(sources: SqlRatingSource[], pick: (source: SqlRatingSource) => string) {
-  const total = sources
-    .map(
-      (source) =>
-        `CASE WHEN ${source.guard} IS NULL THEN 0 ELSE ${source.weight} * ${pick(source)} END`,
-    )
-    .join(" + ");
-  const weight = sources
-    .map((source) => `CASE WHEN ${source.guard} IS NULL THEN 0 ELSE ${source.weight} END`)
-    .join(" + ");
+function blend(terms: RatingTerm[], pick: (term: RatingTerm) => number) {
+  const weight = terms.reduce((total, term) => total + (term.present ? term.weight : 0), 0);
 
-  return `(CASE WHEN (${weight}) = 0 THEN 0 ELSE (${total}) / (${weight}) END)`;
-}
-
-export function blendedRatingSql(payload: string) {
-  return blend(ratingSources(payload), (source) => source.value);
-}
-
-export function weightedRatingSql(payload: string) {
-  const sources = ratingSources(payload);
-  const [tmdb, ...rest] = sources;
-
-  if (!tmdb) {
-    return "0";
+  if (weight === 0) {
+    return 0;
   }
 
-  return blend(
-    [{ ...tmdb, guard: `COALESCE(${tmdb.guard}, 0)` }, ...rest],
-    (source) => source.damped,
-  );
+  const total = terms.reduce((sum, term) => sum + (term.present ? term.weight * pick(term) : 0), 0);
+
+  return total / weight;
+}
+
+// Stored on catalog_titles.blended_rating at write time — keep in sync with
+// the `blended_rating` expression in migrations/0054_catalog_rating_columns.sql.
+export function computeBlendedRating(item: MediaTitle) {
+  return blend(ratingTerms(item), (term) => term.value);
+}
+
+// Stored on catalog_titles.weighted_rating at write time — keep in sync with
+// the `weighted_rating` expression in migrations/0054_catalog_rating_columns.sql.
+export function computeWeightedRating(item: MediaTitle) {
+  const [tmdb, ...rest] = ratingTerms(item);
+
+  if (!tmdb) {
+    return 0;
+  }
+
+  return blend([{ ...tmdb, present: true }, ...rest], (term) => term.damped);
 }

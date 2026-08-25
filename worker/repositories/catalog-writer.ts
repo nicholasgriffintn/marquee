@@ -5,6 +5,7 @@ import type {
   TitleCredit,
   TitleCredits,
 } from "../../src/domain/catalog.ts";
+import { computeBlendedRating, computeWeightedRating } from "../lib/ratings.ts";
 import { readRawItems } from "./catalog-reader.ts";
 
 const READ_CHUNK = 80;
@@ -255,8 +256,9 @@ function upsertTitle(db: D1Database, title: MediaTitle, sourceUpdatedAt: string)
     .prepare(
       `INSERT INTO catalog_titles
          (id, media_type, tmdb_id, title, original_title, year, popularity,
-          provider_ids, payload, source_updated_at, imdb_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          provider_ids, payload, source_updated_at, imdb_id,
+          vote_count, weighted_rating, blended_rating)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          media_type = excluded.media_type,
          tmdb_id = excluded.tmdb_id,
@@ -268,6 +270,9 @@ function upsertTitle(db: D1Database, title: MediaTitle, sourceUpdatedAt: string)
          payload = excluded.payload,
          source_updated_at = excluded.source_updated_at,
          imdb_id = excluded.imdb_id,
+         vote_count = excluded.vote_count,
+         weighted_rating = excluded.weighted_rating,
+         blended_rating = excluded.blended_rating,
          updated_at = CURRENT_TIMESTAMP`,
     )
     .bind(
@@ -282,5 +287,8 @@ function upsertTitle(db: D1Database, title: MediaTitle, sourceUpdatedAt: string)
       JSON.stringify(withoutCredits(title)),
       sourceUpdatedAt,
       title.imdbUrl ? (/\/(tt\d+)/u.exec(title.imdbUrl)?.[1] ?? null) : null,
+      Math.max(0, title.tmdbVoteCount),
+      computeWeightedRating(title),
+      computeBlendedRating(title),
     );
 }
