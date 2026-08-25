@@ -23,10 +23,8 @@ export function PersonPage({
 }) {
   const params = useParams();
   const name = decodeURIComponent(params.name ?? "");
-  const { data, following, error, saveError, isLoading, hasMore, loadMore, toggleFollow } = usePerson(
-    name,
-    isSignedIn,
-  );
+  const { data, following, error, saveError, isLoading, hasMore, loadMore, toggleFollow } =
+    usePerson(name, isSignedIn);
 
   if (!data && (error || !isLoading)) {
     return (
@@ -99,6 +97,13 @@ export function PersonPage({
               <span className="skeleton skeleton-poster" />
             </div>
           ))}
+        </div>
+      )}
+
+      {!isLoading && data && data.items.length === 0 && !error && (
+        <div className="search-empty">
+          <h2>Nothing here.</h2>
+          <p>Nothing of theirs in the catalogue yet.</p>
         </div>
       )}
 

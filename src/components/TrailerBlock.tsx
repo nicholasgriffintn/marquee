@@ -5,6 +5,8 @@ import { artwork } from "../lib/media";
 
 type Video = { key: string; name: string; type: string };
 
+const YOUTUBE_ID_PATTERN = /^[\w-]{6,15}$/;
+
 function videosFor(item: MediaTitle): Video[] {
   const videos = item.videos?.length
     ? item.videos
@@ -21,7 +23,7 @@ function videosFor(item: MediaTitle): Video[] {
 }
 
 export function TrailerBlock({ item }: { item: MediaTitle }) {
-  const videos = videosFor(item);
+  const videos = videosFor(item).filter((video) => YOUTUBE_ID_PATTERN.test(video.key));
   const [active, setActive] = useState<Video | null>(null);
 
   if (videos.length === 0) {
@@ -39,7 +41,7 @@ export function TrailerBlock({ item }: { item: MediaTitle }) {
             src={`https://www.youtube-nocookie.com/embed/${active.key}?autoplay=1&rel=0&modestbranding=1`}
             title={`${item.title} — ${active.name}`}
             allow="accelerometer; autoplay; encrypted-media; picture-in-picture"
-            sandbox="allow-scripts allow-same-origin allow-presentation allow-popups"
+            sandbox="allow-scripts allow-presentation allow-popups"
             allowFullScreen
           />
         ) : (
