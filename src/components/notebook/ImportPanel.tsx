@@ -35,7 +35,10 @@ export function ImportPanel({ onImported }: { onImported: () => void }) {
         setStatus(`Reading ${Math.min(index + BATCH, rows.length)} of ${rows.length}…`);
 
         try {
-          const outcome = await requestJson<{ matched: number; queued: number }>(
+          const outcome = await requestJson<{
+            matched: number;
+            queued: number;
+          }>(
             "/api/profile/import/letterboxd",
             jsonRequest("POST", { rows: rows.slice(index, index + BATCH) }),
           );
@@ -70,7 +73,11 @@ export function ImportPanel({ onImported }: { onImported: () => void }) {
         />
         <span>{isImporting ? "Reading…" : "Hand it over"}</span>
       </label>
-      {status && <p className="notebook-import-status">{status}</p>}
+      {status && (
+        <p className="notebook-import-status" aria-live="polite">
+          {status}
+        </p>
+      )}
     </>
   );
 }

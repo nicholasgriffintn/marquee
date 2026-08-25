@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { ErrorBoundary } from "../components/ErrorBoundary";
@@ -21,12 +21,34 @@ export function AdminPage({ user }: { user: User }) {
   const [params, setParams] = useSearchParams();
   const [vaultRevision, setVaultRevision] = useState(0);
   const tab = TABS.find((entry) => entry.id === params.get("tab"))?.id ?? "overview";
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   function selectTab(next: AdminTab) {
     const merged = new URLSearchParams(params);
 
     merged.set("tab", next);
     setParams(merged, { replace: true });
+  }
+
+  function onTabKeyDown(event: React.KeyboardEvent<HTMLButtonElement>, index: number) {
+    const nextIndex =
+      event.key === "ArrowRight"
+        ? (index + 1) % TABS.length
+        : event.key === "ArrowLeft"
+          ? (index - 1 + TABS.length) % TABS.length
+          : event.key === "Home"
+            ? 0
+            : event.key === "End"
+              ? TABS.length - 1
+              : null;
+
+    if (nextIndex === null) {
+      return;
+    }
+
+    event.preventDefault();
+    selectTab(TABS[nextIndex].id);
+    tabRefs.current[nextIndex]?.focus();
   }
 
   function refreshTab() {
@@ -74,16 +96,21 @@ export function AdminPage({ user }: { user: User }) {
       </p>
 
       <div className="admin-tabs" role="tablist" aria-label="Admin sections">
-        {TABS.map((entry) => (
+        {TABS.map((entry, index) => (
           <button
             type="button"
             key={entry.id}
+            ref={(node) => {
+              tabRefs.current[index] = node;
+            }}
             role="tab"
             id={`admin-tab-${entry.id}`}
             aria-selected={tab === entry.id}
             aria-controls={`admin-panel-${entry.id}`}
+            tabIndex={tab === entry.id ? 0 : -1}
             className={`admin-tab${tab === entry.id ? " selected" : ""}`}
             onClick={() => selectTab(entry.id)}
+            onKeyDown={(event) => onTabKeyDown(event, index)}
           >
             {entry.label}
           </button>
@@ -98,16 +125,28 @@ export function AdminPage({ user }: { user: User }) {
       </div>
 
       {tab === "overview" && (
-        <OverviewTab overview={overview} onResume={(source) => void admin.resume(source)} />
+        <div role="tabpanel" id="admin-panel-overview" aria-labelledby="admin-tab-overview">
+          <OverviewTab overview={overview} onResume={(source) => void admin.resume(source)} />
+        </div>
       )}
 
       {tab === "actions" && (
-        <ActionsTab pending={admin.pending} onRun={(action) => void admin.run(action)} />
+        <div role="tabpanel" id="admin-panel-actions" aria-labelledby="admin-tab-actions">
+          <ActionsTab pending={admin.pending} onRun={(action) => void admin.run(action)} />
+        </div>
       )}
 
-      {tab === "pipeline" && <PipelineTab overview={overview} />}
+      {tab === "pipeline" && (
+        <div role="tabpanel" id="admin-panel-pipeline" aria-labelledby="admin-tab-pipeline">
+          <PipelineTab overview={overview} />
+        </div>
+      )}
 
-      {tab === "listings" && <ListingsTab overview={overview} />}
+      {tab === "listings" && (
+        <div role="tabpanel" id="admin-panel-listings" aria-labelledby="admin-tab-listings">
+          <ListingsTab overview={overview} />
+        </div>
+      )}
 
       {tab === "vault" && (
         <ErrorBoundary label="The vault">
@@ -118,10 +157,12 @@ export function AdminPage({ user }: { user: User }) {
       )}
 
       {tab === "people" && (
-        <PeopleTab
-          users={admin.users}
-          onChangeRole={(userId, role) => void admin.changeRole(userId, role)}
-        />
+        <div role="tabpanel" id="admin-panel-people" aria-labelledby="admin-tab-people">
+          <PeopleTab
+            users={admin.users}
+            onChangeRole={(userId, role) => void admin.changeRole(userId, role)}
+          />
+        </div>
       )}
 
       {overview && (

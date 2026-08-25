@@ -40,9 +40,7 @@ export function ConnectionsPanel({ isSignedIn }: { isSignedIn: boolean }) {
                 : ""}
               {connections.pushStatus === "running" ? " · sending your shelf over…" : ""}
               {connections.pushStatus === "done" ? " · sent" : ""}
-              {connections.pushStatus === "timeout"
-                ? " · still sending, check back shortly"
-                : ""}
+              {connections.pushStatus === "timeout" ? " · still sending, check back shortly" : ""}
             </small>
             <span className="spacer" />
             <button
@@ -157,7 +155,7 @@ export function ConnectionsPanel({ isSignedIn }: { isSignedIn: boolean }) {
       )}
       {connections.error && (
         <div className="connection-row">
-          <p>{connections.error}</p>
+          <p role="alert">{connections.error}</p>
         </div>
       )}
     </>
