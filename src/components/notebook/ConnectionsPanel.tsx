@@ -172,7 +172,7 @@ export function ConnectionsPanel({ isSignedIn }: { isSignedIn: boolean }) {
       )}
       {connections.error && (
         <div className="connection-row">
-          <p>{connections.error}</p>
+          <p role="alert">{connections.error}</p>
         </div>
       )}
     </>

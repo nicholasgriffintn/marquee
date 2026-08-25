@@ -83,7 +83,7 @@ export function FeedPanel({ isSignedIn }: { isSignedIn: boolean }) {
 
       {feeds.error && (
         <div className="connection-row">
-          <p>{feeds.error}</p>
+          <p role="alert">{feeds.error}</p>
         </div>
       )}
     </>
