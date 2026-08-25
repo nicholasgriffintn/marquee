@@ -11,6 +11,7 @@ import {
   resetMirror,
   setWorkStatus,
 } from "../repositories/revival.ts";
+import { setUserRole } from "../services/admin-users.ts";
 import {
   ADMIN_ACTIONS,
   clearSourcePause,
@@ -18,7 +19,6 @@ import {
   listAdminUsers,
   readAdminOverview,
   runAdminAction,
-  setUserRole,
 } from "../services/admin.ts";
 import type { Bindings, EnrichmentSource } from "../types.ts";
 
@@ -165,7 +165,7 @@ adminRoutes.post("/users/:id/role", async (context) => {
   const result = await setUserRole(context.env, id, role);
 
   if (!result.ok) {
-    return context.json({ error: result.error }, 409);
+    return context.json({ error: result.error }, result.code === "not_found" ? 404 : 409);
   }
 
   return context.json({ users: await listAdminUsers(context.env) });
