@@ -439,25 +439,3 @@ export async function listAdminUsers(env: Bindings) {
     };
   });
 }
-
-export async function setUserRole(env: Bindings, userId: string, role: UserRole) {
-  if (role === "viewer") {
-    const admins = await env.DB.prepare(
-      `SELECT count(*) AS total FROM users WHERE role = 'admin' AND id <> ?`,
-    )
-      .bind(userId)
-      .first<{ total: number }>();
-
-    if ((admins?.total ?? 0) === 0) {
-      return { ok: false as const, error: "There has to be at least one administrator" };
-    }
-  }
-
-  const result = await env.DB.prepare(`UPDATE users SET role = ? WHERE id = ?`)
-    .bind(role, userId)
-    .run();
-
-  return result.meta.changes > 0
-    ? { ok: true as const }
-    : { ok: false as const, error: "No such user" };
-}

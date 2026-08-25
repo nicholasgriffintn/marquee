@@ -254,12 +254,17 @@ option. `/api/auth/methods` only advertises what the deployment can actually do.
 
 [email-service]: https://developers.cloudflare.com/email-service/
 
-The first account to sign in becomes the administrator; everyone after that is a viewer. If you
-lock yourself out:
+Every new account starts as a viewer. This prevents a public sign-in from claiming a fresh or
+temporarily empty deployment. After the intended administrator signs in, inspect the users with
+Wrangler from a trusted terminal and promote that account by its exact id:
 
 ```bash
-pnpm exec wrangler d1 execute DB --remote --command "UPDATE users SET role = 'admin' WHERE github_login = 'your-login'"
+pnpm exec wrangler d1 execute DB --remote --command "SELECT id, name, github_login, email, role FROM users ORDER BY created_at, id"
+pnpm exec wrangler d1 execute DB --remote --command "UPDATE users SET role = 'admin' WHERE id = 'the-user-id'"
 ```
+
+Keep this out-of-band promotion step in the deployment runbook. The application will reject any
+later change that would leave the database without an administrator.
 
 A fresh deployment fills in over the first few sweeps rather than all at once. Watch it on `/admin`.
 

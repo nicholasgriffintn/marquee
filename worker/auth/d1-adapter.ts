@@ -112,8 +112,8 @@ export async function findOrCreateByEmail(db: D1Database, email: string) {
 
   await db
     .prepare(
-      `INSERT INTO users (id, name, github_login, avatar_url, email)
-       VALUES (?1, ?2, '', NULL, ?3)`,
+      `INSERT INTO users (id, name, github_login, avatar_url, email, role)
+       VALUES (?1, ?2, '', NULL, ?3, 'viewer')`,
     )
     .bind(id, name, email)
     .run();
@@ -245,14 +245,13 @@ async function resolveIdentity(db: D1Database, identity: ExternalIdentity) {
   }
 
   const userId = crypto.randomUUID();
-  const firstUser = !(await db.prepare("SELECT 1 AS present FROM users LIMIT 1").first());
 
   await db.batch([
     db
       .prepare(
-        "INSERT INTO users (id, name, github_login, avatar_url, role) VALUES (?1, ?2, ?3, ?4, ?5)",
+        "INSERT INTO users (id, name, github_login, avatar_url, role) VALUES (?1, ?2, ?3, ?4, 'viewer')",
       )
-      .bind(userId, name, login, avatarUrl, firstUser ? "admin" : "viewer"),
+      .bind(userId, name, login, avatarUrl),
     db
       .prepare(
         `INSERT INTO identities (provider, provider_subject, user_id, claims_json)
