@@ -7,10 +7,20 @@ export function ConnectionsPanel({ isSignedIn }: { isSignedIn: boolean }) {
   const connections = useLinks(isSignedIn);
   const [tokenLabel, setTokenLabel] = useState("");
   const [confirmPush, setConfirmPush] = useState(false);
+  const [tokenCopied, setTokenCopied] = useState(false);
   const trakt = connections.links.find((link) => link.provider === "trakt");
 
   if (!isSignedIn) {
     return null;
+  }
+
+  async function copyToken(value: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      setTokenCopied(true);
+    } catch {
+      setTokenCopied(false);
+    }
   }
 
   return (
@@ -93,6 +103,7 @@ export function ConnectionsPanel({ isSignedIn }: { isSignedIn: boolean }) {
           onClick={() => {
             void connections.createToken(tokenLabel);
             setTokenLabel("");
+            setTokenCopied(false);
           }}
         >
           Create
@@ -103,6 +114,9 @@ export function ConnectionsPanel({ isSignedIn }: { isSignedIn: boolean }) {
           <strong>Copy it now</strong>
           <code className="token-value">{connections.freshToken}</code>
           <span className="spacer" />
+          <button type="button" onClick={() => void copyToken(connections.freshToken ?? "")}>
+            {tokenCopied ? "Copied" : "Copy"}
+          </button>
           <button type="button" onClick={connections.dismissToken}>
             Done
           </button>
