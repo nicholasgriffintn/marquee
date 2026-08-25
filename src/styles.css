@@ -2848,6 +2848,14 @@ h2 em {
     gap: 0;
     height: 48px;
     margin-inline: -18px;
+    mask-image: linear-gradient(to right, transparent, black 20px, black calc(100% - 20px), transparent);
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent,
+      black 20px,
+      black calc(100% - 20px),
+      transparent
+    );
   }
   .site-header nav a,
   .site-header nav button {
