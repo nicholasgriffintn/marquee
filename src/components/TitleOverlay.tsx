@@ -1,4 +1,12 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from "react";
 
 import type { MediaTitle } from "../domain/catalog";
 import {
@@ -13,18 +21,40 @@ import { DetailPanel } from "./detail/DetailPanel";
 import { UsherCard } from "./usher/UsherCard";
 import { UsherMark } from "./usher/UsherMark";
 
-function MissingTitle({ onClose, onRetry }: { onClose: () => void; onRetry?: () => void }) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const closeRef = useRef<HTMLButtonElement>(null);
-
+function DialogShell({
+  panelRef,
+  closeRef,
+  panelClassName,
+  labelledBy,
+  onClose,
+  children,
+}: {
+  panelRef: RefObject<HTMLDialogElement | null>;
+  closeRef: RefObject<HTMLButtonElement | null>;
+  panelClassName: string;
+  labelledBy?: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
   useLayoutEffect(() => {
-    dialogRef.current?.showModal();
+    panelRef.current?.showModal();
     closeRef.current?.focus();
-  }, []);
+  }, [panelRef, closeRef]);
 
   return (
-    <div className="detail-backdrop" role="presentation" onMouseDown={onClose}>
-      <dialog ref={dialogRef} className="detail-panel detail-panel-missing" aria-modal="true">
+    <div
+      className="detail-backdrop"
+      role="presentation"
+      onMouseDown={(event) => event.target === event.currentTarget && onClose()}
+    >
+      {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
+      <dialog
+        ref={panelRef}
+        className={panelClassName}
+        aria-modal="true"
+        aria-labelledby={labelledBy}
+        onMouseDown={(event) => event.target === event.currentTarget && onClose()}
+      >
         <button
           ref={closeRef}
           type="button"
@@ -34,61 +64,42 @@ function MissingTitle({ onClose, onRetry }: { onClose: () => void; onRetry?: () 
         >
           ×
         </button>
-        <div className="detail-copy search-empty lost">
-          <UsherMark face="unimpressed" crop="head" />
-          <h2>{onRetry ? "The programme slipped." : "Not in the building."}</h2>
-          <p>
-            {onRetry
-              ? "I could not check the catalogue just now. Nothing has been marked missing."
-              : "I have no record of that one. It may never have been booked here."}
-          </p>
-          {onRetry ? (
-            <button
-              type="button"
-              onMouseDown={(event) => event.stopPropagation()}
-              onClick={onRetry}
-            >
-              Try again
-            </button>
-          ) : null}
-        </div>
+        {children}
       </dialog>
     </div>
   );
 }
 
-function LoadingTitle({ onClose }: { onClose: () => void }) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const closeRef = useRef<HTMLButtonElement>(null);
-
-  useLayoutEffect(() => {
-    dialogRef.current?.showModal();
-    closeRef.current?.focus();
-  }, []);
-
+function MissingContent({ onRetry }: { onRetry?: () => void }) {
   return (
-    <div className="detail-backdrop" role="presentation" onMouseDown={onClose}>
-      <dialog ref={dialogRef} className="detail-panel detail-panel-missing" aria-modal="true">
-        <button
-          ref={closeRef}
-          type="button"
-          className="detail-close"
-          onClick={onClose}
-          aria-label="Close details"
-        >
-          ×
+    <div className="detail-copy search-empty lost">
+      <UsherMark face="unimpressed" crop="head" />
+      <h2>{onRetry ? "The programme slipped." : "Not in the building."}</h2>
+      <p>
+        {onRetry
+          ? "I could not check the catalogue just now. Nothing has been marked missing."
+          : "I have no record of that one. It may never have been booked here."}
+      </p>
+      {onRetry ? (
+        <button type="button" onMouseDown={(event) => event.stopPropagation()} onClick={onRetry}>
+          Try again
         </button>
-        <div className="detail-copy">
-          <span className="visually-hidden">Loading title details…</span>
-          <div className="hero-skeleton" aria-hidden="true">
-            <span className="skeleton skeleton-title" />
-            <span className="skeleton skeleton-meta" />
-            <span className="skeleton skeleton-line" />
-            <span className="skeleton skeleton-line short" />
-            <span className="skeleton skeleton-button" />
-          </div>
-        </div>
-      </dialog>
+      ) : null}
+    </div>
+  );
+}
+
+function LoadingContent() {
+  return (
+    <div className="detail-copy">
+      <span className="visually-hidden">Loading title details…</span>
+      <div className="hero-skeleton" aria-hidden="true">
+        <span className="skeleton skeleton-title" />
+        <span className="skeleton skeleton-meta" />
+        <span className="skeleton skeleton-line" />
+        <span className="skeleton skeleton-line short" />
+        <span className="skeleton skeleton-button" />
+      </div>
     </div>
   );
 }
@@ -146,6 +157,8 @@ export function TitleOverlay({
   const [resolvedViewToken, setResolvedViewToken] = useState<symbol | null>(null);
   const currentViewToken = useRef(viewToken);
   const retryController = useRef<AbortController | null>(null);
+  const panelRef = useRef<HTMLDialogElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
   const resolvedEntryState = entryStateForResolution(
     entryState ?? initialEntryLoadState,
     resolvedViewToken === viewToken,
@@ -199,38 +212,58 @@ export function TitleOverlay({
   }, [isSaved, onUsherRequest, titleId]);
 
   if (!title) {
-    if (titleError) {
-      return <MissingTitle onClose={onClose} onRetry={onRetryTitle} />;
+    if (!titleError && !isMissing && !isLoading) {
+      return null;
     }
 
-    if (isMissing) {
-      return <MissingTitle onClose={onClose} />;
-    }
-
-    return isLoading ? <LoadingTitle onClose={onClose} /> : null;
+    return (
+      <DialogShell
+        panelRef={panelRef}
+        closeRef={closeRef}
+        panelClassName="detail-panel detail-panel-missing"
+        onClose={onClose}
+      >
+        {titleError ? (
+          <MissingContent onRetry={onRetryTitle} />
+        ) : isMissing ? (
+          <MissingContent />
+        ) : (
+          <LoadingContent />
+        )}
+      </DialogShell>
+    );
   }
 
   return (
-    <DetailPanel
-      item={title}
-      canSave={canSave}
-      entryState={resolvedEntryState}
-      usherSlot={
-        usherMoment ? (
-          <UsherCard moment={usherMoment} onAction={onUsherAction} onDismiss={onUsherDismiss} />
-        ) : undefined
-      }
-      availabilityEnabled={availabilityEnabled}
+    <DialogShell
+      panelRef={panelRef}
+      closeRef={closeRef}
+      panelClassName="detail-panel"
+      labelledBy="detail-title"
       onClose={onClose}
-      onOpen={onOpen}
-      onSave={onSave}
-      onSaveEntry={onSaveEntry}
-      onRemove={onRemove}
-      onStatus={onStatus}
-      onUpdateDraft={onUpdateDraft}
-      onTracked={onTracked}
-      onRetryEntry={() => void retryEntry()}
-      selectedProviderIds={selectedProviderIds}
-    />
+    >
+      <DetailPanel
+        item={title}
+        panelRef={panelRef}
+        canSave={canSave}
+        entryState={resolvedEntryState}
+        usherSlot={
+          usherMoment ? (
+            <UsherCard moment={usherMoment} onAction={onUsherAction} onDismiss={onUsherDismiss} />
+          ) : undefined
+        }
+        availabilityEnabled={availabilityEnabled}
+        onClose={onClose}
+        onOpen={onOpen}
+        onSave={onSave}
+        onSaveEntry={onSaveEntry}
+        onRemove={onRemove}
+        onStatus={onStatus}
+        onUpdateDraft={onUpdateDraft}
+        onTracked={onTracked}
+        onRetryEntry={() => void retryEntry()}
+        selectedProviderIds={selectedProviderIds}
+      />
+    </DialogShell>
   );
 }
