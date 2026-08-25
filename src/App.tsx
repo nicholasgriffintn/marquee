@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, Route, Routes, useLocation, useMatch, useNavigate } from "react-router-dom";
 
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -176,13 +176,17 @@ export function App() {
     return () => window.clearTimeout(timer);
   }, [requestMoment, wantsDrip]);
 
+  const openBackgroundRef = useRef<typeof location | undefined>(undefined);
+
+  useEffect(() => {
+    openBackgroundRef.current = background ?? (titleMatch ? undefined : location);
+  });
+
   const openTitle = useCallback(
     (item: MediaTitle) => {
-      void navigate(titlePath(item), {
-        state: { background: background ?? (titleMatch ? undefined : location) },
-      });
+      void navigate(titlePath(item), { state: { background: openBackgroundRef.current } });
     },
-    [background, location, navigate, titleMatch],
+    [navigate],
   );
   const closeDetails = useCallback(() => {
     if (background) {
