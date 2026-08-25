@@ -293,16 +293,21 @@ async function readSearchResults(db: D1Database, query: string, providerIds: str
   } satisfies CatalogResponse;
 }
 
-export async function readCollectionTitleIds(db: D1Database, collectionId: number, limit = 24) {
+export async function readCollectionTitleIds(
+  db: D1Database,
+  collectionId: number,
+  limit = 24,
+  offset = 0,
+) {
   const rows = await db
     .prepare(
       `SELECT id
        FROM catalog_titles
        WHERE json_extract(payload, '$.collection.id') = ?1
        ORDER BY COALESCE(json_extract(payload, '$.releaseDate'), '9999-12-31'), popularity DESC
-       LIMIT ?2`,
+       LIMIT ?2 OFFSET ?3`,
     )
-    .bind(collectionId, clamp(limit, 1, 48))
+    .bind(collectionId, clamp(limit, 1, 48), Math.max(0, offset))
     .all<{ id: string }>();
 
   return rows.results.map((row) => row.id);

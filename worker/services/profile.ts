@@ -1,10 +1,12 @@
 import type { ShelfResponse } from "../../src/domain/shelf.ts";
-import { isEntryStatus, isKnownTitle } from "../lib/validation.ts";
+import { isEntryStatus, isKnownTitle, validProviderIds } from "../lib/validation.ts";
 import { deleteEpisodeEntries } from "../repositories/episode-entries.ts";
 import {
   deleteViewingEntry,
   readProfileSummary,
+  readProviderPreferences,
   readViewingEntry,
+  saveProviderPreferences,
   saveViewingEntry,
 } from "../repositories/profile.ts";
 import {
@@ -87,6 +89,24 @@ export async function updateProfile(
   });
 
   return { ok: true, payload: { entry } };
+}
+
+export async function getProviderPreferences(db: D1Database, viewerId: string) {
+  const selectedProviderIds = await readProviderPreferences(db, viewerId);
+
+  return { selectedProviderIds: selectedProviderIds ?? [], isSaved: selectedProviderIds !== null };
+}
+
+export async function updateProviderPreferences(
+  db: D1Database,
+  viewerId: string,
+  input: Record<string, unknown>,
+) {
+  const selectedProviderIds = validProviderIds(input.selectedProviderIds);
+
+  await saveProviderPreferences(db, viewerId, selectedProviderIds);
+
+  return { selectedProviderIds, isSaved: true };
 }
 
 export async function removeFromProfile(db: D1Database, viewerId: string, titleId: string) {
