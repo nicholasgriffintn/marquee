@@ -69,7 +69,11 @@ export async function saveLink(
   env: Bindings,
   viewerId: string,
   provider: LinkProvider,
-  link: { accessToken: string; refreshToken: string | null; expiresAt: string | null },
+  link: {
+    accessToken: string;
+    refreshToken: string | null;
+    expiresAt: string | null;
+  },
   accountLabel: string | null,
 ) {
   await env.DB.prepare(
@@ -105,12 +109,17 @@ export async function readPushedAt(env: Bindings, viewerId: string, provider: Li
   return row?.pushedAt ?? null;
 }
 
-export async function markLinkPushed(env: Bindings, viewerId: string, provider: LinkProvider) {
+export async function markLinkPushed(
+  env: Bindings,
+  viewerId: string,
+  provider: LinkProvider,
+  at: string,
+) {
   await env.DB.prepare(
-    `UPDATE linked_accounts SET pushed_at = CURRENT_TIMESTAMP
+    `UPDATE linked_accounts SET pushed_at = ?
      WHERE viewer_id = ? AND provider = ?`,
   )
-    .bind(viewerId, provider)
+    .bind(at, viewerId, provider)
     .run();
 }
 

@@ -271,7 +271,10 @@ export async function exportTraktShelf(env: Bindings, viewerId: string, origin: 
     }
 
     if (row.status === "watched") {
-      history.push({ ...item, watchedAt: databaseDate(row.updatedAt).toISOString() });
+      history.push({
+        ...item,
+        watchedAt: databaseDate(row.updatedAt).toISOString(),
+      });
     } else if (row.status === "watchlist" || row.status === "watching") {
       watchlist.push(item);
     }
@@ -281,11 +284,15 @@ export async function exportTraktShelf(env: Bindings, viewerId: string, origin: 
     }
   }
 
-  const watched = await pushWaves(history, (wave) => pushTraktHistory(env, accessToken, wave));
   const rated = await pushWaves(ratings, (wave) => pushTraktRatings(env, accessToken, wave));
   const listed = await pushWaves(watchlist, (wave) => pushTraktWatchlist(env, accessToken, wave));
+  const watched = await pushWaves(history, (wave) => pushTraktHistory(env, accessToken, wave));
 
-  await markLinkPushed(env, viewerId, "trakt");
+  const maxUpdatedAt = rows.results.at(-1)?.updatedAt;
+
+  if (maxUpdatedAt) {
+    await markLinkPushed(env, viewerId, "trakt", maxUpdatedAt);
+  }
 
   logEvent("trakt_shelf_pushed", { watched, rated, listed });
 
@@ -303,7 +310,11 @@ export async function traktPushPreview(env: Bindings, viewerId: string) {
      WHERE viewer_id = ?1 AND (?2 IS NULL OR updated_at > ?2)`,
   )
     .bind(viewerId, pushedAt)
-    .first<{ watched: number | null; listed: number | null; rated: number | null }>();
+    .first<{
+      watched: number | null;
+      listed: number | null;
+      rated: number | null;
+    }>();
 
   return {
     pushedAt,
