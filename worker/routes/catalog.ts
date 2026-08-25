@@ -220,9 +220,11 @@ catalogRoutes.get("/items", edgeCache(900), async (context) => {
 
 const PERSON_LIMIT = 48;
 const COLLECTION_LIMIT = 24;
+const MAX_PERSON_PAGE = 200;
 
 catalogRoutes.get("/people/:name", async (context) => {
   const name = decodeURIComponent(context.req.param("name")).slice(0, 120);
+  const page = queryInteger(context, "page", 0, 0, MAX_PERSON_PAGE);
 
   try {
     const person = await readPerson(context.env.DB, name);
@@ -232,16 +234,16 @@ catalogRoutes.get("/people/:name", async (context) => {
     }
 
     const principal = await sessionPrincipal(context.env, context.req.raw);
-    const [items, shelf] = await Promise.all([
-      readPersonTitleIds(context.env.DB, person.personId, PERSON_LIMIT).then((ids) =>
-        readItems(context.env.DB, ids, PERSON_LIMIT),
-      ),
+    const [ids, shelf] = await Promise.all([
+      readPersonTitleIds(context.env.DB, person.personId, PERSON_LIMIT + 1, page * PERSON_LIMIT),
       principal?.user
         ? readPersonShelf(context.env.DB, principal.user.id, person.personId)
         : Promise.resolve({ shelved: 0, watched: 0 }),
     ]);
+    const hasMore = ids.length > PERSON_LIMIT;
+    const items = await readItems(context.env.DB, ids.slice(0, PERSON_LIMIT), PERSON_LIMIT);
 
-    return context.json({ person, items, shelf });
+    return context.json({ person, items, shelf, page, hasMore });
   } catch (error) {
     logError("catalogue_read_failed", error, { area: "person" });
 
