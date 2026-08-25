@@ -272,7 +272,7 @@
   "send_email": [
     {
       "name": "EMAIL",
-      "remote": true
+      "remote": false
     }
   ],
   "analytics_engine_datasets": [
