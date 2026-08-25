@@ -12,6 +12,7 @@ import { useEpisodeEntries } from "../../hooks/useSeasons";
 import { useShowings } from "../../hooks/useShowings";
 import { useTitleInsight } from "../../hooks/useTitleInsight";
 import { useWatchOrder } from "../../hooks/useWatchOrder";
+import { focusableElements } from "../../lib/focus";
 import { detailMeta, languageLabel } from "../../lib/media";
 import { track } from "../../lib/telemetry";
 import type { EntryStatus, ViewingEntry } from "../../types";
@@ -106,6 +107,11 @@ export function DetailPanel({
   const spokenIn = languageLabel(item.originalLanguage);
   const madeIn = item.countries?.slice(0, COUNTRIES_SHOWN).join(", ") ?? "";
   const { exit, leaveVia, report, dismiss } = useExitWarning(item.id);
+  const exitOpenRef = useRef(Boolean(exit));
+
+  useEffect(() => {
+    exitOpenRef.current = Boolean(exit);
+  }, [exit]);
 
   const resumeWatching = () => {
     if (!continueAt) {
@@ -153,18 +159,12 @@ export function DetailPanel({
         return;
       }
 
-      if (event.key !== "Tab" || exit) {
+      if (event.key !== "Tab" || exitOpenRef.current) {
         return;
       }
 
       const panel = panelRef.current;
-      const focusable = panel
-        ? [
-            ...panel.querySelectorAll<HTMLElement>(
-              'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
-            ),
-          ].filter((element) => element.offsetParent !== null)
-        : [];
+      const focusable = panel ? focusableElements(panel) : [];
 
       if (focusable.length === 0) {
         return;
@@ -193,7 +193,7 @@ export function DetailPanel({
       document.body.style.overflow = previousOverflow;
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [exit, onClose]);
+  }, [onClose]);
 
   return (
     <div

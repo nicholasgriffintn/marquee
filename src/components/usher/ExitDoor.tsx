@@ -1,6 +1,6 @@
-import { useEffect, useRef } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useId, useLayoutEffect, useRef } from "react";
 
+import { focusableElements } from "../../lib/focus";
 import { UsherMark } from "./UsherMark";
 
 export type ExitKind = "provider" | "trailer" | "tmdb" | "wikipedia" | "imdb" | "cinema" | "other";
@@ -62,7 +62,9 @@ export function ExitDoor({
 }) {
   const stayRef = useRef<HTMLButtonElement>(null);
   const skipRef = useRef<HTMLInputElement>(null);
-  const shadeRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  const descriptionId = useId();
 
   useEffect(() => {
     const bodyOverflow = document.body.style.overflow;
@@ -74,19 +76,72 @@ export function ExitDoor({
     };
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    const previousFocus =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
     stayRef.current?.focus();
 
     function onKey(event: KeyboardEvent) {
       if (event.key === "Escape") {
+        event.preventDefault();
         event.stopPropagation();
         onClose();
+
+        return;
+      }
+
+      if (event.key !== "Tab") {
+        return;
+      }
+
+      const dialog = dialogRef.current;
+
+      if (!dialog) {
+        return;
+      }
+
+      const focusable = focusableElements(dialog);
+
+      if (focusable.length === 0) {
+        event.preventDefault();
+        dialog.focus();
+
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+
+      if (event.shiftKey && (!dialog.contains(active) || active === first)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (!dialog.contains(active) || active === last)) {
+        event.preventDefault();
+        first.focus();
       }
     }
 
-    window.addEventListener("keydown", onKey, true);
+    function containFocus(event: FocusEvent) {
+      const dialog = dialogRef.current;
 
-    return () => window.removeEventListener("keydown", onKey, true);
+      if (dialog && event.target instanceof Node && !dialog.contains(event.target)) {
+        stayRef.current?.focus();
+      }
+    }
+
+    document.addEventListener("keydown", onKey, true);
+    document.addEventListener("focusin", containFocus);
+
+    return () => {
+      document.removeEventListener("keydown", onKey, true);
+      document.removeEventListener("focusin", containFocus);
+
+      if (previousFocus?.isConnected) {
+        previousFocus.focus();
+      }
+    };
   }, [onClose]);
 
   function leave() {
@@ -99,10 +154,24 @@ export function ExitDoor({
     onClose();
   }
 
-  return createPortal(
-    <div className="exit-shade" ref={shadeRef}>
-      <button type="button" className="exit-backdrop" aria-label="Stay here" onClick={onClose} />
-      <div className="exit-door" role="alertdialog" aria-modal="true" aria-labelledby="exit-title">
+  return (
+    <div className="exit-shade">
+      <button
+        type="button"
+        className="exit-backdrop"
+        aria-label="Stay here"
+        tabIndex={-1}
+        onClick={onClose}
+      />
+      <div
+        ref={dialogRef}
+        className="exit-door"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
+        tabIndex={-1}
+      >
         <p className="exit-sign" aria-hidden="true">
           <span>Exit</span>
         </p>
@@ -110,8 +179,10 @@ export function ExitDoor({
         <div className="exit-body">
           <UsherMark face="unimpressed" crop="head" />
           <div>
-            <h2 id="exit-title">You are leaving the building.</h2>
-            <p className="exit-line">{LINES[exit.kind](exit.label)}</p>
+            <h2 id={titleId}>You are leaving the building.</h2>
+            <p className="exit-line" id={descriptionId}>
+              {LINES[exit.kind](exit.label)}
+            </p>
             <p className="exit-host">
               {exit.label} <em>{hostOf(exit.href)}</em>
             </p>
@@ -132,7 +203,6 @@ export function ExitDoor({
           Stop telling me. I know where the door is.
         </label>
       </div>
-    </div>,
-    document.body,
+    </div>
   );
 }
