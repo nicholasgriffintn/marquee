@@ -24,11 +24,34 @@ export type TraktPending = {
   rated: number;
 };
 
+export type TraktJobStatus = "idle" | "running" | "done" | "timeout";
+
+const POLL_INTERVAL_MS = 3_000;
+const POLL_ATTEMPTS = 15;
+
+async function pollUntil(check: () => Promise<boolean>) {
+  for (let attempt = 0; attempt < POLL_ATTEMPTS; attempt += 1) {
+    // oxlint-disable-next-line no-await-in-loop
+    if (await check()) {
+      return true;
+    }
+
+    if (attempt < POLL_ATTEMPTS - 1) {
+      // oxlint-disable-next-line no-await-in-loop
+      await new Promise((resolve) => window.setTimeout(resolve, POLL_INTERVAL_MS));
+    }
+  }
+
+  return false;
+}
+
 export function useLinks(isSignedIn: boolean) {
   const [links, setLinks] = useState<AccountLink[]>([]);
   const [tokens, setTokens] = useState<ApiToken[]>([]);
   const [freshToken, setFreshToken] = useState("");
   const [pending, setPending] = useState<TraktPending | null>(null);
+  const [syncStatus, setSyncStatus] = useState<TraktJobStatus>("idle");
+  const [pushStatus, setPushStatus] = useState<TraktJobStatus>("idle");
   const [error, setError] = useState("");
 
   const reload = useCallback(async () => {
@@ -61,33 +84,66 @@ export function useLinks(isSignedIn: boolean) {
 
   const syncTrakt = useCallback(async () => {
     setError("");
+    setSyncStatus("running");
 
     try {
       await requestJson("/api/links/trakt/sync", jsonRequest("POST"));
-      await reload();
+
+      const before = links.find((link) => link.provider === "trakt")?.syncedAt ?? null;
+      const finished = await pollUntil(async () => {
+        const response = await requestJson<{ links: AccountLink[] }>("/api/links");
+        const trakt = response.links.find((link) => link.provider === "trakt");
+
+        if (!trakt?.syncedAt || trakt.syncedAt === before) {
+          return false;
+        }
+
+        setLinks(response.links);
+
+        return true;
+      });
+
+      setSyncStatus(finished ? "done" : "timeout");
     } catch {
       setError("Could not start the Trakt sync.");
+      setSyncStatus("idle");
     }
-  }, [reload]);
+  }, [links]);
 
   const pushTrakt = useCallback(async () => {
     setError("");
+    setPushStatus("running");
 
     try {
-      const response = await requestJson<{ queued: boolean }>(
+      const response = await requestJson<TraktPending & { queued: boolean }>(
         "/api/links/trakt/push",
         jsonRequest("POST"),
       );
 
       if (!response.queued) {
         setError("Nothing new to send since the last time.");
+        setPushStatus("idle");
 
         return;
       }
 
-      setPending({ pushedAt: new Date().toISOString(), watched: 0, listed: 0, rated: 0 });
+      const before = response.pushedAt;
+      const finished = await pollUntil(async () => {
+        const preview = await requestJson<TraktPending>("/api/links/trakt/push");
+
+        if (!preview.pushedAt || preview.pushedAt === before) {
+          return false;
+        }
+
+        setPending(preview);
+
+        return true;
+      });
+
+      setPushStatus(finished ? "done" : "timeout");
     } catch {
       setError("Could not send your shelf to Trakt.");
+      setPushStatus("idle");
     }
   }, []);
 
@@ -140,6 +196,8 @@ export function useLinks(isSignedIn: boolean) {
     tokens,
     freshToken,
     pending,
+    syncStatus,
+    pushStatus,
     error,
     createToken,
     revokeToken,

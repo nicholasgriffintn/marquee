@@ -12,6 +12,20 @@ function serviceLine(service: string) {
   return service ? `On ${service}.` : "Not on anything you have. Rent it, or take a backup.";
 }
 
+function UsherFacts({ facts }: { facts: string[] }) {
+  if (facts.length === 0) {
+    return null;
+  }
+
+  return (
+    <ul className="usher-facts">
+      {facts.map((fact) => (
+        <li key={fact}>{fact}</li>
+      ))}
+    </ul>
+  );
+}
+
 export function UsherOrder({
   state,
   guests,
@@ -123,13 +137,7 @@ export function UsherOrder({
                   {pick.line}
                 </p>
                 <p className="usher-order-service">{serviceLine(pick.service)}</p>
-                {pick.facts.length > 0 && (
-                  <ul className="usher-facts">
-                    {pick.facts.map((fact) => (
-                      <li key={fact}>{fact}</li>
-                    ))}
-                  </ul>
-                )}
+                <UsherFacts facts={pick.facts} />
                 <div className="hero-actions">
                   <button type="button" className="hero-play" onClick={() => onOpen(pick.item)}>
                     <span className="play-icon">↗</span> See where to watch
@@ -180,6 +188,7 @@ export function UsherOrder({
                     <small>{mediaMeta(backup.item)}</small>
                     <em>{backup.line}</em>
                     <span className="usher-backup-service">{serviceLine(backup.service)}</span>
+                    <UsherFacts facts={backup.facts} />
                   </span>
                 </button>
               ))}

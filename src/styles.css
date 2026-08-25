@@ -6576,6 +6576,9 @@ button.notebook-primary {
   margin: 0 0 20px;
   padding-left: 14px;
 }
+.programme-lead-copy .usher-facts {
+  margin-bottom: 20px;
+}
 .programme-lead-open {
   background: var(--acid);
   border: 0;

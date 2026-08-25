@@ -24,12 +24,29 @@ export function ConnectionsPanel({ isSignedIn }: { isSignedIn: boolean }) {
             <small>
               {trakt.account ? `Linked as ${trakt.account}` : "Linked"}
               {trakt.syncedAt ? ` · synced ${formatDate(trakt.syncedAt, {})}` : ""}
+              {connections.syncStatus === "running" ? " · bringing your history over…" : ""}
+              {connections.syncStatus === "timeout"
+                ? " · still bringing it over, check back shortly"
+                : ""}
+              {connections.pushStatus === "running" ? " · sending your shelf over…" : ""}
+              {connections.pushStatus === "done" ? " · sent" : ""}
+              {connections.pushStatus === "timeout"
+                ? " · still sending, check back shortly"
+                : ""}
             </small>
             <span className="spacer" />
-            <button type="button" onClick={() => void connections.syncTrakt()}>
+            <button
+              type="button"
+              disabled={connections.syncStatus === "running"}
+              onClick={() => void connections.syncTrakt()}
+            >
               Bring it here
             </button>
-            <button type="button" onClick={() => setConfirmPush(true)}>
+            <button
+              type="button"
+              disabled={connections.pushStatus === "running"}
+              onClick={() => setConfirmPush(true)}
+            >
               Send it there
             </button>
             <button type="button" onClick={() => void connections.unlinkTrakt()}>

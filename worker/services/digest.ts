@@ -21,7 +21,7 @@ export type DigestNumbers = {
 
 export type Digest = {
   createdAt: string;
-  lead: { titleId: string; line: string } | null;
+  lead: { titleId: string; line: string; facts: string[] } | null;
   numbers: DigestNumbers;
   fresh: string[];
   trending: string[];
@@ -63,7 +63,7 @@ async function leadForViewer(env: Bindings, viewerId: string, providerIds: strin
   try {
     const pick = await pickOne(env, viewerId, { providerIds, hour: 20 });
 
-    return pick ? { titleId: pick.item.id, line: pick.line } : null;
+    return pick ? { titleId: pick.item.id, line: pick.line, facts: pick.facts } : null;
   } catch (error) {
     logError("digest_lead_failed", error, { viewerId });
 
@@ -186,7 +186,11 @@ export async function readDigest(env: Bindings, viewerId: string) {
   return {
     createdAt: digest.createdAt,
     lead: digest.lead
-      ? { item: byId.get(digest.lead.titleId) ?? null, line: digest.lead.line }
+      ? {
+          item: byId.get(digest.lead.titleId) ?? null,
+          line: digest.lead.line,
+          facts: digest.lead.facts ?? [],
+        }
       : null,
     numbers: digest.numbers ?? { added: 0, finished: 0, shelved: 0, catalogue: 0 },
     fresh: pick(digest.fresh),
