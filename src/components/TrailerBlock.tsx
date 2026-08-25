@@ -19,11 +19,16 @@ function videosFor(item: MediaTitle): Video[] {
     return videos;
   }
 
-  return [...videos, { key: malKey, name: "MyAnimeList trailer", type: "Trailer" }];
+  return [
+    ...videos,
+    { key: malKey, name: "MyAnimeList trailer", type: "Trailer" },
+  ];
 }
 
 export function TrailerBlock({ item }: { item: MediaTitle }) {
-  const videos = videosFor(item).filter((video) => YOUTUBE_ID_PATTERN.test(video.key));
+  const videos = videosFor(item).filter((video) =>
+    YOUTUBE_ID_PATTERN.test(video.key),
+  );
   const [active, setActive] = useState<Video | null>(null);
 
   if (videos.length === 0) {
@@ -41,7 +46,7 @@ export function TrailerBlock({ item }: { item: MediaTitle }) {
             src={`https://www.youtube-nocookie.com/embed/${active.key}?autoplay=1&rel=0&modestbranding=1`}
             title={`${item.title} — ${active.name}`}
             allow="accelerometer; autoplay; encrypted-media; picture-in-picture"
-            sandbox="allow-scripts allow-presentation allow-popups"
+            sandbox="allow-scripts allow-same-origin allow-presentation allow-popups"
             allowFullScreen
           />
         ) : (
@@ -51,7 +56,9 @@ export function TrailerBlock({ item }: { item: MediaTitle }) {
             onClick={() => setActive(videos[0])}
             aria-label={`Play ${videos[0].name}`}
           >
-            {still && <img src={still} alt="" loading="lazy" decoding="async" />}
+            {still && (
+              <img src={still} alt="" loading="lazy" decoding="async" />
+            )}
             <span className="detail-media-badge">
               <i>▶</i>{" "}
               {videos[0].type === "Trailer"
@@ -70,7 +77,9 @@ export function TrailerBlock({ item }: { item: MediaTitle }) {
               className={active?.key === video.key ? "selected" : ""}
               onClick={() => setActive(video)}
             >
-              {video.name.length > 26 ? `${video.name.slice(0, 26)}…` : video.name}
+              {video.name.length > 26
+                ? `${video.name.slice(0, 26)}…`
+                : video.name}
             </button>
           ))}
         <a
