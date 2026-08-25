@@ -164,7 +164,7 @@ export async function getJikanDetails(malId: number): Promise<JikanDetails | nul
   const media = recordAt(payload, "data");
 
   if (!media) {
-    return null;
+    throw new JikanError("Jikan returned a payload without anime data");
   }
 
   const broadcast = recordAt(media, "broadcast");

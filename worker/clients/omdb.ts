@@ -22,6 +22,14 @@ const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "
 
 const UNRATED = new Set(["n/a", "not rated", "unrated", "none", "no rating"]);
 
+const NOT_FOUND_ERRORS = [
+  "movie not found",
+  "series not found",
+  "episode not found",
+  "incorrect imdb id",
+  "too many results",
+];
+
 export const OmdbError = upstreamError("OmdbError");
 
 export type OmdbFacts = {
@@ -254,12 +262,17 @@ async function requestOmdb(
 
   if (payload.Response === "False") {
     const error = text(payload.Error) ?? "OMDb has no record";
+    const lower = error.toLowerCase();
 
-    if (error.toLowerCase().includes("limit")) {
+    if (lower.includes("limit")) {
       throw new OmdbError("OMDb daily limit reached", 429);
     }
 
-    return null;
+    if (NOT_FOUND_ERRORS.some((known) => lower.includes(known))) {
+      return null;
+    }
+
+    throw new OmdbError(`OMDb ${options.label} reported an error: ${error}`);
   }
 
   return payload;
