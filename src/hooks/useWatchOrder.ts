@@ -1,3 +1,5 @@
+import { useMemo } from "react";
+
 import { watchOrderPlacement } from "../domain/anime";
 import type { MediaTitle } from "../domain/catalog";
 import { useResource } from "./useResource";
@@ -13,9 +15,12 @@ export function useWatchOrder(item: MediaTitle) {
   );
   const entries = data?.related ?? NOTHING;
 
-  return {
-    before: entries.filter((entry) => watchOrderPlacement(entry.relation) === "before"),
-    after: entries.filter((entry) => watchOrderPlacement(entry.relation) === "after"),
-    related: entries.filter((entry) => watchOrderPlacement(entry.relation) === "related"),
-  };
+  return useMemo(
+    () => ({
+      before: entries.filter((entry) => watchOrderPlacement(entry.relation) === "before"),
+      after: entries.filter((entry) => watchOrderPlacement(entry.relation) === "after"),
+      related: entries.filter((entry) => watchOrderPlacement(entry.relation) === "related"),
+    }),
+    [entries],
+  );
 }
