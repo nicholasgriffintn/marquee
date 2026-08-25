@@ -23,7 +23,7 @@ export function PersonPage({
 }) {
   const params = useParams();
   const name = decodeURIComponent(params.name ?? "");
-  const { data, following, error, isLoading, hasMore, loadMore, toggleFollow } = usePerson(
+  const { data, following, error, saveError, isLoading, hasMore, loadMore, toggleFollow } = usePerson(
     name,
     isSignedIn,
   );
@@ -67,6 +67,11 @@ export function PersonPage({
             >
               {following ? "Stop watching for them" : "Tell me when they turn up"}
             </button>
+          )}
+          {saveError && (
+            <p className="catalogue-error" role="alert">
+              {saveError}
+            </p>
           )}
         </div>
       </div>

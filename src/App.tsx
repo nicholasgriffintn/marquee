@@ -553,6 +553,7 @@ export function App() {
             onUsherDismiss={(scope) => void usher.dismiss(scope)}
             title={openDetails.title}
             isMissing={openDetails.isMissing}
+            isLoading={openDetails.isLoading}
             canSave={isSignedIn}
             entries={profile.entries}
             selectedProviderIds={selectedProviderIds}

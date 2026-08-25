@@ -1,4 +1,4 @@
-import { Component, type ErrorInfo, type ReactNode } from "react";
+import { Component, Fragment, type ErrorInfo, type ReactNode } from "react";
 
 import { UsherMark } from "./usher/UsherMark";
 
@@ -10,10 +10,10 @@ type Props = {
   onRetry?: () => void;
 };
 
-type State = { error: Error | null; resetKey: string | number | undefined };
+type State = { error: Error | null; resetKey: string | number | undefined; retryCount: number };
 
 export class ErrorBoundary extends Component<Props, State> {
-  override state: State = { error: null, resetKey: this.props.resetKey };
+  override state: State = { error: null, resetKey: this.props.resetKey, retryCount: 0 };
 
   static getDerivedStateFromError(error: Error): Pick<State, "error"> {
     return { error };
@@ -24,7 +24,7 @@ export class ErrorBoundary extends Component<Props, State> {
       return null;
     }
 
-    return { error: null, resetKey: props.resetKey };
+    return { error: null, resetKey: props.resetKey, retryCount: state.retryCount };
   }
 
   override componentDidCatch(error: Error, info: ErrorInfo) {
@@ -36,13 +36,13 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   private readonly retry = () => {
-    this.setState({ error: null });
+    this.setState((state) => ({ error: null, retryCount: state.retryCount + 1 }));
     this.props.onRetry?.();
   };
 
   override render() {
     if (!this.state.error) {
-      return this.props.children;
+      return <Fragment key={this.state.retryCount}>{this.props.children}</Fragment>;
     }
 
     if (this.props.variant === "page") {

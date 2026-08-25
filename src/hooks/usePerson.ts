@@ -103,7 +103,8 @@ export function usePerson(name: string, isSignedIn: boolean) {
   return {
     data: person ? { person, items, shelf } : null,
     following,
-    error: saveError || loadError,
+    error: loadError,
+    saveError,
     isLoading: active && isLoading,
     hasMore: active && hasMore,
     loadMore: () => setPageState({ key, page: page + 1 }),
