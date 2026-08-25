@@ -100,7 +100,7 @@ export function TonightPage({
   onOpen: (item: MediaTitle) => void;
   onPin: () => void;
   onPick: () => void;
-  onRejectPick: () => void;
+  onRejectPick: (scope?: "never") => void;
   onStartOrder: () => void;
   onOrder: (order: TonightOrder, guestIds: string[]) => void;
   onOrderAnother: () => void;

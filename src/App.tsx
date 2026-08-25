@@ -397,7 +397,7 @@ export function App() {
                 onPick={() =>
                   isSignedIn ? void usher.askForPick(selectedProviderIds) : askForTicket()
                 }
-                onRejectPick={() => void usher.rejectPick(selectedProviderIds)}
+                onRejectPick={(scope) => void usher.rejectPick(selectedProviderIds, scope)}
                 onStartOrder={() => (isSignedIn ? usher.openOrder() : askForTicket())}
                 onOrder={(order, guestIds) =>
                   void usher.placeOrder(order, selectedProviderIds, guestIds)
