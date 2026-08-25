@@ -14,6 +14,28 @@ function versionedKey(url: string) {
   return new Request(key, { method: "GET" });
 }
 
+function namedKey(key: string) {
+  return versionedKey(`https://cache.marquee.internal/${encodeURIComponent(key)}`);
+}
+
+export async function readCachedValue<T>(key: string): Promise<T | null> {
+  const hit = await edgeCaches.default.match(namedKey(key));
+
+  return hit ? ((await hit.json()) as T) : null;
+}
+
+export async function writeCachedValue(key: string, value: unknown, seconds: number) {
+  await edgeCaches.default.put(
+    namedKey(key),
+    new Response(JSON.stringify(value), {
+      headers: {
+        "content-type": "application/json",
+        "cache-control": `public, max-age=${seconds}`,
+      },
+    }),
+  );
+}
+
 export function edgeCache(seconds: number): MiddlewareHandler<{ Bindings: Bindings }> {
   return async (context, next) => {
     if (context.req.method !== "GET") {

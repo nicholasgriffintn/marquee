@@ -1,5 +1,6 @@
 import type { MediaTitle, MediaType } from "../../src/domain/catalog.ts";
 import { ratingSources } from "../../src/domain/ratings.ts";
+import { readCachedValue, writeCachedValue } from "../lib/cache.ts";
 import { logError } from "../lib/logging.ts";
 import { clamp } from "../lib/numbers.ts";
 import { centre, cosine, dot, normalise } from "../lib/vector.ts";
@@ -26,6 +27,7 @@ const POINT_GENRES = 3;
 const OVERVIEW_LIMIT = 190;
 const NOTE_LIMIT = 220;
 const SCORE_LIMIT = 3;
+const MAP_CACHE_SECONDS = 21_600;
 
 export type MapNeighbour = {
   titleId: string;
@@ -287,6 +289,10 @@ function empty(status: TasteMap["status"], shelfCount: number, mappedCount = 0):
   return { status, points: [], shelfCount, mappedCount, axes: { x: null, y: null } };
 }
 
+function shelfSignature(entries: ViewingContext[]) {
+  return `${entries.length}:${entries[0]?.updatedAt ?? ""}`;
+}
+
 export async function buildTasteMap(
   env: Bindings,
   viewerId: string,
@@ -297,6 +303,13 @@ export async function buildTasteMap(
 
   if (weighted.length < MINIMUM_POINTS) {
     return empty("sparse", weighted.length);
+  }
+
+  const cacheKey = `notebook-map:${viewerId}:${shelfSignature(viewer.entries)}`;
+  const cached = await readCachedValue<TasteMap>(cacheKey);
+
+  if (cached) {
+    return cached;
   }
 
   const byId = await readVectors(
@@ -395,11 +408,20 @@ export async function buildTasteMap(
     };
   });
 
-  return {
+  const map: TasteMap = {
     status: "ready",
     points,
     shelfCount: weighted.length,
     mappedCount: points.length,
     axes: { x: nameAxis(byX, traitsByIndex), y: nameAxis(byY, traitsByIndex) },
   };
+  const store = writeCachedValue(cacheKey, map, MAP_CACHE_SECONDS);
+
+  if (options.schedule) {
+    options.schedule(store);
+  } else {
+    await store;
+  }
+
+  return map;
 }
