@@ -8,6 +8,7 @@ export function jobSubject(job: IngestionJob) {
     job.type === "enrich-ratings" ||
     job.type === "enrich-anime" ||
     job.type === "enrich-anilist" ||
+    job.type === "enrich-anilist-media" ||
     job.type === "cache-poster"
   ) {
     return job.titleId;
@@ -73,7 +74,10 @@ export async function recordIngestionRun(env: Bindings, job: IngestionJob) {
       .bind(runId)
       .run();
   } catch (error) {
-    const detail = error instanceof Error ? error.message.slice(0, 500) : "Unknown ingestion error";
+    const detail =
+      error instanceof Error
+        ? error.message.slice(0, 500)
+        : "Unknown ingestion error";
 
     await env.DB.prepare(
       `UPDATE ingestion_runs
