@@ -65,7 +65,6 @@ export const catalogRoutes = new Hono<{
 }>();
 
 catalogRoutes.get("/", edgeCache(900), async (context) => {
-  const query = queryText(context, "query", QUERY_LIMIT);
   const providerIds = validProviderIds(
     queryList(context, "providers", PROVIDER_LIMIT),
   );
@@ -77,10 +76,7 @@ catalogRoutes.get("/", edgeCache(900), async (context) => {
       return context.json({ error: "Catalogue not found" }, 404);
     }
 
-    context.header(
-      "cache-control",
-      query ? "public, max-age=60" : "public, max-age=900",
-    );
+    context.header("cache-control", "public, max-age=900");
 
     return context.json(catalogue);
   } catch (error) {
@@ -311,7 +307,7 @@ catalogRoutes.get("/collections/:id", edgeCache(3_600), async (context) => {
   const collectionId = pathInteger(context, "id", 1, MAX_TMDB_ID);
 
   if (collectionId === null) {
-    return context.json({ error: "Unknown collection" }, 400);
+    return context.json({ error: "Unknown collection" }, 404);
   }
 
   const page = queryInteger(context, "page", 0, 0, MAX_COLLECTION_PAGE);
