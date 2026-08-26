@@ -73,8 +73,35 @@ struct Artwork: View {
   let url: URL?
   let seed: String
   var aspectRatio: CGFloat = 2 / 3
+  var height: CGFloat?
+
+  init(url: URL?, seed: String, aspectRatio: CGFloat = 2 / 3, height: CGFloat? = nil) {
+    self.url = url
+    self.seed = seed
+    self.aspectRatio = aspectRatio
+    self.height = height
+  }
 
   var body: some View {
+    Group {
+      if let height {
+        GeometryReader { proxy in
+          artwork
+            .frame(width: proxy.size.width, height: proxy.size.height)
+            .clipped()
+        }
+        .frame(height: height)
+      } else {
+        artwork
+          .aspectRatio(aspectRatio, contentMode: .fill)
+          .frame(maxWidth: .infinity)
+      }
+    }
+    .clipped()
+    .background(MarqueeTheme.tile)
+  }
+
+  private var artwork: some View {
     AsyncImage(url: url, transaction: Transaction(animation: .easeOut(duration: 0.25))) { phase in
       switch phase {
       case .success(let image): image.resizable().scaledToFill()
@@ -83,10 +110,6 @@ struct Artwork: View {
         placeholder.overlay { ProgressView().tint(MarqueeTheme.acid) }
       }
     }
-    .aspectRatio(aspectRatio, contentMode: .fill)
-    .frame(maxWidth: .infinity)
-    .clipped()
-    .background(MarqueeTheme.tile)
   }
 
   private var placeholder: some View {

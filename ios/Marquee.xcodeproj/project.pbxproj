@@ -1,7 +1,8 @@
 // !$*UTF8*$!
 {
 	archiveVersion = 1;
-	classes = {};
+	classes = {
+	};
 	objectVersion = 77;
 	objects = {
 
@@ -10,9 +11,11 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		A10000000000000000000002 /* Exceptions for Marquee */ = {
+		A10000000000000000000002 /* Exceptions for "Marquee" folder in "Marquee" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (Info.plist,);
+			membershipExceptions = (
+				Info.plist,
+			);
 			target = A10000000000000000000008 /* Marquee */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -20,25 +23,38 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		A10000000000000000000003 /* Marquee */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (A10000000000000000000002 /* Exceptions for Marquee */,);
+			exceptions = (
+				A10000000000000000000002 /* Exceptions for "Marquee" folder in "Marquee" target */,
+			);
 			path = Marquee;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		A10000000000000000000004 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		A10000000000000000000004 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		A10000000000000000000005 = {
 			isa = PBXGroup;
-			children = (A10000000000000000000003 /* Marquee */, A10000000000000000000006 /* Products */);
+			children = (
+				A10000000000000000000003 /* Marquee */,
+				A10000000000000000000006 /* Products */,
+			);
 			sourceTree = "<group>";
 		};
 		A10000000000000000000006 /* Products */ = {
 			isa = PBXGroup;
-			children = (A10000000000000000000001 /* Marquee.app */,);
+			children = (
+				A10000000000000000000001 /* Marquee.app */,
+			);
 			name = Products;
 			sourceTree = "<group>";
 		};
@@ -47,13 +63,22 @@
 /* Begin PBXNativeTarget section */
 		A10000000000000000000008 /* Marquee */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = A10000000000000000000014 /* Build configuration list for Marquee */;
-			buildPhases = (A10000000000000000000009 /* Sources */, A10000000000000000000004 /* Frameworks */, A10000000000000000000010 /* Resources */);
-			buildRules = ();
-			dependencies = ();
-			fileSystemSynchronizedGroups = (A10000000000000000000003 /* Marquee */,);
+			buildConfigurationList = A10000000000000000000014 /* Build configuration list for PBXNativeTarget "Marquee" */;
+			buildPhases = (
+				A10000000000000000000009 /* Sources */,
+				A10000000000000000000004 /* Frameworks */,
+				A10000000000000000000010 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				A10000000000000000000003 /* Marquee */,
+			);
 			name = Marquee;
-			packageProductDependencies = ();
+			packageProductDependencies = (
+			);
 			productName = Marquee;
 			productReference = A10000000000000000000001 /* Marquee.app */;
 			productType = "com.apple.product-type.application";
@@ -67,28 +92,49 @@
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 2650;
 				LastUpgradeCheck = 2650;
-				TargetAttributes = {A10000000000000000000008 = {CreatedOnToolsVersion = 26.0;};};
+				TargetAttributes = {
+					A10000000000000000000008 = {
+						CreatedOnToolsVersion = 26.0;
+					};
+				};
 			};
-			buildConfigurationList = A10000000000000000000013 /* Build configuration list for PBXProject Marquee */;
+			buildConfigurationList = A10000000000000000000013 /* Build configuration list for PBXProject "Marquee" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
-			knownRegions = (en, Base);
+			knownRegions = (
+				en,
+				Base,
+			);
 			mainGroup = A10000000000000000000005;
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A10000000000000000000006 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
-			targets = (A10000000000000000000008 /* Marquee */,);
+			targets = (
+				A10000000000000000000008 /* Marquee */,
+			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		A10000000000000000000010 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		A10000000000000000000010 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		A10000000000000000000009 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		A10000000000000000000009 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
@@ -104,7 +150,10 @@
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_OPTIMIZATION_LEVEL = 0;
-				GCC_PREPROCESSOR_DEFINITIONS = ("DEBUG=1", "$(inherited)");
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				ONLY_ACTIVE_ARCH = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
@@ -181,8 +230,24 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		A10000000000000000000013 /* Build configuration list for PBXProject Marquee */ = {isa = XCConfigurationList; buildConfigurations = (A10000000000000000000011 /* Debug */, A10000000000000000000012 /* Release */); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
-		A10000000000000000000014 /* Build configuration list for Marquee */ = {isa = XCConfigurationList; buildConfigurations = (A10000000000000000000015 /* Debug */, A10000000000000000000016 /* Release */); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		A10000000000000000000013 /* Build configuration list for PBXProject "Marquee" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A10000000000000000000011 /* Debug */,
+				A10000000000000000000012 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A10000000000000000000014 /* Build configuration list for PBXNativeTarget "Marquee" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A10000000000000000000015 /* Debug */,
+				A10000000000000000000016 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 	};
 	rootObject = A10000000000000000000007 /* Project object */;

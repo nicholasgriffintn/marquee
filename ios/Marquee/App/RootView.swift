@@ -7,8 +7,7 @@ struct RootView: View {
       tab("Listings", systemImage: "rectangle.grid.2x2", view: ListingsView())
       tab("Revival", systemImage: "film.stack", view: RevivalView())
       tab("My shelf", systemImage: "books.vertical", view: ShelfView())
-      tab("This week", systemImage: "newspaper", view: DigestView())
-      tab("Notebook", systemImage: "book.closed", view: NotebookView())
+      tab("More", systemImage: "ellipsis", view: MoreView())
     }
     .marqueePage()
   }

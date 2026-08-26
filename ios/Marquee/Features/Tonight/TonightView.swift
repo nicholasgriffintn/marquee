@@ -92,17 +92,32 @@ struct TonightView: View {
       TitleDetailView(item: hero)
     } label: {
       ZStack(alignment: .bottomLeading) {
-        Artwork(url: hero.backdropUrl ?? hero.posterUrl, seed: hero.id, aspectRatio: 16 / 11)
-          .frame(height: 360)
+        Artwork(
+          url: hero.backdropUrl ?? hero.posterUrl,
+          seed: hero.id,
+          aspectRatio: 16 / 11,
+          height: 360
+        )
         LinearGradient(
           colors: [.clear, MarqueeTheme.ink.opacity(0.98)], startPoint: .center, endPoint: .bottom)
         VStack(alignment: .leading, spacing: 8) {
           Text("TONIGHT'S BOARD").font(MarqueeTheme.mono(10, weight: .bold)).tracking(1.4)
             .foregroundStyle(MarqueeTheme.acid)
-          Text(hero.title).font(MarqueeTheme.display(39)).fontWeight(.semibold)
-          Text(itemMeta(hero)).font(MarqueeTheme.mono(10)).foregroundStyle(MarqueeTheme.muted)
-          Text(hero.overview).font(MarqueeTheme.sans(13)).lineLimit(3)
+          Text(hero.title)
+            .font(MarqueeTheme.display(39))
+            .fontWeight(.semibold)
+            .lineLimit(3)
+            .fixedSize(horizontal: false, vertical: true)
+          Text(itemMeta(hero))
+            .font(MarqueeTheme.mono(10))
+            .foregroundStyle(MarqueeTheme.muted)
+            .lineLimit(1)
+          Text(hero.overview)
+            .font(MarqueeTheme.sans(13))
+            .lineLimit(3)
+            .fixedSize(horizontal: false, vertical: true)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(18)
       }
     }

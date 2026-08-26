@@ -116,8 +116,7 @@ private struct ShelfCard: View {
       TitleDetailView(item: item.title)
     } label: {
       VStack(alignment: .leading, spacing: 7) {
-        Artwork(url: item.title.posterUrl, seed: item.title.id)
-          .frame(height: 226)
+        Artwork(url: item.title.posterUrl, seed: item.title.id, height: 226)
           .overlay(alignment: .bottomLeading) {
             Text(item.entry.status.label.uppercased())
               .font(MarqueeTheme.mono(8, weight: .bold))
