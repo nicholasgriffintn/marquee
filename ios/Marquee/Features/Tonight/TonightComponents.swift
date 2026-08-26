@@ -380,7 +380,12 @@ struct TonightProviderStrip: View {
     .padding(.horizontal, 18)
     .padding(.vertical, 22)
     .background(MarqueeTheme.panel)
-    .overlay { Rectangle().stroke(MarqueeTheme.line) }
+    .overlay(alignment: .top) {
+      Rectangle().fill(MarqueeTheme.line).frame(height: 1)
+    }
+    .overlay(alignment: .bottom) {
+      Rectangle().fill(MarqueeTheme.line).frame(height: 1)
+    }
   }
 
   private var manageServicesLabel: some View {
