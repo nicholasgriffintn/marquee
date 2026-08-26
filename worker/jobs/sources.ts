@@ -8,19 +8,6 @@ import {
 } from "../repositories/budgets.ts";
 import type { Bindings, EnrichmentSource } from "../types.ts";
 
-// Every source's pause behaviour lives here, in one place, so a bad backoff
-// is a one-line fix instead of a hunt through each job file.
-//
-// rateLimited: the source told us to slow down (429). Doubles on repeat
-// hits so a struggling free API isn't hammered every cycle; a single
-// successful call resets it back to the base.
-// refused: the source blocked us outright (401/403). Long and flat -
-// a block rarely clears itself within a day, so escalating further buys
-// nothing.
-//
-// omdb and poster share the OMDb budget: claimBudget is the real guard
-// against the daily limit, so a 429 there means throttle, not exhaustion -
-// their base pause is shorter than the rest.
 const BACKOFF: Record<
   EnrichmentSource,
   { rateLimited: BackoffPolicy; refused: BackoffPolicy }
@@ -47,7 +34,7 @@ const BACKOFF: Record<
   },
   anilist: {
     rateLimited: { baseMinutes: 30, capMinutes: 60 * 6 },
-    refused: { baseMinutes: 60 * 24 * 7, capMinutes: 60 * 24 * 7 },
+    refused: { baseMinutes: 60, capMinutes: 60 * 12 },
   },
 };
 
@@ -97,8 +84,8 @@ export function titleParts(titleId: string) {
 
   return match
     ? {
-        mediaType: match[1] === "movie" ? ("movie" as const) : ("tv" as const),
-        tmdbId: Number(match[2]),
-      }
+      mediaType: match[1] === "movie" ? ("movie" as const) : ("tv" as const),
+      tmdbId: Number(match[2]),
+    }
     : null;
 }
