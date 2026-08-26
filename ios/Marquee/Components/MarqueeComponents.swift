@@ -26,13 +26,24 @@ struct RootNavigationToolbar: ToolbarContent {
   let onSearch: () -> Void
 
   var body: some ToolbarContent {
-    ToolbarItem(placement: .topBarLeading) {
-      HStack(spacing: 10) {
-        MarqueeMark()
-        HeaderSearchField(query: $query, onSearch: onSearch)
+    if #available(iOS 26.0, *) {
+      ToolbarItem(placement: .topBarLeading) {
+        leadingContent
+      }
+      .sharedBackgroundVisibility(.hidden)
+    } else {
+      ToolbarItem(placement: .topBarLeading) {
+        leadingContent
       }
     }
     AccountToolbar()
+  }
+
+  private var leadingContent: some View {
+    HStack(spacing: 10) {
+      MarqueeMark()
+      HeaderSearchField(query: $query, onSearch: onSearch)
+    }
   }
 }
 
