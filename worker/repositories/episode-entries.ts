@@ -16,6 +16,8 @@ type EntryRow = {
   updatedAt: string;
 };
 
+const WATCHED_KEY_CHUNK = 90;
+
 export type EpisodeEntryInput = {
   titleId: string;
   scope: EntryScope;
@@ -225,16 +227,32 @@ export async function deleteEpisodeEntries(db: D1Database, viewerId: string, tit
     .run();
 }
 
-export async function readWatchedEpisodeKeys(db: D1Database, viewerId: string, limit = 2_000) {
-  const rows = await db
-    .prepare(
-      `SELECT title_id AS titleId, season_number AS season, episode_number AS episode
-         FROM viewing_episode_entries
-        WHERE viewer_id = ?1 AND scope = 'episode' AND watched = 1
-        LIMIT ?2`,
-    )
-    .bind(viewerId, limit)
-    .all<{ titleId: string; season: number; episode: number }>();
+export async function readWatchedEpisodeKeys(db: D1Database, viewerId: string, titleIds: string[]) {
+  const unique = [...new Set(titleIds)];
 
-  return new Set(rows.results.map((row) => `${row.titleId}:${row.season}:${row.episode}`));
+  if (unique.length === 0) {
+    return new Set<string>();
+  }
+
+  const keys = new Set<string>();
+
+  for (let index = 0; index < unique.length; index += WATCHED_KEY_CHUNK) {
+    const wave = unique.slice(index, index + WATCHED_KEY_CHUNK);
+    // oxlint-disable-next-line no-await-in-loop
+    const rows = await db
+      .prepare(
+        `SELECT title_id AS titleId, season_number AS season, episode_number AS episode
+           FROM viewing_episode_entries
+          WHERE viewer_id = ? AND scope = 'episode' AND watched = 1
+            AND title_id IN (${wave.map(() => "?").join(",")})`,
+      )
+      .bind(viewerId, ...wave)
+      .all<{ titleId: string; season: number; episode: number }>();
+
+    for (const row of rows.results) {
+      keys.add(`${row.titleId}:${row.season}:${row.episode}`);
+    }
+  }
+
+  return keys;
 }

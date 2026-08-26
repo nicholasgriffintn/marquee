@@ -185,7 +185,7 @@ function announcedEvent(episode: UpcomingEpisode, title: MediaTitle, origin: str
 }
 
 async function collectDiary(env: Bindings, viewerId: string) {
-  const [episodes, releases, announced, watched] = await Promise.all([
+  const [episodes, releases, announced] = await Promise.all([
     readEpisodes(env, viewerId).catch((error: unknown): EpisodeRow[] => {
       logError("feed_episodes_failed", error, { viewerId });
 
@@ -201,12 +201,15 @@ async function collectDiary(env: Bindings, viewerId: string) {
 
       return [];
     }),
-    readWatchedEpisodeKeys(env.DB, viewerId).catch((error: unknown): Set<string> => {
-      logError("feed_watched_failed", error, { viewerId });
-
-      return new Set();
-    }),
   ]);
+  const watched = await readWatchedEpisodeKeys(env.DB, viewerId, [
+    ...episodes.map((row) => row.titleId),
+    ...announced.map((episode) => episode.titleId),
+  ]).catch((error: unknown): Set<string> => {
+    logError("feed_watched_failed", error, { viewerId });
+
+    return new Set();
+  });
   const timed = new Set(episodes.map((row) => slotKey(row.titleId, row.season, row.episode)));
   const fresh = announced.filter((episode) => {
     const key = slotKey(episode.titleId, episode.seasonNumber, episode.episodeNumber);
