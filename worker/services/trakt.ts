@@ -259,16 +259,26 @@ export async function exportTraktShelf(env: Bindings, viewerId: string, origin: 
        FROM viewing_entries
       WHERE viewer_id = ?1
         AND (?2 IS NULL OR updated_at > ?2)
-      ORDER BY updated_at
+      ORDER BY updated_at, id
       LIMIT ${PUSH_LIMIT}`,
   )
     .bind(viewerId, pushedAt)
     .all<ShelfRow>();
+  const page = rows.results;
+  const boundary = page.at(-1)?.updatedAt;
+  // The cursor is a timestamp, so a full page that splits a group of rows sharing one
+  // updated_at would strand the rest of that group behind a strict `>` forever. Hold
+  // them back for the next run instead, unless the whole page is one such group.
+  const trimmed =
+    page.length === PUSH_LIMIT && boundary
+      ? page.filter((row) => row.updatedAt !== boundary)
+      : page;
+  const pushable = trimmed.length > 0 ? trimmed : page;
   const history: TraktPushItem[] = [];
   const ratings: TraktPushItem[] = [];
   const watchlist: TraktPushItem[] = [];
 
-  for (const row of rows.results) {
+  for (const row of pushable) {
     const item = pushItem(row);
 
     if (!item) {
@@ -293,7 +303,7 @@ export async function exportTraktShelf(env: Bindings, viewerId: string, origin: 
   const listed = await pushWaves(watchlist, (wave) => pushTraktWatchlist(env, accessToken, wave));
   const watched = await pushWaves(history, (wave) => pushTraktHistory(env, accessToken, wave));
 
-  const maxUpdatedAt = rows.results.at(-1)?.updatedAt;
+  const maxUpdatedAt = pushable.at(-1)?.updatedAt;
 
   if (maxUpdatedAt) {
     await markLinkPushed(env, viewerId, "trakt", maxUpdatedAt);

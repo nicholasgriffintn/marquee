@@ -28,18 +28,18 @@ type JoinedRow = {
 };
 
 const ORDER_BY: Record<ShelfSort, string> = {
-  added: "e.updated_at DESC",
-  rating: "e.rating IS NULL, e.rating DESC, e.updated_at DESC",
+  added: "e.updated_at DESC, e.id",
+  rating: "e.rating IS NULL, e.rating DESC, e.updated_at DESC, e.id",
   status: `CASE e.status
              WHEN 'watching' THEN 0
              WHEN 'watchlist' THEN 1
              WHEN 'watched' THEN 2
              ELSE 3
-           END, t.title COLLATE NOCASE`,
-  year: "t.year IS NULL, t.year DESC, t.title COLLATE NOCASE",
+           END, t.title COLLATE NOCASE, e.id`,
+  year: "t.year IS NULL, t.year DESC, t.title COLLATE NOCASE, e.id",
   genre: `json_extract(t.payload, '$.genres[0]') IS NULL,
           json_extract(t.payload, '$.genres[0]') COLLATE NOCASE,
-          t.title COLLATE NOCASE`,
+          t.title COLLATE NOCASE, e.id`,
 };
 
 const FURTHEST_EPISODE = `viewing_episode_entries
