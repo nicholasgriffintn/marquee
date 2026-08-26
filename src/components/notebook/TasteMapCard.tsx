@@ -12,6 +12,7 @@ import {
   type TasteMapResponse,
 } from "../../domain/notebook";
 import { TitleArt } from "../TitleArt";
+import { StarIcon } from "../ui";
 
 const POSTER_WIDTH = 92;
 const STARS = [1, 2, 3, 4, 5];
@@ -32,9 +33,7 @@ function Stars({ rating }: { rating: number }) {
   return (
     <span className="taste-card-stars" aria-label={`${rating} out of 5`}>
       {STARS.map((star) => (
-        <span key={star} className={star <= rating ? "on" : ""} aria-hidden="true">
-          ★
-        </span>
+        <StarIcon key={star} className={star <= rating ? "on" : ""} />
       ))}
     </span>
   );

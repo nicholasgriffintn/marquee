@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { PageTitle } from "../components/PageTitle";
-import { ArrowIcon, Poster } from "../components/ui";
+import { ArrowIcon, Poster, SearchIcon, StarIcon } from "../components/ui";
 import { UsherCard } from "../components/usher/UsherCard";
 import { UsherMark } from "../components/usher/UsherMark";
 import type { MediaTitle } from "../domain/catalog";
@@ -45,7 +45,7 @@ function groupFor(sort: ShelfSort, item: MediaTitle, entry: ViewingEntry) {
   }
 
   if (sort === "rating") {
-    return entry.rating ? `${"★".repeat(entry.rating)} ${entry.rating}/5` : "Not rated yet";
+    return entry.rating ? `${entry.rating}/5` : "Not rated yet";
   }
 
   if (sort === "status") {
@@ -224,7 +224,9 @@ export function LibraryPage({
       {savedCount > 0 && (
         <div className="browse-filters">
           <label className="browse-search">
-            <span>⌕</span>
+            <span aria-hidden="true">
+              <SearchIcon />
+            </span>
             <input
               value={params.get("q") ?? ""}
               onChange={(event) => update({ q: event.target.value })}
@@ -317,9 +319,18 @@ export function LibraryPage({
                 >
                   <Poster item={item} />
                   <strong>{item.title}</strong>
-                  <small>
+                  <small className="shelf-item-meta">
                     {STATUS_LABELS[entry.status]}
-                    {entry.rating ? ` · ${"★".repeat(entry.rating)}` : ""}
+                    {entry.rating ? (
+                      <span className="shelf-item-rating" aria-label={`${entry.rating} out of 5`}>
+                        <span aria-hidden="true">·</span>
+                        {Array.from({ length: entry.rating }, (_, index) => index + 1).map(
+                          (star) => (
+                            <StarIcon key={star} />
+                          ),
+                        )}
+                      </span>
+                    ) : null}
                     {entry.season && entry.episode
                       ? ` · ${episodeLabel(entry.season, entry.episode)}`
                       : ""}

@@ -4,6 +4,7 @@ import { clockLabel, runtimeLabel, type RevivalWork } from "../../domain/revival
 import { useProgressReporter } from "../../hooks/useRevival";
 import { track } from "../../lib/telemetry";
 import { ArtPlaceholder } from "../ArtPlaceholder";
+import { PlayIcon } from "../ui";
 
 const FINISHED_RATIO = 0.97;
 const RESUME_FLOOR_SECONDS = 5;
@@ -144,7 +145,7 @@ export function ReelPlayer({
             )}
             <span className="revival-curtain-face">
               <span className="revival-curtain-play" aria-hidden="true">
-                ▶
+                <PlayIcon />
               </span>
               <span className="revival-curtain-copy">
                 <strong>{resuming ? "Back to your seat" : "Start the projector"}</strong>

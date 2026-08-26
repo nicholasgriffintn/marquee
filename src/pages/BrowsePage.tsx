@@ -4,7 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { PageTitle } from "../components/PageTitle";
 import { TitleCard } from "../components/TitleCard";
-import { ProviderBadge } from "../components/ui";
+import { ProviderBadge, SearchIcon, VerticalChevronIcon } from "../components/ui";
 import type { MediaTitle, Provider } from "../domain/catalog";
 import { useBrowse, useGenres, useKeywords } from "../hooks/useBrowse";
 
@@ -111,7 +111,9 @@ export function BrowsePage({
 
       <div className="browse-filters">
         <label className="browse-search">
-          <span>⌕</span>
+          <span aria-hidden="true">
+            <SearchIcon />
+          </span>
           <input
             value={query}
             onChange={(event) => update({ q: event.target.value })}
@@ -160,7 +162,7 @@ export function BrowsePage({
           aria-expanded={showAdvancedFilters}
           onClick={() => setShowAdvancedFilters(true)}
         >
-          Show more filters <span aria-hidden="true">↓</span>
+          Show more filters <VerticalChevronIcon />
         </button>
 
         <div className={`browse-advanced${showAdvancedFilters ? " expanded" : ""}`}>
@@ -231,7 +233,7 @@ export function BrowsePage({
             aria-expanded={showAdvancedFilters}
             onClick={() => setShowAdvancedFilters(false)}
           >
-            Show less filters <span aria-hidden="true">↑</span>
+            Show less filters <VerticalChevronIcon up />
           </button>
         </div>
 

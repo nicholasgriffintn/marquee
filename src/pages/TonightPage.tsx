@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ContentRail } from "../components/ContentRail";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { TitleArt } from "../components/TitleArt";
-import { ArrowIcon, ProviderBadge } from "../components/ui";
+import { ArrowIcon, ExternalLinkIcon, ProviderBadge } from "../components/ui";
 import { UsherBanner } from "../components/usher/UsherBanner";
 import { UsherCard } from "../components/usher/UsherCard";
 import { UsherConsole } from "../components/usher/UsherConsole";
@@ -224,7 +224,10 @@ export function TonightPage({
                     <p className="hero-lede">{featured.overview || "No synopsis available."}</p>
                     <div className="hero-actions">
                       <button type="button" className="hero-play" onClick={() => onOpen(featured)}>
-                        <span className="play-icon">↗</span> See where to watch
+                        <span className="play-icon">
+                          <ExternalLinkIcon />
+                        </span>{" "}
+                        See where to watch
                       </button>
                     </div>
                   </>

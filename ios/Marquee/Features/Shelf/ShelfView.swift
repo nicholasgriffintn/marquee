@@ -141,7 +141,13 @@ private struct ShelfCard: View {
           Text(itemMeta(item.title)).lineLimit(1)
           Spacer()
           if let rating = item.entry.rating {
-            Text(String(repeating: "★", count: rating)).foregroundStyle(MarqueeTheme.acid)
+            HStack(spacing: 2) {
+              ForEach(0..<rating, id: \.self) { _ in
+                Image(systemName: "star.fill")
+              }
+            }
+            .font(.system(size: 10, weight: .bold))
+            .foregroundStyle(MarqueeTheme.acid)
           }
         }
         .font(MarqueeTheme.mono(8)).foregroundStyle(MarqueeTheme.muted)

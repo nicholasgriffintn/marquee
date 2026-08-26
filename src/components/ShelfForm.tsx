@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { runConfirmedRemoval } from "../domain/profile-entry";
 import { isEntryStatus, type EntryStatus, type ViewingEntry } from "../types";
+import { StarIcon } from "./ui";
 
 const STATUSES: { value: EntryStatus; label: string }[] = [
   { value: "watchlist", label: "On my watchlist" },
@@ -94,7 +95,7 @@ export function ShelfForm({
             }
             aria-label={`${rating} star${rating === 1 ? "" : "s"}`}
           >
-            ★
+            <StarIcon />
           </button>
         ))}
       </div>

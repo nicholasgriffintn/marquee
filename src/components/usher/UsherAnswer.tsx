@@ -4,7 +4,7 @@ import type { MediaTitle, Provider } from "../../domain/catalog";
 import type { UsherQuestion } from "../../domain/usher";
 import { requestJson } from "../../lib/api";
 import { TitleArt } from "../TitleArt";
-import { ProviderBadge } from "../ui";
+import { CheckIcon, CloseIcon, ProviderBadge } from "../ui";
 
 const SEEN_GRID = 18;
 
@@ -193,7 +193,7 @@ function PeopleAnswer({
               type="button"
               onClick={() => setPicked((current) => current.filter((entry) => entry !== name))}
             >
-              {name} <span aria-hidden="true">×</span>
+              {name} <CloseIcon />
               <span className="visually-hidden">Remove {name}</span>
             </button>
           ))}
@@ -326,6 +326,11 @@ function TitleAnswer({
               }
             >
               <TitleArt url={item.posterUrl} seed={item.id} label={item.title} width={160} />
+              {isPicked ? (
+                <span className="usher-grid-card-check" aria-hidden="true">
+                  <CheckIcon />
+                </span>
+              ) : null}
               <small>{item.title}</small>
             </button>
           );

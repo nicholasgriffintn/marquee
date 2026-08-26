@@ -6,6 +6,7 @@ import { orderPhrase, USHER_ORDER, type TonightOrder } from "../../domain/usher"
 import type { OrderResult, UsherOrderState } from "../../hooks/useUsher";
 import { heroTitleClass, mediaMeta, scoreLabel } from "../../lib/media";
 import { TitleArt } from "../TitleArt";
+import { ChevronIcon, ExternalLinkIcon } from "../ui";
 import { UsherMark } from "./UsherMark";
 
 function serviceLine(service: string) {
@@ -101,7 +102,7 @@ export function UsherOrder({
           <div className="hero-gradient" />
 
           <button type="button" className="usher-exit" onClick={onClose}>
-            ← Back to tonight
+            <ChevronIcon back /> Back to tonight
           </button>
 
           <div className="usher-hero-figure" aria-hidden="true">
@@ -140,7 +141,10 @@ export function UsherOrder({
                 <UsherFacts facts={pick.facts} />
                 <div className="hero-actions">
                   <button type="button" className="hero-play" onClick={() => onOpen(pick.item)}>
-                    <span className="play-icon">↗</span> See where to watch
+                    <span className="play-icon">
+                      <ExternalLinkIcon />
+                    </span>{" "}
+                    See where to watch
                   </button>
                   <button type="button" className="usher-pin" onClick={onAnother}>
                     Something else
@@ -204,7 +208,7 @@ export function UsherOrder({
       <div className="hero-gradient" />
 
       <button type="button" className="usher-exit" onClick={onClose}>
-        ← Back to tonight
+        <ChevronIcon back /> Back to tonight
       </button>
 
       <div className="usher-hero-figure" aria-hidden="true">

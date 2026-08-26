@@ -4,6 +4,7 @@ import { ErrorBoundary } from "../components/ErrorBoundary";
 import { PageTitle } from "../components/PageTitle";
 import { ReelCard } from "../components/revival/ReelCard";
 import { ReelPlayer } from "../components/revival/ReelPlayer";
+import { ExternalLinkIcon } from "../components/ui";
 import { UsherMark } from "../components/usher/UsherMark";
 import {
   CONDITION_LABELS,
@@ -108,7 +109,7 @@ export function RevivalScreenPage({ isSignedIn }: { isSignedIn: boolean }) {
           <dt>Source record</dt>
           <dd>
             <a href={work.sourceUrl} target="_blank" rel="noreferrer">
-              {SOURCE_LABELS[work.source]} ↗
+              {SOURCE_LABELS[work.source]} <ExternalLinkIcon />
             </a>
           </dd>
         </div>
