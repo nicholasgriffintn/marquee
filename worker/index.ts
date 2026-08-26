@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 
+import { hasBearerCredential } from "./auth/api-tokens.ts";
 import { authRoutes } from "./auth/routes.ts";
 import { CuratorSession } from "./durable/curator-session.ts";
 import { consumeDeadLetters, consumeIngestion } from "./jobs/ingestion-consumer.ts";
@@ -33,10 +34,14 @@ import { RailsWorkflow } from "./workflows/rails.ts";
 const app = new Hono<{ Bindings: Bindings }>();
 
 app.use("/api/*", async (context, next) => {
+  const isNativeExchange = context.req.path === "/api/auth/native/exchange";
+
   if (
     context.req.method !== "GET" &&
     context.req.method !== "HEAD" &&
-    !hasTrustedOrigin(context.req.raw, context.env.SITE_ORIGIN)
+    !hasTrustedOrigin(context.req.raw, context.env.SITE_ORIGIN) &&
+    !hasBearerCredential(context.req.raw) &&
+    !isNativeExchange
   ) {
     return context.json({ error: "Cross-origin request rejected" }, 403);
   }

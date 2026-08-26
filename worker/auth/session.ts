@@ -4,6 +4,7 @@ import type { Context, MiddlewareHandler } from "hono";
 import { jsonResponse } from "../lib/http.ts";
 import { canonicalOrigin } from "../lib/security.ts";
 import type { Bindings } from "../types.ts";
+import { bearerToken, bearerUser } from "./api-tokens.ts";
 import { createAuthentication } from "./authentication.ts";
 import type { MarqueeUser } from "./model.ts";
 
@@ -32,7 +33,7 @@ export function authenticationFor(env: Bindings, request: Request) {
   return createAuthentication(env.DB, env, origin);
 }
 
-type Principal = { token: string; user: MarqueeUser };
+export type Principal = { kind: "bearer" | "session"; token: string; user: MarqueeUser };
 
 const principals = new WeakMap<Request, Promise<Principal | null>>();
 
@@ -53,13 +54,18 @@ export function sessionPrincipal(env: Bindings, request: Request) {
 async function resolvePrincipal(env: Bindings, request: Request): Promise<Principal | null> {
   const token = parseCookies(request.headers.get("cookie") ?? "").get(SESSION_COOKIE);
 
-  if (!token) {
-    return null;
+  if (token) {
+    const user = await authenticationFor(env, request).currentUser(token);
+
+    if (user) {
+      return { kind: "session", token, user };
+    }
   }
 
-  const user = await authenticationFor(env, request).currentUser(token);
+  const apiToken = bearerToken(request);
+  const user = apiToken ? await bearerUser(env, request) : null;
 
-  return user ? { token, user } : null;
+  return user && apiToken ? { kind: "bearer", token: apiToken, user } : null;
 }
 
 export function guestIdentity(env: Bindings, request: Request) {

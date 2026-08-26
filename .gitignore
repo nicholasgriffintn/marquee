@@ -5,3 +5,5 @@ dist
 .DS_Store
 worker-configuration.d.ts
 .claude
+*.xcuserstate
+xcuserdata/

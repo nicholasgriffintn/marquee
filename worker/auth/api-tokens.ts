@@ -1,3 +1,4 @@
+import { randomHex } from "../lib/tokens.ts";
 import { hashState } from "../repositories/links.ts";
 import type { Bindings } from "../types.ts";
 import type { MarqueeUser } from "./model.ts";
@@ -5,9 +6,18 @@ import type { MarqueeUser } from "./model.ts";
 const TOKEN_PREFIX = "mq_";
 
 export function mintToken() {
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return `${TOKEN_PREFIX}${randomHex()}`;
+}
 
-  return `${TOKEN_PREFIX}${[...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+export function bearerToken(request: Request) {
+  const header = request.headers.get("authorization") ?? "";
+  const token = header.toLowerCase().startsWith("bearer ") ? header.slice(7).trim() : "";
+
+  return token.startsWith(TOKEN_PREFIX) && token.length <= 200 ? token : null;
+}
+
+export function hasBearerCredential(request: Request) {
+  return /^mq_[0-9a-f]{64}$/u.test(bearerToken(request) ?? "");
 }
 
 export async function storeApiToken(env: Bindings, userId: string, token: string, label: string) {
@@ -40,8 +50,7 @@ export async function revokeApiToken(env: Bindings, userId: string, id: string) 
 }
 
 export async function bearerUser(env: Bindings, request: Request): Promise<MarqueeUser | null> {
-  const header = request.headers.get("authorization") ?? "";
-  const token = header.toLowerCase().startsWith("bearer ") ? header.slice(7).trim() : "";
+  const token = bearerToken(request) ?? "";
 
   if (!token.startsWith(TOKEN_PREFIX) || token.length > 200) {
     return null;
@@ -83,4 +92,18 @@ export async function bearerUser(env: Bindings, request: Request): Promise<Marqu
     role: row.role === "admin" ? "admin" : "viewer",
     createdAt: new Date(),
   };
+}
+
+export async function revokeBearerToken(env: Bindings, request: Request) {
+  const token = bearerToken(request);
+
+  if (!token) {
+    return false;
+  }
+
+  const result = await env.DB.prepare(`DELETE FROM api_tokens WHERE token_hash = ?`)
+    .bind(await hashState(token))
+    .run();
+
+  return result.meta.changes > 0;
 }

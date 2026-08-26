@@ -224,6 +224,13 @@ pnpm dev
 
 Open <http://localhost:8787>.
 
+## Running the iOS app
+
+The native SwiftUI client lives in [`ios/`](ios/README.md). It uses the same Worker API and visual
+language as the web app, including native GitHub sign-in, the six non-admin tabs, title panels and
+signed-in shelf and notebook actions. Apply all migrations before running it so the single-use
+native authentication exchange is available.
+
 Fill in `.dev.vars` from the table above. For sign-in, create a GitHub OAuth app with
 `http://localhost:8787/api/auth/callback/github` as its callback URL. For Trakt, an application at
 <https://trakt.tv/oauth/applications> with `http://localhost:8787/api/links/trakt/callback`.
