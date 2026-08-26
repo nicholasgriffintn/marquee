@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct MoreView: View {
+  @EnvironmentObject private var appState: AppState
+
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 26) {
@@ -53,37 +55,54 @@ struct MoreView: View {
     systemImage: String,
     @ViewBuilder destination: () -> Destination
   ) -> some View {
-    NavigationLink {
-      destination()
-        .toolbar(.hidden, for: .tabBar)
-    } label: {
-      HStack(alignment: .top, spacing: 16) {
-        Text(number)
-          .font(MarqueeTheme.mono(10, weight: .bold))
-          .foregroundStyle(MarqueeTheme.ink)
-          .frame(width: 38, height: 38)
-          .background(MarqueeTheme.acid)
-
-        VStack(alignment: .leading, spacing: 6) {
-          HStack {
-            Label(title, systemImage: systemImage)
-              .font(MarqueeTheme.display(24))
-              .fontWeight(.semibold)
-            Spacer()
-            Image(systemName: "arrow.right")
-              .font(.system(size: 12, weight: .bold))
-              .foregroundStyle(MarqueeTheme.acid)
-          }
-          Text(copy)
-            .font(MarqueeTheme.sans(13))
-            .foregroundStyle(MarqueeTheme.muted)
-            .fixedSize(horizontal: false, vertical: true)
+    Group {
+      if appState.isSignedIn {
+        NavigationLink {
+          destination()
+            .toolbar(.hidden, for: .tabBar)
+        } label: {
+          destinationLabel(number: number, title: title, copy: copy, systemImage: systemImage)
+        }
+      } else {
+        Button(action: appState.requireSignIn) {
+          destinationLabel(number: number, title: title, copy: copy, systemImage: systemImage)
         }
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(17)
-      .background(MarqueeTheme.panel)
     }
     .buttonStyle(.plain)
+  }
+
+  private func destinationLabel(
+    number: String,
+    title: String,
+    copy: String,
+    systemImage: String
+  ) -> some View {
+    HStack(alignment: .top, spacing: 16) {
+      Text(number)
+        .font(MarqueeTheme.mono(10, weight: .bold))
+        .foregroundStyle(MarqueeTheme.ink)
+        .frame(width: 38, height: 38)
+        .background(MarqueeTheme.acid)
+
+      VStack(alignment: .leading, spacing: 6) {
+        HStack {
+          Label(title, systemImage: systemImage)
+            .font(MarqueeTheme.display(24))
+            .fontWeight(.semibold)
+          Spacer()
+          Image(systemName: "arrow.right")
+            .font(.system(size: 12, weight: .bold))
+            .foregroundStyle(MarqueeTheme.acid)
+        }
+        Text(copy)
+          .font(MarqueeTheme.sans(13))
+          .foregroundStyle(MarqueeTheme.muted)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(17)
+    .background(MarqueeTheme.panel)
   }
 }

@@ -49,7 +49,7 @@ struct AccountToolbar: ToolbarContent {
           avatar(for: user)
         }
       } else {
-        Button("Get a ticket") { Task { await appState.signIn() } }
+        Button("Get a ticket") { appState.requireSignIn() }
           .font(MarqueeTheme.mono(10, weight: .bold))
       }
     }
@@ -259,7 +259,7 @@ struct TicketGate: View {
       Text(title).font(MarqueeTheme.display(31)).fontWeight(.semibold)
       Text(message).font(MarqueeTheme.sans(15)).foregroundStyle(MarqueeTheme.muted)
       Button {
-        Task { await appState.signIn() }
+        appState.requireSignIn()
       } label: {
         Label("Get a ticket", systemImage: "ticket")
           .font(MarqueeTheme.mono(12, weight: .bold))

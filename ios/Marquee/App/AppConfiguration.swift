@@ -11,6 +11,17 @@ enum AppConfiguration {
     return "Marquee-iOS/\(version ?? "unknown") (app.pashi.marquee; iOS)"
   }()
 
+  static let apiOrigin: String = {
+    guard var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else {
+      return baseURL.absoluteString
+    }
+
+    components.path = ""
+    components.query = nil
+    components.fragment = nil
+    return components.url?.absoluteString ?? baseURL.absoluteString
+  }()
+
   static func resolve(_ url: URL?) -> URL? {
     guard let url else { return nil }
     guard url.scheme == nil else { return url }

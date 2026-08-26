@@ -58,6 +58,199 @@ struct TonightHero: View {
   }
 }
 
+struct TonightUsherHero: View {
+  let prompt: String
+  let status: String
+  let summary: String
+  let error: String
+  let items: [MediaTitle]
+  let pick: UsherPickResponse?
+  let isAsking: Bool
+  let isPicking: Bool
+  let onClear: () -> Void
+  let onRefine: (String) -> Void
+
+  @State private var activeID = ""
+
+  private let refinements = ["Shorter", "Lighter", "Older", "Weirder", "More acclaimed"]
+
+  private var isPick: Bool { isPicking || pick != nil }
+  private var active: MediaTitle? {
+    if isPick { return pick?.item }
+    return items.first(where: { $0.id == activeID }) ?? items.first
+  }
+  private var isThinking: Bool { isAsking || isPicking }
+
+  var body: some View {
+    ZStack(alignment: .bottomLeading) {
+      if let active {
+        Artwork(
+          url: active.backdropUrl ?? active.posterUrl,
+          seed: active.id,
+          aspectRatio: 16 / 9,
+          height: 560
+        )
+      } else {
+        MarqueeTheme.ink.frame(height: 560)
+      }
+
+      LinearGradient(
+        colors: [MarqueeTheme.ink.opacity(0.18), MarqueeTheme.ink.opacity(0.78), MarqueeTheme.ink],
+        startPoint: .topTrailing,
+        endPoint: .bottomLeading
+      )
+
+      VStack(alignment: .leading, spacing: 15) {
+        Button(action: onClear) {
+          Label("Back to tonight", systemImage: "arrow.left")
+            .font(MarqueeTheme.mono(10, weight: .bold))
+        }
+
+        HStack(spacing: 11) {
+          Image("UsherHead")
+            .resizable()
+            .scaledToFit()
+            .frame(width: 58, height: 42)
+          VStack(alignment: .leading, spacing: 3) {
+            Text("THE USHER")
+              .font(MarqueeTheme.mono(10, weight: .bold))
+              .tracking(1.8)
+              .foregroundStyle(MarqueeTheme.acid)
+            Text(usherContext)
+              .font(MarqueeTheme.serif(13))
+              .italic()
+              .foregroundStyle(MarqueeTheme.muted)
+              .lineLimit(1)
+          }
+        }
+
+        if !error.isEmpty {
+          Text("No.")
+            .font(MarqueeTheme.display(48))
+            .fontWeight(.medium)
+          Text(error)
+            .font(MarqueeTheme.sans(15))
+            .foregroundStyle(MarqueeTheme.coral)
+            .accessibilityLabel("The Usher could not answer: \(error)")
+        } else if let active {
+          usherAnswer(active)
+        } else {
+          HStack(spacing: 12) {
+            ProgressView().tint(MarqueeTheme.acid)
+            Text(status.isEmpty ? "Reading the room." : status)
+              .font(MarqueeTheme.sans(15))
+              .foregroundStyle(MarqueeTheme.paper.opacity(0.82))
+          }
+          .frame(minHeight: 90, alignment: .leading)
+          .accessibilityElement(children: .combine)
+          .accessibilityLabel(status.isEmpty ? "The Usher is thinking" : status)
+        }
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(.horizontal, 22)
+      .padding(.top, 24)
+      .padding(.bottom, 28)
+    }
+    .frame(maxWidth: .infinity)
+    .clipped()
+  }
+
+  private var usherContext: String {
+    if isPick { return isThinking ? "picking something" : "my pick for tonight" }
+    return prompt.isEmpty ? "since you asked" : "you asked: “\(prompt)”"
+  }
+
+  @ViewBuilder private func usherAnswer(_ item: MediaTitle) -> some View {
+    Text(item.title)
+      .font(MarqueeTheme.display(item.title.count > 34 ? 35 : 44))
+      .fontWeight(.medium)
+      .tracking(-1.6)
+      .fixedSize(horizontal: false, vertical: true)
+    Text("\(mediaMeta(item)) · \(scoreLabel(item))")
+      .font(MarqueeTheme.mono(9, weight: .medium))
+      .tracking(0.35)
+      .textCase(.uppercase)
+      .foregroundStyle(MarqueeTheme.acid)
+
+    if isThinking {
+      HStack(spacing: 10) {
+        ProgressView().tint(MarqueeTheme.acid)
+        Text(status.isEmpty ? "Reading the room." : status)
+      }
+      .font(MarqueeTheme.sans(14))
+      .foregroundStyle(MarqueeTheme.paper.opacity(0.88))
+      .accessibilityElement(children: .combine)
+    } else {
+      Text(pick?.line ?? summary)
+        .font(MarqueeTheme.sans(14))
+        .foregroundStyle(MarqueeTheme.paper.opacity(0.88))
+        .lineSpacing(3)
+    }
+
+    if let facts = pick?.facts {
+      ForEach(facts, id: \.self) { fact in
+        Text("— \(fact)")
+          .font(MarqueeTheme.mono(9))
+          .foregroundStyle(MarqueeTheme.muted)
+      }
+    }
+
+    NavigationLink {
+      TitleDetailView(item: item)
+    } label: {
+      Label("See where to watch", systemImage: "arrow.up.right")
+        .font(MarqueeTheme.sans(12, weight: .heavy))
+        .foregroundStyle(MarqueeTheme.ink)
+        .padding(.horizontal, 16)
+        .frame(height: 43)
+        .background(MarqueeTheme.acid)
+    }
+
+    if !isPick, items.count > 1 {
+      ScrollView(.horizontal, showsIndicators: false) {
+        HStack(spacing: 8) {
+          ForEach(items) { candidate in
+            Button {
+              activeID = candidate.id
+            } label: {
+              Artwork(url: candidate.posterUrl, seed: candidate.id)
+                .frame(width: 48, height: 72)
+                .overlay {
+                  Rectangle().stroke(
+                    candidate.id == item.id ? MarqueeTheme.acid : MarqueeTheme.line,
+                    lineWidth: candidate.id == item.id ? 2 : 1
+                  )
+                }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(candidate.title)
+            .accessibilityValue(candidate.id == item.id ? "Selected" : "")
+          }
+        }
+      }
+    }
+
+    if !isPick, !items.isEmpty, !isThinking {
+      VStack(alignment: .leading, spacing: 8) {
+        Text("REFINE")
+          .font(MarqueeTheme.mono(9, weight: .bold))
+          .foregroundStyle(MarqueeTheme.muted)
+        ScrollView(.horizontal, showsIndicators: false) {
+          HStack(spacing: 7) {
+            ForEach(refinements, id: \.self) { refinement in
+              Button(refinement) { onRefine(refinement) }
+                .font(MarqueeTheme.sans(11, weight: .medium))
+                .padding(.horizontal, 11)
+                .frame(height: 36)
+                .overlay { Rectangle().stroke(MarqueeTheme.line) }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
 struct TonightUsherConsole: View {
   @Binding var prompt: String
   let isAsking: Bool
@@ -144,6 +337,8 @@ struct TonightUsherConsole: View {
 struct TonightProviderStrip: View {
   let providers: [MarqueeProvider]
   let selectedProviderIDs: Set<String>
+  let isSignedIn: Bool
+  let onRequireSignIn: () -> Void
   let onSelect: (Set<String>) -> Void
 
   private var filterable: [MarqueeProvider] {
@@ -160,14 +355,16 @@ struct TonightProviderStrip: View {
         )
         .font(MarqueeTheme.sans(15, weight: .heavy))
         Spacer()
-        NavigationLink {
-          NotebookView().toolbar(.hidden, for: .tabBar)
-        } label: {
-          HStack(spacing: 6) {
-            Text("Manage services")
-            Image(systemName: "arrow.right")
+        if isSignedIn {
+          NavigationLink {
+            NotebookView().toolbar(.hidden, for: .tabBar)
+          } label: {
+            manageServicesLabel
           }
-          .font(MarqueeTheme.mono(9, weight: .bold))
+        } else {
+          Button(action: onRequireSignIn) {
+            manageServicesLabel
+          }
         }
       }
 
@@ -184,6 +381,14 @@ struct TonightProviderStrip: View {
     .padding(.vertical, 22)
     .background(MarqueeTheme.panel)
     .overlay { Rectangle().stroke(MarqueeTheme.line) }
+  }
+
+  private var manageServicesLabel: some View {
+    HStack(spacing: 6) {
+      Text("Manage services")
+      Image(systemName: "arrow.right")
+    }
+    .font(MarqueeTheme.mono(9, weight: .bold))
   }
 
   private func providerButton(id: String?, name: String) -> some View {

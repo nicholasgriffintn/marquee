@@ -76,6 +76,7 @@ struct APIClient {
     request.timeoutInterval = 45
     request.setValue("application/json", forHTTPHeaderField: "Accept")
     request.setValue(AppConfiguration.userAgent, forHTTPHeaderField: "User-Agent")
+    request.setValue(AppConfiguration.apiOrigin, forHTTPHeaderField: "Origin")
 
     if let token = try KeychainStore.readToken() {
       request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")

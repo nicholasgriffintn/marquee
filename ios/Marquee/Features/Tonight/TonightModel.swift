@@ -7,12 +7,19 @@ final class TonightModel: ObservableObject {
   @Published private(set) var trending: [MediaTitle] = []
   @Published private(set) var providers: [MarqueeProvider] = []
   @Published private(set) var curated: [MediaTitle] = []
+  @Published private(set) var curatorPrompt = ""
+  @Published private(set) var curatorStatus = ""
   @Published private(set) var curatorSummary = ""
+  @Published private(set) var usherError = ""
   @Published private(set) var pick: UsherPickResponse?
   @Published private(set) var isLoading = true
   @Published private(set) var isAsking = false
   @Published private(set) var isPicking = false
   @Published var error = ""
+
+  var isUsherActive: Bool {
+    isAsking || isPicking || !curatorPrompt.isEmpty || pick != nil || !usherError.isEmpty
+  }
 
   func load(api: APIClient, providerIDs: [String], isSignedIn: Bool) async {
     isLoading = true
@@ -55,14 +62,25 @@ final class TonightModel: ObservableObject {
     isLoading = false
   }
 
-  func ask(_ prompt: String, api: APIClient, providerIDs: [String]) async {
+  func ask(
+    _ prompt: String,
+    api: APIClient,
+    providerIDs: [String],
+    isRefinement: Bool = false
+  ) async {
     let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else { return }
 
     isAsking = true
-    curated = []
+    pick = nil
+    curatorPrompt = trimmed
+    curatorStatus = "Thinking"
     curatorSummary = ""
-    error = ""
+    usherError = ""
+
+    if !isRefinement {
+      curated = []
+    }
 
     do {
       let calendar = Calendar.current
@@ -78,7 +96,8 @@ final class TonightModel: ObservableObject {
       )
       applyCuratorStream(data)
     } catch {
-      self.error = error.localizedDescription
+      usherError = error.localizedDescription
+      curatorStatus = ""
     }
 
     isAsking = false
@@ -86,7 +105,12 @@ final class TonightModel: ObservableObject {
 
   func askForPick(api: APIClient, providerIDs: [String]) async {
     isPicking = true
-    error = ""
+    pick = nil
+    curatorPrompt = ""
+    curatorStatus = ""
+    curatorSummary = ""
+    curated = []
+    usherError = ""
 
     do {
       let calendar = Calendar.current
@@ -102,10 +126,19 @@ final class TonightModel: ObservableObject {
       )
       pick = response
     } catch {
-      self.error = error.localizedDescription
+      usherError = error.localizedDescription
     }
 
     isPicking = false
+  }
+
+  func clearUsher() {
+    curatorPrompt = ""
+    curatorStatus = ""
+    curatorSummary = ""
+    curated = []
+    pick = nil
+    usherError = ""
   }
 
   private func applyCuratorStream(_ data: Data) {
@@ -118,10 +151,20 @@ final class TonightModel: ObservableObject {
         let event = try? JSONDecoder().decode(CuratorEvent.self, from: payload)
       else { continue }
 
-      if let items = event.items { curated = items }
+      if event.type == "status", let label = event.label { curatorStatus = label }
+      if let items = event.items {
+        curated = items
+        curatorStatus = ""
+      }
       if let text = event.text { curatorSummary += text }
-      if let summary = event.summary { curatorSummary = summary }
-      if let message = event.message { error = message }
+      if let summary = event.summary {
+        curatorSummary = summary
+        curatorStatus = ""
+      }
+      if let message = event.message {
+        usherError = message
+        curatorStatus = ""
+      }
     }
   }
 }

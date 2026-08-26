@@ -12,7 +12,32 @@ struct TonightView: View {
   var body: some View {
     ScrollView {
       LazyVStack(alignment: .leading, spacing: 32) {
-        if let hero = model.sections.first?.items.first {
+        if model.isUsherActive {
+          TonightUsherHero(
+            prompt: model.curatorPrompt,
+            status: model.curatorStatus,
+            summary: model.curatorSummary,
+            error: model.usherError,
+            items: model.curated,
+            pick: model.pick,
+            isAsking: model.isAsking,
+            isPicking: model.isPicking,
+            onClear: {
+              prompt = ""
+              model.clearUsher()
+            },
+            onRefine: { value in
+              Task {
+                await model.ask(
+                  value,
+                  api: appState.api,
+                  providerIDs: appState.selectedProviderIDs.sorted(),
+                  isRefinement: true
+                )
+              }
+            }
+          )
+        } else if let hero = model.sections.first?.items.first {
           TonightHero(item: hero)
         } else {
           MarqueeMasthead(
@@ -24,26 +49,30 @@ struct TonightView: View {
           .padding(.top, 16)
         }
 
-        TonightUsherConsole(
-          prompt: $prompt,
-          isAsking: model.isAsking,
-          isPicking: model.isPicking,
-          onAsk: { value in
-            Task {
-              await model.ask(
-                value,
-                api: appState.api,
-                providerIDs: appState.selectedProviderIDs.sorted()
-              )
-            }
-          },
-          onPick: pickSomething
-        )
+        if !model.isUsherActive {
+          TonightUsherConsole(
+            prompt: $prompt,
+            isAsking: model.isAsking,
+            isPicking: model.isPicking,
+            onAsk: { value in
+              Task {
+                await model.ask(
+                  value,
+                  api: appState.api,
+                  providerIDs: appState.selectedProviderIDs.sorted()
+                )
+              }
+            },
+            onPick: pickSomething
+          )
+        }
 
         if !model.providers.isEmpty {
           TonightProviderStrip(
             providers: model.providers,
             selectedProviderIDs: appState.selectedProviderIDs,
+            isSignedIn: appState.isSignedIn,
+            onRequireSignIn: appState.requireSignIn,
             onSelect: { ids in Task { await appState.saveProviders(ids) } }
           )
         }
@@ -52,23 +81,6 @@ struct TonightView: View {
           LoadingHouse()
         } else if !model.error.isEmpty && model.sections.isEmpty {
           HouseMessage(title: "The board is blank.", message: model.error)
-            .padding(.horizontal, 18)
-        }
-
-        if !model.curated.isEmpty {
-          TitleRail(
-            section: CatalogSection(
-              id: "curator",
-              title: "The Usher found these",
-              description: model.curatorSummary,
-              items: model.curated,
-              angle: nil,
-              reason: nil
-            ))
-        }
-
-        if let pick = model.pick, let item = pick.item {
-          TonightPickCard(item: item, response: pick)
             .padding(.horizontal, 18)
         }
 
@@ -121,7 +133,7 @@ struct TonightView: View {
         )
       }
     } else {
-      Task { await appState.signIn() }
+      appState.requireSignIn()
     }
   }
 }

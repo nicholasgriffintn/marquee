@@ -5,6 +5,8 @@ import Foundation
 final class AppState: ObservableObject {
   @Published private(set) var user: MarqueeUser?
   @Published private(set) var isRestoring = true
+  @Published private(set) var isSigningIn = false
+  @Published var isPresentingSignIn = false
   @Published var authenticationError = ""
   @Published var selectedProviderIDs: Set<String> = []
   @Published private(set) var shelfVersion = 0
@@ -13,6 +15,16 @@ final class AppState: ObservableObject {
   private let authentication = AuthenticationSession()
 
   var isSignedIn: Bool { user != nil }
+
+  func requireSignIn() {
+    authenticationError = ""
+    isPresentingSignIn = true
+  }
+
+  func dismissSignIn() {
+    guard !isSigningIn else { return }
+    isPresentingSignIn = false
+  }
 
   func restore() async {
     defer { isRestoring = false }
@@ -34,6 +46,10 @@ final class AppState: ObservableObject {
   }
 
   func signIn() async {
+    guard !isSigningIn else { return }
+
+    isSigningIn = true
+    defer { isSigningIn = false }
     authenticationError = ""
     let guestProviderIDs = selectedProviderIDs
 
@@ -50,6 +66,7 @@ final class AppState: ObservableObject {
       let session: SessionResponse = try await api.get("/api/auth/session")
       user = session.user
       await loadProviderPreferences(migrating: guestProviderIDs)
+      isPresentingSignIn = false
     } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
       return
     } catch {

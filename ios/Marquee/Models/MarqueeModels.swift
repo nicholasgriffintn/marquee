@@ -348,6 +348,16 @@ struct NativeTokenResponse: Codable { let token: String }
 
 struct Acknowledgement: Codable {}
 
+struct AuthMethodProvider: Codable, Identifiable {
+  let id: String
+  let label: String
+}
+
+struct AuthMethodsResponse: Codable {
+  let providers: [AuthMethodProvider]
+  let magicLink: Bool
+}
+
 struct CuratorRequest: Encodable {
   let prompt: String
   let providerIds: [String]
