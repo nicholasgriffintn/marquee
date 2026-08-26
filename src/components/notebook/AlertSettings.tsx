@@ -138,7 +138,7 @@ export function AlertSettings({ isSignedIn }: { isSignedIn: boolean }) {
       </form>
 
       {(status || confirmation) && (
-        <p className="notebook-import-status">
+        <p className="notebook-import-status" aria-live="polite">
           {status || CONFIRM_COPY[confirmation] || ""}
           {confirmation && (
             <button type="button" className="alert-dismiss" onClick={clearConfirmation}>

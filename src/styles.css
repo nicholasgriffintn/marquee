@@ -738,7 +738,9 @@ svg {
 }
 @media (prefers-reduced-motion: reduce) {
   .skeleton,
-  .availability-spinner {
+  .availability-spinner,
+  .detail-panel,
+  .modal-shell {
     animation: none;
   }
   .hero-actions .hero-play,
