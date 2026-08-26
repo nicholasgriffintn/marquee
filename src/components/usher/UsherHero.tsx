@@ -151,10 +151,20 @@ export function UsherHero({
               </button>
               {isPick ? (
                 <>
-                  <button type="button" className="usher-pin" onClick={() => onReject()}>
+                  <button
+                    type="button"
+                    className="usher-pin"
+                    disabled={isThinking}
+                    onClick={() => onReject()}
+                  >
                     Not that
                   </button>
-                  <button type="button" className="usher-quiet" onClick={() => onReject("never")}>
+                  <button
+                    type="button"
+                    className="usher-quiet"
+                    disabled={isThinking}
+                    onClick={() => onReject("never")}
+                  >
                     Never suggest this again
                   </button>
                 </>
