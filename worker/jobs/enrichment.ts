@@ -31,9 +31,6 @@ import type { Bindings, EnrichmentSource, IngestionJob } from "../types.ts";
 import { withRateLimitPause, type SourceAttempt } from "./sources.ts";
 
 const ANIME_KEYWORD_LIMIT = 60;
-
-// miniflare's local queue simulation holds one timer per pending message and
-// caps out at 10,000 process-wide; real Cloudflare Queues has no such limit.
 const LOCAL_DEV_PER_RUN_CAP = 500;
 
 const RUN_STATUS: Record<string, string> = {
@@ -136,8 +133,14 @@ async function enrichmentRoom(env: Bindings, enricher: Enricher) {
   return Math.floor(pace * enricher.share);
 }
 
-export async function queueEnrichment(env: Bindings) {
+export async function queueEnrichment(env: Bindings, only?: EnrichmentSource) {
+  const queued: Partial<Record<EnrichmentSource, number>> = {};
+
   for (const enricher of ENRICHERS) {
+    if (only && enricher.source !== only) {
+      continue;
+    }
+
     if (!sourceConfigured(env, enricher.source)) {
       continue;
     }
@@ -147,6 +150,7 @@ export async function queueEnrichment(env: Bindings) {
 
     if (room <= 0) {
       logEvent("enrichment_skipped", { source: enricher.source });
+      queued[enricher.source] = 0;
 
       continue;
     }
@@ -167,11 +171,16 @@ export async function queueEnrichment(env: Bindings) {
     // oxlint-disable-next-line no-await-in-loop
     await enqueue(
       enrichmentQueue(env, enricher.source),
-      titleIds.map(
-        (titleId): IngestionJob => ({ type: enricher.job, titleId }),
-      ),
+      titleIds.map((titleId): IngestionJob => ({
+        type: enricher.job,
+        titleId,
+      })),
     );
+
+    queued[enricher.source] = titleIds.length;
   }
+
+  return queued;
 }
 
 function latinName(name: string) {
@@ -605,18 +614,18 @@ export async function enrichAniListMedia(env: Bindings, titleId: string) {
     anime: title?.anime
       ? { ...title.anime, ...details }
       : {
-          format: null,
-          episodes: null,
-          durationMinutes: null,
-          season: null,
-          seasonYear: null,
-          source: null,
-          synonyms: [],
-          romajiTitle: null,
-          englishTitle: null,
-          nativeTitle: null,
-          relations: [],
-          ...details,
-        },
+        format: null,
+        episodes: null,
+        durationMinutes: null,
+        season: null,
+        seasonYear: null,
+        source: null,
+        synonyms: [],
+        romajiTitle: null,
+        englishTitle: null,
+        nativeTitle: null,
+        relations: [],
+        ...details,
+      },
   });
 }

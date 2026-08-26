@@ -1,14 +1,24 @@
 import type { UserRole } from "../auth/model.ts";
-import { queueEmbeddings, queueEnrichment, queueStaleAvailability } from "../jobs/ingestion.ts";
+import {
+  queueEmbeddings,
+  queueEnrichment,
+  queueStaleAvailability,
+} from "../jobs/ingestion.ts";
 import { readBudgets, resumeSource } from "../repositories/budgets.ts";
 import { readCinemaCoverage } from "../repositories/cinemas.ts";
 import { readBackfillProgress } from "../repositories/discover.ts";
 import { rebuildPeopleIndex } from "../repositories/usher.ts";
-import { readWorkingSetStats, rebuildWorkingSet } from "../repositories/working-set.ts";
+import {
+  readWorkingSetStats,
+  rebuildWorkingSet,
+} from "../repositories/working-set.ts";
 import type { Bindings, EnrichmentSource, IngestionJob } from "../types.ts";
 import { dispatchAlerts, previewAlerts } from "./alerts/dispatch.ts";
 import { computeAngleScores } from "./angle-scores.ts";
-import { queueCinemaDirectories, queueCinemaScreenings } from "./cinema-sync.ts";
+import {
+  queueCinemaDirectories,
+  queueCinemaScreenings,
+} from "./cinema-sync.ts";
 import { advanceDiscoverFrontier } from "./discover.ts";
 import { queueRevivalMirrors } from "./revival-mirror.ts";
 import { queueRevivalSources } from "./revival.ts";
@@ -20,6 +30,10 @@ export const ADMIN_ACTIONS = [
   "catalog-head",
   "availability",
   "enrichment",
+  "enrichment-omdb",
+  "enrichment-poster",
+  "enrichment-mal",
+  "enrichment-anilist",
   "embeddings",
   "discover",
   "schedule",
@@ -47,7 +61,9 @@ const RUN_WINDOW_HOURS = 24;
 export type AdminAction = (typeof ADMIN_ACTIONS)[number];
 
 export function isAdminAction(value: unknown): value is AdminAction {
-  return typeof value === "string" && ADMIN_ACTIONS.includes(value as AdminAction);
+  return (
+    typeof value === "string" && ADMIN_ACTIONS.includes(value as AdminAction)
+  );
 }
 
 const QUEUED_JOBS: Partial<Record<AdminAction, IngestionJob>> = {
@@ -125,6 +141,28 @@ async function catalogueStats(env: Bindings) {
   };
 }
 
+const ENRICHMENT_ACTION_SOURCE: Partial<Record<AdminAction, EnrichmentSource>> =
+  {
+    "enrichment-omdb": "omdb",
+    "enrichment-poster": "poster",
+    "enrichment-mal": "mal",
+    "enrichment-anilist": "anilist",
+  };
+
+function enrichmentDetail(queued: Partial<Record<EnrichmentSource, number>>) {
+  const entries = Object.entries(queued);
+
+  if (entries.length === 0) {
+    return "Nothing queued - no source is configured";
+  }
+
+  return entries
+    .map(([source, count]) =>
+      count === 0 ? `${source}: nothing due` : `${source}: ${count} queued`,
+    )
+    .join(" · ");
+}
+
 const JOB_TYPE_SOURCE: Record<string, string> = {
   "enrich-anime": "mal",
   "enrich-anilist": "mal",
@@ -135,9 +173,10 @@ const JOB_TYPE_SOURCE: Record<string, string> = {
 };
 
 async function enrichmentStats(env: Bindings) {
-  const [enriched, justwatch, attempted, recent, recentJustwatch] = await Promise.all([
-    env.DB.prepare(
-      `SELECT source,
+  const [enriched, justwatch, attempted, recent, recentJustwatch] =
+    await Promise.all([
+      env.DB.prepare(
+        `SELECT source,
               sum(CASE WHEN miss = 0 THEN 1 ELSE 0 END) AS titles,
               sum(CASE WHEN miss = 1 THEN 1 ELSE 0 END) AS misses,
               sum(CASE WHEN miss = 2 THEN 1 ELSE 0 END) AS pending,
@@ -145,50 +184,50 @@ async function enrichmentStats(env: Bindings) {
        FROM title_enrichment
        GROUP BY source
        ORDER BY source`,
-    ).all<{
-      source: string;
-      titles: number;
-      misses: number;
-      pending: number;
-      newest: string;
-    }>(),
-    env.DB.prepare(
-      `SELECT
+      ).all<{
+        source: string;
+        titles: number;
+        misses: number;
+        pending: number;
+        newest: string;
+      }>(),
+      env.DB.prepare(
+        `SELECT
          sum(CASE WHEN json_array_length(COALESCE(json_extract(payload, '$.providers'), json('[]'))) > 0 THEN 1 ELSE 0 END) AS titles,
          sum(CASE WHEN json_array_length(COALESCE(json_extract(payload, '$.providers'), json('[]'))) = 0 THEN 1 ELSE 0 END) AS misses,
          max(enriched_at) AS newest
        FROM catalog_titles
        WHERE enriched_at IS NOT NULL`,
-    ).first<{ titles: number; misses: number; newest: string }>(),
-    env.DB.prepare(
-      `SELECT job_type AS jobType, count(*) AS attempted
+      ).first<{ titles: number; misses: number; newest: string }>(),
+      env.DB.prepare(
+        `SELECT job_type AS jobType, count(*) AS attempted
        FROM ingestion_runs
        WHERE job_type IN ('enrich-anime', 'enrich-anilist', 'enrich-anilist-media', 'enrich-ratings', 'cache-poster', 'enrich-availability')
          AND started_at > datetime('now', ?)
        GROUP BY job_type`,
-    )
-      .bind(`-${RUN_WINDOW_HOURS} hours`)
-      .all<{ jobType: string; attempted: number }>(),
-    env.DB.prepare(
-      `SELECT source,
+      )
+        .bind(`-${RUN_WINDOW_HOURS} hours`)
+        .all<{ jobType: string; attempted: number }>(),
+      env.DB.prepare(
+        `SELECT source,
               sum(CASE WHEN miss = 0 THEN 1 ELSE 0 END) AS titles,
               sum(CASE WHEN miss = 1 THEN 1 ELSE 0 END) AS misses
        FROM title_enrichment
        WHERE fetched_at > datetime('now', ?)
        GROUP BY source`,
-    )
-      .bind(`-${RUN_WINDOW_HOURS} hours`)
-      .all<{ source: string; titles: number; misses: number }>(),
-    env.DB.prepare(
-      `SELECT
+      )
+        .bind(`-${RUN_WINDOW_HOURS} hours`)
+        .all<{ source: string; titles: number; misses: number }>(),
+      env.DB.prepare(
+        `SELECT
          sum(CASE WHEN json_array_length(COALESCE(json_extract(payload, '$.providers'), json('[]'))) > 0 THEN 1 ELSE 0 END) AS titles,
          sum(CASE WHEN json_array_length(COALESCE(json_extract(payload, '$.providers'), json('[]'))) = 0 THEN 1 ELSE 0 END) AS misses
        FROM catalog_titles
        WHERE enriched_at > datetime('now', ?)`,
-    )
-      .bind(`-${RUN_WINDOW_HOURS} hours`)
-      .first<{ titles: number; misses: number }>(),
-  ]);
+      )
+        .bind(`-${RUN_WINDOW_HOURS} hours`)
+        .first<{ titles: number; misses: number }>(),
+    ]);
 
   const attemptedBySource = new Map<string, number>();
 
@@ -196,11 +235,16 @@ async function enrichmentStats(env: Bindings) {
     const source = JOB_TYPE_SOURCE[row.jobType];
 
     if (source) {
-      attemptedBySource.set(source, (attemptedBySource.get(source) ?? 0) + row.attempted);
+      attemptedBySource.set(
+        source,
+        (attemptedBySource.get(source) ?? 0) + row.attempted,
+      );
     }
   }
 
-  const recentBySource = new Map(recent.results.map((row) => [row.source, row]));
+  const recentBySource = new Map(
+    recent.results.map((row) => [row.source, row]),
+  );
 
   if (recentJustwatch) {
     recentBySource.set("justwatch", {
@@ -228,18 +272,18 @@ async function enrichmentStats(env: Bindings) {
 
   const justwatchRow = justwatch
     ? [
-      withAttempts({
-        source: "justwatch",
-        titles: justwatch.titles,
-        misses: justwatch.misses,
-        pending: 0,
-        newest: justwatch.newest,
-      }),
-    ]
+        withAttempts({
+          source: "justwatch",
+          titles: justwatch.titles,
+          misses: justwatch.misses,
+          pending: 0,
+          newest: justwatch.newest,
+        }),
+      ]
     : [];
 
-  return [...enriched.results.map(withAttempts), ...justwatchRow].sort((left, right) =>
-    left.source.localeCompare(right.source),
+  return [...enriched.results.map(withAttempts), ...justwatchRow].sort(
+    (left, right) => left.source.localeCompare(right.source),
   );
 }
 
@@ -371,9 +415,23 @@ export async function runAdminAction(env: Bindings, action: AdminAction) {
   }
 
   if (action === "enrichment") {
-    await queueEnrichment(env);
+    const queued = await queueEnrichment(env);
+    const total = Object.values(queued).reduce((sum, count) => sum + count, 0);
 
-    return { detail: "Queued ratings, posters and anime enrichment" };
+    return { queued: total, detail: enrichmentDetail(queued) };
+  }
+
+  const singleSource = ENRICHMENT_ACTION_SOURCE[action];
+
+  if (singleSource) {
+    const queued = await queueEnrichment(env, singleSource);
+    const count = queued[singleSource];
+
+    if (count === undefined) {
+      return { queued: 0, detail: `${singleSource} is not configured` };
+    }
+
+    return { queued: count, detail: enrichmentDetail(queued) };
   }
 
   if (action === "embeddings") {
@@ -440,7 +498,9 @@ export async function runAdminAction(env: Bindings, action: AdminAction) {
 
     return {
       queued,
-      detail: queued ? `Queued ${queued} prints for mirroring` : "Every approved print is mirrored",
+      detail: queued
+        ? `Queued ${queued} prints for mirroring`
+        : "Every approved print is mirrored",
     };
   }
 
@@ -455,7 +515,10 @@ export async function runAdminAction(env: Bindings, action: AdminAction) {
   return { detail: `Queued ${job.type}` };
 }
 
-export async function clearSourcePause(env: Bindings, source: EnrichmentSource) {
+export async function clearSourcePause(
+  env: Bindings,
+  source: EnrichmentSource,
+) {
   await resumeSource(env, source);
 
   return { detail: `${source} resumed` };

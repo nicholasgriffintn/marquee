@@ -10,6 +10,10 @@ export type AdminAction =
   | "catalog-head"
   | "availability"
   | "enrichment"
+  | "enrichment-omdb"
+  | "enrichment-poster"
+  | "enrichment-mal"
+  | "enrichment-anilist"
   | "embeddings"
   | "discover"
   | "schedule"
@@ -139,7 +143,9 @@ export function useAdmin(enabled: boolean) {
     }
 
     try {
-      const next = await requestJson<{ users: AdminUser[] }>("/api/admin/users");
+      const next = await requestJson<{ users: AdminUser[] }>(
+        "/api/admin/users",
+      );
 
       setUsers(next.users);
       setUsersLoaded(true);
@@ -164,7 +170,9 @@ export function useAdmin(enabled: boolean) {
         setError("");
         await refresh();
       } catch (caught) {
-        setError(caught instanceof Error ? caught.message : "That action failed.");
+        setError(
+          caught instanceof Error ? caught.message : "That action failed.",
+        );
       } finally {
         setPending("");
       }
@@ -183,7 +191,11 @@ export function useAdmin(enabled: boolean) {
         setMessage(result.detail);
         await refresh();
       } catch (caught) {
-        setError(caught instanceof Error ? caught.message : "Could not resume that source.");
+        setError(
+          caught instanceof Error
+            ? caught.message
+            : "Could not resume that source.",
+        );
       }
     },
     [refresh],
@@ -200,7 +212,11 @@ export function useAdmin(enabled: boolean) {
       setMessage(`Role updated to ${role}`);
       setError("");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not change that role.");
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Could not change that role.",
+      );
     }
   }, []);
 

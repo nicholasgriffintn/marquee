@@ -52,6 +52,16 @@ export const ACTION_GROUPS: {
     ],
   },
   {
+    title: "Enrichment by source",
+    note: "The same queue as 'Queue enrichment', narrowed to one upstream. Each still respects that source's own daily budget and only picks up titles that are actually due, so pressing one twice in a row queues nothing the second time.",
+    actions: [
+      { id: "enrichment-omdb", label: "Ratings (OMDb)" },
+      { id: "enrichment-poster", label: "Posters (OMDb)" },
+      { id: "enrichment-mal", label: "Anime detail (MAL)" },
+      { id: "enrichment-anilist", label: "Streams and cast (AniList)" },
+    ],
+  },
+  {
     title: "Rebuilds",
     note: "Fast jobs that go straight onto the ingestion queue.",
     actions: [
