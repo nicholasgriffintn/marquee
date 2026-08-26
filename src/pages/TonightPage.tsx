@@ -44,7 +44,7 @@ export function TonightPage({
   error,
   providerError,
   sections,
-  heroSections,
+  featured,
   isHeroReady,
   episodes,
   trending,
@@ -83,7 +83,7 @@ export function TonightPage({
   error: string;
   providerError: string;
   sections: CatalogSection[];
-  heroSections: CatalogSection[];
+  featured: MediaTitle | undefined;
   isHeroReady: boolean;
   episodes: ScheduledEpisode[];
   trending: MediaTitle[];
@@ -135,7 +135,7 @@ export function TonightPage({
 
     return () => window.clearTimeout(timer);
   }, [isUsherMode]);
-  const featured = isHeroReady ? heroSections.flatMap((section) => section.items)[0] : undefined;
+  const readyFeatured = isHeroReady ? featured : undefined;
   const filterableProviders = providers.filter(
     (provider) => provider.status === "feed" && Boolean(provider.tmdbProviderIds?.length),
   );
@@ -196,16 +196,16 @@ export function TonightPage({
             />
           ) : (
             <section
-              className={`hero-section${featured?.backdropUrl ? "" : " hero-empty"}${
-                featured ? "" : " hero-loading"
+              className={`hero-section${readyFeatured?.backdropUrl ? "" : " hero-empty"}${
+                readyFeatured ? "" : " hero-loading"
               }`}
             >
-              {featured && (
+              {readyFeatured && (
                 <div className="hero-art" aria-hidden="true">
                   <TitleArt
-                    url={featured.backdropUrl}
-                    seed={featured.id}
-                    label={featured.title}
+                    url={readyFeatured.backdropUrl}
+                    seed={readyFeatured.id}
+                    label={readyFeatured.title}
                     width={1280}
                     kind="backdrop"
                     wide
@@ -215,15 +215,21 @@ export function TonightPage({
               )}
               <div className="hero-gradient" />
               <div className="hero-copy">
-                {featured ? (
+                {readyFeatured ? (
                   <>
-                    <h1 className={heroTitleClass(featured.title)}>{featured.title}</h1>
+                    <h1 className={heroTitleClass(readyFeatured.title)}>{readyFeatured.title}</h1>
                     <p className="hero-meta">
-                      {mediaMeta(featured)} · {scoreLabel(featured)}
+                      {mediaMeta(readyFeatured)} · {scoreLabel(readyFeatured)}
                     </p>
-                    <p className="hero-lede">{featured.overview || "No synopsis available."}</p>
+                    <p className="hero-lede">
+                      {readyFeatured.overview || "No synopsis available."}
+                    </p>
                     <div className="hero-actions">
-                      <button type="button" className="hero-play" onClick={() => onOpen(featured)}>
+                      <button
+                        type="button"
+                        className="hero-play"
+                        onClick={() => onOpen(readyFeatured)}
+                      >
                         <span className="play-icon">
                           <ExternalLinkIcon />
                         </span>{" "}
@@ -336,7 +342,7 @@ export function TonightPage({
         </ErrorBoundary>
       )}
 
-      {error && featured && (
+      {error && readyFeatured && (
         <p className="catalogue-error" role="alert">
           {error}
         </p>

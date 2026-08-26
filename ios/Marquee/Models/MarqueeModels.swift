@@ -112,6 +112,12 @@ struct CatalogResponse: Codable {
   let fetchedAt: String
 }
 
+struct FeaturedTitleResponse: Codable {
+  let item: MediaTitle?
+  let source: String?
+  let fetchedAt: String
+}
+
 struct RailsResponse: Codable {
   let sections: [CatalogSection]
 }

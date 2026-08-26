@@ -44,6 +44,7 @@ import {
   getProviderCatalogue,
   getTitleAvailability,
 } from "../services/catalog.ts";
+import { getFeaturedTitle } from "../services/featured.ts";
 import { getPersonalRails } from "../services/personal-rails.ts";
 import { getSeason, getSeasonIndex } from "../services/seasons.ts";
 import type { Bindings } from "../types.ts";
@@ -107,6 +108,30 @@ catalogRoutes.get("/rails", requireAuthentication, async (context) => {
     logError("personal_rails_failed", error, { area: "catalogue" });
 
     return context.json({ sections: [] });
+  }
+});
+
+catalogRoutes.get("/featured", async (context) => {
+  const providerIds = validProviderIds(
+    queryList(context, "providers", PROVIDER_LIMIT),
+  );
+  const principal = await sessionPrincipal(context.env, context.req.raw);
+
+  try {
+    context.header("cache-control", "private, max-age=300");
+
+    return context.json(
+      await getFeaturedTitle(context.env, {
+        viewerId: principal?.user.id ?? null,
+        providerIds,
+        origin: edgeOrigin(context.req.raw),
+      }),
+    );
+  } catch (error) {
+    logError("featured_title_failed", error, { area: "catalogue" });
+    context.header("cache-control", "no-store");
+
+    return context.json({ item: null, source: null, fetchedAt: "" });
   }
 });
 

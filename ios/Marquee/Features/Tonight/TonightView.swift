@@ -6,7 +6,7 @@ struct TonightView: View {
   @State private var prompt = ""
 
   private var loadKey: String {
-    "\(appState.isSignedIn)-\(appState.selectedProviderIDs.sorted().joined(separator: ","))"
+    "\(appState.isSignedIn)-\(appState.shelfVersion)-\(appState.selectedProviderIDs.sorted().joined(separator: ","))"
   }
 
   var body: some View {
@@ -37,7 +37,7 @@ struct TonightView: View {
               }
             }
           )
-        } else if let hero = model.sections.first?.items.first {
+        } else if let hero = model.featured ?? model.sections.first?.items.first {
           TonightHero(item: hero)
         } else {
           MarqueePageHeader(

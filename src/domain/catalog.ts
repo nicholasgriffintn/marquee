@@ -245,6 +245,12 @@ export type CatalogResponse = {
   fetchedAt: string;
 };
 
+export type FeaturedTitleResponse = {
+  item: MediaTitle | null;
+  source: "personal" | "trending" | "catalogue" | null;
+  fetchedAt: string;
+};
+
 export type ProvidersResponse = {
   providers: Provider[];
   region: "GB";

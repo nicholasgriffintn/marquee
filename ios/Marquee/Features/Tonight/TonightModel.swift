@@ -2,6 +2,7 @@ import Foundation
 
 @MainActor
 final class TonightModel: ObservableObject {
+  @Published private(set) var featured: MediaTitle?
   @Published private(set) var sections: [CatalogSection] = []
   @Published private(set) var episodes: [ScheduledEpisode] = []
   @Published private(set) var trending: [MediaTitle] = []
@@ -24,12 +25,19 @@ final class TonightModel: ObservableObject {
   func load(api: APIClient, providerIDs: [String], isSignedIn: Bool) async {
     isLoading = true
     error = ""
+    featured = nil
 
     do {
+      let providerQuery =
+        providerIDs.isEmpty
+        ? [] : [URLQueryItem(name: "providers", value: providerIDs.joined(separator: ","))]
       async let catalogue: CatalogResponse = api.get(
         "/api/catalog",
-        query: providerIDs.isEmpty
-          ? [] : [URLQueryItem(name: "providers", value: providerIDs.joined(separator: ","))]
+        query: providerQuery
+      )
+      async let feature: FeaturedTitleResponse? = try? api.get(
+        "/api/catalog/featured",
+        query: providerQuery
       )
       async let schedule: TonightResponse = api.get(
         "/api/catalog/tonight",
@@ -38,8 +46,8 @@ final class TonightModel: ObservableObject {
       async let trend: TrendingResponse = api.get("/api/catalog/trending")
       async let providerList: ProvidersResponse = api.get("/api/catalog/providers")
 
-      let (catalogueValue, scheduleValue, trendValue, providerValue) = try await (
-        catalogue, schedule, trend, providerList
+      let (catalogueValue, featureValue, scheduleValue, trendValue, providerValue) = try await (
+        catalogue, feature, schedule, trend, providerList
       )
       var allSections = catalogueValue.sections
 
@@ -52,6 +60,7 @@ final class TonightModel: ObservableObject {
       }
 
       sections = allSections
+      featured = featureValue?.item ?? allSections.first?.items.first
       episodes = scheduleValue.episodes
       trending = trendValue.items
       providers = providerValue.providers
