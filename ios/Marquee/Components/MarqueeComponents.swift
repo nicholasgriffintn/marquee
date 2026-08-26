@@ -87,21 +87,37 @@ struct AccountToolbar: ToolbarContent {
   @EnvironmentObject private var appState: AppState
 
   var body: some ToolbarContent {
-    ToolbarItem(placement: .topBarTrailing) {
-      if appState.isRestoring {
+    if appState.isRestoring {
+      ToolbarItem(placement: .topBarTrailing) {
         ProgressView().tint(MarqueeTheme.acid)
-      } else if let user = appState.user {
-        Menu {
-          Text(user.name)
-          Button("Sign out", role: .destructive) { Task { await appState.signOut() } }
-        } label: {
-          avatar(for: user)
+      }
+    } else if let user = appState.user {
+      if #available(iOS 26.0, *) {
+        ToolbarItem(placement: .topBarTrailing) {
+          accountMenu(for: user)
         }
+        .sharedBackgroundVisibility(.hidden)
       } else {
+        ToolbarItem(placement: .topBarTrailing) {
+          accountMenu(for: user)
+        }
+      }
+    } else {
+      ToolbarItem(placement: .topBarTrailing) {
         Button("Get a ticket") { appState.requireSignIn() }
           .font(MarqueeTheme.mono(10, weight: .bold))
       }
     }
+  }
+
+  private func accountMenu(for user: MarqueeUser) -> some View {
+    Menu {
+      Text(user.name)
+      Button("Sign out", role: .destructive) { Task { await appState.signOut() } }
+    } label: {
+      avatar(for: user)
+    }
+    .buttonStyle(.plain)
   }
 
   private func avatar(for user: MarqueeUser) -> some View {
