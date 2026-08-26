@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { ErrorBoundary } from "../components/ErrorBoundary";
@@ -20,8 +20,16 @@ export function AdminPage({ user }: { user: User }) {
   const { overview } = admin;
   const [params, setParams] = useSearchParams();
   const [vaultRevision, setVaultRevision] = useState(0);
+  const [pipelineRevision, setPipelineRevision] = useState(0);
+  const [listingsRevision, setListingsRevision] = useState(0);
   const tab = TABS.find((entry) => entry.id === params.get("tab"))?.id ?? "overview";
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  useEffect(() => {
+    if (tab === "people" && !admin.usersLoaded) {
+      void admin.loadUsers();
+    }
+  }, [tab, admin.usersLoaded, admin.loadUsers]);
 
   function selectTab(next: AdminTab) {
     const merged = new URLSearchParams(params);
@@ -54,6 +62,24 @@ export function AdminPage({ user }: { user: User }) {
   function refreshTab() {
     if (tab === "vault") {
       setVaultRevision((current) => current + 1);
+
+      return;
+    }
+
+    if (tab === "pipeline") {
+      setPipelineRevision((current) => current + 1);
+
+      return;
+    }
+
+    if (tab === "listings") {
+      setListingsRevision((current) => current + 1);
+
+      return;
+    }
+
+    if (tab === "people") {
+      void admin.loadUsers();
 
       return;
     }
@@ -119,7 +145,7 @@ export function AdminPage({ user }: { user: User }) {
         {READS_DATA.has(tab) && (
           <button type="button" className="admin-refresh" onClick={refreshTab}>
             Refresh
-            {overview && tab !== "vault" && <em>read {formatTime(overview.fetchedAt, {})}</em>}
+            {overview && tab === "overview" && <em>read {formatTime(overview.fetchedAt, {})}</em>}
           </button>
         )}
       </div>
@@ -142,13 +168,13 @@ export function AdminPage({ user }: { user: User }) {
 
       {tab === "pipeline" && (
         <div role="tabpanel" id="admin-panel-pipeline" aria-labelledby="admin-tab-pipeline">
-          <PipelineTab overview={overview} />
+          <PipelineTab overview={overview} revision={pipelineRevision} />
         </div>
       )}
 
       {tab === "listings" && (
         <div role="tabpanel" id="admin-panel-listings" aria-labelledby="admin-tab-listings">
-          <ListingsTab overview={overview} />
+          <ListingsTab overview={overview} revision={listingsRevision} />
         </div>
       )}
 

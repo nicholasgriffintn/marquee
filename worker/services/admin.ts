@@ -17,6 +17,7 @@ export const ADMIN_ACTIONS = [
   "sweep-light",
   "sweep-deep",
   "digest",
+  "catalog-head",
   "availability",
   "enrichment",
   "embeddings",
@@ -50,6 +51,7 @@ export function isAdminAction(value: unknown): value is AdminAction {
 }
 
 const QUEUED_JOBS: Partial<Record<AdminAction, IngestionJob>> = {
+  "catalog-head": { type: "sync-catalog" },
   schedule: { type: "sync-schedule" },
   buzz: { type: "sync-buzz" },
   providers: { type: "sync-providers" },
@@ -63,9 +65,6 @@ type CountRow = Record<string, number>;
 
 async function catalogueStats(env: Bindings) {
   const [row, working] = await Promise.all([
-    // Subqueries that hit the same table are folded into one grouped pass
-    // (sum(CASE ...)) instead of one full scan per count, since this runs on
-    // every admin overview load.
     env.DB.prepare(
       `SELECT
          tt.titles, tt.movies, tt.shows, tt.posters, tt.animeIds, tt.animeDetails,
@@ -229,14 +228,14 @@ async function enrichmentStats(env: Bindings) {
 
   const justwatchRow = justwatch
     ? [
-        withAttempts({
-          source: "justwatch",
-          titles: justwatch.titles,
-          misses: justwatch.misses,
-          pending: 0,
-          newest: justwatch.newest,
-        }),
-      ]
+      withAttempts({
+        source: "justwatch",
+        titles: justwatch.titles,
+        misses: justwatch.misses,
+        pending: 0,
+        newest: justwatch.newest,
+      }),
+    ]
     : [];
 
   return [...enriched.results.map(withAttempts), ...justwatchRow].sort((left, right) =>
@@ -245,57 +244,74 @@ async function enrichmentStats(env: Bindings) {
 }
 
 export async function readAdminOverview(env: Bindings) {
-  const [catalogue, enrichment, backfill, failures, lastRuns, budgets, cinemas, sections] =
-    await Promise.all([
-      catalogueStats(env),
-      enrichmentStats(env),
-      readBackfillProgress(env.DB),
-      env.DB.prepare(
-        `SELECT job_type AS jobType, subject_id AS subjectId, error, started_at AS startedAt
+  const [catalogue, backfill, budgets] = await Promise.all([
+    catalogueStats(env),
+    readBackfillProgress(env.DB),
+    readBudgets(env),
+  ]);
+
+  return {
+    catalogue,
+    backfill,
+    budgets,
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
+export async function readAdminPipeline(env: Bindings) {
+  const [enrichment, failures, lastRuns] = await Promise.all([
+    enrichmentStats(env),
+    env.DB.prepare(
+      `SELECT job_type AS jobType, subject_id AS subjectId, error, started_at AS startedAt
          FROM ingestion_runs
          WHERE status = 'failed'
          ORDER BY started_at DESC
          LIMIT 15`,
-      ).all<{
-        jobType: string;
-        subjectId: string | null;
-        error: string | null;
-        startedAt: string;
-      }>(),
-      env.DB.prepare(
-        `SELECT job_type AS jobType, status, max(started_at) AS lastRunAt,
+    ).all<{
+      jobType: string;
+      subjectId: string | null;
+      error: string | null;
+      startedAt: string;
+    }>(),
+    env.DB.prepare(
+      `SELECT job_type AS jobType, status, max(started_at) AS lastRunAt,
                 count(*) AS runs, count(DISTINCT subject_id) AS subjects
          FROM ingestion_runs
          WHERE started_at > datetime('now', ?)
          GROUP BY job_type, status
          ORDER BY lastRunAt DESC
          LIMIT 20`,
-      )
-        .bind(`-${RUN_WINDOW_HOURS} hours`)
-        .all<{
-          jobType: string;
-          status: string;
-          lastRunAt: string;
-          runs: number;
-          subjects: number;
-        }>(),
-      readBudgets(env),
-      readCinemaCoverage(env.DB),
-      env.DB.prepare(
-        `SELECT id, title, json_array_length(title_ids) AS titles, source_updated_at AS builtAt
-         FROM catalog_sections
-         ORDER BY rowid`,
-      ).all<{ id: string; title: string; titles: number; builtAt: string }>(),
-    ]);
+    )
+      .bind(`-${RUN_WINDOW_HOURS} hours`)
+      .all<{
+        jobType: string;
+        status: string;
+        lastRunAt: string;
+        runs: number;
+        subjects: number;
+      }>(),
+  ]);
 
   return {
-    catalogue,
     enrichment,
-    backfill,
     failures: failures.results,
     lastRuns: lastRuns.results,
     runWindowHours: RUN_WINDOW_HOURS,
-    budgets,
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
+export async function readAdminListings(env: Bindings) {
+  const [cinemas, sections] = await Promise.all([
+    readCinemaCoverage(env.DB),
+    env.DB.prepare(
+      `SELECT id, title, json_array_length(title_ids) AS titles, source_updated_at AS builtAt
+         FROM catalog_sections
+         ORDER BY rowid`,
+    ).all<{ id: string; title: string; titles: number; builtAt: string }>(),
+  ]);
+
+  return {
     cinemas,
     sections: sections.results,
     fetchedAt: new Date().toISOString(),

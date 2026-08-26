@@ -1,7 +1,8 @@
 import { useState } from "react";
 
 import { ErrorBoundary } from "../../components/ErrorBoundary";
-import type { AdminOverview } from "../../hooks/useAdmin";
+import type { AdminOverview, AdminPipeline } from "../../hooks/useAdmin";
+import { useResource } from "../../hooks/useResource";
 import { parseDatabaseDate } from "../../lib/dates";
 import { RUN_STATUSES, type RunStatus } from "./config";
 
@@ -9,19 +10,34 @@ function stamp(value: string) {
   return parseDatabaseDate(value)?.toLocaleString() ?? "never";
 }
 
-export function PipelineTab({ overview }: { overview: AdminOverview | null }) {
+export function PipelineTab({
+  overview,
+  revision,
+}: {
+  overview: AdminOverview | null;
+  revision: number;
+}) {
   const [runStatus, setRunStatus] = useState<RunStatus>("all");
-  const runs = (overview?.lastRuns ?? []).filter(
+  const { data: pipeline, error } = useResource<AdminPipeline>("/api/admin/pipeline", {
+    errorMessage: "Could not read the pipeline.",
+    refreshKey: String(revision),
+  });
+  const runs = (pipeline?.lastRuns ?? []).filter(
     (run) => runStatus === "all" || run.status === runStatus,
   );
 
   return (
     <ErrorBoundary label="The pipeline">
       <div role="tabpanel" id="admin-panel-pipeline" aria-labelledby="admin-tab-pipeline">
-        {overview && overview.lastRuns.length > 0 && (
+        {error && (
+          <p className="catalogue-error" role="alert">
+            {error}
+          </p>
+        )}
+        {pipeline && pipeline.lastRuns.length > 0 && (
           <section className="panel-block" aria-labelledby="admin-runs-title">
             <h2 id="admin-runs-title">Recent jobs</h2>
-            <p className="admin-note">Last {overview.runWindowHours} hours</p>
+            <p className="admin-note">Last {pipeline.runWindowHours} hours</p>
             <div className="admin-filters">
               {RUN_STATUSES.map((status) => (
                 <button
@@ -34,8 +50,8 @@ export function PipelineTab({ overview }: { overview: AdminOverview | null }) {
                   {status}
                   <em>
                     {status === "all"
-                      ? overview.lastRuns.length
-                      : overview.lastRuns.filter((run) => run.status === status).length}
+                      ? pipeline.lastRuns.length
+                      : pipeline.lastRuns.filter((run) => run.status === status).length}
                   </em>
                 </button>
               ))}
@@ -55,11 +71,11 @@ export function PipelineTab({ overview }: { overview: AdminOverview | null }) {
             </ul>
           </section>
         )}
-        {overview && overview.failures.length > 0 && (
+        {pipeline && pipeline.failures.length > 0 && (
           <section className="panel-block" aria-labelledby="admin-failures-title">
             <h2 id="admin-failures-title">Latest failures</h2>
             <ul className="failure-list">
-              {overview.failures.map((failure) => (
+              {pipeline.failures.map((failure) => (
                 <li key={`${failure.jobType}-${failure.startedAt}-${failure.subjectId ?? ""}`}>
                   <strong>{failure.jobType}</strong>
                   <small>
@@ -72,23 +88,23 @@ export function PipelineTab({ overview }: { overview: AdminOverview | null }) {
             </ul>
           </section>
         )}
-        {overview && overview.enrichment.length > 0 && (
+        {pipeline && pipeline.enrichment.length > 0 && (
           <section className="panel-block" aria-labelledby="admin-enrichment-title">
             <h2 id="admin-enrichment-title">Enrichment coverage</h2>
             <ul className="admin-list">
-              {overview.enrichment.map((source) => {
+              {pipeline.enrichment.map((source) => {
                 const recorded = source.titles + source.misses;
                 const hitRate = recorded > 0 ? Math.round((source.titles / recorded) * 100) : null;
                 const silentRate =
                   source.attempted > 0
                     ? Math.round((source.silentFailures / source.attempted) * 100)
                     : 0;
-                const budget = overview.budgets.find((row) => row.source === source.source);
+                const budget = overview?.budgets.find((row) => row.source === source.source);
                 const pausedUntil = budget?.pausedUntil
                   ? parseDatabaseDate(budget.pausedUntil)
                   : null;
                 const isPaused = pausedUntil
-                  ? pausedUntil.getTime() > new Date(overview.fetchedAt).getTime()
+                  ? pausedUntil.getTime() > new Date(pipeline.fetchedAt).getTime()
                   : false;
 
                 return (

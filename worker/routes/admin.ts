@@ -18,7 +18,9 @@ import {
   clearSourcePause,
   isAdminAction,
   listAdminUsers,
+  readAdminListings,
   readAdminOverview,
+  readAdminPipeline,
   runAdminAction,
 } from "../services/admin.ts";
 import type { Bindings, EnrichmentSource } from "../types.ts";
@@ -42,6 +44,30 @@ adminRoutes.get("/overview", async (context) => {
     logError("admin_overview_failed", error, { area: "admin" });
 
     return context.json({ error: "Could not read the pipeline" }, 500);
+  }
+});
+
+adminRoutes.get("/pipeline", async (context) => {
+  try {
+    context.header("cache-control", "no-store");
+
+    return context.json(await readAdminPipeline(context.env));
+  } catch (error) {
+    logError("admin_pipeline_failed", error, { area: "admin" });
+
+    return context.json({ error: "Could not read the pipeline" }, 500);
+  }
+});
+
+adminRoutes.get("/listings", async (context) => {
+  try {
+    context.header("cache-control", "no-store");
+
+    return context.json(await readAdminListings(context.env));
+  } catch (error) {
+    logError("admin_listings_failed", error, { area: "admin" });
+
+    return context.json({ error: "Could not read the listings" }, 500);
   }
 });
 

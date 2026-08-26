@@ -1,5 +1,6 @@
 import { ErrorBoundary } from "../../components/ErrorBoundary";
-import type { AdminOverview } from "../../hooks/useAdmin";
+import type { AdminListings, AdminOverview } from "../../hooks/useAdmin";
+import { useResource } from "../../hooks/useResource";
 
 function cinemaTotals(rows: { cinemas: number; located: number; screenings: number }[]) {
   const cinemas = rows.reduce((total, row) => total + row.cinemas, 0);
@@ -9,15 +10,31 @@ function cinemaTotals(rows: { cinemas: number; located: number; screenings: numb
   return `${cinemas.toLocaleString()} cinemas across ${rows.length.toLocaleString()} chains, ${located.toLocaleString()} of them placed on a map, ${screenings.toLocaleString()} screenings ahead.`;
 }
 
-export function ListingsTab({ overview }: { overview: AdminOverview | null }) {
+export function ListingsTab({
+  overview,
+  revision,
+}: {
+  overview: AdminOverview | null;
+  revision: number;
+}) {
+  const { data: listings, error } = useResource<AdminListings>("/api/admin/listings", {
+    errorMessage: "Could not read the listings.",
+    refreshKey: String(revision),
+  });
+
   return (
     <ErrorBoundary label="The listings">
       <div role="tabpanel" id="admin-panel-listings" aria-labelledby="admin-tab-listings">
-        {overview && overview.sections.length > 0 && (
+        {error && (
+          <p className="catalogue-error" role="alert">
+            {error}
+          </p>
+        )}
+        {listings && listings.sections.length > 0 && (
           <section className="panel-block" aria-labelledby="admin-sections-title">
             <h2 id="admin-sections-title">Homepage rails</h2>
             <ul className="admin-list">
-              {overview.sections.map((section) => (
+              {listings.sections.map((section) => (
                 <li key={section.id}>
                   <strong>{section.title}</strong>
                   <small>{section.titles} titles</small>
@@ -28,19 +45,19 @@ export function ListingsTab({ overview }: { overview: AdminOverview | null }) {
             </ul>
           </section>
         )}
-        {overview && (
+        {listings && (
           <section className="panel-block" aria-labelledby="admin-cinemas-title">
             <h2 id="admin-cinemas-title">Cinema listings</h2>
             <p className="admin-note">
-              {cinemaTotals(overview.cinemas)} A cinema without coordinates never shows up in a
+              {cinemaTotals(listings.cinemas)} A cinema without coordinates never shows up in a
               nearby search, and listings are only pulled for the{" "}
-              {(overview.catalogue.interestCells ?? 0).toLocaleString()} places a member has looked
+              {(overview?.catalogue.interestCells ?? 0).toLocaleString()} places a member has looked
               from in the last thirty days — with none of those, Pull local listings has nothing to
               queue.
             </p>
-            {overview.cinemas.length > 0 ? (
+            {listings.cinemas.length > 0 ? (
               <ul className="admin-list">
-                {overview.cinemas.map((row) => (
+                {listings.cinemas.map((row) => (
                   <li key={row.source}>
                     <strong>{row.source}</strong>
                     <small>

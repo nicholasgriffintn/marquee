@@ -7,6 +7,7 @@ export type AdminAction =
   | "sweep-light"
   | "sweep-deep"
   | "digest"
+  | "catalog-head"
   | "availability"
   | "enrichment"
   | "embeddings"
@@ -31,6 +32,26 @@ export type AdminAction =
 
 export type AdminOverview = {
   catalogue: Record<string, number>;
+  backfill: {
+    mediaType: string;
+    status: string;
+    partitions: number;
+    titles: number;
+    pagesDone: number;
+    totalPages: number;
+  }[];
+  budgets: {
+    source: string;
+    callLimit: number;
+    used: number;
+    windowKind: string;
+    pausedUntil: string | null;
+    consecutivePauses: number;
+  }[];
+  fetchedAt: string;
+};
+
+export type AdminPipeline = {
   enrichment: {
     source: string;
     titles: number;
@@ -39,14 +60,6 @@ export type AdminOverview = {
     newest: string;
     attempted: number;
     silentFailures: number;
-  }[];
-  backfill: {
-    mediaType: string;
-    status: string;
-    partitions: number;
-    titles: number;
-    pagesDone: number;
-    totalPages: number;
   }[];
   failures: {
     jobType: string;
@@ -62,14 +75,10 @@ export type AdminOverview = {
     subjects: number;
   }[];
   runWindowHours: number;
-  budgets: {
-    source: string;
-    callLimit: number;
-    used: number;
-    windowKind: string;
-    pausedUntil: string | null;
-    consecutivePauses: number;
-  }[];
+  fetchedAt: string;
+};
+
+export type AdminListings = {
   cinemas: {
     source: string;
     cinemas: number;
@@ -95,6 +104,7 @@ export type AdminUser = {
 export function useAdmin(enabled: boolean) {
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [usersLoaded, setUsersLoaded] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [pending, setPending] = useState("");
@@ -108,13 +118,7 @@ export function useAdmin(enabled: boolean) {
     setLoading(true);
 
     try {
-      const [nextOverview, nextUsers] = await Promise.all([
-        requestJson<AdminOverview>("/api/admin/overview"),
-        requestJson<{ users: AdminUser[] }>("/api/admin/users"),
-      ]);
-
-      setOverview(nextOverview);
-      setUsers(nextUsers.users);
+      setOverview(await requestJson<AdminOverview>("/api/admin/overview"));
       setError("");
     } catch {
       setError("Could not read the admin panel.");
@@ -128,6 +132,22 @@ export function useAdmin(enabled: boolean) {
 
     return () => window.clearTimeout(timer);
   }, [refresh]);
+
+  const loadUsers = useCallback(async () => {
+    if (!enabled) {
+      return;
+    }
+
+    try {
+      const next = await requestJson<{ users: AdminUser[] }>("/api/admin/users");
+
+      setUsers(next.users);
+      setUsersLoaded(true);
+      setError("");
+    } catch {
+      setError("Could not read the user list.");
+    }
+  }, [enabled]);
 
   const run = useCallback(
     async (action: AdminAction) => {
@@ -188,6 +208,7 @@ export function useAdmin(enabled: boolean) {
     changeRole,
     error,
     loading,
+    loadUsers,
     message,
     overview,
     pending,
@@ -195,5 +216,6 @@ export function useAdmin(enabled: boolean) {
     resume,
     run,
     users,
+    usersLoaded,
   };
 }

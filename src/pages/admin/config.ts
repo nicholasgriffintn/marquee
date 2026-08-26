@@ -43,6 +43,7 @@ export const ACTION_GROUPS: {
     title: "Backfills",
     note: "Queue work without waiting for a sweep. Each one respects the call budgets below. The backfill walks TMDB in dated windows, so every run picks up where the last one stopped.",
     actions: [
+      { id: "catalog-head", label: "Sync latest titles" },
       { id: "availability", label: "Refresh availability" },
       { id: "enrichment", label: "Queue enrichment" },
       { id: "embeddings", label: "Queue embeddings" },
