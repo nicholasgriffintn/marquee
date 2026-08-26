@@ -4,49 +4,12 @@ struct TitleDetailHero: View {
   let item: MediaTitle
 
   var body: some View {
-    ZStack(alignment: .bottomLeading) {
-      Artwork(
-        url: item.backdropUrl ?? item.posterUrl,
-        seed: item.id,
-        aspectRatio: 16 / 10,
-        height: 410
-      )
-      LinearGradient(
-        stops: [
-          .init(color: MarqueeTheme.ink.opacity(0.02), location: 0.25),
-          .init(color: MarqueeTheme.ink.opacity(0.4), location: 0.58),
-          .init(color: MarqueeTheme.ink, location: 1),
-        ],
-        startPoint: .top,
-        endPoint: .bottom
-      )
-      VStack(alignment: .leading, spacing: 9) {
-        Text(item.mediaType == "movie" ? "FEATURE" : "SERIES")
-          .font(MarqueeTheme.mono(9, weight: .bold))
-          .tracking(1.2)
-          .foregroundStyle(MarqueeTheme.ink)
-          .padding(.horizontal, 8)
-          .padding(.vertical, 5)
-          .background(MarqueeTheme.acid)
-        Text(item.title)
-          .font(MarqueeTheme.display(42))
-          .fontWeight(.semibold)
-          .lineLimit(3)
-          .fixedSize(horizontal: false, vertical: true)
-        Text(
-          [itemMeta(item), runtimeLabel(minutes: item.runtimeMinutes)].filter { !$0.isEmpty }
-            .joined(separator: " · ")
-        )
-        .font(MarqueeTheme.mono(10, weight: .medium))
-        .foregroundStyle(MarqueeTheme.paper.opacity(0.76))
-        .lineLimit(2)
-      }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(.horizontal, 20)
-      .padding(.bottom, 22)
-    }
-    .frame(maxWidth: .infinity)
-    .clipped()
+    Artwork(
+      url: item.posterUrl ?? item.backdropUrl,
+      seed: item.id,
+      aspectRatio: 16 / 10,
+      height: 300
+    )
   }
 }
 
@@ -54,26 +17,36 @@ struct TitleOverview: View {
   let item: MediaTitle
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 14) {
-      TitleDetailSectionLabel("THE PICTURE")
+    VStack(alignment: .leading, spacing: 12) {
+      Text(item.title)
+        .font(MarqueeTheme.display(46))
+        .fontWeight(.medium)
+        .tracking(-2.2)
+        .foregroundStyle(MarqueeTheme.ink)
+        .fixedSize(horizontal: false, vertical: true)
+      Text("\(item.mediaType == "movie" ? "Film" : "Television") · \(mediaMeta(item))")
+        .font(MarqueeTheme.mono(10))
+        .textCase(.uppercase)
+        .foregroundStyle(MarqueeTheme.mutedOnPaper)
+        .fixedSize(horizontal: false, vertical: true)
+      if item.originalTitle != item.title {
+        Text("Original title · \(item.originalTitle)")
+          .font(MarqueeTheme.mono(9))
+          .textCase(.uppercase)
+          .foregroundStyle(MarqueeTheme.mutedOnPaper)
+      }
       if let tagline = item.tagline, !tagline.isEmpty {
         Text(tagline)
-          .font(MarqueeTheme.display(25))
+          .font(MarqueeTheme.serif(17))
           .italic()
-          .foregroundStyle(MarqueeTheme.acid)
+          .foregroundStyle(MarqueeTheme.ink)
           .fixedSize(horizontal: false, vertical: true)
       }
-      Text(item.overview.isEmpty ? "No synopsis is on the programme yet." : item.overview)
-        .font(MarqueeTheme.sans(16))
-        .foregroundStyle(MarqueeTheme.paper)
+      Text(item.overview.isEmpty ? "No synopsis available." : item.overview)
+        .font(MarqueeTheme.sans(17))
+        .foregroundStyle(MarqueeTheme.ink)
         .lineSpacing(4)
         .fixedSize(horizontal: false, vertical: true)
-      if !item.genres.isEmpty {
-        Text(item.genres.joined(separator: "  ·  "))
-          .font(MarqueeTheme.mono(9, weight: .medium))
-          .foregroundStyle(MarqueeTheme.muted)
-          .fixedSize(horizontal: false, vertical: true)
-      }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
   }
@@ -81,52 +54,122 @@ struct TitleOverview: View {
 
 struct TitleWatchOptions: View {
   let item: MediaTitle
+  let selectedProviderIDs: Set<String>
+  @State private var showAll = false
+  @State private var showPaid = false
 
-  var body: some View {
-    if !item.providers.isEmpty {
-      VStack(alignment: .leading, spacing: 12) {
-        TitleDetailSectionLabel("WHERE TO WATCH")
-        ForEach(item.providers) { provider in
-          if let url = provider.webUrl ?? item.watchLink {
-            providerLink(provider, destination: url)
-          }
-        }
-      }
-      .frame(maxWidth: .infinity, alignment: .leading)
-    }
+  private var options: WatchOptionGroups {
+    watchOptions(
+      providers: item.providers,
+      fallbackURL: item.watchLink,
+      selectedProviderIDs: selectedProviderIDs
+    )
   }
 
-  private func providerLink(_ provider: ProviderAvailability, destination: URL) -> some View {
-    Link(destination: destination) {
-      HStack(spacing: 13) {
-        Text(String(provider.name.prefix(1)).uppercased())
-          .font(MarqueeTheme.display(20))
-          .foregroundStyle(MarqueeTheme.ink)
-          .frame(width: 38, height: 38)
-          .background(MarqueeTheme.acid)
-        VStack(alignment: .leading, spacing: 3) {
-          Text(provider.name)
-            .font(MarqueeTheme.sans(14, weight: .bold))
-            .foregroundStyle(MarqueeTheme.white)
-            .lineLimit(1)
-          if !provider.offerTypes.isEmpty {
-            Text(provider.offerTypes.joined(separator: " · ").uppercased())
-              .font(MarqueeTheme.mono(8, weight: .medium))
-              .tracking(0.5)
-              .foregroundStyle(MarqueeTheme.muted)
-              .lineLimit(2)
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      TitleDetailSectionLabel("WATCH NOW")
+
+      if options.all.isEmpty {
+        Text("No streaming options found.")
+          .font(MarqueeTheme.sans(11))
+          .foregroundStyle(MarqueeTheme.mutedOnPaper)
+      } else {
+        if let primary = options.primary {
+          WatchOptionLink(option: primary, primary: true)
+        }
+
+        ForEach(shownStreaming) { option in
+          WatchOptionLink(option: option)
+        }
+
+        if !heldStreaming.isEmpty && !showAll {
+          Button(
+            "Show \(heldStreaming.count) more way\(heldStreaming.count == 1 ? "" : "s") to watch"
+          ) {
+            showAll = true
+          }
+          .font(MarqueeTheme.mono(10, weight: .heavy))
+          .textCase(.uppercase)
+          .foregroundStyle(MarqueeTheme.blue)
+        }
+
+        if !options.paid.isEmpty {
+          if options.primary != nil {
+            Button(
+              "Rent or buy from \(options.paid.count) service\(options.paid.count == 1 ? "" : "s")"
+            ) {
+              showPaid.toggle()
+            }
+            .font(MarqueeTheme.mono(10, weight: .heavy))
+            .textCase(.uppercase)
+            .foregroundStyle(MarqueeTheme.blue)
+          }
+
+          if showPaid || options.primary == nil {
+            ForEach(options.paid) { option in
+              WatchOptionLink(option: option)
+            }
+          }
+        }
+
+        Text(watchCredit)
+          .font(MarqueeTheme.mono(10))
+          .foregroundStyle(MarqueeTheme.mutedOnPaper)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  private var shownStreaming: [WatchOption] {
+    showAll ? options.rest : Array(options.rest.prefix(3))
+  }
+
+  private var heldStreaming: [WatchOption] {
+    Array(options.rest.dropFirst(3))
+  }
+
+  private var watchCredit: String {
+    let hasJustWatch = options.all.contains { $0.provider.source != "AniList" }
+    let hasAniList = options.all.contains { $0.provider.source == "AniList" }
+    return (hasJustWatch ? "Availability from JustWatch. " : "")
+      + (hasAniList ? "Streaming sites from AniList. " : "")
+      + "It changes without telling me."
+  }
+}
+
+private struct WatchOptionLink: View {
+  let option: WatchOption
+  var primary = false
+
+  var body: some View {
+    Link(destination: option.destination) {
+      HStack(spacing: 12) {
+        ProviderBadge(
+          providerID: option.provider.id, name: option.provider.name, size: primary ? 30 : 23)
+        VStack(alignment: .leading, spacing: 2) {
+          Text(option.label)
+            .font(MarqueeTheme.sans(12, weight: .heavy))
+            .lineLimit(2)
+          if primary {
+            Text(option.provider.offerTypes.joined(separator: " · "))
+              .font(MarqueeTheme.mono(8))
+              .opacity(0.75)
           }
         }
         .layoutPriority(1)
         Spacer()
         Image(systemName: "arrow.up.right")
-          .font(.system(size: 12, weight: .bold))
-          .foregroundStyle(MarqueeTheme.acid)
+          .font(.system(size: 11, weight: .bold))
       }
+      .foregroundStyle(primary ? MarqueeTheme.white : MarqueeTheme.ink)
       .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(13)
-      .background(MarqueeTheme.panel)
-      .overlay { Rectangle().stroke(MarqueeTheme.line) }
+      .padding(primary ? 12 : 10)
+      .background(primary ? MarqueeTheme.blue : Color.clear)
+      .overlay {
+        if !primary { Rectangle().stroke(MarqueeTheme.paperLine) }
+      }
     }
   }
 }
@@ -162,8 +205,9 @@ struct TitleShelfEditor: View {
         .scrollContentBackground(.hidden)
         .frame(minHeight: 96)
         .padding(8)
-        .background(MarqueeTheme.ink)
-        .overlay { Rectangle().stroke(MarqueeTheme.line) }
+        .foregroundStyle(MarqueeTheme.ink)
+        .background(MarqueeTheme.white)
+        .overlay { Rectangle().stroke(MarqueeTheme.paperLine) }
       HStack {
         Button(action: onSave) {
           if isSaving {
@@ -187,9 +231,9 @@ struct TitleShelfEditor: View {
           message.hasPrefix("Saved") ? MarqueeTheme.acid : MarqueeTheme.muted)
       }
     }
-    .padding(16)
-    .background(MarqueeTheme.panel)
-    .overlay { Rectangle().stroke(MarqueeTheme.line) }
+    .foregroundStyle(MarqueeTheme.ink)
+    .padding(.top, 24)
+    .overlay(alignment: .top) { Rectangle().fill(MarqueeTheme.paperLine).frame(height: 1) }
   }
 }
 
@@ -198,7 +242,7 @@ struct TitleSourceLinks: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
-      TitleDetailSectionLabel("ELSEWHERE")
+      TitleDetailSectionLabel("SOURCE LINKS")
       HStack(spacing: 9) {
         ForEach(destinations, id: \.label) { destination in
           Link(destination: destination.url) {
@@ -207,10 +251,10 @@ struct TitleSourceLinks: View {
               Image(systemName: "arrow.up.right")
             }
             .font(MarqueeTheme.mono(9, weight: .bold))
-            .foregroundStyle(MarqueeTheme.paper)
+            .foregroundStyle(MarqueeTheme.ink)
             .padding(.horizontal, 11)
             .padding(.vertical, 9)
-            .overlay { Rectangle().stroke(MarqueeTheme.line) }
+            .overlay { Rectangle().stroke(MarqueeTheme.paperLine) }
           }
         }
       }
@@ -241,6 +285,6 @@ private struct TitleDetailSectionLabel: View {
     Text(label)
       .font(MarqueeTheme.mono(9, weight: .bold))
       .tracking(1.35)
-      .foregroundStyle(MarqueeTheme.acid)
+      .foregroundStyle(MarqueeTheme.mutedOnPaper)
   }
 }

@@ -102,7 +102,10 @@ struct Artwork: View {
   }
 
   private var artwork: some View {
-    AsyncImage(url: url, transaction: Transaction(animation: .easeOut(duration: 0.25))) { phase in
+    AsyncImage(
+      url: AppConfiguration.resolve(url),
+      transaction: Transaction(animation: .easeOut(duration: 0.25))
+    ) { phase in
       switch phase {
       case .success(let image): image.resizable().scaledToFill()
       case .failure: placeholder
@@ -173,15 +176,17 @@ struct TitleRail: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 13) {
       VStack(alignment: .leading, spacing: 3) {
+        if !section.description.isEmpty {
+          Text(section.description)
+            .font(MarqueeTheme.mono(9))
+            .tracking(0.9)
+            .textCase(.uppercase)
+            .foregroundStyle(MarqueeTheme.acid)
+            .lineLimit(2)
+        }
         Text(section.title)
           .font(MarqueeTheme.display(25))
           .fontWeight(.semibold)
-        if !section.description.isEmpty {
-          Text(section.description)
-            .font(MarqueeTheme.sans(12))
-            .foregroundStyle(MarqueeTheme.muted)
-            .lineLimit(2)
-        }
       }
       .padding(.horizontal, 18)
       ScrollView(.horizontal, showsIndicators: false) {
@@ -283,4 +288,30 @@ func itemMeta(_ item: MediaTitle) -> String {
 func runtimeLabel(minutes: Int?) -> String {
   guard let minutes else { return "" }
   return minutes >= 60 ? "\(minutes / 60)h \(minutes % 60)m" : "\(minutes)m"
+}
+
+func mediaMeta(_ item: MediaTitle) -> String {
+  let duration: String? =
+    if item.mediaType == "movie" {
+      item.runtimeMinutes.map { "\($0) min" }
+    } else if let seasons = item.numberOfSeasons {
+      "\(seasons) season\(seasons == 1 ? "" : "s")"
+        + (item.episodeCount.map { ", \($0) episodes" } ?? "")
+    } else {
+      nil
+    }
+
+  return [
+    item.year.map(String.init), item.certification, duration,
+    item.genres.prefix(2).joined(separator: " / "),
+  ]
+  .compactMap { value in
+    guard let value, !value.isEmpty else { return nil }
+    return value
+  }
+  .joined(separator: " · ")
+}
+
+func scoreLabel(_ item: MediaTitle) -> String {
+  item.tmdbScore.map { String(format: "%.1f / 10", $0) } ?? "Not yet rated"
 }

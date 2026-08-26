@@ -31,6 +31,7 @@ struct MediaTitle: Codable, Identifiable {
   let year: Int?
   let runtimeMinutes: Int?
   let numberOfSeasons: Int?
+  let episodeCount: Int?
   let genres: [String]
   let certification: String?
   let tmdbScore: Double?
@@ -305,6 +306,8 @@ struct MarqueeProvider: Codable, Identifiable {
   let name: String
   let category: String
   let homepage: URL?
+  let status: String?
+  let tmdbProviderIds: [Int]?
 }
 
 struct ProvidersResponse: Codable { let providers: [MarqueeProvider] }

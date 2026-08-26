@@ -5,6 +5,7 @@ final class TonightModel: ObservableObject {
   @Published private(set) var sections: [CatalogSection] = []
   @Published private(set) var episodes: [ScheduledEpisode] = []
   @Published private(set) var trending: [MediaTitle] = []
+  @Published private(set) var providers: [MarqueeProvider] = []
   @Published private(set) var curated: [MediaTitle] = []
   @Published private(set) var curatorSummary = ""
   @Published private(set) var pick: UsherPickResponse?
@@ -28,8 +29,11 @@ final class TonightModel: ObservableObject {
         query: [URLQueryItem(name: "limit", value: "12")]
       )
       async let trend: TrendingResponse = api.get("/api/catalog/trending")
+      async let providerList: ProvidersResponse = api.get("/api/catalog/providers")
 
-      let (catalogueValue, scheduleValue, trendValue) = try await (catalogue, schedule, trend)
+      let (catalogueValue, scheduleValue, trendValue, providerValue) = try await (
+        catalogue, schedule, trend, providerList
+      )
       var allSections = catalogueValue.sections
 
       if isSignedIn, let personal: RailsResponse = try? await api.get("/api/catalog/rails") {
@@ -43,6 +47,7 @@ final class TonightModel: ObservableObject {
       sections = allSections
       episodes = scheduleValue.episodes
       trending = trendValue.items
+      providers = providerValue.providers
     } catch {
       self.error = error.localizedDescription
     }

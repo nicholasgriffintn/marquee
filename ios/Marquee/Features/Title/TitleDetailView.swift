@@ -17,7 +17,6 @@ struct TitleDetailView: View {
         TitleDetailHero(item: item)
         VStack(alignment: .leading, spacing: 28) {
           TitleOverview(item: item)
-          TitleWatchOptions(item: item)
           if appState.isSignedIn {
             TitleShelfEditor(
               entry: $model.entry,
@@ -31,22 +30,23 @@ struct TitleDetailView: View {
               },
               onRemove: { confirmRemoval = true }
             )
-          } else {
-            TicketGate(
-              title: "Keep this on your shelf.",
-              message: "A ticket lets you mark it, rate it and leave a note for the Usher."
-            )
           }
+          TitleWatchOptions(
+            item: item,
+            selectedProviderIDs: appState.selectedProviderIDs
+          )
           TitleSourceLinks(item: item)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 20)
         .padding(.top, 28)
         .padding(.bottom, 48)
+        .background(MarqueeTheme.paper)
       }
       .frame(maxWidth: .infinity, alignment: .leading)
     }
     .scrollIndicators(.hidden)
+    .background(MarqueeTheme.paper)
     .navigationTitle(item.title)
     .navigationBarTitleDisplayMode(.inline)
     .toolbar(.hidden, for: .tabBar)
