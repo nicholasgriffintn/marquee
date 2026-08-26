@@ -98,11 +98,14 @@ export function useAdmin(enabled: boolean) {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [pending, setPending] = useState("");
+  const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
     if (!enabled) {
       return;
     }
+
+    setLoading(true);
 
     try {
       const [nextOverview, nextUsers] = await Promise.all([
@@ -115,6 +118,8 @@ export function useAdmin(enabled: boolean) {
       setError("");
     } catch {
       setError("Could not read the admin panel.");
+    } finally {
+      setLoading(false);
     }
   }, [enabled]);
 
@@ -179,5 +184,16 @@ export function useAdmin(enabled: boolean) {
     }
   }, []);
 
-  return { changeRole, error, message, overview, pending, refresh, resume, run, users };
+  return {
+    changeRole,
+    error,
+    loading,
+    message,
+    overview,
+    pending,
+    refresh,
+    resume,
+    run,
+    users,
+  };
 }

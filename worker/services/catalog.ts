@@ -36,7 +36,10 @@ async function readBuzzFor(db: D1Database, ids: string[]) {
   }
 }
 
-async function withBuzz<Item extends MediaTitle>(db: D1Database, items: Item[]) {
+async function withBuzz<Item extends MediaTitle>(
+  db: D1Database,
+  items: Item[],
+) {
   return applyBuzz(
     items,
     await readBuzzFor(
@@ -55,7 +58,9 @@ export async function getCatalogue(env: Bindings, providerIds: string[]) {
 
   const buzz = await readBuzzFor(
     env.DB,
-    catalogue.sections.flatMap((section) => section.items.map((item) => item.id)),
+    catalogue.sections.flatMap((section) =>
+      section.items.map((item) => item.id),
+    ),
   );
 
   return {
@@ -67,7 +72,11 @@ export async function getCatalogue(env: Bindings, providerIds: string[]) {
   };
 }
 
-export async function searchCatalogue(env: Bindings, query: string, providerIds: string[]) {
+export async function searchCatalogue(
+  env: Bindings,
+  query: string,
+  providerIds: string[],
+) {
   const catalogue = await readCatalog(env.DB, query, providerIds);
   const items = catalogue?.sections[0]?.items ?? [];
   let pending: MediaTitle[] = [];
@@ -86,10 +95,14 @@ export async function searchCatalogue(env: Bindings, query: string, providerIds:
   };
 }
 
-export async function searchCatalogueHybrid(env: Bindings, query: string, providerIds: string[]) {
-  const items = (await retrieveTitles(env, { text: query, limit: HYBRID_SEARCH_LIMIT })).filter(
-    (title) => includesProvider(title, providerIds),
-  );
+export async function searchCatalogueHybrid(
+  env: Bindings,
+  query: string,
+  providerIds: string[],
+) {
+  const items = (
+    await retrieveTitles(env, { text: query, limit: HYBRID_SEARCH_LIMIT })
+  ).filter((title) => includesProvider(title, providerIds));
 
   return {
     items: await withBuzz(env.DB, items),
@@ -112,7 +125,11 @@ export async function getAnimeWatchOrder(db: D1Database, titleId: string) {
   const relations = title?.anime?.relations ?? [];
 
   if (relations.length === 0) {
-    return { related: [], source: "MyAnimeList", fetchedAt: new Date().toISOString() };
+    return {
+      related: [],
+      source: "MyAnimeList",
+      fetchedAt: new Date().toISOString(),
+    };
   }
 
   const found = await readTitlesByMalId(
@@ -122,7 +139,9 @@ export async function getAnimeWatchOrder(db: D1Database, titleId: string) {
   const related = relations.flatMap((relation) => {
     const item = found.get(relation.malId);
 
-    return item && item.id !== titleId ? [{ relation: relation.relation, item }] : [];
+    return item && item.id !== titleId
+      ? [{ relation: relation.relation, item }]
+      : [];
   });
 
   const withCounts = await withBuzz(
@@ -135,6 +154,32 @@ export async function getAnimeWatchOrder(db: D1Database, titleId: string) {
       relation: entry.relation,
       item: withCounts[index] ?? entry.item,
     })),
+    source: "MyAnimeList",
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
+export async function getAnimeRecommendations(db: D1Database, titleId: string) {
+  const [title] = await readItems(db, [titleId]);
+  const malIds = title?.anime?.recommendations ?? [];
+
+  if (malIds.length === 0) {
+    return {
+      items: [],
+      source: "MyAnimeList",
+      fetchedAt: new Date().toISOString(),
+    };
+  }
+
+  const found = await readTitlesByMalId(db, malIds);
+  const items = malIds.flatMap((malId) => {
+    const item = found.get(malId);
+
+    return item && item.id !== titleId ? [item] : [];
+  });
+
+  return {
+    items: await withBuzz(db, items),
     source: "MyAnimeList",
     fetchedAt: new Date().toISOString(),
   };
@@ -177,20 +222,27 @@ export type BrowseQuery = {
 const PAGE_SIZE = 24;
 const BROWSE_MIN_VOTES = 20;
 
-async function browseByPopularityOrScore(env: Bindings, browse: BrowseQuery, minVotes: number) {
+async function browseByPopularityOrScore(
+  env: Bindings,
+  browse: BrowseQuery,
+  minVotes: number,
+) {
   const search = {
     mediaType: browse.mediaType,
     genres: browse.genres,
     keywords: browse.keywords,
     providerIds: browse.providerIds,
     query: browse.query,
-    sort: browse.query && browse.sort === "popularity" ? undefined : browse.sort,
+    sort:
+      browse.query && browse.sort === "popularity" ? undefined : browse.sort,
     minVotes,
     limit: PAGE_SIZE + 1,
     offset: browse.page * PAGE_SIZE,
   };
 
-  return browse.query ? searchTitlesFirst(env.DB, search) : queryCatalogue(env.DB, search);
+  return browse.query
+    ? searchTitlesFirst(env.DB, search)
+    : queryCatalogue(env.DB, search);
 }
 
 export async function browseCatalogue(env: Bindings, browse: BrowseQuery) {
@@ -263,11 +315,16 @@ export async function getTonight(
   }
 
   const seen = new Set(
-    scheduled.map((episode) => `${episode.showName}|${episode.airsAt.slice(0, 10)}`),
+    scheduled.map(
+      (episode) => `${episode.showName}|${episode.airsAt.slice(0, 10)}`,
+    ),
   );
   const calendar = await traktUpcoming(env, viewerId, origin);
   const extra = calendar
-    .filter((episode) => !seen.has(`${episode.showName}|${episode.airsAt.slice(0, 10)}`))
+    .filter(
+      (episode) =>
+        !seen.has(`${episode.showName}|${episode.airsAt.slice(0, 10)}`),
+    )
     .map((episode) => ({
       titleId: episode.tmdbId ? `tv:${episode.tmdbId}` : null,
       showName: episode.showName,
@@ -282,19 +339,25 @@ export async function getTonight(
     (episode) => Date.parse(episode.airsAt) < Date.now() + 36 * 3_600_000,
   );
 
-  merged.sort((left, right) => Date.parse(left.airsAt) - Date.parse(right.airsAt));
+  merged.sort(
+    (left, right) => Date.parse(left.airsAt) - Date.parse(right.airsAt),
+  );
   merged.length = Math.min(merged.length, limit);
 
   const hydrated = await readRanked(
     env.DB,
-    merged.flatMap((episode) => (episode.titleId && !episode.item ? [episode.titleId] : [])),
+    merged.flatMap((episode) =>
+      episode.titleId && !episode.item ? [episode.titleId] : [],
+    ),
   );
   const byId = new Map(hydrated.map((item) => [item.id, item]));
 
   return {
     episodes: merged.map((episode) => ({
       ...episode,
-      item: episode.item ?? (episode.titleId ? (byId.get(episode.titleId) ?? null) : null),
+      item:
+        episode.item ??
+        (episode.titleId ? (byId.get(episode.titleId) ?? null) : null),
     })),
     fetchedAt: new Date().toISOString(),
   };

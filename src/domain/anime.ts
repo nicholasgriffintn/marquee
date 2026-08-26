@@ -52,7 +52,10 @@ export function animeMeta(item: MediaTitle) {
     return { year: null, extras: [] };
   }
 
-  const format = anime.format && !IMPLIED_FORMATS.has(anime.format) ? FORMATS[anime.format] : null;
+  const format =
+    anime.format && !IMPLIED_FORMATS.has(anime.format)
+      ? FORMATS[anime.format]
+      : null;
 
   return {
     year: animeSeasonLabel(anime),
@@ -91,12 +94,17 @@ export function watchOrderPlacement(relation: string) {
 
 const FALLBACK_SOURCE = "TMDB / JustWatch";
 
-export function mergeAnimeProviders(item: MediaTitle, providers: ProviderAvailability[]) {
+export function mergeAnimeProviders(
+  item: MediaTitle,
+  providers: ProviderAvailability[],
+) {
   const merged = new Map(providers.map((provider) => [provider.id, provider]));
 
   for (const stream of item.anime?.streams ?? []) {
     const registered = findRegistryProvider(stream.site);
-    const id = registered?.id ?? `mal:${stream.site.toLowerCase().replaceAll(/[^a-z0-9]+/gu, "-")}`;
+    const id =
+      registered?.id ??
+      `anilist:${stream.site.toLowerCase().replaceAll(/[^a-z0-9]+/gu, "-")}`;
     const existing = merged.get(id);
 
     if (existing && existing.source !== FALLBACK_SOURCE) {
@@ -108,7 +116,7 @@ export function mergeAnimeProviders(item: MediaTitle, providers: ProviderAvailab
       name: registered?.name ?? stream.site,
       offerTypes: [SUBSCRIPTION],
       webUrl: stream.url,
-      source: "MyAnimeList",
+      source: "AniList",
     });
   }
 

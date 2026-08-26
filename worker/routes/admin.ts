@@ -11,6 +11,7 @@ import {
   resetMirror,
   setWorkStatus,
 } from "../repositories/revival.ts";
+import { readOverviewSample } from "../services/admin-sample.ts";
 import { setUserRole } from "../services/admin-users.ts";
 import {
   ADMIN_ACTIONS,
@@ -22,7 +23,10 @@ import {
 } from "../services/admin.ts";
 import type { Bindings, EnrichmentSource } from "../types.ts";
 
-export const adminRoutes = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
+export const adminRoutes = new Hono<{
+  Bindings: Bindings;
+  Variables: AuthVariables;
+}>();
 
 adminRoutes.use("*", requireAdmin);
 
@@ -30,11 +34,39 @@ adminRoutes.get("/overview", async (context) => {
   try {
     context.header("cache-control", "no-store");
 
-    return context.json({ ...(await readAdminOverview(context.env)), actions: ADMIN_ACTIONS });
+    return context.json({
+      ...(await readAdminOverview(context.env)),
+      actions: ADMIN_ACTIONS,
+    });
   } catch (error) {
     logError("admin_overview_failed", error, { area: "admin" });
 
     return context.json({ error: "Could not read the pipeline" }, 500);
+  }
+});
+
+adminRoutes.get("/overview/sample/:type/:key", async (context) => {
+  const type = context.req.param("type");
+  const key = context.req.param("key");
+
+  if (type !== "count" && type !== "budget") {
+    return context.json({ error: "Unknown sample type" }, 400);
+  }
+
+  try {
+    context.header("cache-control", "no-store");
+
+    const sample = await readOverviewSample(context.env, type, key);
+
+    if (!sample) {
+      return context.json({ error: "No sample for that metric" }, 404);
+    }
+
+    return context.json({ type, key, ...sample });
+  } catch (error) {
+    logError("admin_sample_failed", error, { area: "admin", type, key });
+
+    return context.json({ error: "Could not read a sample" }, 500);
   }
 });
 
@@ -117,7 +149,10 @@ adminRoutes.post("/revival/:workId/:decision", async (context) => {
   try {
     if (decision === "mirror") {
       await resetMirror(context.env.DB, workId);
-      await context.env.REVIVAL_QUEUE.send({ type: "mirror-revival-work", workId });
+      await context.env.REVIVAL_QUEUE.send({
+        type: "mirror-revival-work",
+        workId,
+      });
 
       return context.json({ workId, decision, queued: true });
     }
@@ -130,12 +165,18 @@ adminRoutes.post("/revival/:workId/:decision", async (context) => {
     );
 
     if (changed && decision === "approve") {
-      await context.env.REVIVAL_QUEUE.send({ type: "mirror-revival-work", workId });
+      await context.env.REVIVAL_QUEUE.send({
+        type: "mirror-revival-work",
+        workId,
+      });
     }
 
     return context.json({ workId, decision, changed });
   } catch (error) {
-    logError("admin_revival_decision_failed", error, { area: "revival", workId });
+    logError("admin_revival_decision_failed", error, {
+      area: "revival",
+      workId,
+    });
 
     return context.json({ error: "That decision did not stick" }, 500);
   }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 import type { MediaTitle, Provider, ProviderAvailability } from "../domain/catalog";
 import { providerLogo } from "../domain/provider-logos";
@@ -157,6 +157,58 @@ export function Dropdown({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+export function Modal({
+  onClose,
+  labelledBy,
+  className,
+  children,
+}: {
+  onClose: () => void;
+  labelledBy?: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  const panelRef = useRef<HTMLDialogElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+
+  useLayoutEffect(() => {
+    panelRef.current?.showModal();
+    closeRef.current?.focus();
+  }, []);
+
+  return (
+    <div
+      className="modal-backdrop"
+      role="presentation"
+      onMouseDown={(event) => event.target === event.currentTarget && onClose()}
+    >
+      {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
+      <dialog
+        ref={panelRef}
+        className={`modal-shell${className ? ` ${className}` : ""}`}
+        aria-modal="true"
+        aria-labelledby={labelledBy}
+        onCancel={(event) => {
+          event.preventDefault();
+          onClose();
+        }}
+        onMouseDown={(event) => event.target === event.currentTarget && onClose()}
+      >
+        <button
+          ref={closeRef}
+          type="button"
+          className="modal-close"
+          onClick={onClose}
+          aria-label="Close"
+        >
+          ×
+        </button>
+        {children}
+      </dialog>
     </div>
   );
 }

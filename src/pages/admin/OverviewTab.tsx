@@ -1,8 +1,11 @@
+import { useState } from "react";
+
 import { ErrorBoundary } from "../../components/ErrorBoundary";
 import type { AdminOverview } from "../../hooks/useAdmin";
 import { parseDatabaseDate } from "../../lib/dates";
 import { COUNT_LABELS } from "./config";
 import { ProgressBar } from "./ProgressBar";
+import { SampleModal } from "./SampleModal";
 
 type BackfillRow = {
   mediaType: string;
@@ -57,16 +60,27 @@ function stamp(value: string) {
   return parseDatabaseDate(value)?.toLocaleString() ?? "never";
 }
 
+type Sample = { type: "count" | "budget"; key: string; label: string };
+
 export function OverviewTab({
   overview,
+  loading,
   onResume,
 }: {
   overview: AdminOverview | null;
+  loading: boolean;
   onResume: (source: string) => void;
 }) {
+  const [sample, setSample] = useState<Sample | null>(null);
+
   return (
     <ErrorBoundary label="The readouts">
       <div role="tabpanel" id="admin-panel-overview" aria-labelledby="admin-tab-overview">
+        {!overview && loading && (
+          <p className="admin-note">
+            <i className="availability-spinner" aria-hidden="true" /> Reading the pipeline…
+          </p>
+        )}
         {overview && (
           <section className="panel-block" aria-labelledby="admin-counts-title">
             <h2 id="admin-counts-title">Catalogue</h2>
@@ -74,14 +88,25 @@ export function OverviewTab({
               Availability is only kept fresh for the working set — everything on a shelf or a
               pinned list, everything a rail can surface, anything with an insight or an air date
               ahead of it, plus the most popular titles. The rest of the catalogue is searchable and
-              fills in its providers when something actually reaches for it.
+              fills in its providers when something actually reaches for it. Click a number for a
+              sample of what is behind it.
             </p>
             <div className="admin-counts">
               {COUNT_LABELS.map((count) => (
-                <div key={count.key}>
+                <button
+                  type="button"
+                  key={count.key}
+                  onClick={() =>
+                    setSample({
+                      type: "count",
+                      key: count.key,
+                      label: count.label,
+                    })
+                  }
+                >
                   <strong>{(overview.catalogue[count.key] ?? 0).toLocaleString()}</strong>
                   <span>{count.label}</span>
-                </div>
+                </button>
               ))}
             </div>
           </section>
@@ -131,6 +156,18 @@ export function OverviewTab({
                       : `${budget.used.toLocaleString()} / ${budget.callLimit.toLocaleString()} per ${budget.windowKind}`}
                   </span>
                   <ProgressBar done={budget.used} total={budget.callLimit} />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSample({
+                        type: "budget",
+                        key: budget.source,
+                        label: budget.source,
+                      })
+                    }
+                  >
+                    See sample
+                  </button>
                   {budget.pausedUntil && (
                     <button type="button" onClick={() => onResume(budget.source)}>
                       Resume now
@@ -142,6 +179,14 @@ export function OverviewTab({
           </section>
         )}
       </div>
+      {sample && (
+        <SampleModal
+          type={sample.type}
+          itemKey={sample.key}
+          label={sample.label}
+          onClose={() => setSample(null)}
+        />
+      )}
     </ErrorBoundary>
   );
 }

@@ -49,11 +49,18 @@ export type Bindings = {
   MEDIA: R2Bucket;
   TRAKT_CLIENT_ID?: string;
   TRAKT_CLIENT_SECRET?: string;
+  MAL_CLIENT_ID?: string;
 };
 
 export type CatalogSweepParameters = { deep?: boolean };
 
-export type EnrichmentSource = "tmdb" | "justwatch" | "omdb" | "poster" | "jikan";
+export type EnrichmentSource =
+  | "tmdb"
+  | "justwatch"
+  | "omdb"
+  | "poster"
+  | "mal"
+  | "anilist";
 
 export type TitleRatings = {
   imdbScore: number | null;
@@ -70,12 +77,18 @@ export type TitleRatings = {
 export type IngestionJob =
   | { type: "sync-catalog" }
   | { type: "sync-providers" }
-  | { type: "sync-discover-page"; mediaType: "movie" | "tv"; page: number; partitionId?: string }
+  | {
+      type: "sync-discover-page";
+      mediaType: "movie" | "tv";
+      page: number;
+      partitionId?: string;
+    }
   | { type: "measure-discover-partition"; partitionId: string }
   | { type: "enrich-availability"; titleId: string }
   | { type: "enrich-ratings"; titleId: string }
   | { type: "enrich-anime"; titleId: string }
   | { type: "enrich-anilist"; titleId: string }
+  | { type: "enrich-anilist-media"; titleId: string }
   | { type: "import-anime-ids"; offset?: number; force?: boolean }
   | { type: "cache-poster"; titleId: string }
   | { type: "import-imdb-title"; imdbId: string }

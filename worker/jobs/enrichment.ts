@@ -1,5 +1,6 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
-import { getJikanDetails } from "../clients/jikan.ts";
+import { getAniListDetails } from "../clients/anilist.ts";
+import { getMalAnimeDetails } from "../clients/myanimelist.ts";
 import {
   getOmdbTitle,
   searchOmdb,
@@ -7,11 +8,18 @@ import {
   type OmdbSearchResult,
 } from "../clients/omdb.ts";
 import { logError, logEvent } from "../lib/logging.ts";
+import { isLocalDev } from "../lib/environment.ts";
 import { enqueue } from "../lib/queue.ts";
 import { comparableTitle, imdbIdFrom } from "../lib/text.ts";
-import { claimBudget, isRateLimited, isRefused, readBudgetPace } from "../repositories/budgets.ts";
+import {
+  claimBudget,
+  isRateLimited,
+  isRefused,
+  readBudgetPace,
+} from "../repositories/budgets.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
 import {
+  selectAniListCandidates,
   selectAnimeCandidates,
   selectUnenriched,
   storeEnrichment,
@@ -24,13 +32,18 @@ import { withRateLimitPause, type SourceAttempt } from "./sources.ts";
 
 const ANIME_KEYWORD_LIMIT = 60;
 
+// miniflare's local queue simulation holds one timer per pending message and
+// caps out at 10,000 process-wide; real Cloudflare Queues has no such limit.
+const LOCAL_DEV_PER_RUN_CAP = 500;
+
 const RUN_STATUS: Record<string, string> = {
   "Finished Airing": "Ended",
   "Currently Airing": "Returning Series",
   "Not yet aired": "Planned",
 };
 const YEAR_SLACK = 2;
-const LATIN_SCRIPT = /^[\p{Script=Latin}\p{Script=Common}\p{Script=Inherited}]+$/u;
+const LATIN_SCRIPT =
+  /^[\p{Script=Latin}\p{Script=Common}\p{Script=Inherited}]+$/u;
 
 const ENRICHERS = [
   {
@@ -50,11 +63,19 @@ const ENRICHERS = [
     share: 0.3,
   },
   {
-    source: "jikan",
+    source: "mal",
     job: "enrich-anime",
     maxAgeDays: 14,
     missBackoffDays: 3,
     perRun: 120,
+    share: 1,
+  },
+  {
+    source: "anilist",
+    job: "enrich-anilist-media",
+    maxAgeDays: 1,
+    missBackoffDays: 3,
+    perRun: 500,
     share: 1,
   },
 ] as const satisfies readonly {
@@ -81,11 +102,20 @@ function enrichmentQueue(env: Bindings, source: EnrichmentSource) {
 }
 
 function sourceCandidates(env: Bindings, enricher: Enricher, limit: number) {
-  const window = { maxAgeDays: enricher.maxAgeDays, missBackoffDays: enricher.missBackoffDays };
+  const window = {
+    maxAgeDays: enricher.maxAgeDays,
+    missBackoffDays: enricher.missBackoffDays,
+  };
 
-  return enricher.source === "jikan"
-    ? selectAnimeCandidates(env, window, limit)
-    : selectUnenriched(env, enricher.source, window, limit);
+  if (enricher.source === "mal") {
+    return selectAnimeCandidates(env, window, limit);
+  }
+
+  if (enricher.source === "anilist") {
+    return selectAniListCandidates(env, window, limit);
+  }
+
+  return selectUnenriched(env, enricher.source, window, limit);
 }
 
 function sourceConfigured(env: Bindings, source: EnrichmentSource) {
@@ -93,7 +123,11 @@ function sourceConfigured(env: Bindings, source: EnrichmentSource) {
     return Boolean(env.OMDB_API_KEY);
   }
 
-  return source === "jikan";
+  if (source === "mal") {
+    return Boolean(env.MAL_CLIENT_ID);
+  }
+
+  return true;
 }
 
 async function enrichmentRoom(env: Bindings, enricher: Enricher) {
@@ -117,15 +151,25 @@ export async function queueEnrichment(env: Bindings) {
       continue;
     }
 
-    // oxlint-disable-next-line no-await-in-loop
-    const titleIds = await sourceCandidates(env, enricher, Math.min(enricher.perRun, room));
+    const limit = isLocalDev(env)
+      ? Math.min(enricher.perRun, room, LOCAL_DEV_PER_RUN_CAP)
+      : Math.min(enricher.perRun, room);
 
-    logEvent("enrichment_queued", { source: enricher.source, count: titleIds.length, room });
+    // oxlint-disable-next-line no-await-in-loop
+    const titleIds = await sourceCandidates(env, enricher, limit);
+
+    logEvent("enrichment_queued", {
+      source: enricher.source,
+      count: titleIds.length,
+      room,
+    });
 
     // oxlint-disable-next-line no-await-in-loop
     await enqueue(
       enrichmentQueue(env, enricher.source),
-      titleIds.map((titleId): IngestionJob => ({ type: enricher.job, titleId })),
+      titleIds.map(
+        (titleId): IngestionJob => ({ type: enricher.job, titleId }),
+      ),
     );
   }
 }
@@ -182,7 +226,11 @@ async function findByName(
   title: MediaTitle,
 ): Promise<SourceAttempt<OmdbRecord | null>> {
   const attempt = await lookup(env, () =>
-    getOmdbTitle(env, { title: title.title, year: title.year, mediaType: title.mediaType }),
+    getOmdbTitle(env, {
+      title: title.title,
+      year: title.year,
+      mediaType: title.mediaType,
+    }),
   );
 
   if (attempt.limited) {
@@ -190,7 +238,9 @@ async function findByName(
   }
 
   const record = attempt.value;
-  const named = record?.imdbId ? comparableNames(title).has(comparableTitle(record.title)) : false;
+  const named = record?.imdbId
+    ? comparableNames(title).has(comparableTitle(record.title))
+    : false;
 
   return { limited: false, value: named ? record : null };
 }
@@ -198,12 +248,16 @@ async function findByName(
 function bestMatch(title: MediaTitle, results: OmdbSearchResult[]) {
   const names = comparableNames(title);
   const named = results.filter(
-    (result) => names.has(comparableTitle(result.title)) && yearMatches(title.year, result.year),
+    (result) =>
+      names.has(comparableTitle(result.title)) &&
+      yearMatches(title.year, result.year),
   );
 
   return named.reduce<OmdbSearchResult | null>(
     (best, result) =>
-      !best || yearGap(title.year, result.year) < yearGap(title.year, best.year) ? result : best,
+      !best || yearGap(title.year, result.year) < yearGap(title.year, best.year)
+        ? result
+        : best,
     null,
   );
 }
@@ -221,7 +275,9 @@ async function searchFor(
     searchOmdb(env, query, { mediaType: title.mediaType }),
   );
 
-  return attempt.limited ? attempt : { limited: false, value: bestMatch(title, attempt.value) };
+  return attempt.limited
+    ? attempt
+    : { limited: false, value: bestMatch(title, attempt.value) };
 }
 
 async function findBySearch(
@@ -293,22 +349,34 @@ function omdbFields(title: MediaTitle, record: OmdbRecord) {
       animeScore: title.ratings?.animeScore ?? null,
       animeVotes: title.ratings?.animeVotes ?? null,
     },
-    ...(title.certification || !facts.certification ? {} : { certification: facts.certification }),
+    ...(title.certification || !facts.certification
+      ? {}
+      : { certification: facts.certification }),
     ...(title.runtimeMinutes || !facts.runtimeMinutes
       ? {}
       : { runtimeMinutes: facts.runtimeMinutes }),
-    ...(title.genres.length > 0 || facts.genres.length === 0 ? {} : { genres: facts.genres }),
-    ...(title.releaseDate || !facts.releaseDate ? {} : { releaseDate: facts.releaseDate }),
+    ...(title.genres.length > 0 || facts.genres.length === 0
+      ? {}
+      : { genres: facts.genres }),
+    ...(title.releaseDate || !facts.releaseDate
+      ? {}
+      : { releaseDate: facts.releaseDate }),
     ...(title.year || !record.year ? {} : { year: record.year }),
     ...(title.overview.trim() || !facts.plot ? {} : { overview: facts.plot }),
-    ...(title.people?.length || facts.people.length === 0 ? {} : { people: facts.people }),
-    ...(title.studios?.length || facts.studios.length === 0 ? {} : { studios: facts.studios }),
+    ...(title.people?.length || facts.people.length === 0
+      ? {}
+      : { people: facts.people }),
+    ...(title.studios?.length || facts.studios.length === 0
+      ? {}
+      : { studios: facts.studios }),
     ...(facts.countries.length > 0 ? { countries: facts.countries } : {}),
     ...(facts.languages.length > 0 ? { languages: facts.languages } : {}),
     ...(title.numberOfSeasons || !facts.numberOfSeasons
       ? {}
       : { numberOfSeasons: facts.numberOfSeasons }),
-    ...(title.posterUrl || !facts.posterUrl ? {} : { posterUrl: facts.posterUrl }),
+    ...(title.posterUrl || !facts.posterUrl
+      ? {}
+      : { posterUrl: facts.posterUrl }),
   };
 }
 
@@ -369,33 +437,33 @@ export async function enrichAnime(env: Bindings, titleId: string) {
   const malId = title?.externalIds?.malId ?? null;
 
   if (!malId) {
-    await storeEnrichmentMiss(env, titleId, "jikan", "no-mal-id");
+    await storeEnrichmentMiss(env, titleId, "mal", "no-mal-id");
 
     return;
   }
 
-  if (!(await claimBudget(env, "jikan"))) {
-    logEvent("budget_exhausted", { source: "jikan", titleId });
+  if (!(await claimBudget(env, "mal"))) {
+    logEvent("budget_exhausted", { source: "mal", titleId });
 
     return;
   }
 
-  const attempt = await withRateLimitPause(env, "jikan", async () => {
+  const attempt = await withRateLimitPause(env, "mal", async () => {
     try {
-      return await getJikanDetails(malId);
+      return await getMalAnimeDetails(env, malId);
     } catch (error) {
       if (isRefused(error) || isRateLimited(error)) {
         throw error;
       }
 
-      logError("jikan_lookup_failed", error, { titleId });
+      logError("mal_lookup_failed", error, { titleId });
 
       return "unavailable" as const;
     }
   });
 
   if (attempt.limited) {
-    await storeEnrichmentTransient(env, titleId, "jikan", "rate-limited");
+    await storeEnrichmentTransient(env, titleId, "mal", "rate-limited");
 
     return;
   }
@@ -403,13 +471,13 @@ export async function enrichAnime(env: Bindings, titleId: string) {
   const details = attempt.value;
 
   if (details === "unavailable") {
-    await storeEnrichmentTransient(env, titleId, "jikan", "mal-unavailable");
+    await storeEnrichmentTransient(env, titleId, "mal", "mal-unavailable");
 
     return;
   }
 
   if (!details) {
-    await storeEnrichmentMiss(env, titleId, "jikan", "no-mal-record");
+    await storeEnrichmentMiss(env, titleId, "mal", "no-mal-record");
 
     return;
   }
@@ -435,27 +503,35 @@ export async function enrichAnime(env: Bindings, titleId: string) {
     ]),
   ].slice(0, ANIME_KEYWORD_LIMIT);
 
-  await storeEnrichment(env, titleId, "jikan", {
+  await storeEnrichment(env, titleId, "mal", {
     anime: {
       ...details.anime,
       broadcast: details.broadcast,
       background: details.background,
-      licensors: details.licensors,
-      producers: details.producers,
       rank: details.rank,
+      popularity: details.popularity,
       members: details.members,
       favorites: details.favorites,
       keyVisualUrl: details.keyVisualUrl,
-      trailerKey: details.trailerKey,
-      links: details.links,
+      videos: details.videos,
+      statusBreakdown: details.statusBreakdown,
     },
     keywords,
     ...(title?.status || !RUN_STATUS[details.status ?? ""]
       ? {}
       : { status: RUN_STATUS[details.status ?? ""] }),
-    ...(title?.lastAirDate || !details.airedTo ? {} : { lastAirDate: details.airedTo }),
-    ...(title?.studios?.length || details.studios.length === 0 ? {} : { studios: details.studios }),
-    ...(title?.posterUrl || !details.keyVisualUrl ? {} : { posterUrl: details.keyVisualUrl }),
+    ...(title?.certification || !details.rating
+      ? {}
+      : { certification: `MAL ${details.rating}` }),
+    ...(title?.lastAirDate || !details.airedTo
+      ? {}
+      : { lastAirDate: details.airedTo }),
+    ...(title?.studios?.length || details.studios.length === 0
+      ? {}
+      : { studios: details.studios }),
+    ...(title?.posterUrl || !details.keyVisualUrl
+      ? {}
+      : { posterUrl: details.keyVisualUrl }),
     ratings: {
       imdbScore: title?.ratings?.imdbScore ?? null,
       imdbVotes: title?.ratings?.imdbVotes ?? null,
@@ -467,5 +543,80 @@ export async function enrichAnime(env: Bindings, titleId: string) {
       animeScore: details.score,
       animeVotes: details.scoredBy,
     },
+  });
+}
+
+export async function enrichAniListMedia(env: Bindings, titleId: string) {
+  const [title] = await readItems(env.DB, [titleId]);
+  const anilistId = title?.externalIds?.anilistId ?? null;
+
+  if (!anilistId) {
+    await storeEnrichmentMiss(env, titleId, "anilist", "no-anilist-id");
+
+    return;
+  }
+
+  if (!(await claimBudget(env, "anilist"))) {
+    logEvent("budget_exhausted", { source: "anilist", titleId });
+
+    return;
+  }
+
+  const attempt = await withRateLimitPause(env, "anilist", async () => {
+    try {
+      return await getAniListDetails(anilistId);
+    } catch (error) {
+      if (isRefused(error) || isRateLimited(error)) {
+        throw error;
+      }
+
+      logError("anilist_lookup_failed", error, { titleId });
+
+      return "unavailable" as const;
+    }
+  });
+
+  if (attempt.limited) {
+    await storeEnrichmentTransient(env, titleId, "anilist", "rate-limited");
+
+    return;
+  }
+
+  const details = attempt.value;
+
+  if (details === "unavailable") {
+    await storeEnrichmentTransient(
+      env,
+      titleId,
+      "anilist",
+      "anilist-unavailable",
+    );
+
+    return;
+  }
+
+  if (!details) {
+    await storeEnrichmentMiss(env, titleId, "anilist", "no-anilist-record");
+
+    return;
+  }
+
+  await storeEnrichment(env, titleId, "anilist", {
+    anime: title?.anime
+      ? { ...title.anime, ...details }
+      : {
+          format: null,
+          episodes: null,
+          durationMinutes: null,
+          season: null,
+          seasonYear: null,
+          source: null,
+          synonyms: [],
+          romajiTitle: null,
+          englishTitle: null,
+          nativeTitle: null,
+          relations: [],
+          ...details,
+        },
   });
 }

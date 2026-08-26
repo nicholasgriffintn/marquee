@@ -1,7 +1,11 @@
 import { useState, type MouseEvent } from "react";
 
 import type { ProviderAvailability } from "../domain/catalog";
-import { STREAMING_LIMIT, watchOptions, type WatchOption } from "../domain/watch";
+import {
+  STREAMING_LIMIT,
+  watchOptions,
+  type WatchOption,
+} from "../domain/watch";
 import { ArrowIcon, ChevronIcon, ProviderBadge } from "./ui";
 import type { Exit } from "./usher/ExitDoor";
 
@@ -55,10 +59,18 @@ export function WatchBlock({
 }) {
   const [showAll, setShowAll] = useState(false);
   const [showPaid, setShowPaid] = useState(false);
-  const { primary, rest, paid } = watchOptions(providers, fallbackHref, selectedProviderIds);
+  const { primary, rest, paid } = watchOptions(
+    providers,
+    fallbackHref,
+    selectedProviderIds,
+  );
   const listed = [primary, ...rest, ...paid].filter(Boolean);
-  const fromJustWatch = listed.some((option) => option.provider.source !== "MyAnimeList");
-  const fromMyAnimeList = listed.some((option) => option.provider.source === "MyAnimeList");
+  const fromJustWatch = listed.some(
+    (option) => option.provider.source !== "AniList",
+  );
+  const fromAniList = listed.some(
+    (option) => option.provider.source === "AniList",
+  );
 
   if (!primary && rest.length === 0 && paid.length === 0) {
     if (isRefreshing) {
@@ -98,13 +110,21 @@ export function WatchBlock({
       {shown.length > 0 && (
         <div className={`watch-grid${showAll ? " expanded" : ""}`}>
           {shown.map((option) => (
-            <WatchLink key={option.provider.id} option={option} onLeave={onLeave} />
+            <WatchLink
+              key={option.provider.id}
+              option={option}
+              onLeave={onLeave}
+            />
           ))}
         </div>
       )}
 
       {held.length > 0 && !showAll && (
-        <button type="button" className="watch-more" onClick={() => setShowAll(true)}>
+        <button
+          type="button"
+          className="watch-more"
+          onClick={() => setShowAll(true)}
+        >
           Show {held.length} more way{held.length === 1 ? "" : "s"} to watch
           <ChevronIcon />
         </button>
@@ -119,14 +139,19 @@ export function WatchBlock({
               aria-expanded={paidOpen}
               onClick={() => setShowPaid((open) => !open)}
             >
-              Rent or buy from {paid.length} service{paid.length === 1 ? "" : "s"}
+              Rent or buy from {paid.length} service
+              {paid.length === 1 ? "" : "s"}
               <ChevronIcon />
             </button>
           )}
           {paidOpen && (
             <div className="watch-grid expanded">
               {paid.map((option) => (
-                <WatchLink key={option.provider.id} option={option} onLeave={onLeave} />
+                <WatchLink
+                  key={option.provider.id}
+                  option={option}
+                  onLeave={onLeave}
+                />
               ))}
             </div>
           )}
@@ -136,13 +161,17 @@ export function WatchBlock({
         {fromJustWatch && (
           <>
             Availability from{" "}
-            <a href="https://www.justwatch.com" target="_blank" rel="noreferrer">
+            <a
+              href="https://www.justwatch.com"
+              target="_blank"
+              rel="noreferrer"
+            >
               JustWatch
             </a>
             .{" "}
           </>
         )}
-        {fromMyAnimeList ? "Streaming sites from MyAnimeList. " : ""}
+        {fromAniList ? "Streaming sites from AniList. " : ""}
         It changes without telling me.
       </p>
     </div>

@@ -13,16 +13,12 @@ function videosFor(item: MediaTitle): Video[] {
     : item.trailerKey
       ? [{ key: item.trailerKey, name: "Trailer", type: "Trailer" }]
       : [];
-  const malKey = item.anime?.trailerKey;
+  const seen = new Set(videos.map((video) => video.key));
+  const malVideos = (item.anime?.videos ?? [])
+    .filter((video) => !seen.has(video.key))
+    .map((video) => ({ key: video.key, name: video.name, type: "Trailer" }));
 
-  if (!malKey || videos.some((video) => video.key === malKey)) {
-    return videos;
-  }
-
-  return [
-    ...videos,
-    { key: malKey, name: "MyAnimeList trailer", type: "Trailer" },
-  ];
+  return [...videos, ...malVideos];
 }
 
 export function TrailerBlock({ item }: { item: MediaTitle }) {

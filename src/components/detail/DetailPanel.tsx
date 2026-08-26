@@ -1,11 +1,21 @@
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { Link } from "react-router-dom";
 
 import { mergeAnimeProviders } from "../../domain/anime";
 import { collectionPath, type MediaTitle } from "../../domain/catalog";
-import { removalDisclosure, type ProfileEntryState } from "../../domain/profile-entry";
+import {
+  removalDisclosure,
+  type ProfileEntryState,
+} from "../../domain/profile-entry";
 import { useAvailability } from "../../hooks/useAvailability";
 import { useCollection } from "../../hooks/useCollection";
+import { useAnimeRecommendations } from "../../hooks/useAnimeRecommendations";
 import { useRecommendations } from "../../hooks/useRecommendations";
 import { useTitleReels } from "../../hooks/useRevival";
 import { useEpisodeEntries } from "../../hooks/useSeasons";
@@ -27,6 +37,7 @@ import { ExitDoor } from "../usher/ExitDoor";
 import { WatchBlock } from "../WatchBlock";
 import { AirLine } from "./AirLine";
 import { BuzzNote } from "./BuzzNote";
+import { CastAndStaff } from "./CastAndStaff";
 import { CreditsBlock } from "./CreditsBlock";
 import { MarqueeRead } from "./MarqueeRead";
 import { ScoreRow } from "./ScoreRow";
@@ -96,15 +107,29 @@ export function DetailPanel({
   const live = view.titleId === item.id ? view : null;
   const tab = live?.tab ?? "overview";
   const jump = live?.jump ?? null;
-  const setTab = (next: DetailTab) => setView({ titleId: item.id, tab: next, jump });
+  const setTab = (next: DetailTab) =>
+    setView({ titleId: item.id, tab: next, jump });
   const tracker = useEpisodeEntries(item.id, canSave);
   const progress = tracker.progress;
-  const continueAt = isSeries && progress && progress.watched > 0 ? progress.upNext : null;
-  const { providers, nextEpisode, isRefreshing } = useAvailability(item, availabilityEnabled);
+  const continueAt =
+    isSeries && progress && progress.watched > 0 ? progress.upNext : null;
+  const { providers, nextEpisode, isRefreshing } = useAvailability(
+    item,
+    availabilityEnabled,
+  );
   const watchProviders = mergeAnimeProviders(item, providers);
   const watchOrder = useWatchOrder(item);
-  const { insight, pairs, isLoading: isInsightLoading } = useTitleInsight(item.id);
-  const similar = useRecommendations(item.id, item.recommendationIds, SIMILAR_LIMIT);
+  const {
+    insight,
+    pairs,
+    isLoading: isInsightLoading,
+  } = useTitleInsight(item.id);
+  const similar = useRecommendations(
+    item.id,
+    item.recommendationIds,
+    SIMILAR_LIMIT,
+  );
+  const malSimilar = useAnimeRecommendations(item);
   const showings = useShowings(item, canSave);
   const reels = useTitleReels(item.id, item.mediaType, item.tmdbId);
   const collection = useCollection(item.collection?.id);
@@ -200,10 +225,13 @@ export function DetailPanel({
       <div className="detail-copy">
         <h2 id="detail-title">{item.title}</h2>
         <p className="detail-meta">
-          {item.mediaType === "movie" ? "Film" : "Television"} · {detailMeta(item)}
+          {item.mediaType === "movie" ? "Film" : "Television"} ·{" "}
+          {detailMeta(item)}
         </p>
         {item.originalTitle && item.originalTitle !== item.title && (
-          <p className="detail-original">Original title · {item.originalTitle}</p>
+          <p className="detail-original">
+            Original title · {item.originalTitle}
+          </p>
         )}
         {(item.studios?.length || spokenIn || madeIn) && (
           <p className="detail-original">
@@ -218,7 +246,11 @@ export function DetailPanel({
         )}
         {item.tagline && <p className="detail-tagline">{item.tagline}</p>}
         {isSeries && (
-          <div className="detail-tabs" role="tablist" aria-label="Overview or episodes">
+          <div
+            className="detail-tabs"
+            role="tablist"
+            aria-label="Overview or episodes"
+          >
             {DETAIL_TABS.map((name) => (
               <button
                 type="button"
@@ -231,7 +263,9 @@ export function DetailPanel({
                 onClick={() => setTab(name)}
               >
                 {name === "overview" ? "Overview" : "Episodes"}
-                {name === "episodes" && item.episodeCount ? <em>{item.episodeCount}</em> : null}
+                {name === "episodes" && item.episodeCount ? (
+                  <em>{item.episodeCount}</em>
+                ) : null}
               </button>
             ))}
           </div>
@@ -243,26 +277,38 @@ export function DetailPanel({
           aria-labelledby={isSeries ? "detail-tab-overview" : undefined}
           hidden={isSeries && tab !== "overview"}
         >
-          <p className="detail-synopsis">{item.overview || "No synopsis available."}</p>
+          <p className="detail-synopsis">
+            {item.overview || "No synopsis available."}
+          </p>
           {item.anime?.background && (
             <p className="detail-background">
               {item.anime.background}
-              <small className="detail-credit">Background from MyAnimeList</small>
+              <small className="detail-credit">
+                Background from MyAnimeList
+              </small>
             </p>
           )}
           <MarqueeRead insight={insight} isLoading={isInsightLoading} />
           {canSave && (
             <ErrorBoundary label="The shelf card">
-              {entryState.status === "idle" || entryState.status === "loading" ? (
+              {entryState.status === "idle" ||
+              entryState.status === "loading" ? (
                 <p className="availability-empty" aria-live="polite">
                   <i className="availability-spinner" aria-hidden="true" />
                   Checking your shelf…
                 </p>
               ) : entryState.status === "error" ? (
                 <div className="availability-empty" role="alert">
-                  <p>Your saved shelf entry could not be checked. No changes have been made.</p>
+                  <p>
+                    Your saved shelf entry could not be checked. No changes have
+                    been made.
+                  </p>
                   {entryState.retryable && (
-                    <button type="button" className="save-button" onClick={onRetryEntry}>
+                    <button
+                      type="button"
+                      className="save-button"
+                      onClick={onRetryEntry}
+                    >
                       Try again
                     </button>
                   )}
@@ -272,21 +318,31 @@ export function DetailPanel({
                   entry={entryState.entry}
                   title={item.title}
                   isSeries={isSeries}
-                  confirmRemove={() => window.confirm(removalDisclosure(isSeries))}
+                  confirmRemove={() =>
+                    window.confirm(removalDisclosure(isSeries))
+                  }
                   onRemove={onRemove}
                   onSave={onSaveEntry}
                   onStatus={onStatus}
                   onUpdateDraft={onUpdateDraft}
                 />
               ) : (
-                <button type="button" className="save-button" onClick={() => onSave(item)}>
+                <button
+                  type="button"
+                  className="save-button"
+                  onClick={() => onSave(item)}
+                >
                   <PlusIcon /> Save to my shelf
                 </button>
               )}
             </ErrorBoundary>
           )}
           <AirLine item={item} nextEpisode={nextEpisode} />
-          <WatchOrder label="Before this" entries={watchOrder.before} onOpen={onOpen} />
+          <WatchOrder
+            label="Before this"
+            entries={watchOrder.before}
+            onOpen={onOpen}
+          />
           <ErrorBoundary label="Where to watch">
             <WatchBlock
               providers={watchProviders}
@@ -297,10 +353,22 @@ export function DetailPanel({
               onLeave={leaveVia}
             />
           </ErrorBoundary>
-          <WatchOrder label="After this" entries={watchOrder.after} onOpen={onOpen} />
-          <WatchOrder label="Related" entries={watchOrder.related} onOpen={onOpen} />
+          <WatchOrder
+            label="After this"
+            entries={watchOrder.after}
+            onOpen={onOpen}
+          />
+          <WatchOrder
+            label="Related"
+            entries={watchOrder.related}
+            onOpen={onOpen}
+          />
           {continueAt && (
-            <button type="button" className="detail-continue" onClick={resumeWatching}>
+            <button
+              type="button"
+              className="detail-continue"
+              onClick={resumeWatching}
+            >
               <span>
                 Continue S{continueAt.season} E{continueAt.episode}
               </span>
@@ -329,6 +397,7 @@ export function DetailPanel({
           <ErrorBoundary label="The credits">
             <CreditsBlock key={item.id} titleId={item.id} />
           </ErrorBoundary>
+          <CastAndStaff item={item} />
           {item.keywords?.length ? (
             <div className="detail-chips">
               {item.keywords.slice(0, KEYWORDS_SHOWN).map((keyword) => (
@@ -352,7 +421,10 @@ export function DetailPanel({
               onOpen={onOpen}
               footer={
                 collection.hasMore ? (
-                  <Link className="detail-similar-more" to={collectionPath(item.collection.id)}>
+                  <Link
+                    className="detail-similar-more"
+                    to={collectionPath(item.collection.id)}
+                  >
                     See the whole collection
                   </Link>
                 ) : undefined
@@ -362,6 +434,12 @@ export function DetailPanel({
           <TitleTrack
             label="More like this"
             items={similar}
+            caption={similarCaption}
+            onOpen={onOpen}
+          />
+          <TitleTrack
+            label="MyAnimeList recommends"
+            items={malSimilar}
             caption={similarCaption}
             onOpen={onOpen}
           />
@@ -388,7 +466,9 @@ export function DetailPanel({
           </div>
         )}
       </div>
-      {exit && <ExitDoor exit={exit} onLeave={() => report(exit)} onClose={dismiss} />}
+      {exit && (
+        <ExitDoor exit={exit} onLeave={() => report(exit)} onClose={dismiss} />
+      )}
     </>
   );
 }

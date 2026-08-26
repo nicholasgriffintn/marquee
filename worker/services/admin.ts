@@ -63,51 +63,73 @@ type CountRow = Record<string, number>;
 
 async function catalogueStats(env: Bindings) {
   const [row, working] = await Promise.all([
+    // Subqueries that hit the same table are folded into one grouped pass
+    // (sum(CASE ...)) instead of one full scan per count, since this runs on
+    // every admin overview load.
     env.DB.prepare(
       `SELECT
-         (SELECT count(*) FROM catalog_titles) AS titles,
-         (SELECT count(*) FROM catalog_titles WHERE media_type = 'movie') AS movies,
-         (SELECT count(*) FROM catalog_titles WHERE media_type = 'tv') AS shows,
-         (SELECT count(*) FROM catalog_titles WHERE poster_key IS NOT NULL) AS posters,
+         tt.titles, tt.movies, tt.shows, tt.posters, tt.animeIds, tt.animeDetails,
          (SELECT count(*) FROM title_embeddings WHERE content_hash IS NOT NULL) AS embeddings,
          (SELECT count(*) FROM title_buzz WHERE article <> '') AS buzz,
          (SELECT count(*) FROM title_schedule WHERE airs_at >= datetime('now')) AS upcoming,
          (SELECT count(*) FROM catalog_sections) AS sections,
-         (SELECT count(*) FROM cinemas) AS cinemas,
-         (SELECT count(*) FROM cinemas WHERE latitude IS NOT NULL) AS cinemasPlaced,
+         cc.cinemas, cc.cinemasPlaced,
          (SELECT count(*) FROM cinema_films) AS cinemaFilms,
          (SELECT count(*) FROM cinema_screenings WHERE business_day >= date('now')) AS screenings,
          (SELECT count(*) FROM cinema_interest WHERE last_seen_at > datetime('now', '-30 days')) AS interestCells,
          (SELECT count(*) FROM viewing_entries) AS shelfEntries,
-         (SELECT count(*) FROM users) AS users,
-         (SELECT count(*) FROM users WHERE alert_email_verified_at IS NOT NULL) AS alertReady,
-         (SELECT count(*) FROM viewer_alerts) AS alertsSent,
-         (SELECT count(*) FROM viewer_alerts WHERE julianday(sent_at) > julianday('now', '-7 days')) AS alertsWeek,
+         uu.users, uu.alertReady,
+         va.alertsSent, va.alertsWeek,
          (SELECT count(*) FROM viewer_signals) AS signals,
          (SELECT count(*) FROM viewer_beliefs WHERE revoked_at IS NULL) AS beliefs,
          (SELECT count(*) FROM catalog_people) AS people,
          (SELECT count(*) FROM catalog_seasons) AS seasons,
          (SELECT count(*) FROM title_insights) AS insights,
-         (SELECT count(*) FROM catalog_titles
-           WHERE json_extract(payload, '$.externalIds.malId') IS NOT NULL) AS animeIds,
-         (SELECT count(*) FROM catalog_titles
-           WHERE json_extract(payload, '$.anime') IS NOT NULL) AS animeDetails,
-         (SELECT count(*) FROM revival_works) AS revivalWorks,
-         (SELECT count(*) FROM revival_works WHERE status = 'approved') AS revivalApproved,
-         (SELECT count(*) FROM revival_works WHERE mirror_state = 'mirrored') AS revivalMirrored,
-         (SELECT count(*) FROM revival_works WHERE status = 'candidate') AS revivalPending,
+         rv.revivalWorks, rv.revivalApproved, rv.revivalMirrored, rv.revivalPending,
          (SELECT count(*) FROM ai_rails) AS railSets,
-         (SELECT count(*) FROM pinned_shelves) AS pinnedShelves`,
+         (SELECT count(*) FROM pinned_shelves) AS pinnedShelves
+       FROM
+         (SELECT
+            count(*) AS titles,
+            sum(CASE WHEN media_type = 'movie' THEN 1 ELSE 0 END) AS movies,
+            sum(CASE WHEN media_type = 'tv' THEN 1 ELSE 0 END) AS shows,
+            sum(CASE WHEN poster_key IS NOT NULL THEN 1 ELSE 0 END) AS posters,
+            sum(CASE WHEN json_extract(payload, '$.externalIds.malId') IS NOT NULL THEN 1 ELSE 0 END) AS animeIds,
+            sum(CASE WHEN json_extract(payload, '$.anime') IS NOT NULL THEN 1 ELSE 0 END) AS animeDetails
+          FROM catalog_titles) AS tt,
+         (SELECT
+            count(*) AS cinemas,
+            sum(CASE WHEN latitude IS NOT NULL THEN 1 ELSE 0 END) AS cinemasPlaced
+          FROM cinemas) AS cc,
+         (SELECT
+            count(*) AS users,
+            sum(CASE WHEN alert_email_verified_at IS NOT NULL THEN 1 ELSE 0 END) AS alertReady
+          FROM users) AS uu,
+         (SELECT
+            count(*) AS alertsSent,
+            sum(CASE WHEN julianday(sent_at) > julianday('now', '-7 days') THEN 1 ELSE 0 END) AS alertsWeek
+          FROM viewer_alerts) AS va,
+         (SELECT
+            count(*) AS revivalWorks,
+            sum(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) AS revivalApproved,
+            sum(CASE WHEN mirror_state = 'mirrored' THEN 1 ELSE 0 END) AS revivalMirrored,
+            sum(CASE WHEN status = 'candidate' THEN 1 ELSE 0 END) AS revivalPending
+          FROM revival_works) AS rv`,
     ).first<CountRow>(),
     readWorkingSetStats(env.DB),
   ]);
 
-  return { ...row, workingSet: working.titles, availabilityFresh: working.fresh };
+  return {
+    ...row,
+    workingSet: working.titles,
+    availabilityFresh: working.fresh,
+  };
 }
 
 const JOB_TYPE_SOURCE: Record<string, string> = {
-  "enrich-anime": "jikan",
-  "enrich-anilist": "jikan",
+  "enrich-anime": "mal",
+  "enrich-anilist": "mal",
+  "enrich-anilist-media": "anilist",
   "enrich-ratings": "omdb",
   "cache-poster": "poster",
   "enrich-availability": "justwatch",
@@ -124,7 +146,13 @@ async function enrichmentStats(env: Bindings) {
        FROM title_enrichment
        GROUP BY source
        ORDER BY source`,
-    ).all<{ source: string; titles: number; misses: number; pending: number; newest: string }>(),
+    ).all<{
+      source: string;
+      titles: number;
+      misses: number;
+      pending: number;
+      newest: string;
+    }>(),
     env.DB.prepare(
       `SELECT
          sum(CASE WHEN json_array_length(COALESCE(json_extract(payload, '$.providers'), json('[]'))) > 0 THEN 1 ELSE 0 END) AS titles,
@@ -136,7 +164,7 @@ async function enrichmentStats(env: Bindings) {
     env.DB.prepare(
       `SELECT job_type AS jobType, count(*) AS attempted
        FROM ingestion_runs
-       WHERE job_type IN ('enrich-anime', 'enrich-anilist', 'enrich-ratings', 'cache-poster', 'enrich-availability')
+       WHERE job_type IN ('enrich-anime', 'enrich-anilist', 'enrich-anilist-media', 'enrich-ratings', 'cache-poster', 'enrich-availability')
          AND started_at > datetime('now', ?)
        GROUP BY job_type`,
     )
@@ -176,7 +204,10 @@ async function enrichmentStats(env: Bindings) {
   const recentBySource = new Map(recent.results.map((row) => [row.source, row]));
 
   if (recentJustwatch) {
-    recentBySource.set("justwatch", { source: "justwatch", ...recentJustwatch });
+    recentBySource.set("justwatch", {
+      source: "justwatch",
+      ...recentJustwatch,
+    });
   }
 
   const withAttempts = (row: {
@@ -291,7 +322,10 @@ export async function runAdminAction(env: Bindings, action: AdminAction) {
   if (action === "people") {
     const people = await rebuildPeopleIndex(env.DB);
 
-    return { people, detail: `Indexed ${people.toLocaleString()} credited names` };
+    return {
+      people,
+      detail: `Indexed ${people.toLocaleString()} credited names`,
+    };
   }
 
   if (action === "angle-scores") {
@@ -335,7 +369,10 @@ export async function runAdminAction(env: Bindings, action: AdminAction) {
   if (action === "working-set") {
     const titles = await rebuildWorkingSet(env.DB);
 
-    return { queued: titles, detail: `Working set now tracks ${titles} titles` };
+    return {
+      queued: titles,
+      detail: `Working set now tracks ${titles} titles`,
+    };
   }
 
   if (action === "cinemas") {

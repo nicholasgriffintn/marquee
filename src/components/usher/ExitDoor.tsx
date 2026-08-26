@@ -1,9 +1,23 @@
-import { useEffect, useId, useLayoutEffect, useRef } from "react";
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  type MouseEvent,
+  type SyntheticEvent,
+} from "react";
 
 import { focusableElements } from "../../lib/focus";
 import { UsherMark } from "./UsherMark";
 
-export type ExitKind = "provider" | "trailer" | "tmdb" | "wikipedia" | "imdb" | "cinema" | "other";
+export type ExitKind =
+  | "provider"
+  | "trailer"
+  | "tmdb"
+  | "wikipedia"
+  | "imdb"
+  | "cinema"
+  | "other";
 
 export type Exit = {
   href: string;
@@ -18,10 +32,13 @@ const SKIP_KEY = "marquee.skipExitWarning";
 const LINES: Record<ExitKind, (label: string) => string> = {
   provider: (label) =>
     `${label} is through that door. I don't work there, and I can't help you once you're through it.`,
-  trailer: () => "The trailer is next door. They will try to sell you three more on the way out.",
-  tmdb: () => "The records office. Nearly everything I know about this came from in there.",
+  trailer: () =>
+    "The trailer is next door. They will try to sell you three more on the way out.",
+  tmdb: () =>
+    "The records office. Nearly everything I know about this came from in there.",
   wikipedia: () => "The library. Mind the spoilers, they do not sort them.",
-  imdb: () => "Another lot's records. Perfectly good. Do not read the comments.",
+  imdb: () =>
+    "Another lot's records. Perfectly good. Do not read the comments.",
   cinema: (label) =>
     `${label}. A proper house, with a proper screen. Go on, then — I'll still be here.`,
   other: () => "That is outside the building. I cannot vouch for it.",
@@ -62,9 +79,14 @@ export function ExitDoor({
 }) {
   const stayRef = useRef<HTMLButtonElement>(null);
   const skipRef = useRef<HTMLInputElement>(null);
+  const shadeRef = useRef<HTMLDialogElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const descriptionId = useId();
+
+  useEffect(() => {
+    shadeRef.current?.showModal();
+  }, []);
 
   useEffect(() => {
     const bodyOverflow = document.body.style.overflow;
@@ -78,7 +100,9 @@ export function ExitDoor({
 
   useLayoutEffect(() => {
     const previousFocus =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
 
     stayRef.current?.focus();
 
@@ -117,7 +141,10 @@ export function ExitDoor({
       if (event.shiftKey && (!dialog.contains(active) || active === first)) {
         event.preventDefault();
         last.focus();
-      } else if (!event.shiftKey && (!dialog.contains(active) || active === last)) {
+      } else if (
+        !event.shiftKey &&
+        (!dialog.contains(active) || active === last)
+      ) {
         event.preventDefault();
         first.focus();
       }
@@ -126,7 +153,11 @@ export function ExitDoor({
     function containFocus(event: FocusEvent) {
       const dialog = dialogRef.current;
 
-      if (dialog && event.target instanceof Node && !dialog.contains(event.target)) {
+      if (
+        dialog &&
+        event.target instanceof Node &&
+        !dialog.contains(event.target)
+      ) {
         stayRef.current?.focus();
       }
     }
@@ -154,15 +185,27 @@ export function ExitDoor({
     onClose();
   }
 
+  function onShadeClick(event: MouseEvent<HTMLDialogElement>) {
+    if (event.target === event.currentTarget) {
+      onClose();
+    }
+  }
+
+  function onCancel(event: SyntheticEvent<HTMLDialogElement>) {
+    event.preventDefault();
+    onClose();
+  }
+
   return (
-    <div className="exit-shade">
-      <button
-        type="button"
-        className="exit-backdrop"
-        aria-label="Stay here"
-        tabIndex={-1}
-        onClick={onClose}
-      />
+    // Clicking the backdrop dismisses the dialog same as Escape or "Stay here" -
+    // both keyboard-reachable, so the backdrop itself doesn't need its own key handler.
+    // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions
+    <dialog
+      ref={shadeRef}
+      className="exit-shade"
+      onClick={onShadeClick}
+      onCancel={onCancel}
+    >
       <div
         ref={dialogRef}
         className="exit-door"
@@ -203,6 +246,6 @@ export function ExitDoor({
           Stop telling me. I know where the door is.
         </label>
       </div>
-    </div>
+    </dialog>
   );
 }

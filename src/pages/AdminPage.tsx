@@ -126,7 +126,11 @@ export function AdminPage({ user }: { user: User }) {
 
       {tab === "overview" && (
         <div role="tabpanel" id="admin-panel-overview" aria-labelledby="admin-tab-overview">
-          <OverviewTab overview={overview} onResume={(source) => void admin.resume(source)} />
+          <OverviewTab
+            overview={overview}
+            loading={admin.loading}
+            onResume={(source) => void admin.resume(source)}
+          />
         </div>
       )}
 

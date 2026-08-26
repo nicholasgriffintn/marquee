@@ -2484,6 +2484,75 @@ h2 em {
   width: 46px;
   z-index: 3;
 }
+.modal-backdrop {
+  align-items: center;
+  background: rgba(0, 0, 0, 0.78);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 24px;
+  position: fixed;
+  z-index: 60;
+}
+.modal-shell {
+  animation: modal-in 0.2s ease both;
+  background: var(--paper);
+  border: 0;
+  color: var(--ink);
+  inset: 0;
+  margin: auto;
+  max-height: 80vh;
+  max-width: 640px;
+  overflow-y: auto;
+  padding: 42px 30px 30px;
+  position: fixed;
+  width: min(92vw, 640px);
+}
+.modal-shell::backdrop {
+  background: transparent;
+}
+.modal-close {
+  background: var(--ink);
+  border: 0;
+  color: white;
+  font: 24px/1 var(--serif);
+  height: 38px;
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 38px;
+  z-index: 3;
+}
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+.sample-modal h2 {
+  font-size: 20px;
+  margin: 0 0 14px;
+}
+.sample-table-wrap {
+  overflow-x: auto;
+}
+.sample-table {
+  border-collapse: collapse;
+  font: 11px var(--mono);
+  width: 100%;
+}
+.sample-table th,
+.sample-table td {
+  border-bottom: 1px solid var(--line);
+  padding: 8px 10px;
+  text-align: left;
+  white-space: nowrap;
+}
+.sample-table th {
+  color: var(--muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
 .detail-panel .poster-wide {
   align-self: start;
   aspect-ratio: auto;
@@ -2868,7 +2937,13 @@ h2 em {
     gap: 0;
     height: 48px;
     margin-inline: -18px;
-    mask-image: linear-gradient(to right, transparent, black 20px, black calc(100% - 20px), transparent);
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      black 20px,
+      black calc(100% - 20px),
+      transparent
+    );
     -webkit-mask-image: linear-gradient(
       to right,
       transparent,
@@ -3271,12 +3346,22 @@ h2 em {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
 }
-.admin-counts > div {
+.admin-counts > button {
+  background: none;
+  border: 0;
   border-top: 1px solid var(--line);
+  color: inherit;
+  cursor: pointer;
   display: flex;
   flex-direction: column;
+  font: inherit;
   gap: 4px;
   padding: 16px 10px;
+  text-align: left;
+}
+.admin-counts > button:hover,
+.admin-counts > button:focus-visible {
+  background: var(--panel-tile);
 }
 .admin-counts strong {
   color: var(--acid);
@@ -6711,26 +6796,26 @@ button.notebook-primary {
 
 .exit-shade {
   align-items: center;
-  z-index: 90;
-  animation: exit-in 0.16s ease;
-  background: rgba(6, 7, 5, 0.72);
+  background: none;
+  border: 0;
   display: flex;
+  height: 100%;
   inset: 0;
   justify-content: center;
+  margin: 0;
+  max-height: none;
+  max-width: none;
   padding: 24px;
-  position: fixed;
+  width: 100%;
+}
+.exit-shade::backdrop {
+  animation: exit-in 0.16s ease;
+  background: rgba(6, 7, 5, 0.72);
 }
 @keyframes exit-in {
   from {
     opacity: 0;
   }
-}
-.exit-backdrop {
-  background: none;
-  border: 0;
-  cursor: default;
-  inset: 0;
-  position: absolute;
 }
 .exit-door {
   background: var(--panel);
@@ -6831,7 +6916,7 @@ button.notebook-primary {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .exit-shade {
+  .exit-shade::backdrop {
     animation: none;
   }
 }

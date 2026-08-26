@@ -139,7 +139,8 @@
       "OMDB_API_KEY",
       "TRAKT_CLIENT_ID",
       "TRAKT_CLIENT_SECRET",
-      "EUROPEANA_API_KEY"
+      "EUROPEANA_API_KEY",
+      "MAL_CLIENT_ID"
     ]
   },
   "observability": {

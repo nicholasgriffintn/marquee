@@ -17,11 +17,20 @@ const CREDITS: { name: string; href: string; note: string; logo?: string }[] = [
     href: "https://www.justwatch.com",
     note: "Every piece of availability on this site",
   },
-  { name: "TVmaze", href: "https://www.tvmaze.com", note: "Air dates and episode schedules" },
   {
-    name: "MyAnimeList via Jikan",
-    href: "https://jikan.moe",
-    note: "Anime formats, seasons, watch order and where it streams",
+    name: "TVmaze",
+    href: "https://www.tvmaze.com",
+    note: "Air dates and episode schedules",
+  },
+  {
+    name: "MyAnimeList",
+    href: "https://myanimelist.net",
+    note: "Anime formats, seasons and watch order",
+  },
+  {
+    name: "AniList",
+    href: "https://anilist.co",
+    note: "Where anime streams, cast and crew",
   },
   {
     name: "Fribb's anime lists",
@@ -33,7 +42,11 @@ const CREDITS: { name: string; href: string; note: string; logo?: string }[] = [
     href: "https://wikimediafoundation.org",
     note: "Pageview trends behind Trending",
   },
-  { name: "Trakt", href: "https://trakt.tv", note: "Your imported watch history" },
+  {
+    name: "Trakt",
+    href: "https://trakt.tv",
+    note: "Your imported watch history",
+  },
   {
     name: "OpenStreetMap",
     href: "https://www.openstreetmap.org/copyright",
@@ -57,18 +70,33 @@ const CREDITS: { name: string; href: string; note: string; logo?: string }[] = [
 ];
 
 const CATEGORIES: { name: ProviderCategory; aside: string }[] = [
-  { name: "Subscription", aside: "The ones with a standing order against your name." },
-  { name: "Broadcaster", aside: "Free at the point of use, if you have paid the licence." },
+  {
+    name: "Subscription",
+    aside: "The ones with a standing order against your name.",
+  },
+  {
+    name: "Broadcaster",
+    aside: "Free at the point of use, if you have paid the licence.",
+  },
   { name: "Free", aside: "Free, with the adverts that implies." },
   { name: "Cinema", aside: "Rooms with actual seats in them." },
   { name: "Specialist", aside: "Narrow shelves, well kept." },
   { name: "Sport", aside: "Not my department, but people ask." },
-  { name: "Rent or buy", aside: "A ticket for one evening, or the print itself." },
-  { name: "Additional coverage", aside: "Listed because they turn up in the data." },
+  {
+    name: "Rent or buy",
+    aside: "A ticket for one evening, or the print itself.",
+  },
+  {
+    name: "Additional coverage",
+    aside: "Listed because they turn up in the data.",
+  },
 ];
 
 const STATUS_COPY: Record<string, { label: string; note: string }> = {
-  feed: { label: "We can see inside", note: "Live availability. I know what is on there tonight." },
+  feed: {
+    label: "We can see inside",
+    note: "Live availability. I know what is on there tonight.",
+  },
   link: {
     label: "We can only point",
     note: "No feed to read, so I send you to the door and wish you luck.",
@@ -98,49 +126,76 @@ export function SourcesPage({
         }
       >
         <p>
-          None of it is mine. I did not make a single one of these films and I do not own a frame of
-          them. What I have is a very long list of who does, and the good manners to say so. Below
-          is every service I know about, and exactly how much I can tell you about each.
+          None of it is mine. I did not make a single one of these films and I
+          do not own a frame of them. What I have is a very long list of who
+          does, and the good manners to say so. Below is every service I know
+          about, and exactly how much I can tell you about each.
         </p>
       </PageTitle>
 
-      <section className="source-attribution" aria-labelledby="source-attribution-title">
+      <section
+        className="source-attribution"
+        aria-labelledby="source-attribution-title"
+      >
         <h2 id="source-attribution-title">On the record</h2>
         <p className="source-terms-lede">
-          Everything above stands on somebody else's work. Here is whose, and what they are owed.
+          Everything above stands on somebody else's work. Here is whose, and
+          what they are owed.
         </p>
         <div className="source-credits">
           {CREDITS.map((credit) => (
-            <a key={credit.name} href={credit.href} target="_blank" rel="noreferrer">
+            <a
+              key={credit.name}
+              href={credit.href}
+              target="_blank"
+              rel="noreferrer"
+            >
               {credit.logo ? (
-                <img className="tmdb-logo" src={credit.logo} alt={credit.name} />
+                <img
+                  className="tmdb-logo"
+                  src={credit.logo}
+                  alt={credit.name}
+                />
               ) : (
                 <strong>{credit.name}</strong>
               )}
               <span>{credit.note}</span>
             </a>
           ))}
-          {Array.from({ length: (3 - (CREDITS.length % 3)) % 3 }, (_, index) => (
-            <span className="source-credit-blank" key={index} aria-hidden="true" />
-          ))}
+          {Array.from(
+            { length: (3 - (CREDITS.length % 3)) % 3 },
+            (_, index) => (
+              <span
+                className="source-credit-blank"
+                key={index}
+                aria-hidden="true"
+              />
+            ),
+          )}
         </div>
 
         <div className="source-terms">
           <p>
-            Cinema listings are published by the chains themselves — Cineworld, Picturehouse and Vue
-            — and are read exactly as they are given. Where a chain publishes days but not times,
-            you get days, and I am not going to invent the rest. Cinema locations come from
-            OpenStreetMap contributors, licensed under the{" "}
-            <a href="https://opendatacommons.org/licenses/odbl/" target="_blank" rel="noreferrer">
+            Cinema listings are published by the chains themselves — Cineworld,
+            Picturehouse and Vue — and are read exactly as they are given. Where
+            a chain publishes days but not times, you get days, and I am not
+            going to invent the rest. Cinema locations come from OpenStreetMap
+            contributors, licensed under the{" "}
+            <a
+              href="https://opendatacommons.org/licenses/odbl/"
+              target="_blank"
+              rel="noreferrer"
+            >
               ODbL
             </a>
             .
           </p>
           <p>
-            This product uses the TMDB API but is not endorsed or certified by TMDB. Availability
-            changes hourly and nobody tells me when it does, so check the service itself before you
-            settle in. If something here is wrong, it is wrong because I was told wrong — say so and
-            I will chase it.
+            This product uses the TMDB API but is not endorsed or certified by
+            TMDB. Availability changes hourly and nobody tells me when it does,
+            so check the service itself before you settle in. If something here
+            is wrong, it is wrong because I was told wrong — say so and I will
+            chase it.
           </p>
         </div>
       </section>
@@ -187,7 +242,9 @@ export function SourcesPage({
         <h2 id="directory-title">The directory</h2>
 
         {CATEGORIES.map((category) => {
-          const listed = providers.filter((provider) => provider.category === category.name);
+          const listed = providers.filter(
+            (provider) => provider.category === category.name,
+          );
 
           if (listed.length === 0) {
             return null;
@@ -207,7 +264,11 @@ export function SourcesPage({
                     <span className="source-entry">
                       <span className="source-entry-name">
                         {provider.homepage ? (
-                          <a href={provider.homepage} target="_blank" rel="noreferrer">
+                          <a
+                            href={provider.homepage}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
                             {provider.name}
                           </a>
                         ) : (
@@ -224,7 +285,9 @@ export function SourcesPage({
                       </span>
                       <small>{provider.sourceLabel}</small>
                     </span>
-                    <span className={`source-status source-status-${provider.status}`}>
+                    <span
+                      className={`source-status source-status-${provider.status}`}
+                    >
                       {STATUS_COPY[provider.status]?.label ?? provider.status}
                     </span>
                   </li>
@@ -236,9 +299,9 @@ export function SourcesPage({
       </section>
 
       <p className="source-redirect">
-        Which of them you actually pay for is your business, not this page's. I keep that in{" "}
-        <Link to="/notebook#services">your notebook</Link>, where you can change it without
-        announcing it to anyone.
+        Which of them you actually pay for is your business, not this page's. I
+        keep that in <Link to="/notebook#services">your notebook</Link>, where
+        you can change it without announcing it to anyone.
       </p>
     </section>
   );
