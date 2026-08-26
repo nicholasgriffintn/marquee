@@ -1,34 +1,21 @@
 import SwiftUI
 
-struct MarqueeMasthead: View {
-  let eyebrow: String
+struct MarqueePageHeader: View {
   let title: String
-  var copy: String = ""
+  let description: String
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 9) {
-      HStack(spacing: 10) {
-        Text("M")
-          .font(MarqueeTheme.sans(17, weight: .heavy))
-          .foregroundStyle(MarqueeTheme.ink)
-          .frame(width: 36, height: 36)
-          .background(MarqueeTheme.acid)
-          .rotationEffect(.degrees(-2))
-        Text(eyebrow.uppercased())
-          .font(MarqueeTheme.mono(11, weight: .bold))
-          .tracking(1.2)
-          .foregroundStyle(MarqueeTheme.muted)
-      }
+    VStack(alignment: .leading, spacing: 20) {
       Text(title)
-        .font(MarqueeTheme.display(38))
+        .font(MarqueeTheme.display(44))
         .fontWeight(.semibold)
+        .tracking(-2.2)
         .fixedSize(horizontal: false, vertical: true)
-      if !copy.isEmpty {
-        Text(copy)
-          .font(MarqueeTheme.sans(15))
-          .foregroundStyle(MarqueeTheme.muted)
-          .fixedSize(horizontal: false, vertical: true)
-      }
+      Text(description)
+        .font(MarqueeTheme.sans(15))
+        .foregroundStyle(MarqueeTheme.muted)
+        .fixedSize(horizontal: false, vertical: true)
+      Rectangle().fill(MarqueeTheme.line).frame(height: 1)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
   }
@@ -256,13 +243,14 @@ struct TitleRail: View {
 
 struct TitleGrid: View {
   let items: [MediaTitle]
+  var ranked = false
 
   var body: some View {
     LazyVGrid(
       columns: [GridItem(.adaptive(minimum: 142), spacing: 14)], alignment: .leading, spacing: 24
     ) {
-      ForEach(items) { item in
-        TitleCard(item: item, width: 148)
+      ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+        TitleCard(item: item, width: 148, rank: ranked ? index + 1 : nil)
       }
     }
   }

@@ -18,9 +18,7 @@ struct DigestView: View {
         }
       }
     }
-    .navigationTitle("This week")
-    .navigationBarTitleDisplayMode(.inline)
-    .marqueePage()
+    .marqueeRootPage()
   }
 
   private var programme: some View {

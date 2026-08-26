@@ -540,6 +540,14 @@ svg {
   flex-direction: column;
   gap: 10px;
 }
+.browse-advanced {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.browse-more-filters {
+  display: none;
+}
 .browse-facet > span {
   color: var(--muted);
   font: 800 9px var(--mono);
@@ -3619,6 +3627,28 @@ h2 em {
   line-height: 1.4;
 }
 @media (max-width: 760px) {
+  .browse-advanced {
+    display: none;
+  }
+  .browse-advanced.expanded {
+    display: flex;
+  }
+  .browse-more-filters {
+    align-items: center;
+    background: none;
+    border: 1px solid var(--panel-line);
+    color: var(--white);
+    display: flex;
+    font: 700 10px var(--mono);
+    justify-content: space-between;
+    min-height: 42px;
+    padding: 0 12px;
+    text-transform: uppercase;
+    width: 100%;
+  }
+  .browse-more-filters-open[aria-expanded="true"] {
+    display: none;
+  }
   .schedule-strip {
     background: var(--panel);
     margin: 0 18px 42px;

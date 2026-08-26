@@ -42,4 +42,10 @@ struct MarqueePage: ViewModifier {
 
 extension View {
   func marqueePage() -> some View { modifier(MarqueePage()) }
+
+  func marqueeRootPage() -> some View {
+    navigationTitle("Marquee")
+      .navigationBarTitleDisplayMode(.inline)
+      .marqueePage()
+  }
 }

@@ -21,9 +21,7 @@ struct NotebookView: View {
         }
       }
     }
-    .navigationTitle("Notebook")
-    .navigationBarTitleDisplayMode(.inline)
-    .marqueePage()
+    .marqueeRootPage()
   }
 
   private var notebook: some View {
@@ -37,11 +35,19 @@ struct NotebookView: View {
             Color.clear
           }
           .frame(width: 112, height: 130)
-          MarqueeMasthead(
-            eyebrow: "The Usher's notebook",
-            title: "What I have worked out about you.",
-            copy: "Nothing in it is a secret. Correct it, set it aside, or tear it out."
-          )
+          VStack(alignment: .leading, spacing: 8) {
+            Text("THE USHER'S NOTEBOOK")
+              .font(MarqueeTheme.mono(10, weight: .bold))
+              .tracking(1.1)
+              .foregroundStyle(MarqueeTheme.muted)
+            Text("What I have worked out about you.")
+              .font(MarqueeTheme.display(34))
+              .fontWeight(.semibold)
+              .tracking(-1.2)
+            Text("Nothing in it is a secret. Correct it, set it aside, or tear it out.")
+              .font(MarqueeTheme.sans(14))
+              .foregroundStyle(MarqueeTheme.muted)
+          }
         }
 
         if model.isLoading {

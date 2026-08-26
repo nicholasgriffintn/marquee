@@ -8,10 +8,10 @@ struct RevivalView: View {
   var body: some View {
     ScrollView {
       LazyVStack(alignment: .leading, spacing: 30) {
-        MarqueeMasthead(
-          eyebrow: "The revival house",
-          title: "The small screen at the back.",
-          copy: "Public-domain prints, provenance attached, no ticket required."
+        MarqueePageHeader(
+          title: "The revival house",
+          description:
+            "The small screen at the back. Public-domain prints, provenance attached, no ticket required."
         )
         .padding(.horizontal, 18)
         .padding(.top, 16)
@@ -34,11 +34,9 @@ struct RevivalView: View {
       }
       .padding(.bottom, 30)
     }
-    .navigationTitle("Revival house")
-    .navigationBarTitleDisplayMode(.inline)
     .task { await model.load(api: appState.api) }
     .refreshable { await model.load(api: appState.api) }
-    .marqueePage()
+    .marqueeRootPage()
   }
 
   private func bill(_ programme: RevivalProgramme) -> some View {

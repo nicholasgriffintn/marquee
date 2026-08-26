@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { ErrorBoundary } from "../components/ErrorBoundary";
@@ -52,6 +53,9 @@ export function BrowsePage({
   const selectedGenres = (params.get("genres") ?? "").split(",").filter(Boolean);
   const selectedKeywords = (params.get("keywords") ?? "").split(",").filter(Boolean);
   const selectedProviders = (params.get("providers") ?? "").split(",").filter(Boolean);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(
+    selectedGenres.length > 0 || selectedKeywords.length > 0 || selectedProviders.length > 0,
+  );
   const query = params.get("q") ?? "";
   const sortParam = params.get("sort");
   const sort: BrowsePreset["sort"] =
@@ -150,64 +154,86 @@ export function BrowsePage({
           </div>
         </div>
 
-        <div className="browse-facet">
-          <span>Genre</span>
-          <div className="browse-chips">
-            {genres.map((genre) => (
-              <button
-                type="button"
-                key={genre}
-                className={selectedGenres.includes(genre) ? "selected" : ""}
-                aria-pressed={selectedGenres.includes(genre)}
-                onClick={() => update({ genres: toggle(selectedGenres, genre).join(",") })}
-              >
-                {genre}
-              </button>
-            ))}
-          </div>
-        </div>
+        <button
+          type="button"
+          className="browse-more-filters browse-more-filters-open"
+          aria-expanded={showAdvancedFilters}
+          onClick={() => setShowAdvancedFilters(true)}
+        >
+          Show more filters <span aria-hidden="true">↓</span>
+        </button>
 
-        {shownKeywords.length > 0 && (
+        <div className={`browse-advanced${showAdvancedFilters ? " expanded" : ""}`}>
           <div className="browse-facet">
-            <span>Tag</span>
+            <span>Genre</span>
             <div className="browse-chips">
-              {shownKeywords.map((keyword) => (
+              {genres.map((genre) => (
                 <button
                   type="button"
-                  key={keyword}
-                  className={selectedKeywords.includes(keyword) ? "selected" : ""}
-                  aria-pressed={selectedKeywords.includes(keyword)}
-                  onClick={() => update({ keywords: toggle(selectedKeywords, keyword).join(",") })}
+                  key={genre}
+                  className={selectedGenres.includes(genre) ? "selected" : ""}
+                  aria-pressed={selectedGenres.includes(genre)}
+                  onClick={() => update({ genres: toggle(selectedGenres, genre).join(",") })}
                 >
-                  {keyword}
+                  {genre}
                 </button>
               ))}
             </div>
           </div>
-        )}
 
-        {filterable.length > 0 && (
-          <div className="browse-facet">
-            <span>Source</span>
-            <div className="browse-chips browse-chips-sources">
-              {filterable.slice(0, 24).map((provider) => (
-                <button
-                  type="button"
-                  key={provider.id}
-                  className={selectedProviders.includes(provider.id) ? "selected" : ""}
-                  aria-pressed={selectedProviders.includes(provider.id)}
-                  title={provider.name}
-                  onClick={() =>
-                    update({ providers: toggle(selectedProviders, provider.id).join(",") })
-                  }
-                >
-                  <ProviderBadge provider={provider} compact />
-                  <small>{provider.name}</small>
-                </button>
-              ))}
+          {shownKeywords.length > 0 && (
+            <div className="browse-facet">
+              <span>Tag</span>
+              <div className="browse-chips">
+                {shownKeywords.map((keyword) => (
+                  <button
+                    type="button"
+                    key={keyword}
+                    className={selectedKeywords.includes(keyword) ? "selected" : ""}
+                    aria-pressed={selectedKeywords.includes(keyword)}
+                    onClick={() =>
+                      update({ keywords: toggle(selectedKeywords, keyword).join(",") })
+                    }
+                  >
+                    {keyword}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          )}
+
+          {filterable.length > 0 && (
+            <div className="browse-facet">
+              <span>Source</span>
+              <div className="browse-chips browse-chips-sources">
+                {filterable.slice(0, 24).map((provider) => (
+                  <button
+                    type="button"
+                    key={provider.id}
+                    className={selectedProviders.includes(provider.id) ? "selected" : ""}
+                    aria-pressed={selectedProviders.includes(provider.id)}
+                    title={provider.name}
+                    onClick={() =>
+                      update({ providers: toggle(selectedProviders, provider.id).join(",") })
+                    }
+                  >
+                    <ProviderBadge provider={provider} compact />
+                    <small>{provider.name}</small>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <button
+            type="button"
+            className="browse-more-filters browse-more-filters-close"
+            aria-expanded={showAdvancedFilters}
+            onClick={() => setShowAdvancedFilters(false)}
+          >
+            Show less filters <span aria-hidden="true">↑</span>
+          </button>
+        </div>
 
         {hasFilters && (
           <button

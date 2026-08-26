@@ -6,10 +6,9 @@ struct MoreView: View {
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 26) {
-        MarqueeMasthead(
-          eyebrow: "House directory",
-          title: "The rest of the programme.",
-          copy: "Your week in print, and everything the Usher has written down."
+        MarqueePageHeader(
+          title: "More",
+          description: "Your week in print, and everything the Usher has written down."
         )
 
         VStack(spacing: 1) {
@@ -43,9 +42,7 @@ struct MoreView: View {
       .padding(20)
       .padding(.bottom, 72)
     }
-    .navigationTitle("More")
-    .navigationBarTitleDisplayMode(.inline)
-    .marqueePage()
+    .marqueeRootPage()
   }
 
   private func destination<Destination: View>(

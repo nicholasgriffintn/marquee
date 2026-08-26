@@ -113,6 +113,10 @@ struct BrowseResponse: Codable {
   let page: Int
 }
 
+struct GenresResponse: Codable { let genres: [String] }
+
+struct KeywordsResponse: Codable { let keywords: [String] }
+
 struct SearchResponse: Codable {
   let items: [MediaTitle]
 }

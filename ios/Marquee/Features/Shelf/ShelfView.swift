@@ -18,19 +18,17 @@ struct ShelfView: View {
         }
       }
     }
-    .navigationTitle("My shelf")
-    .navigationBarTitleDisplayMode(.inline)
-    .marqueePage()
+    .marqueeRootPage()
   }
 
   private var shelf: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 22) {
-        MarqueeMasthead(
-          eyebrow: "My shelf",
-          title: model.shelved == 0
-            ? "Nothing put away yet." : "\(model.shelved) titles, in your own hand.",
-          copy: "Tap a poster to change its status, rating or note."
+        MarqueePageHeader(
+          title: "My shelf",
+          description: model.shelved == 0
+            ? "Ratings and notes stay in your account and shape your recommendations."
+            : "\(model.shelved) title\(model.shelved == 1 ? "" : "s"). Tap a poster to rate it or add notes."
         )
         filters
 
@@ -62,7 +60,6 @@ struct ShelfView: View {
       .padding(18)
       .padding(.bottom, 24)
     }
-    .searchable(text: $model.query, prompt: "Search your shelf")
     .task(id: "\(model.filterKey)|\(appState.shelfVersion)") {
       await model.reload(api: appState.api)
     }
@@ -71,6 +68,20 @@ struct ShelfView: View {
 
   private var filters: some View {
     VStack(alignment: .leading, spacing: 10) {
+      HStack(spacing: 10) {
+        Image(systemName: "magnifyingglass")
+          .font(.system(size: 14, weight: .bold))
+          .foregroundStyle(MarqueeTheme.acid)
+        TextField("Search your shelf", text: $model.query)
+          .font(MarqueeTheme.sans(14))
+          .textInputAutocapitalization(.never)
+          .autocorrectionDisabled()
+      }
+      .padding(.horizontal, 14)
+      .frame(minHeight: 46)
+      .background(MarqueeTheme.panel)
+      .overlay { Rectangle().stroke(MarqueeTheme.line) }
+
       HStack {
         Menu {
           ForEach(ShelfModel.Sort.allCases) { sort in Button(sort.label) { model.sort = sort } }

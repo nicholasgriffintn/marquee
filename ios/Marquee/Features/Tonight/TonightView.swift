@@ -40,10 +40,10 @@ struct TonightView: View {
         } else if let hero = model.sections.first?.items.first {
           TonightHero(item: hero)
         } else {
-          MarqueeMasthead(
-            eyebrow: "Tonight at Marquee",
-            title: "Something worth sitting down for.",
-            copy: "Your services, your shelf, and the whole catalogue — set out for this evening."
+          MarqueePageHeader(
+            title: "Tonight",
+            description:
+              "Your services, your shelf, and the whole catalogue — set out for this evening."
           )
           .padding(.horizontal, 18)
           .padding(.top, 16)
@@ -107,8 +107,6 @@ struct TonightView: View {
       }
       .padding(.bottom, 30)
     }
-    .navigationTitle("Marquee")
-    .navigationBarTitleDisplayMode(.inline)
     .task(id: loadKey) {
       await model.load(
         api: appState.api,
@@ -123,7 +121,7 @@ struct TonightView: View {
         isSignedIn: appState.isSignedIn
       )
     }
-    .marqueePage()
+    .marqueeRootPage()
   }
 
   private func pickSomething() {
