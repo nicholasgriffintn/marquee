@@ -21,9 +21,6 @@ struct ListingsView: View {
             message: model.error.isEmpty ? "Try a title, a plot, or a wider filter." : model.error
           )
         } else {
-          Text("\(model.items.count) titles")
-            .font(MarqueeTheme.mono(10, weight: .bold))
-            .foregroundStyle(MarqueeTheme.muted)
           TitleGrid(items: model.items, ranked: model.ranksResults)
           if model.hasMore {
             Button {
