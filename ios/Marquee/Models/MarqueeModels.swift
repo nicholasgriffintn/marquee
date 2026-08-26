@@ -257,6 +257,19 @@ struct RevivalCard: Codable, Identifiable {
   let stillUrl: URL?
   let mirrored: Bool
   let condition: String
+
+  init(work: RevivalWork) {
+    id = work.id
+    title = work.title
+    year = work.year
+    country = work.country
+    kind = work.kind
+    runtimeSeconds = work.runtimeSeconds
+    director = work.director
+    stillUrl = work.stillUrl
+    mirrored = work.mirrored
+    condition = work.condition
+  }
 }
 
 struct RevivalBillSlot: Codable, Identifiable {
@@ -281,6 +294,10 @@ struct RevivalProgramme: Codable {
   let fetchedAt: String
 }
 
+struct RevivalSearchResponse: Codable {
+  let works: [RevivalCard]
+}
+
 struct RevivalTag: Codable, Identifiable {
   var id: String { "\(kind)-\(slug)" }
   let kind: String
@@ -302,19 +319,37 @@ struct RevivalWork: Codable, Identifiable {
   let rightsBasis: String
   let rightsNote: String
   let rightsUrl: URL?
+  let titleId: String?
   let country: String?
   let ukClear: Bool
   let ukExpiresYear: Int?
   let mirrored: Bool
   let delivery: String
   let reelUrl: URL
+  let streamBytes: Int?
+  let height: Int?
+  let downloads: Int?
   let condition: String
   let contentNotice: String?
   let tags: [RevivalTag]
 }
 
+struct RevivalPrint: Codable, Identifiable {
+  let id: String
+  let source: String
+  let sourceUrl: URL
+  let title: String
+  let runtimeSeconds: Int?
+  let condition: String
+  let streamBytes: Int?
+  let height: Int?
+  let downloads: Int?
+  let mirrored: Bool
+}
+
 struct RevivalScreening: Codable {
   let work: RevivalWork
+  let prints: [RevivalPrint]
   let positionSeconds: Int
   let finished: Bool
   let alsoShowing: [RevivalWork]

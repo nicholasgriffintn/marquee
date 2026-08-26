@@ -66,20 +66,7 @@ struct ListingsFilters: View {
   }
 
   private var search: some View {
-    HStack(spacing: 10) {
-      Image(systemName: "magnifyingglass")
-        .font(.system(size: 14, weight: .bold))
-        .foregroundStyle(MarqueeTheme.acid)
-      TextField("Search listings", text: $model.query)
-        .font(MarqueeTheme.sans(14))
-        .textInputAutocapitalization(.never)
-        .autocorrectionDisabled()
-        .submitLabel(.search)
-    }
-    .padding(.horizontal, 14)
-    .frame(minHeight: 46)
-    .background(MarqueeTheme.panel)
-    .overlay { Rectangle().stroke(MarqueeTheme.line) }
+    MarqueeSearchField(placeholder: "Search listings", text: $model.query)
   }
 
   private var sourceFacet: some View {

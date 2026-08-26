@@ -48,6 +48,32 @@ export function SearchIcon({ className }: IconProps = {}) {
   );
 }
 
+export function SearchField({
+  value,
+  onChange,
+  placeholder,
+  label,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  label: string;
+}) {
+  return (
+    <label className="browse-search">
+      <span aria-hidden="true">
+        <SearchIcon />
+      </span>
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        aria-label={label}
+      />
+    </label>
+  );
+}
+
 export function PlayIcon({ className }: IconProps = {}) {
   return (
     <svg className={className} viewBox="0 0 20 20" aria-hidden="true">

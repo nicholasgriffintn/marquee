@@ -118,6 +118,28 @@ struct AccountToolbar: ToolbarContent {
   }
 }
 
+struct MarqueeSearchField: View {
+  let placeholder: String
+  @Binding var text: String
+
+  var body: some View {
+    HStack(spacing: 10) {
+      Image(systemName: "magnifyingglass")
+        .font(.system(size: 14, weight: .bold))
+        .foregroundStyle(MarqueeTheme.acid)
+      TextField(placeholder, text: $text)
+        .font(MarqueeTheme.sans(14))
+        .textInputAutocapitalization(.never)
+        .autocorrectionDisabled()
+        .submitLabel(.search)
+    }
+    .padding(.horizontal, 14)
+    .frame(minHeight: 46)
+    .background(MarqueeTheme.panel)
+    .overlay { Rectangle().stroke(MarqueeTheme.line) }
+  }
+}
+
 struct Artwork: View {
   let url: URL?
   let seed: String

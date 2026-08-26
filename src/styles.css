@@ -8273,7 +8273,7 @@ a.showtime:hover small {
   scroll-padding-inline: 0;
 }
 .revival-search {
-  align-items: baseline;
+  align-items: center;
   display: flex;
   flex-wrap: wrap;
   gap: 14px;
@@ -8283,23 +8283,11 @@ a.showtime:hover small {
 .revival-shelves .revival-search {
   padding-inline: 0;
 }
-.revival-search input {
-  background: none;
-  border: 0;
-  border-bottom: 1px solid var(--line);
-  color: var(--paper);
-  font: 400 15px var(--sans);
-  min-width: min(320px, 100%);
-  padding: 8px 0;
+.revival-search .browse-search {
+  flex: 0 1 420px;
+  width: 100%;
 }
-.revival-search input::placeholder {
-  color: var(--muted);
-}
-.revival-search input:focus-visible {
-  border-bottom-color: var(--acid);
-  outline: none;
-}
-.revival-search span {
+.revival-search > span {
   color: var(--muted);
   font: 9px var(--mono);
   letter-spacing: 0.08em;

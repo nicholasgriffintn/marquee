@@ -4,7 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { PageTitle } from "../components/PageTitle";
 import { TitleCard } from "../components/TitleCard";
-import { ProviderBadge, SearchIcon, VerticalChevronIcon } from "../components/ui";
+import { ProviderBadge, SearchField, VerticalChevronIcon } from "../components/ui";
 import type { MediaTitle, Provider } from "../domain/catalog";
 import { useBrowse, useGenres, useKeywords } from "../hooks/useBrowse";
 
@@ -110,17 +110,12 @@ export function BrowsePage({
       </PageTitle>
 
       <div className="browse-filters">
-        <label className="browse-search">
-          <span aria-hidden="true">
-            <SearchIcon />
-          </span>
-          <input
-            value={query}
-            onChange={(event) => update({ q: event.target.value })}
-            placeholder={`Search ${preset.title.toLowerCase()}`}
-            aria-label={`Search ${preset.title}`}
-          />
-        </label>
+        <SearchField
+          value={query}
+          onChange={(value) => update({ q: value })}
+          placeholder={`Search ${preset.title.toLowerCase()}`}
+          label={`Search ${preset.title}`}
+        />
 
         <div className="browse-facet">
           <span>Kind</span>
