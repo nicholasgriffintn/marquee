@@ -9,6 +9,7 @@ struct MarqueeApp: App {
       RootView()
         .environmentObject(appState)
         .task { await appState.restore() }
+        .onOpenURL { url in Task { await appState.handleAuthenticationCallback(url) } }
         .preferredColorScheme(.dark)
     }
   }

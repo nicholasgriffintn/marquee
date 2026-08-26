@@ -98,15 +98,101 @@ struct SignInView: View {
       .padding(12)
       .background(MarqueeTheme.acid)
       .foregroundStyle(MarqueeTheme.blue)
-    } else if let github = model.github {
+    } else if model.github != nil || model.magicLink {
+      VStack(spacing: 12) {
+        if let github = model.github {
+          Button {
+            Task { await appState.signInWithGitHub() }
+          } label: {
+            HStack(spacing: 10) {
+              if appState.isSigningIn {
+                ProgressView().tint(MarqueeTheme.paper)
+              }
+              Text(appState.isSigningIn ? "Opening GitHub…" : github.label)
+            }
+            .font(MarqueeTheme.sans(13, weight: .heavy))
+            .foregroundStyle(MarqueeTheme.paper)
+            .frame(maxWidth: .infinity)
+            .frame(height: 52)
+            .background(MarqueeTheme.ink)
+          }
+          .buttonStyle(.plain)
+          .disabled(appState.isSigningIn || model.isRequestingMagicLink)
+        }
+
+        if model.github != nil && model.magicLink {
+          Text("OR")
+            .font(MarqueeTheme.mono(10, weight: .bold))
+            .tracking(2)
+            .foregroundStyle(MarqueeTheme.mutedOnPaper)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 2)
+        }
+
+        if model.magicLink {
+          magicLinkForm
+        }
+
+        if !model.error.isEmpty {
+          Text(model.error)
+            .font(MarqueeTheme.sans(13))
+            .foregroundStyle(MarqueeTheme.coral)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+      }
+    } else {
+      Text(model.error)
+        .font(MarqueeTheme.sans(13))
+        .foregroundStyle(MarqueeTheme.coral)
+    }
+  }
+
+  private var magicLinkForm: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      if !model.magicLinkMessage.isEmpty {
+        Text(model.magicLinkMessage)
+          .font(MarqueeTheme.sans(13))
+          .foregroundStyle(MarqueeTheme.blue)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(12)
+          .background(MarqueeTheme.acid)
+          .accessibilityLabel("Magic-link status: \(model.magicLinkMessage)")
+      }
+
+      Text("EMAIL")
+        .font(MarqueeTheme.mono(10, weight: .bold))
+        .tracking(2)
+
+      HStack(spacing: 10) {
+        Image(systemName: "envelope")
+          .font(.system(size: 16, weight: .medium))
+          .foregroundStyle(MarqueeTheme.mutedOnPaper)
+        TextField("Email", text: $model.email)
+          .font(MarqueeTheme.sans(15))
+          .foregroundStyle(MarqueeTheme.ink)
+          .textContentType(.emailAddress)
+          .textInputAutocapitalization(.never)
+          .autocorrectionDisabled()
+          .keyboardType(.emailAddress)
+          .submitLabel(.send)
+          .onSubmit { Task { await model.requestMagicLink(api: appState.api) } }
+      }
+      .padding(.horizontal, 14)
+      .frame(height: 50)
+      .background(MarqueeTheme.white)
+      .overlay { Rectangle().stroke(MarqueeTheme.paperLine) }
+
       Button {
-        Task { await appState.signIn() }
+        Task { await model.requestMagicLink(api: appState.api) }
       } label: {
         HStack(spacing: 10) {
-          if appState.isSigningIn {
+          if model.isRequestingMagicLink {
             ProgressView().tint(MarqueeTheme.paper)
+          } else {
+            Image(systemName: "envelope")
+              .font(.system(size: 14, weight: .bold))
           }
-          Text(appState.isSigningIn ? "Opening GitHub…" : github.label)
+          Text(model.isRequestingMagicLink ? "Posting ticket…" : "Post me a ticket")
         }
         .font(MarqueeTheme.sans(13, weight: .heavy))
         .foregroundStyle(MarqueeTheme.paper)
@@ -115,11 +201,10 @@ struct SignInView: View {
         .background(MarqueeTheme.ink)
       }
       .buttonStyle(.plain)
-      .disabled(appState.isSigningIn)
-    } else {
-      Text(model.error)
-        .font(MarqueeTheme.sans(13))
-        .foregroundStyle(MarqueeTheme.coral)
+      .disabled(
+        appState.isSigningIn || model.isRequestingMagicLink
+          || model.email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      )
     }
   }
 

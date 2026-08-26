@@ -46,7 +46,7 @@ final class AppState: ObservableObject {
     }
   }
 
-  func signIn() async {
+  func signInWithGitHub() async {
     guard !isSigningIn else { return }
 
     isSigningIn = true
@@ -57,21 +57,38 @@ final class AppState: ObservableObject {
     do {
       let start = AppConfiguration.baseURL.appending(path: "/api/auth/native/github")
       let code = try await authentication.authenticate(at: start)
-      let response: NativeTokenResponse = try await api.send(
-        "/api/auth/native/exchange",
-        method: "POST",
-        body: ["code": code]
+      try await completeNativeSignIn(
+        code: code,
+        verifier: nil,
+        guestProviderIDs: guestProviderIDs
       )
-
-      try KeychainStore.saveToken(response.token)
-      let session: SessionResponse = try await api.get("/api/auth/session")
-      user = session.user
-      await loadProviderPreferences(migrating: guestProviderIDs)
-      isPresentingSignIn = false
     } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
       return
     } catch {
       authenticationError = error.localizedDescription
+    }
+  }
+
+  func handleAuthenticationCallback(_ url: URL) async {
+    guard NativeAuthenticationCallback.matches(url), !isSigningIn else { return }
+
+    isSigningIn = true
+    defer { isSigningIn = false }
+    authenticationError = ""
+
+    do {
+      let code = try NativeAuthenticationCallback.code(from: url)
+      guard let verifier = try KeychainStore.readMagicLinkVerifier() else {
+        throw APIError.server(status: 401, message: "That ticket request has expired. Start again.")
+      }
+      try await completeNativeSignIn(
+        code: code,
+        verifier: verifier,
+        guestProviderIDs: selectedProviderIDs
+      )
+    } catch {
+      authenticationError = error.localizedDescription
+      isPresentingSignIn = true
     }
   }
 
@@ -83,6 +100,7 @@ final class AppState: ObservableObject {
     }
 
     KeychainStore.removeToken()
+    KeychainStore.removeMagicLinkVerifier()
     user = nil
     selectedProviderIDs = Set(
       UserDefaults.standard.stringArray(forKey: "selectedProviderIds") ?? [])
@@ -109,6 +127,25 @@ final class AppState: ObservableObject {
 
   func shelfDidChange() { shelfVersion += 1 }
 
+  private func completeNativeSignIn(
+    code: String,
+    verifier: String?,
+    guestProviderIDs: Set<String>
+  ) async throws {
+    let response: NativeTokenResponse = try await api.send(
+      "/api/auth/native/exchange",
+      method: "POST",
+      body: NativeExchangeRequest(code: code, verifier: verifier)
+    )
+
+    try KeychainStore.saveToken(response.token)
+    if verifier != nil { KeychainStore.removeMagicLinkVerifier() }
+    let session: SessionResponse = try await api.get("/api/auth/session")
+    user = session.user
+    await loadProviderPreferences(migrating: guestProviderIDs)
+    isPresentingSignIn = false
+  }
+
   private func loadProviderPreferences(migrating guestIDs: Set<String> = []) async {
     if isSignedIn {
       if let preferences: ProviderPreferences = try? await api.get("/api/profile/providers") {
@@ -123,4 +160,9 @@ final class AppState: ObservableObject {
         UserDefaults.standard.stringArray(forKey: "selectedProviderIds") ?? [])
     }
   }
+}
+
+private struct NativeExchangeRequest: Encodable {
+  let code: String
+  let verifier: String?
 }

@@ -20,23 +20,33 @@ const NATIVE_AUTH_CALLBACK = "marquee://auth/callback";
 export const nativeAuthRoutes = new Hono<{ Bindings: Bindings }>();
 
 nativeAuthRoutes.get("/github", (context) => startNativeGitHub(context));
+nativeAuthRoutes.get("/magic", (context) => completeNativeMagicLink(context));
 nativeAuthRoutes.post("/exchange", (context) => exchangeNativeCode(context));
 
 function mintNativeAuthCode() {
   return `${NATIVE_CODE_PREFIX}${randomHex()}`;
 }
 
-async function storeNativeAuthCode(env: Bindings, userId: string, code: string) {
+async function storeNativeAuthCode(
+  env: Bindings,
+  userId: string,
+  code: string,
+  challenge?: string,
+) {
   await env.DB.prepare(`DELETE FROM native_auth_codes WHERE expires_at <= CURRENT_TIMESTAMP`).run();
   await env.DB.prepare(
     `INSERT INTO native_auth_codes (code_hash, user_id, expires_at)
      VALUES (?, ?, datetime('now', ?))`,
   )
-    .bind(await hashState(code), userId, `+${NATIVE_CODE_TTL_MINUTES} minutes`)
+    .bind(
+      await hashState(challenge ? `${code}:${challenge}` : code),
+      userId,
+      `+${NATIVE_CODE_TTL_MINUTES} minutes`,
+    )
     .run();
 }
 
-async function consumeNativeAuthCode(env: Bindings, code: string) {
+async function consumeNativeAuthCode(env: Bindings, code: string, verifier?: string) {
   if (!code.startsWith(NATIVE_CODE_PREFIX) || code.length > 200) {
     return null;
   }
@@ -46,7 +56,7 @@ async function consumeNativeAuthCode(env: Bindings, code: string) {
      WHERE code_hash = ? AND expires_at > CURRENT_TIMESTAMP
      RETURNING user_id AS userId`,
   )
-    .bind(await hashState(code))
+    .bind(await hashState(verifier ? `${code}:${await hashState(verifier)}` : code))
     .first<{ userId: string }>();
 
   return row?.userId ?? null;
@@ -71,15 +81,53 @@ export async function completeNativeAuthentication(
     return null;
   }
 
+  return finishNativeAuthentication(context, userId, sessionToken);
+}
+
+async function finishNativeAuthentication(
+  context: AppContext,
+  userId: string,
+  sessionToken: string,
+  challenge?: string,
+) {
   const code = mintNativeAuthCode();
 
-  await storeNativeAuthCode(context.env, userId, code);
+  await storeNativeAuthCode(context.env, userId, code, challenge);
   await authenticationFor(context.env, context.req.raw).logout(sessionToken);
 
   return withCookies(
     context.redirect(nativeCallbackUrl({ code }).href),
     ...expiredFlowCookies(context),
   );
+}
+
+async function completeNativeMagicLink(context: AppContext) {
+  const url = new URL(context.req.url);
+  const token = url.searchParams.get("token") ?? "";
+  const challenge = url.searchParams.get("challenge") ?? "";
+
+  if (!token || !/^[a-f\d]{64}$/u.test(challenge)) {
+    return context.redirect(nativeCallbackUrl({ error: "invalid_callback" }).href);
+  }
+
+  try {
+    const result = await authenticationFor(context.env, context.req.raw).completeMagicLink(token);
+
+    if (result.status !== "authenticated") {
+      throw new AuthError("unsupported_operation");
+    }
+
+    return finishNativeAuthentication(
+      context,
+      result.session.user.id,
+      result.session.token,
+      challenge,
+    );
+  } catch (error) {
+    logError("native_magic_link_failed", error);
+
+    return context.redirect(nativeCallbackUrl({ error: "invalid_callback" }).href);
+  }
 }
 
 export function nativeAuthenticationFailure(context: AppContext, error: string) {
@@ -121,7 +169,8 @@ async function startNativeGitHub(context: AppContext) {
 async function exchangeNativeCode(context: AppContext) {
   const body = await readJsonObject(context.req.raw);
   const code = typeof body?.code === "string" ? body.code : "";
-  const userId = await consumeNativeAuthCode(context.env, code);
+  const verifier = typeof body?.verifier === "string" ? body.verifier : undefined;
+  const userId = await consumeNativeAuthCode(context.env, code, verifier);
 
   if (!userId) {
     return jsonResponse({ error: "That ticket has expired. Start again at the box office." }, 401);

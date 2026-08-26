@@ -192,6 +192,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				MARKETING_VERSION = 1.0;
+				MARQUEE_API_BASE_URL = "http://localhost:8787";
 				PRODUCT_BUNDLE_IDENTIFIER = app.pashi.marquee;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -217,6 +218,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				MARKETING_VERSION = 1.0;
+				MARQUEE_API_BASE_URL = "https://marquee.pashi.app";
 				PRODUCT_BUNDLE_IDENTIFIER = app.pashi.marquee;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
