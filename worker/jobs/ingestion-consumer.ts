@@ -72,11 +72,21 @@ export async function consumeDeadLetters(batch: MessageBatch<unknown>, env: Bind
     );
   });
 
-  if (statements.length) {
-    await env.DB.batch(statements);
-  }
+  try {
+    if (statements.length) {
+      await env.DB.batch(statements);
+    }
 
-  console.error(JSON.stringify({ event: "dead_letters_recorded", count: statements.length }));
+    console.error(JSON.stringify({ event: "dead_letters_recorded", count: statements.length }));
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        event: "dead_letters_record_failed",
+        count: statements.length,
+        detail: error instanceof Error ? error.message.slice(0, 300) : String(error).slice(0, 300),
+      }),
+    );
+  }
 
   for (const message of batch.messages) {
     message.ack();

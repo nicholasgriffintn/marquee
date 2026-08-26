@@ -67,6 +67,8 @@ export async function sendAlertEmail(
     });
   } catch (error) {
     logError("alert_email_failed", error);
+
+    throw new Error("Could not send that email", { cause: error });
   }
 }
 
