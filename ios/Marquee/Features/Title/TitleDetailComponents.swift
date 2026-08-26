@@ -5,7 +5,7 @@ struct TitleDetailHero: View {
 
   var body: some View {
     Artwork(
-      url: item.posterUrl ?? item.backdropUrl,
+      url: item.backdropUrl ?? item.posterUrl,
       seed: item.id,
       aspectRatio: 16 / 10,
       height: 300
@@ -19,12 +19,12 @@ struct TitleOverview: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
       Text(item.title)
-        .font(MarqueeTheme.display(46))
-        .fontWeight(.medium)
-        .tracking(-2.2)
+        .font(MarqueeTheme.sans(46, weight: .heavy))
+        .tracking(-3.1)
+        .lineSpacing(-5)
         .foregroundStyle(MarqueeTheme.ink)
         .fixedSize(horizontal: false, vertical: true)
-      Text("\(item.mediaType == "movie" ? "Film" : "Television") · \(mediaMeta(item))")
+      Text("\(item.mediaType == "movie" ? "Film" : "TV") · \(mediaMeta(item))")
         .font(MarqueeTheme.mono(10))
         .textCase(.uppercase)
         .foregroundStyle(MarqueeTheme.mutedOnPaper)
@@ -34,6 +34,13 @@ struct TitleOverview: View {
           .font(MarqueeTheme.mono(9))
           .textCase(.uppercase)
           .foregroundStyle(MarqueeTheme.mutedOnPaper)
+      }
+      if !productionLine.isEmpty {
+        Text(productionLine)
+          .font(MarqueeTheme.mono(9))
+          .textCase(.uppercase)
+          .foregroundStyle(MarqueeTheme.mutedOnPaper)
+          .fixedSize(horizontal: false, vertical: true)
       }
       if let tagline = item.tagline, !tagline.isEmpty {
         Text(tagline)
@@ -50,17 +57,30 @@ struct TitleOverview: View {
     }
     .frame(maxWidth: .infinity, alignment: .leading)
   }
+
+  private var productionLine: String {
+    [
+      item.studios?.prefix(2).joined(separator: " / "),
+      item.countries?.prefix(2).joined(separator: " / "),
+      item.languages?.prefix(2).joined(separator: " / "),
+    ]
+    .compactMap { $0 }
+    .filter { !$0.isEmpty }
+    .joined(separator: " · ")
+  }
 }
 
 struct TitleWatchOptions: View {
   let item: MediaTitle
+  let providers: [ProviderAvailability]
   let selectedProviderIDs: Set<String>
+  @Binding var pendingDestination: ExternalDestination?
   @State private var showAll = false
   @State private var showPaid = false
 
   private var options: WatchOptionGroups {
     watchOptions(
-      providers: item.providers,
+      providers: providers,
       fallbackURL: item.watchLink,
       selectedProviderIDs: selectedProviderIDs
     )
@@ -76,11 +96,12 @@ struct TitleWatchOptions: View {
           .foregroundStyle(MarqueeTheme.mutedOnPaper)
       } else {
         if let primary = options.primary {
-          WatchOptionLink(option: primary, primary: true)
+          WatchOptionLink(
+            option: primary, primary: true, pendingDestination: $pendingDestination)
         }
 
         ForEach(shownStreaming) { option in
-          WatchOptionLink(option: option)
+          WatchOptionLink(option: option, pendingDestination: $pendingDestination)
         }
 
         if !heldStreaming.isEmpty && !showAll {
@@ -108,7 +129,7 @@ struct TitleWatchOptions: View {
 
           if showPaid || options.primary == nil {
             ForEach(options.paid) { option in
-              WatchOptionLink(option: option)
+              WatchOptionLink(option: option, pendingDestination: $pendingDestination)
             }
           }
         }
@@ -142,9 +163,14 @@ struct TitleWatchOptions: View {
 private struct WatchOptionLink: View {
   let option: WatchOption
   var primary = false
+  @Binding var pendingDestination: ExternalDestination?
 
   var body: some View {
-    Link(destination: option.destination) {
+    ExternalLinkButton(
+      pendingDestination: $pendingDestination,
+      destination: ExternalDestination(
+        url: option.destination, label: option.provider.name, kind: .provider)
+    ) {
       HStack(spacing: 12) {
         ProviderBadge(
           providerID: option.provider.id, name: option.provider.name, size: primary ? 30 : 23)
@@ -239,13 +265,17 @@ struct TitleShelfEditor: View {
 
 struct TitleSourceLinks: View {
   let item: MediaTitle
+  @Binding var pendingDestination: ExternalDestination?
 
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
       TitleDetailSectionLabel("SOURCE LINKS")
       HStack(spacing: 9) {
         ForEach(destinations, id: \.label) { destination in
-          Link(destination: destination.url) {
+          ExternalLinkButton(
+            pendingDestination: $pendingDestination,
+            destination: destination
+          ) {
             HStack(spacing: 6) {
               Text(destination.label)
               Image(systemName: "arrow.up.right")
@@ -262,19 +292,26 @@ struct TitleSourceLinks: View {
     .frame(maxWidth: .infinity, alignment: .leading)
   }
 
-  private var destinations: [(label: String, url: URL)] {
-    var destinations = [(label: "TMDB", url: item.tmdbUrl)]
-    if let imdb = item.imdbUrl { destinations.append((label: "IMDb", url: imdb)) }
+  private var destinations: [ExternalDestination] {
+    var destinations: [ExternalDestination] = []
     if let key = item.trailerKey,
       let trailer = URL(string: "https://www.youtube.com/watch?v=\(key)")
     {
-      destinations.append((label: "Trailer", url: trailer))
+      destinations.append(ExternalDestination(url: trailer, label: "Trailer", kind: .trailer))
+    }
+    destinations.append(ExternalDestination(url: item.tmdbUrl, label: "TMDB", kind: .tmdb))
+    if let wikipedia = item.buzz?.articleUrl {
+      destinations.append(
+        ExternalDestination(url: wikipedia, label: "Wikipedia", kind: .wikipedia))
+    }
+    if let imdb = item.imdbUrl {
+      destinations.append(ExternalDestination(url: imdb, label: "IMDb", kind: .imdb))
     }
     return destinations
   }
 }
 
-private struct TitleDetailSectionLabel: View {
+struct TitleDetailSectionLabel: View {
   let label: String
 
   init(_ label: String) {

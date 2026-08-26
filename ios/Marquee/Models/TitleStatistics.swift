@@ -5,6 +5,26 @@ struct TitleRatingSummary {
   let votes: String?
 }
 
+struct TitleConsensus {
+  let score: Double
+  let sourceCount: Int
+}
+
+func titleConsensus(_ item: MediaTitle) -> TitleConsensus? {
+  var values: [(score: Double, weight: Double)] = []
+  if let score = item.tmdbScore, item.tmdbVoteCount > 0 { values.append((score, 1)) }
+  if let score = item.ratings?.imdbScore { values.append((score, 1.3)) }
+  if let score = rottenTomatoesScore(item.ratings?.rottenTomatoes) {
+    values.append((Double(score) / 10, 0.8))
+  }
+  if let score = item.ratings?.metascore { values.append((Double(score) / 10, 0.8)) }
+  if let score = item.ratings?.animeScore { values.append((score, 0.8)) }
+  guard values.count > 1 else { return nil }
+  let totalWeight = values.reduce(0) { $0 + $1.weight }
+  let score = values.reduce(0) { $0 + ($1.score * $1.weight) } / totalWeight
+  return TitleConsensus(score: score, sourceCount: values.count)
+}
+
 func titleRatingSummary(_ item: MediaTitle, limit: Int = 3) -> TitleRatingSummary {
   var sources: [(label: String, display: String, outOfTen: Bool, votes: Int?)] = []
 
@@ -52,6 +72,17 @@ func statisticChangeLabel(_ delta: Double) -> String {
   let percentage = Int((delta * 100).rounded())
   let value = percentage.formatted(.number.grouping(.automatic))
   return "\(percentage >= 0 ? "+" : "")\(value)%"
+}
+
+func moneyStatisticLabel(_ value: Int) -> String {
+  let amount = Double(value)
+  if value >= 1_000_000_000 {
+    return String(format: "$%.1fbn", amount / 1_000_000_000)
+  }
+  if value >= 1_000_000 {
+    return "$\(Int((amount / 1_000_000).rounded()))m"
+  }
+  return "$\(value.formatted())"
 }
 
 private func rottenTomatoesScore(_ value: String?) -> Int? {

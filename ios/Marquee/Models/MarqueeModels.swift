@@ -21,9 +21,13 @@ struct ProviderAvailability: Codable, Identifiable {
 }
 
 struct TitleBuzz: Codable {
+  let article: String?
+  let articleUrl: URL?
+  let match: String?
   let views: Int
   let previousViews: Int
   let delta: Double
+  let measuredAt: String?
 }
 
 struct TitleRatings: Codable {
@@ -31,8 +35,23 @@ struct TitleRatings: Codable {
   let imdbVotes: Int?
   let rottenTomatoes: String?
   let metascore: Int?
+  let awards: String?
+  let awardWins: Int?
+  let boxOffice: Int?
   let animeScore: Double?
   let animeVotes: Int?
+}
+
+struct TitleCollection: Codable {
+  let id: Int
+  let name: String
+}
+
+struct TitleVideo: Codable, Identifiable {
+  var id: String { key }
+  let key: String
+  let name: String
+  let type: String
 }
 
 struct MediaTitle: Codable, Identifiable {
@@ -62,6 +81,19 @@ struct MediaTitle: Codable, Identifiable {
   let trailerKey: String?
   let buzz: TitleBuzz?
   let ratings: TitleRatings?
+  let keywords: [String]?
+  let originalLanguage: String?
+  let status: String?
+  let collection: TitleCollection?
+  let studios: [String]?
+  let countries: [String]?
+  let languages: [String]?
+  let revenue: Int?
+  let budget: Int?
+  let lastAirDate: String?
+  let nextAirDate: String?
+  let recommendationIds: [String]?
+  let videos: [TitleVideo]?
 }
 
 struct CatalogSection: Codable, Identifiable {
