@@ -53,6 +53,10 @@ function DialogShell({
         className={panelClassName}
         aria-modal="true"
         aria-labelledby={labelledBy}
+        onCancel={(event) => {
+          event.preventDefault();
+          onClose();
+        }}
         onMouseDown={(event) => event.target === event.currentTarget && onClose()}
       >
         <button
