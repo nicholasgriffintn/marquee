@@ -42,13 +42,27 @@ export function useAvailability(item: MediaTitle, enabled: boolean) {
     attempted.current = id;
     setIsRefreshing(true);
 
+    let live = true;
+
     requestJson<AvailabilityResponse>(
       `/api/catalog/${mediaType}/${tmdbId}/availability/refresh`,
       jsonRequest("POST"),
     )
-      .then((response) => setRefreshed(response))
+      .then((response) => {
+        if (live) {
+          setRefreshed(response);
+        }
+      })
       .catch(() => {})
-      .finally(() => setIsRefreshing(false));
+      .finally(() => {
+        if (live) {
+          setIsRefreshing(false);
+        }
+      });
+
+    return () => {
+      live = false;
+    };
   }, [data, enabled, id, mediaType, tmdbId]);
 
   const live = refreshed ?? data;

@@ -67,6 +67,7 @@ export function useUsher(isSignedIn: boolean) {
   const uninvited = useRef(0);
   const rejected = useRef<string[]>([]);
   const inFlight = useRef(false);
+  const pickRun = useRef(0);
   const awayDays = useRef(0);
   const momentRef = useRef<UsherMoment | null>(null);
 
@@ -234,6 +235,10 @@ export function useUsher(isSignedIn: boolean) {
         return;
       }
 
+      const run = pickRun.current + 1;
+
+      pickRun.current = run;
+
       setPick((current) => ({ ...current, isPicking: true, error: "" }));
 
       try {
@@ -245,6 +250,10 @@ export function useUsher(isSignedIn: boolean) {
             ...viewingMoment(),
           }),
         );
+
+        if (run !== pickRun.current) {
+          return;
+        }
 
         if (response.item) {
           startJourney(response.item.id, "usher_pick");
@@ -258,6 +267,10 @@ export function useUsher(isSignedIn: boolean) {
           error: response.item ? "" : response.line,
         });
       } catch (error) {
+        if (run !== pickRun.current) {
+          return;
+        }
+
         setPick({
           item: null,
           line: "",
@@ -353,6 +366,7 @@ export function useUsher(isSignedIn: boolean) {
   );
 
   const openOrder = useCallback(() => {
+    pickRun.current += 1;
     setPick(NO_PICK);
     setAside("");
     setOrder({ ...NO_ORDER, isOpen: true });
@@ -391,12 +405,14 @@ export function useUsher(isSignedIn: boolean) {
   }, []);
 
   const clearPick = useCallback(() => {
+    pickRun.current += 1;
     setPick(NO_PICK);
     setAside("");
     setOrder(NO_ORDER);
   }, []);
 
   const say = useCallback((line: string) => {
+    pickRun.current += 1;
     setPick(NO_PICK);
     setAside(line);
   }, []);
