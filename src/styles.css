@@ -3058,9 +3058,10 @@ h2 em {
     top: 8px;
   }
   .rail-provider-row {
+    bottom: 8px;
     gap: 4px;
     right: 8px;
-    top: 40px;
+    top: auto;
   }
   .rail-card-title {
     bottom: auto;

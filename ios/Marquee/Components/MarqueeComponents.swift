@@ -170,7 +170,7 @@ struct TitleCard: View {
             .fixedSize()
             .padding(7)
           }
-          .overlay(alignment: .topTrailing) {
+          .overlay(alignment: .bottomTrailing) {
             HStack(spacing: 4) {
               ForEach(item.providers.prefix(providerLimit)) { provider in
                 ProviderBadge(providerID: provider.id, name: provider.name, size: 24)
@@ -181,7 +181,7 @@ struct TitleCard: View {
                   .foregroundStyle(MarqueeTheme.white.opacity(0.78))
               }
             }
-            .padding(.top, 38)
+            .padding(.bottom, 7)
             .padding(.trailing, 7)
           }
         Text(item.title)
