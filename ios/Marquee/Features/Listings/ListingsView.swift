@@ -52,6 +52,16 @@ struct ListingsView: View {
     }
     .task { await model.loadFacets(api: appState.api) }
     .task(id: model.filterKey) { await model.reload(api: appState.api) }
+    .task {
+      let query = appState.catalogueSearchQuery
+      if model.query != query { model.query = query }
+    }
+    .onChange(of: appState.catalogueSearchQuery) { _, query in
+      if model.query != query { model.query = query }
+    }
+    .onChange(of: model.query) { _, query in
+      if appState.catalogueSearchQuery != query { appState.catalogueSearchQuery = query }
+    }
     .marqueeRootPage()
   }
 }

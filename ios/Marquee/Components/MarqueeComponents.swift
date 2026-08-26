@@ -21,6 +21,57 @@ struct MarqueePageHeader: View {
   }
 }
 
+struct RootNavigationToolbar: ToolbarContent {
+  @Binding var query: String
+  let onSearch: () -> Void
+
+  var body: some ToolbarContent {
+    ToolbarItem(placement: .topBarLeading) {
+      HStack(spacing: 10) {
+        MarqueeMark()
+        HeaderSearchField(query: $query, onSearch: onSearch)
+      }
+    }
+    AccountToolbar()
+  }
+}
+
+private struct MarqueeMark: View {
+  var body: some View {
+    Image("MarqueeMark")
+      .resizable()
+      .scaledToFit()
+      .frame(width: 34, height: 34)
+      .background(MarqueeTheme.acid)
+      .clipShape(Rectangle())
+      .rotationEffect(.degrees(-2))
+      .accessibilityLabel("Marquee")
+  }
+}
+
+private struct HeaderSearchField: View {
+  @Binding var query: String
+  let onSearch: () -> Void
+
+  var body: some View {
+    HStack(spacing: 7) {
+      Image(systemName: "magnifyingglass")
+        .font(.system(size: 12, weight: .bold))
+        .foregroundStyle(MarqueeTheme.acid)
+      TextField("Search", text: $query)
+        .font(MarqueeTheme.sans(13))
+        .textInputAutocapitalization(.never)
+        .autocorrectionDisabled()
+        .submitLabel(.search)
+        .onSubmit(onSearch)
+    }
+    .padding(.horizontal, 10)
+    .frame(width: 150, height: 34)
+    .background(MarqueeTheme.ink)
+    .overlay { Rectangle().stroke(MarqueeTheme.line) }
+  }
+}
+
 struct AccountToolbar: ToolbarContent {
   @EnvironmentObject private var appState: AppState
 

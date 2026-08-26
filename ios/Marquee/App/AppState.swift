@@ -9,6 +9,7 @@ final class AppState: ObservableObject {
   @Published var isPresentingSignIn = false
   @Published var authenticationError = ""
   @Published var selectedProviderIDs: Set<String> = []
+  @Published var catalogueSearchQuery = ""
   @Published private(set) var shelfVersion = 0
 
   let api = APIClient(baseURL: AppConfiguration.baseURL)

@@ -33,7 +33,18 @@ struct RootView: View {
   ) -> some View {
     NavigationStack {
       view
-        .toolbar { AccountToolbar() }
+        .toolbar {
+          RootNavigationToolbar(
+            query: $appState.catalogueSearchQuery,
+            onSearch: {
+              guard
+                !appState.catalogueSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+                  .isEmpty
+              else { return }
+              selection = .listings
+            }
+          )
+        }
     }
     .tabItem { Label(title, systemImage: systemImage) }
     .tag(tab)
