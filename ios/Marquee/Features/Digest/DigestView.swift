@@ -142,7 +142,7 @@ struct DigestView: View {
   }
 
   private func formatDate(_ value: String) -> String {
-    guard let date = ISO8601DateFormatter().date(from: value) else { return "Soon" }
+    guard let date = MarqueeDate.parse(value) else { return "Soon" }
     return date.formatted(.dateTime.weekday(.abbreviated).hour().minute())
   }
 }

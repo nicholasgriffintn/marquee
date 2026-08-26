@@ -487,14 +487,24 @@ struct TonightEpisodeBoard: View {
   }
 
   private func episodeCode(_ episode: ScheduledEpisode) -> String {
+    var details: [String] = []
+
     if let season = episode.season, let number = episode.episode {
-      return "S\(season)E\(number) · \(episode.episodeName ?? "New episode")"
+      details.append("S\(season)E\(number)")
+    } else {
+      details.append("New episode")
     }
-    return episode.episodeName ?? "New episode"
+    if let name = episode.episodeName, !name.isEmpty { details.append(name) }
+    if let network = episode.network, !network.isEmpty { details.append(network) }
+
+    return details.joined(separator: " · ")
   }
 
   private func episodeTime(_ value: String) -> String {
-    guard let date = ISO8601DateFormatter().date(from: value) else { return "Tonight" }
-    return date.formatted(date: .omitted, time: .shortened)
+    guard let date = MarqueeDate.parse(value) else { return "—" }
+    if Calendar.current.isDateInToday(date) {
+      return date.formatted(date: .omitted, time: .shortened)
+    }
+    return date.formatted(.dateTime.weekday(.abbreviated).hour().minute())
   }
 }

@@ -92,9 +92,12 @@ struct Artwork: View {
         }
         .frame(height: height)
       } else {
-        artwork
-          .aspectRatio(aspectRatio, contentMode: .fill)
-          .frame(maxWidth: .infinity)
+        GeometryReader { proxy in
+          artwork
+            .frame(width: proxy.size.width, height: proxy.size.height)
+            .clipped()
+        }
+        .aspectRatio(aspectRatio, contentMode: .fit)
       }
     }
     .clipped()
@@ -136,6 +139,9 @@ struct Artwork: View {
 struct TitleCard: View {
   let item: MediaTitle
   var width: CGFloat = 142
+  var rank: Int? = nil
+
+  private let providerLimit = 2
 
   var body: some View {
     NavigationLink {
@@ -145,33 +151,80 @@ struct TitleCard: View {
         Artwork(url: item.posterUrl, seed: item.id)
           .frame(width: width, height: width * 1.5)
           .overlay(alignment: .topLeading) {
-            if let score = item.tmdbScore {
-              Text(String(format: "%.1f", score))
-                .font(MarqueeTheme.mono(9, weight: .bold))
-                .foregroundStyle(MarqueeTheme.ink)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 4)
-                .background(MarqueeTheme.acid)
-                .padding(7)
+            HStack(spacing: 5) {
+              if let rank {
+                Text("#\(rank)")
+                  .foregroundStyle(MarqueeTheme.ink)
+                  .padding(.horizontal, 7)
+                  .padding(.vertical, 5)
+                  .background(MarqueeTheme.acid)
+              }
+              Text(item.mediaType == "movie" ? "FILM" : "TV")
+                .foregroundStyle(MarqueeTheme.white)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 5)
+                .background(MarqueeTheme.ink.opacity(0.72))
             }
+            .font(MarqueeTheme.mono(8, weight: .bold))
+            .tracking(0.7)
+            .fixedSize()
+            .padding(7)
+          }
+          .overlay(alignment: .topTrailing) {
+            HStack(spacing: 4) {
+              ForEach(item.providers.prefix(providerLimit)) { provider in
+                ProviderBadge(providerID: provider.id, name: provider.name, size: 24)
+              }
+              if item.providers.count > providerLimit {
+                Text("+\(item.providers.count - providerLimit)")
+                  .font(MarqueeTheme.mono(9, weight: .bold))
+                  .foregroundStyle(MarqueeTheme.white.opacity(0.78))
+              }
+            }
+            .padding(.top, 38)
+            .padding(.trailing, 7)
           }
         Text(item.title)
           .font(MarqueeTheme.sans(13, weight: .bold))
           .lineLimit(2)
           .multilineTextAlignment(.leading)
+        if let buzz = item.buzz {
+          (Text("WIKIPEDIA \(statisticChangeLabel(buzz.delta))")
+            .foregroundStyle(MarqueeTheme.blue)
+            + Text("  \(compactStatisticCount(buzz.views)) READERS THIS WEEK")
+            .foregroundStyle(MarqueeTheme.muted))
+            .font(MarqueeTheme.mono(8, weight: .bold))
+            .tracking(0.5)
+            .textCase(.uppercase)
+            .lineLimit(2)
+        }
+        ratingLine
         Text(itemMeta(item))
           .font(MarqueeTheme.mono(9))
           .foregroundStyle(MarqueeTheme.muted)
-          .lineLimit(1)
+          .lineLimit(2)
       }
       .frame(width: width, alignment: .leading)
     }
     .buttonStyle(.plain)
   }
+
+  private var ratingLine: some View {
+    let summary = titleRatingSummary(item)
+
+    return
+      (Text(summary.sources.uppercased()).foregroundStyle(MarqueeTheme.acid)
+      + Text(summary.votes.map { "  \($0.uppercased())" } ?? "")
+      .foregroundStyle(MarqueeTheme.muted))
+      .font(MarqueeTheme.mono(8, weight: .medium))
+      .tracking(0.45)
+      .lineLimit(3)
+  }
 }
 
 struct TitleRail: View {
   let section: CatalogSection
+  var ranked = false
 
   var body: some View {
     VStack(alignment: .leading, spacing: 13) {
@@ -191,7 +244,9 @@ struct TitleRail: View {
       .padding(.horizontal, 18)
       ScrollView(.horizontal, showsIndicators: false) {
         LazyHStack(alignment: .top, spacing: 13) {
-          ForEach(section.items) { TitleCard(item: $0) }
+          ForEach(Array(section.items.enumerated()), id: \.element.id) { index, item in
+            TitleCard(item: item, rank: ranked ? index + 1 : nil)
+          }
         }
         .padding(.horizontal, 18)
       }

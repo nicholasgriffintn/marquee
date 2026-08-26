@@ -93,7 +93,9 @@ struct TonightView: View {
               items: model.trending,
               angle: nil,
               reason: nil
-            ))
+            ),
+            ranked: true
+          )
         }
 
         if !model.episodes.isEmpty {

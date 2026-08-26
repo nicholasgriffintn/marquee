@@ -28,12 +28,13 @@ export const TitleCard = memo(function TitleCard({
       >
         <div className={`rail-art${item.backdropUrl ? "" : " rail-art-missing"}`}>
           <TitleArt
-            url={item.backdropUrl}
+            url={item.backdropUrl ?? item.posterUrl}
             seed={item.id}
             label={item.title}
             width={780}
             kind="backdrop"
             wide
+            portraitUrl={item.posterUrl ?? item.backdropUrl}
           />
           <div className="rail-tags">
             {rank !== undefined && <span className="rail-rank">#{rank}</span>}
@@ -41,7 +42,6 @@ export const TitleCard = memo(function TitleCard({
               {item.pending ? "FETCHING" : item.mediaType === "movie" ? "FILM" : "TV"}
             </span>
           </div>
-          <strong>{item.title}</strong>
           <div className="rail-provider-row">
             {item.providers.slice(0, RAIL_PROVIDER_LIMIT).map((provider) => (
               <ProviderBadge provider={provider} compact key={provider.id} />
@@ -53,6 +53,7 @@ export const TitleCard = memo(function TitleCard({
             )}
           </div>
         </div>
+        <strong className="rail-card-title">{item.title}</strong>
       </button>
       <div className="rail-meta">
         {item.buzz && (

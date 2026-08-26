@@ -20,6 +20,21 @@ struct ProviderAvailability: Codable, Identifiable {
   let source: String
 }
 
+struct TitleBuzz: Codable {
+  let views: Int
+  let previousViews: Int
+  let delta: Double
+}
+
+struct TitleRatings: Codable {
+  let imdbScore: Double?
+  let imdbVotes: Int?
+  let rottenTomatoes: String?
+  let metascore: Int?
+  let animeScore: Double?
+  let animeVotes: Int?
+}
+
 struct MediaTitle: Codable, Identifiable {
   let id: String
   let tmdbId: Int
@@ -45,6 +60,8 @@ struct MediaTitle: Codable, Identifiable {
   let imdbUrl: URL?
   let tagline: String?
   let trailerKey: String?
+  let buzz: TitleBuzz?
+  let ratings: TitleRatings?
 }
 
 struct CatalogSection: Codable, Identifiable {

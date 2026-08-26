@@ -1567,6 +1567,7 @@ h2 em {
   border: 0;
   display: block;
   padding: 0;
+  position: relative;
   text-align: left;
   width: 100%;
 }
@@ -1580,9 +1581,15 @@ h2 em {
     transform 0.2s ease,
     box-shadow 0.2s ease;
 }
-.rail-art > img {
+.rail-art > img,
+.rail-art > picture,
+.rail-art > picture > img {
+  display: block;
   height: 100%;
+  max-height: 100%;
+  max-width: 100%;
   object-fit: cover;
+  overflow: hidden;
   width: 100%;
 }
 .rail-card:hover .rail-art {
@@ -1618,8 +1625,9 @@ h2 em {
   letter-spacing: 0.1em;
   padding: 5px 8px;
 }
-.rail-art > strong {
+.rail-card-title {
   bottom: 18px;
+  color: var(--white);
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -3036,12 +3044,47 @@ h2 em {
     display: none;
   }
   .rail-track {
-    grid-auto-columns: minmax(250px, 78vw);
+    grid-auto-columns: minmax(142px, 42vw);
     scroll-padding-inline: 18px;
   }
-  .schedule-list {
-    grid-auto-columns: minmax(220px, 72vw);
-    scroll-padding-inline: 18px;
+  .rail-art {
+    aspect-ratio: 2 / 3;
+  }
+  .rail-art::after {
+    display: none;
+  }
+  .rail-tags {
+    left: 8px;
+    top: 8px;
+  }
+  .rail-provider-row {
+    gap: 4px;
+    right: 8px;
+    top: 40px;
+  }
+  .rail-card-title {
+    bottom: auto;
+    font-size: 15px;
+    letter-spacing: -0.025em;
+    line-height: 1.18;
+    margin-top: 8px;
+    padding-inline: 2px;
+    position: static;
+  }
+  .rail-meta {
+    gap: 6px;
+    padding-top: 6px;
+  }
+  .rail-buzz,
+  .source-label,
+  .rail-meta > span:last-child {
+    font-size: 8px;
+    line-height: 1.45;
+  }
+  .rail-buzz em,
+  .source-label em {
+    display: block;
+    margin-left: 0;
   }
   .rail-heading button {
     display: none;
@@ -3188,7 +3231,7 @@ h2 em {
     font-size: 8px;
   }
   .rail-track {
-    grid-auto-columns: 84vw;
+    grid-auto-columns: minmax(138px, 42vw);
   }
   .title-grid {
     gap: 30px 10px;
@@ -3573,6 +3616,43 @@ h2 em {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.4;
+}
+@media (max-width: 760px) {
+  .schedule-strip {
+    background: var(--panel);
+    margin: 0 18px 42px;
+    padding: 18px;
+  }
+  .schedule-heading {
+    padding: 0 0 12px;
+  }
+  .schedule-heading strong {
+    font-size: 26px;
+  }
+  .schedule-heading small {
+    font-size: 8px;
+    margin-left: auto;
+  }
+  .schedule-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    overflow: visible;
+    padding: 0;
+  }
+  .schedule-item {
+    column-gap: 10px;
+    grid-template-columns: 54px minmax(0, 1fr);
+    padding: 12px 0;
+  }
+  .schedule-item time {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+  }
+  .schedule-item strong,
+  .schedule-item small {
+    grid-column: 2;
+  }
 }
 .digest-heading {
   border-top: 1px solid var(--line);
