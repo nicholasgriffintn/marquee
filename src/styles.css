@@ -6115,6 +6115,20 @@ button.notebook-primary {
   .usher-console {
     padding-inline: 22px;
   }
+  .usher-console-row {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: none;
+  }
+  .usher-console-row::-webkit-scrollbar {
+    display: none;
+  }
+  .usher-console-row > button {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
   .schedule-heading,
   .schedule-list {
     padding-inline: 18px;
