@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import type { MediaTitle } from "../domain/catalog";
 import { artwork } from "../lib/media";
+import { ExternalLinkIcon, PlayIcon } from "./ui";
 
 type Video = { key: string; name: string; type: string };
 
@@ -22,9 +23,7 @@ function videosFor(item: MediaTitle): Video[] {
 }
 
 export function TrailerBlock({ item }: { item: MediaTitle }) {
-  const videos = videosFor(item).filter((video) =>
-    YOUTUBE_ID_PATTERN.test(video.key),
-  );
+  const videos = videosFor(item).filter((video) => YOUTUBE_ID_PATTERN.test(video.key));
   const [active, setActive] = useState<Video | null>(null);
 
   if (videos.length === 0) {
@@ -52,11 +51,11 @@ export function TrailerBlock({ item }: { item: MediaTitle }) {
             onClick={() => setActive(videos[0])}
             aria-label={`Play ${videos[0].name}`}
           >
-            {still && (
-              <img src={still} alt="" loading="lazy" decoding="async" />
-            )}
+            {still && <img src={still} alt="" loading="lazy" decoding="async" />}
             <span className="detail-media-badge">
-              <i>▶</i>{" "}
+              <i>
+                <PlayIcon />
+              </i>{" "}
               {videos[0].type === "Trailer"
                 ? "Play trailer"
                 : `Play ${videos[0].type.toLowerCase()}`}
@@ -73,9 +72,7 @@ export function TrailerBlock({ item }: { item: MediaTitle }) {
               className={active?.key === video.key ? "selected" : ""}
               onClick={() => setActive(video)}
             >
-              {video.name.length > 26
-                ? `${video.name.slice(0, 26)}…`
-                : video.name}
+              {video.name.length > 26 ? `${video.name.slice(0, 26)}…` : video.name}
             </button>
           ))}
         <a
@@ -84,7 +81,7 @@ export function TrailerBlock({ item }: { item: MediaTitle }) {
           target="_blank"
           rel="noreferrer"
         >
-          Watch on YouTube ↗
+          Watch on YouTube <ExternalLinkIcon />
         </a>
       </div>
     </div>

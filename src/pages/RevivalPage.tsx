@@ -5,6 +5,7 @@ import { ErrorBoundary } from "../components/ErrorBoundary";
 import { PageTitle } from "../components/PageTitle";
 import { ProjectionNote } from "../components/revival/ProjectionNote";
 import { ReelCard } from "../components/revival/ReelCard";
+import { SearchField } from "../components/ui";
 import { UsherMark } from "../components/usher/UsherMark";
 import { revivalPath, workMeta, type RevivalBillSlot, type RevivalShelf } from "../domain/revival";
 import { useNearViewport } from "../hooks/useNearViewport";
@@ -78,7 +79,7 @@ export function RevivalPage({ isReady }: { isReady: boolean }) {
           The small screen at the back. When the building came down, the sign went in a skip and
           this did not. The prints are out of copyright, the projectionist is somewhere behind that
           door, and the ticket is nothing.{" "}
-          {programme.total ? `${programme.total} in the vault.` : ""}
+          {programme.total ? `${programme.total.toLocaleString()} in the vault.` : ""}
         </p>
       </PageTitle>
 
@@ -89,18 +90,17 @@ export function RevivalPage({ isReady }: { isReady: boolean }) {
       )}
 
       <div className="revival-search">
-        <input
-          type="search"
+        <SearchField
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={setQuery}
           placeholder="Search the vault"
-          aria-label="Search the vault"
+          label="Search the vault"
         />
         {search.isActive && (
           <span>
             {search.isSearching
               ? "Looking…"
-              : `${search.works.length} of ${programme.total} in the vault`}
+              : `${search.works.length.toLocaleString()} of ${programme.total.toLocaleString()} in the vault`}
           </span>
         )}
       </div>

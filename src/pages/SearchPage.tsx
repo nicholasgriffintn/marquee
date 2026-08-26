@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { PageTitle } from "../components/PageTitle";
 import { TitleCard } from "../components/TitleCard";
+import { ArrowIcon } from "../components/ui";
 import { UsherCard } from "../components/usher/UsherCard";
 import { UsherMark } from "../components/usher/UsherMark";
 import type { MediaTitle } from "../domain/catalog";
@@ -59,7 +60,9 @@ export function SearchPage({
             <strong>The Usher</strong>
             <small>Thirty years on the door. Not in the catalogue, but he is here.</small>
           </span>
-          <em aria-hidden="true">→</em>
+          <em aria-hidden="true">
+            <ArrowIcon />
+          </em>
         </Link>
       )}
 

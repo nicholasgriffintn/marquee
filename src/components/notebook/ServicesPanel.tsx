@@ -2,7 +2,7 @@ import { useState } from "react";
 
 import type { Provider, ProvidersResponse } from "../../domain/catalog";
 import type { ProviderCategory } from "../../domain/providers";
-import { ProviderBadge } from "../ui";
+import { CloseIcon, ExternalLinkIcon, MinusIcon, PlusIcon, ProviderBadge } from "../ui";
 
 const CATEGORIES: Array<{ id: string; name: ProviderCategory }> = [
   { id: "subscription", name: "Subscription" },
@@ -85,7 +85,7 @@ export function ServicesPanel({
                   aria-label={`Stop including ${provider.name}`}
                   onClick={() => toggleProvider(provider.id)}
                 >
-                  ×
+                  <CloseIcon />
                 </button>
               </li>
             ))}
@@ -153,6 +153,10 @@ export function ServicesPanel({
               }}
             >
               <summary>
+                <span className="source-group-toggle" aria-hidden="true">
+                  <PlusIcon className="source-group-plus" />
+                  <MinusIcon className="source-group-minus" />
+                </span>
                 <span className="source-group-name">{group.name}</span>
                 <small>
                   {group.shown.length}
@@ -187,7 +191,7 @@ export function ServicesPanel({
                     )}
                     {provider.status === "link" && provider.homepage && (
                       <a href={provider.homepage} target="_blank" rel="noreferrer">
-                        Open ↗
+                        Open <ExternalLinkIcon />
                       </a>
                     )}
                     {provider.status === "marker" && (

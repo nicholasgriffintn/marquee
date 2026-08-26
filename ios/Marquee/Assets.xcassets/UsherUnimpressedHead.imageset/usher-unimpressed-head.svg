@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="108 98 296 200" role="img" aria-label="The Usher">
+  <g fill="none" stroke="#11130f" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M95 101 184 99l72 101 72-101 89 2-30 267h-76l10-134-65 83-65-83 10 134h-76z" fill="#f3f0e7" stroke-width="22"/>
+    <path d="m213 292 43 25 43-25-8 71-35 27-35-27z" fill="#ff6e56" stroke-width="14"/>
+    <g fill="#c9f35d" stroke-width="7">
+      <circle cx="128" cy="142" r="10"/><circle cx="137" cy="197" r="10"/><circle cx="143" cy="253" r="10"/><circle cx="148" cy="310" r="10"/>
+      <circle cx="384" cy="142" r="10"/><circle cx="375" cy="197" r="10"/><circle cx="369" cy="253" r="10"/><circle cx="364" cy="310" r="10"/>
+      <circle cx="256" cy="338" r="8"/>
+    </g>
+    <path d="M167 150h34M311 150h34" stroke-width="13"/>
+    <path d="M171 178c4 25 15 37 34 37 19 0 30-12 34-37M273 178c4 25 15 37 34 37 19 0 30-12 34-37" fill="#f3f0e7" stroke-width="9"/>
+    <path d="M185 178c2 17 9 25 20 25s18-8 20-25M287 178c2 17 9 25 20 25s18-8 20-25" fill="#11130f" stroke-width="4"/>
+    <path d="M239 239h34" stroke-width="10"/>
+  </g>
+</svg>

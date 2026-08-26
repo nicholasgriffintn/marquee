@@ -16,7 +16,7 @@ import {
 } from "../domain/seasons";
 import { useSeasons, type EpisodePatch, type EpisodeTracker } from "../hooks/useSeasons";
 import { artwork, artworkSrcSet } from "../lib/media";
-import { ArrowIcon, ChevronIcon, Dropdown, type DropdownOption } from "./ui";
+import { ArrowIcon, CheckIcon, ChevronIcon, Dropdown, StarIcon, type DropdownOption } from "./ui";
 
 const STARS = [1, 2, 3, 4, 5];
 
@@ -40,7 +40,7 @@ function StarRow({
           aria-pressed={rating === star}
           onClick={() => onRate(rating === star ? null : star)}
         >
-          ★
+          <StarIcon />
         </button>
       ))}
     </div>
@@ -140,7 +140,7 @@ function EpisodeRow({
           aria-label={`${watched ? "Unmark" : "Mark"} ${label} as watched`}
           onClick={() => onSave({ ...patch, watched: !watched })}
         >
-          {watched ? "✓" : ""}
+          {watched ? <CheckIcon /> : null}
         </button>
       )}
       <div className="episode-body">
@@ -347,7 +347,7 @@ export function SeasonsBlock({
       content: (
         <>
           {tab.seasonNumber === 0 ? "Specials" : `Series ${tab.seasonNumber}`}
-          {stats && stats.watched > 0 ? <em>{done ? "✓" : stats.watched}</em> : null}
+          {stats && stats.watched > 0 ? <em>{done ? <CheckIcon /> : stats.watched}</em> : null}
         </>
       ),
     };

@@ -141,11 +141,13 @@ export function changeLabel(delta: number) {
 }
 
 export function heroTitleClass(title: string) {
-  if (title.length > 46) {
+  const longestWord = Math.max(...title.trim().split(/\s+/).map((word) => word.length), 0);
+
+  if (title.length > 46 || longestWord > 20) {
     return "hero-title hero-title-tiny";
   }
 
-  if (title.length > 26) {
+  if (title.length > 26 || longestWord > 13) {
     return "hero-title hero-title-small";
   }
 

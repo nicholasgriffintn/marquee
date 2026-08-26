@@ -10,7 +10,18 @@ import { isRecord } from "../lib/values.ts";
 import { confirmAlertEmail } from "../repositories/alerts.ts";
 import { hashState } from "../repositories/links.ts";
 import type { Bindings } from "../types.ts";
-import { listApiTokens, mintToken, revokeApiToken, storeApiToken } from "./api-tokens.ts";
+import {
+  listApiTokens,
+  mintToken,
+  revokeApiToken,
+  revokeBearerToken,
+  storeApiToken,
+} from "./api-tokens.ts";
+import {
+  completeNativeAuthentication,
+  nativeAuthenticationFailure,
+  nativeAuthRoutes,
+} from "./native-auth.ts";
 import {
   authenticationFor,
   RETURN_COOKIE,
@@ -27,6 +38,7 @@ authRoutes.get("/methods", (context) => listMethods(context));
 authRoutes.get("/magic", (context) => completeMagicLink(context));
 authRoutes.get("/alert-email", (context) => confirmAlertAddress(context));
 authRoutes.get("/callback/:provider", (context) => completeOAuth(context));
+authRoutes.route("/native", nativeAuthRoutes);
 authRoutes.get("/session", (context) => getSession(context));
 authRoutes.post("/logout", (context) => logout(context));
 authRoutes.get("/tokens", (context) => listTokens(context));
@@ -112,12 +124,20 @@ async function runAuthProtocol(context: AppContext) {
     return withCookies(jsonResponse({ status: "completed" }), await revokeSession(context));
   }
 
-  if (action === "request_magic_link") {
+  if (action === "request_magic_link" || action === "request_native_magic_link") {
     const values = isRecord(body?.values) ? body.values : {};
     const email = typeof values.email === "string" ? values.email.trim().slice(0, 200) : "";
+    const nativeChallenge =
+      action === "request_native_magic_link" && typeof values.challenge === "string"
+        ? values.challenge
+        : "";
 
     if (!email || !email.includes("@")) {
       return jsonResponse({ error: "That is not an address I can post to." }, 400);
+    }
+
+    if (action === "request_native_magic_link" && !/^[a-f\d]{64}$/u.test(nativeChallenge)) {
+      return jsonResponse({ error: "That ticket request is incomplete. Start again." }, 400);
     }
 
     if (!emailConfigured(context.env)) {
@@ -127,7 +147,12 @@ async function runAuthProtocol(context: AppContext) {
     const returnTo = safeReturnPath(typeof values.returnTo === "string" ? values.returnTo : "");
 
     try {
-      await authenticationFor(context.env, context.req.raw).requestMagicLink(email);
+      await authenticationFor(context.env, context.req.raw).requestMagicLink(
+        email,
+        action === "request_native_magic_link"
+          ? { kind: "native", challenge: nativeChallenge }
+          : { kind: "web" },
+      );
     } catch (error) {
       logError("magic_link_request_failed", error);
     }
@@ -137,7 +162,9 @@ async function runAuthProtocol(context: AppContext) {
         status: "completed",
         message: "Check your email. The link works once, and not for long.",
       }),
-      returnTo ? temporaryCookie(context, RETURN_COOKIE, returnTo) : null,
+      action === "request_magic_link" && returnTo
+        ? temporaryCookie(context, RETURN_COOKIE, returnTo)
+        : null,
     );
   }
 
@@ -207,6 +234,16 @@ async function completeGitHub(context: AppContext) {
       throw new AuthError("unsupported_operation");
     }
 
+    const nativeResponse = await completeNativeAuthentication(
+      context,
+      result.session.user.id,
+      result.session.token,
+    );
+
+    if (nativeResponse) {
+      return nativeResponse;
+    }
+
     return withCookies(
       context.redirect(destination(context, returnTo).href),
       ...flowCookies(context),
@@ -243,7 +280,11 @@ async function revokeSession(context: AppContext) {
   const principal = await sessionPrincipal(context.env, context.req.raw);
 
   if (principal) {
-    await authenticationFor(context.env, context.req.raw).logout(principal.token);
+    if (principal.kind === "session") {
+      await authenticationFor(context.env, context.req.raw).logout(principal.token);
+    } else {
+      await revokeBearerToken(context.env, context.req.raw);
+    }
   }
 
   return expiredCookie(context, SESSION_COOKIE);
@@ -293,6 +334,12 @@ async function revokeToken(context: AppContext) {
 }
 
 function failedCallback(context: AppContext, error: string) {
+  const nativeResponse = nativeAuthenticationFailure(context, error);
+
+  if (nativeResponse) {
+    return nativeResponse;
+  }
+
   const url = destination(context);
 
   url.searchParams.set("authError", error);

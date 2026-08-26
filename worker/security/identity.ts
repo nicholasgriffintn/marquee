@@ -1,6 +1,5 @@
 import { parseCookies } from "@ngriffin_uk/auth-cookie";
 
-import { bearerUser } from "../auth/api-tokens.ts";
 import { GUEST_COOKIE, sessionPrincipal } from "../auth/session.ts";
 import type { Bindings } from "../types.ts";
 
@@ -27,14 +26,6 @@ async function resolveIdentity(env: Bindings, request: Request): Promise<Identit
 
   if (principal) {
     return { member: true, key: principal.user.id, userId: principal.user.id };
-  }
-
-  if (request.headers.get("authorization")) {
-    const user = await bearerUser(env, request);
-
-    if (user) {
-      return { member: true, key: user.id, userId: user.id };
-    }
   }
 
   return { member: false, key: anonymousKey(request), userId: null };

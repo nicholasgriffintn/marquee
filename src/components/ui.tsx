@@ -5,18 +5,106 @@ import { providerLogo } from "../domain/provider-logos";
 import { providerMark } from "../domain/providers";
 import { TitleArt } from "./TitleArt";
 
-export function ArrowIcon() {
+type IconProps = { className?: string };
+
+export function ArrowIcon({ className }: IconProps = {}) {
   return (
-    <svg viewBox="0 0 20 20" aria-hidden="true">
+    <svg className={className} viewBox="0 0 20 20" aria-hidden="true">
       <path d="M4 10h11M11 5l5 5-5 5" />
     </svg>
   );
 }
 
-export function ChevronIcon({ back }: { back?: boolean }) {
+export function ChevronIcon({ back, className }: { back?: boolean; className?: string }) {
   return (
-    <svg viewBox="0 0 20 20" aria-hidden="true">
+    <svg className={className} viewBox="0 0 20 20" aria-hidden="true">
       <path d={back ? "M12 4l-6 6 6 6" : "M8 4l6 6-6 6"} />
+    </svg>
+  );
+}
+
+export function CloseIcon({ className }: IconProps = {}) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" aria-hidden="true">
+      <path d="M5 5l10 10M15 5 5 15" />
+    </svg>
+  );
+}
+
+export function ExternalLinkIcon({ className }: IconProps = {}) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" aria-hidden="true">
+      <path d="M6 14 14 6M9 6h5v5" />
+    </svg>
+  );
+}
+
+export function SearchIcon({ className }: IconProps = {}) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" aria-hidden="true">
+      <circle cx="8.5" cy="8.5" r="4.5" />
+      <path d="m12 12 4 4" />
+    </svg>
+  );
+}
+
+export function SearchField({
+  value,
+  onChange,
+  placeholder,
+  label,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  label: string;
+}) {
+  return (
+    <label className="browse-search">
+      <span aria-hidden="true">
+        <SearchIcon />
+      </span>
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        aria-label={label}
+      />
+    </label>
+  );
+}
+
+export function PlayIcon({ className }: IconProps = {}) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" aria-hidden="true">
+      <path className="icon-fill" d="M7 4.5 15.5 10 7 15.5Z" />
+    </svg>
+  );
+}
+
+export function StarIcon({ className }: IconProps = {}) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" aria-hidden="true">
+      <path
+        className="icon-fill"
+        d="m10 2.8 2.2 4.5 5 .8-3.6 3.5.8 5-4.4-2.4-4.4 2.4.8-5-3.6-3.5 5-.8Z"
+      />
+    </svg>
+  );
+}
+
+export function CheckIcon({ className }: IconProps = {}) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" aria-hidden="true">
+      <path d="m4 10 4 4 8-9" />
+    </svg>
+  );
+}
+
+export function VerticalChevronIcon({ up = false, className }: IconProps & { up?: boolean } = {}) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" aria-hidden="true">
+      <path d={up ? "m4 12 6-6 6 6" : "m4 8 6 6 6-6"} />
     </svg>
   );
 }
@@ -60,12 +148,6 @@ export function Dropdown({
 
   useEffect(() => {
     if (isOpen) {
-      setActive(options.findIndex((option) => option.selected));
-    }
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (isOpen) {
       optionRefs.current[active]?.scrollIntoView({ block: "nearest" });
     }
   }, [active, isOpen]);
@@ -84,6 +166,7 @@ export function Dropdown({
       event.preventDefault();
 
       if (!isOpen) {
+        setActive(options.findIndex((option) => option.selected));
         setIsOpen(true);
 
         return;
@@ -109,6 +192,17 @@ export function Dropdown({
     }
   }
 
+  function toggleOpen() {
+    if (isOpen) {
+      setIsOpen(false);
+
+      return;
+    }
+
+    setActive(options.findIndex((option) => option.selected));
+    setIsOpen(true);
+  }
+
   function onBlur(event: React.FocusEvent<HTMLDivElement>) {
     if (!wrapRef.current?.contains(event.relatedTarget)) {
       setIsOpen(false);
@@ -126,7 +220,7 @@ export function Dropdown({
         aria-controls={panelId}
         aria-label={label}
         aria-activedescendant={isOpen && active >= 0 ? `${panelId}-option-${active}` : undefined}
-        onClick={() => setIsOpen((current) => !current)}
+        onClick={toggleOpen}
         onKeyDown={onKeyDown}
       >
         {trigger}
@@ -205,7 +299,7 @@ export function Modal({
           onClick={onClose}
           aria-label="Close"
         >
-          ×
+          <CloseIcon />
         </button>
         {children}
       </dialog>
@@ -213,10 +307,18 @@ export function Modal({
   );
 }
 
-export function PlusIcon() {
+export function PlusIcon({ className }: IconProps = {}) {
   return (
-    <svg viewBox="0 0 20 20" aria-hidden="true">
+    <svg className={className} viewBox="0 0 20 20" aria-hidden="true">
       <path d="M10 3v14M3 10h14" />
+    </svg>
+  );
+}
+
+export function MinusIcon({ className }: IconProps = {}) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" aria-hidden="true">
+      <path d="M3 10h14" />
     </svg>
   );
 }

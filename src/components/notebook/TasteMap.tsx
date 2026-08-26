@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useState } from "react";
 
 import type { MapNeighbour, MapPoint, TasteMapResponse } from "../../domain/notebook";
 import { isAbortError, requestJson } from "../../lib/api";
+import { ArrowIcon } from "../ui";
 import { TasteMapCard } from "./TasteMapCard";
 
 const SIZE = 560;
@@ -91,7 +92,9 @@ function MapSummary({ map, landed }: { map: TasteMapResponse; landed: number }) 
           <div>
             <dt>Left to right</dt>
             <dd>
-              {axes.x.low} → {axes.x.high}
+              <span className="taste-axis-range">
+                {axes.x.low} <ArrowIcon /> {axes.x.high}
+              </span>
             </dd>
           </div>
         )}
@@ -99,7 +102,9 @@ function MapSummary({ map, landed }: { map: TasteMapResponse; landed: number }) 
           <div>
             <dt>Bottom to top</dt>
             <dd>
-              {axes.y.low} → {axes.y.high}
+              <span className="taste-axis-range">
+                {axes.y.low} <ArrowIcon /> {axes.y.high}
+              </span>
             </dd>
           </div>
         )}
@@ -287,10 +292,10 @@ export function TasteMap({ isSignedIn }: { isSignedIn: boolean }) {
           {axes.x && (
             <>
               <text className="taste-map-axis" x={PAD} y={SIZE - 10} textAnchor="start">
-                ← {axes.x.low}
+                {axes.x.low}
               </text>
               <text className="taste-map-axis" x={SIZE - PAD} y={SIZE - 10} textAnchor="end">
-                {axes.x.high} →
+                {axes.x.high}
               </text>
             </>
           )}
@@ -304,7 +309,7 @@ export function TasteMap({ isSignedIn }: { isSignedIn: boolean }) {
                 textAnchor="start"
                 transform={`rotate(-90 14 ${SIZE - PAD})`}
               >
-                ← {axes.y.low}
+                {axes.y.low}
               </text>
               <text
                 className="taste-map-axis"
@@ -313,7 +318,7 @@ export function TasteMap({ isSignedIn }: { isSignedIn: boolean }) {
                 textAnchor="end"
                 transform={`rotate(-90 14 ${PAD})`}
               >
-                {axes.y.high} →
+                {axes.y.high}
               </text>
             </>
           )}

@@ -18,6 +18,7 @@ import {
 import type { UsherMoment } from "../domain/usher";
 import type { EntryStatus, ViewingEntry } from "../types";
 import { DetailPanel } from "./detail/DetailPanel";
+import { CloseIcon } from "./ui";
 import { UsherCard } from "./usher/UsherCard";
 import { UsherMark } from "./usher/UsherMark";
 
@@ -66,7 +67,7 @@ function DialogShell({
           onClick={onClose}
           aria-label="Close details"
         >
-          ×
+          <CloseIcon />
         </button>
         {children}
       </dialog>

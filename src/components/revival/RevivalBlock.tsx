@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 
 import { revivalPath, runtimeLabel, SOURCE_LABELS, type RevivalWork } from "../../domain/revival";
+import { PlayIcon } from "../ui";
 
 export function RevivalBlock({ works }: { works: RevivalWork[] }) {
   if (works.length === 0) {
@@ -12,7 +13,9 @@ export function RevivalBlock({ works }: { works: RevivalWork[] }) {
       <span>Playing here, free</span>
       {works.map((work) => (
         <Link className="watch-button" key={work.id} to={revivalPath(work)}>
-          <span className="revival-mark">▶</span>
+          <span className="revival-mark">
+            <PlayIcon />
+          </span>
           <span>
             {work.title}
             <small>

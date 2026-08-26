@@ -7,6 +7,7 @@ import type { CuratorState } from "../../hooks/useCurator";
 import type { UsherPickState } from "../../hooks/useUsher";
 import { heroTitleClass, mediaMeta, scoreLabel } from "../../lib/media";
 import { TitleArt } from "../TitleArt";
+import { ChevronIcon, ExternalLinkIcon } from "../ui";
 import { UsherMark } from "./UsherMark";
 
 const REFINEMENTS = ["Shorter", "Lighter", "Older", "Weirder", "More acclaimed"];
@@ -43,7 +44,7 @@ export function UsherHero({
       <section className="hero-section usher-hero usher-hero-aside hero-empty">
         <div className="hero-gradient" />
         <button type="button" className="usher-exit" onClick={onClear}>
-          ← Back to tonight
+          <ChevronIcon back /> Back to tonight
         </button>
         <div className="usher-hero-figure" aria-hidden="true">
           <UsherMark face="idle" className="usher-figure" />
@@ -99,7 +100,7 @@ export function UsherHero({
       <div className="hero-gradient" />
 
       <button type="button" className="usher-exit" onClick={onClear}>
-        ← Back to tonight
+        <ChevronIcon back /> Back to tonight
       </button>
 
       {isPick && (
@@ -147,7 +148,10 @@ export function UsherHero({
             )}
             <div className="hero-actions">
               <button type="button" className="hero-play" onClick={() => onOpen(active)}>
-                <span className="play-icon">↗</span> See where to watch
+                <span className="play-icon">
+                  <ExternalLinkIcon />
+                </span>{" "}
+                See where to watch
               </button>
               {isPick ? (
                 <>

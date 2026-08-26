@@ -12,6 +12,7 @@ import { asideFor, type UsherMoment } from "./domain/usher";
 import { useAiRails } from "./hooks/useAiRails";
 import { useCatalog } from "./hooks/useCatalog";
 import { useCurator } from "./hooks/useCurator";
+import { useFeaturedTitle } from "./hooks/useFeaturedTitle";
 import { usePersonalRails } from "./hooks/usePersonalRails";
 import { usePinned } from "./hooks/usePinned";
 import { useProfile } from "./hooks/useProfile";
@@ -118,6 +119,11 @@ export function App() {
   const isViewerReady = !session.isLoading && profile.isLoaded && providersResolved;
   const isHome = location.pathname === "/";
   const catalog = useCatalog(selectedProviderIds, isViewerReady && isHome);
+  const featuredTitle = useFeaturedTitle(
+    selectedProviderIds,
+    isViewerReady && isHome,
+    profile.shelfKey,
+  );
   const search = useSearch(query, selectedProviderIds);
   const curator = useCurator();
   const usher = useUsher(isSignedIn);
@@ -255,9 +261,11 @@ export function App() {
       ),
     [aiRails.heroSections, catalog.catalogue, personalRails.sections, pinned.sections],
   );
+  const featured = featuredTitle.item ?? heroSections.flatMap((section) => section.items)[0];
   const isHeroReady =
     isViewerReady &&
     !catalog.isLoading &&
+    featuredTitle.isResolved &&
     aiRails.isResolved &&
     pinned.isResolved &&
     personalRails.isResolved;
@@ -443,7 +451,7 @@ export function App() {
                   error={catalog.error}
                   providerError={catalog.providerError}
                   sections={sections}
-                  heroSections={heroSections}
+                  featured={featured}
                   isHeroReady={isHeroReady}
                   episodes={episodes}
                   trending={trending}

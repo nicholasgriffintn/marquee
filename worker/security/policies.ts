@@ -105,6 +105,7 @@ export const RULES: readonly Rule[] = [
   { path: "/api/auth/magic", policy: "auth" },
   { path: "/api/auth/alert-email", policy: "auth" },
   { path: "/api/auth/callback/*", policy: "auth" },
+  { path: "/api/auth/native/*", policy: "auth" },
   { path: "/api/auth/tokens", methods: WRITE_METHODS, policy: "auth" },
   { path: "/api/auth/tokens/*", methods: WRITE_METHODS, policy: "auth" },
   { path: "/api/catalog/search", policy: "search" },

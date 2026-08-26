@@ -234,6 +234,10 @@ work. Run jobs by hand from `/admin`, which has a button for each one and takes 
 the crons take in production. To exercise the cron entrypoint itself, set `LOCAL_SYNC=on` and hit
 `/cdn-cgi/local/scheduled`.
 
+## The iOS app
+
+There's also a native SwiftUI client that lives in [`ios/`](ios/README.md), you can find out more about it there.
+
 ## Deploying
 
 Set the secrets listed under `secrets.required` in `wrangler.json`, then:

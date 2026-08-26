@@ -14,9 +14,11 @@ export interface Authentication {
   logout(rawSession: string): Promise<void>;
   startGitHub(): Promise<URL>;
   completeGitHub(code: string, state: string): Promise<AuthFlowResult<MarqueeUser>>;
-  requestMagicLink(email: string): Promise<void>;
+  requestMagicLink(email: string, destination?: MagicLinkDestination): Promise<void>;
   completeMagicLink(token: string): Promise<AuthFlowResult<MarqueeUser>>;
 }
+
+export type MagicLinkDestination = { kind: "web" } | { kind: "native"; challenge: string };
 
 export function createAuthentication(
   db: D1Database,
@@ -36,18 +38,13 @@ export function createAuthentication(
       }),
     ).providers.github;
 
-  const magicLink = () =>
+  const magicLink = (destination: MagicLinkDestination = { kind: "web" }) =>
     auth.use(
       magicLinkAuth<MarqueeUser>({
         mode: "link",
         resolveUser: (email) => findOrCreateByEmail(db, email),
         send: async ({ email, token, expiresAt }) => {
-          await sendSignInEmail(
-            env,
-            email,
-            `${origin}/api/auth/magic?token=${encodeURIComponent(token)}`,
-            expiresAt,
-          );
+          await sendSignInEmail(env, email, magicLinkUrl(origin, destination, token), expiresAt);
         },
       }),
     ).providers["magic-link"];
@@ -57,11 +54,25 @@ export function createAuthentication(
     logout: (rawSession) => auth.revokeSession(rawSession),
     startGitHub: () => github().startAuthorization(),
     completeGitHub: (code, state) => github().completeAuthorization({ code, state }),
-    requestMagicLink: async (email) => {
-      await magicLink().request(email);
+    requestMagicLink: async (email, destination = { kind: "web" }) => {
+      await magicLink(destination).request(email);
     },
     completeMagicLink: (token) => magicLink().authenticate({ token }),
   };
+}
+
+function magicLinkUrl(origin: string, destination: MagicLinkDestination, token: string) {
+  const url = new URL(
+    destination.kind === "native" ? "/api/auth/native/magic" : "/api/auth/magic",
+    origin,
+  );
+
+  url.searchParams.set("token", token);
+  if (destination.kind === "native") {
+    url.searchParams.set("challenge", destination.challenge);
+  }
+
+  return url.href;
 }
 
 function requiredSecret(value: string | undefined) {

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import type { MediaTitle } from "../domain/catalog";
 import { TitleArt } from "./TitleArt";
-import { ArrowIcon } from "./ui";
+import { ArrowIcon, SearchIcon } from "./ui";
 
 export function SearchBox({
   query,
@@ -86,7 +86,9 @@ export function SearchBox({
   return (
     <div className="search-box-wrap" ref={boxRef}>
       <label className="search-box">
-        <span>⌕</span>
+        <span aria-hidden="true">
+          <SearchIcon />
+        </span>
         <input
           value={query}
           onChange={(event) => {

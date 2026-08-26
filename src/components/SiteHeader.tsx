@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 
 import type { User } from "../types";
@@ -14,18 +14,49 @@ const NAV: { to: string; label: string; private: boolean; admin?: boolean }[] = 
   { to: "/admin", label: "Admin", private: true, admin: true },
 ];
 
+function AccountAvatar({ user }: { user: User }) {
+  return user.avatarUrl ? (
+    <img src={user.avatarUrl} alt="" />
+  ) : (
+    <span className="avatar-fallback">{user.name.slice(0, 1)}</span>
+  );
+}
+
 function AccountTools({ user, onSignOut }: { user: User; onSignOut: () => void }) {
+  const menuRef = useRef<HTMLDetailsElement>(null);
+
+  useEffect(() => {
+    function closeMenu(event: PointerEvent) {
+      const menu = menuRef.current;
+
+      if (menu?.open && !menu.contains(event.target as Node)) {
+        menu.open = false;
+      }
+    }
+
+    document.addEventListener("pointerdown", closeMenu);
+
+    return () => document.removeEventListener("pointerdown", closeMenu);
+  }, []);
+
   return (
     <div className="account-tools">
-      {user.avatarUrl ? (
-        <img src={user.avatarUrl} alt="" />
-      ) : (
-        <span className="avatar-fallback">{user.name.slice(0, 1)}</span>
-      )}
+      <AccountAvatar user={user} />
       <span className="account-name">{user.name}</span>
-      <button type="button" onClick={onSignOut}>
+      <button className="account-sign-out" type="button" onClick={onSignOut}>
         Sign out
       </button>
+      <details className="account-menu" ref={menuRef}>
+        <summary aria-label={`Open account menu for ${user.name}`}>
+          <AccountAvatar user={user} />
+        </summary>
+        <div className="account-menu-popover">
+          <strong>{user.name}</strong>
+          <button type="button" onClick={onSignOut}>
+            Sign out
+          </button>
+        </div>
+      </details>
     </div>
   );
 }
@@ -44,6 +75,7 @@ function SignInLink({ returnTo }: { returnTo: string }) {
         <strong>Sign in</strong>
         <small>get a ticket</small>
       </span>
+      <span className="sign-in-mobile-copy">Get a ticket</span>
     </Link>
   );
 }

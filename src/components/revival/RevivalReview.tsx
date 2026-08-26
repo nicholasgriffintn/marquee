@@ -8,6 +8,7 @@ import {
   type RevivalWork,
 } from "../../domain/revival";
 import { jsonRequest, requestJson } from "../../lib/api";
+import { ExternalLinkIcon } from "../ui";
 
 type ReviewWork = RevivalWork & {
   status: RevivalStatus;
@@ -190,7 +191,7 @@ export function RevivalReview({ revision: outerRevision = 0 }: { revision?: numb
             </small>
             <span className="spacer" />
             <a href={work.sourceUrl} target="_blank" rel="noreferrer">
-              Source ↗
+              Source <ExternalLinkIcon />
             </a>
             {work.status !== "approved" && (
               <button
