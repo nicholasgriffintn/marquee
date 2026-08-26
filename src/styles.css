@@ -901,6 +901,7 @@ svg .icon-fill {
 }
 .hero-copy {
   max-width: 690px;
+  min-width: 0;
   padding: 72px var(--gutter) 118px;
   position: relative;
   z-index: 2;
@@ -911,6 +912,7 @@ svg .icon-fill {
   -webkit-line-clamp: 4;
   margin-bottom: -0.28em;
   overflow: hidden;
+  overflow-wrap: anywhere;
   padding-bottom: 0.28em;
 }
 .hero-copy h1.hero-title-small {
@@ -939,6 +941,8 @@ h2 em {
   font: 10px var(--mono);
   letter-spacing: 0.04em;
   margin: 18px 0 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   text-transform: uppercase;
 }
 .hero-lede {
@@ -947,6 +951,7 @@ h2 em {
   line-height: 1.55;
   margin: 18px 0 25px;
   max-width: 560px;
+  overflow-wrap: anywhere;
 }
 .hero-actions {
   display: flex;
@@ -3139,7 +3144,9 @@ h2 em {
       linear-gradient(0deg, #11130f 0 20%, transparent 68%);
   }
   .hero-copy {
+    box-sizing: border-box;
     padding: 80px 22px 70px;
+    width: 100%;
   }
   .hero-copy h1 {
     font-size: clamp(54px, 16vw, 76px);

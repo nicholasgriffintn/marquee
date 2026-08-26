@@ -17,18 +17,24 @@ struct TonightHero: View {
           .fontWeight(.medium)
           .tracking(-2.4)
           .lineLimit(4)
+          .minimumScaleFactor(0.72)
+          .allowsTightening(true)
+          .frame(maxWidth: .infinity, alignment: .leading)
           .fixedSize(horizontal: false, vertical: true)
         Text("\(mediaMeta(item)) · \(scoreLabel(item))")
           .font(MarqueeTheme.mono(10, weight: .medium))
           .tracking(0.4)
           .textCase(.uppercase)
           .foregroundStyle(MarqueeTheme.acid)
+          .frame(maxWidth: .infinity, alignment: .leading)
           .fixedSize(horizontal: false, vertical: true)
         Text(item.overview.isEmpty ? "No synopsis available." : item.overview)
           .font(MarqueeTheme.sans(14))
           .foregroundStyle(MarqueeTheme.paper.opacity(0.86))
           .lineSpacing(3)
           .lineLimit(4)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .fixedSize(horizontal: false, vertical: true)
         NavigationLink {
           TitleDetailView(item: item)
         } label: {
@@ -52,9 +58,7 @@ struct TonightHero: View {
   }
 
   private var titleSize: CGFloat {
-    if item.title.count > 46 { return 34 }
-    if item.title.count > 26 { return 42 }
-    return 50
+    marqueeHeroTitleSize(item.title, regular: 50, long: 42, veryLong: 34)
   }
 }
 
@@ -162,15 +166,24 @@ struct TonightUsherHero: View {
 
   @ViewBuilder private func usherAnswer(_ item: MediaTitle) -> some View {
     Text(item.title)
-      .font(MarqueeTheme.display(item.title.count > 34 ? 35 : 44))
+      .font(
+        MarqueeTheme.display(
+          marqueeHeroTitleSize(item.title, regular: 44, long: 35, veryLong: 31))
+      )
       .fontWeight(.medium)
       .tracking(-1.6)
+      .lineLimit(4)
+      .minimumScaleFactor(0.72)
+      .allowsTightening(true)
+      .frame(maxWidth: .infinity, alignment: .leading)
       .fixedSize(horizontal: false, vertical: true)
     Text("\(mediaMeta(item)) · \(scoreLabel(item))")
       .font(MarqueeTheme.mono(9, weight: .medium))
       .tracking(0.35)
       .textCase(.uppercase)
       .foregroundStyle(MarqueeTheme.acid)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .fixedSize(horizontal: false, vertical: true)
 
     if isThinking {
       HStack(spacing: 10) {
@@ -185,6 +198,8 @@ struct TonightUsherHero: View {
         .font(MarqueeTheme.sans(14))
         .foregroundStyle(MarqueeTheme.paper.opacity(0.88))
         .lineSpacing(3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     if let facts = pick?.facts {
