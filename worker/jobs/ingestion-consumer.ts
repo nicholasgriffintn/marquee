@@ -1,6 +1,12 @@
 import { isIngestionJob } from "../lib/validation.ts";
 import type { Bindings, IngestionJob } from "../types.ts";
-import { jobSubject, recordIngestionRun } from "./ingestion-runs.ts";
+import { executeIngestionJob } from "./ingestion.ts";
+import {
+  completeIngestionRun,
+  failIngestionRun,
+  ingestionRunStartStatement,
+  jobSubject,
+} from "./ingestion-runs.ts";
 
 function errorStatus(error: unknown) {
   if (error instanceof Error && "status" in error) {
@@ -12,54 +18,109 @@ function errorStatus(error: unknown) {
   return null;
 }
 
-export async function consumeIngestion(batch: MessageBatch<unknown>, env: Bindings) {
+function handleIngestionFailure(
+  message: Message<unknown>,
+  job: IngestionJob,
+  error: unknown,
+): void {
+  const status = errorStatus(error);
+  const permanent =
+    status !== null && status >= 400 && status < 500 && status !== 429;
+
+  console.error(
+    JSON.stringify({
+      event: "ingestion_job_failed",
+      jobType: job.type,
+      subjectId: jobSubject(job),
+      attempt: message.attempts,
+      kind: error instanceof Error ? error.name : "UnknownError",
+      status,
+      permanent,
+      detail:
+        error instanceof Error
+          ? error.message.slice(0, 300)
+          : String(error).slice(0, 300),
+    }),
+  );
+
+  if (permanent) {
+    message.ack();
+
+    return;
+  }
+
+  message.retry({
+    delaySeconds:
+      status === 429
+        ? Math.min(900, 180 * message.attempts)
+        : Math.min(300, 30 * message.attempts),
+  });
+}
+
+export async function consumeIngestion(
+  batch: MessageBatch<unknown>,
+  env: Bindings,
+) {
+  const runs: {
+    message: Message<unknown>;
+    job: IngestionJob;
+    runId: string;
+  }[] = [];
+
   for (const message of batch.messages) {
     if (!isIngestionJob(message.body)) {
-      console.error(JSON.stringify({ event: "invalid_ingestion_job", messageId: message.id }));
+      console.error(
+        JSON.stringify({
+          event: "invalid_ingestion_job",
+          messageId: message.id,
+        }),
+      );
       message.ack();
       continue;
     }
 
+    runs.push({ message, job: message.body, runId: crypto.randomUUID() });
+  }
+
+  if (runs.length) {
     try {
-      // oxlint-disable-next-line no-await-in-loop
-      await recordIngestionRun(env, message.body);
-      message.ack();
-    } catch (error) {
-      const status = errorStatus(error);
-      const permanent = status !== null && status >= 400 && status < 500 && status !== 429;
-
-      console.error(
-        JSON.stringify({
-          event: "ingestion_job_failed",
-          jobType: message.body.type,
-          subjectId: jobSubject(message.body),
-          attempt: message.attempts,
-          kind: error instanceof Error ? error.name : "UnknownError",
-          status,
-          permanent,
-          detail:
-            error instanceof Error ? error.message.slice(0, 300) : String(error).slice(0, 300),
-        }),
+      await env.DB.batch(
+        runs.map(({ job, runId }) =>
+          ingestionRunStartStatement(env, runId, job),
+        ),
       );
-
-      if (permanent) {
-        message.ack();
-        continue;
+    } catch (error) {
+      for (const { message, job } of runs) {
+        handleIngestionFailure(message, job, error);
       }
 
-      message.retry({
-        delaySeconds:
-          status === 429
-            ? Math.min(900, 180 * message.attempts)
-            : Math.min(300, 30 * message.attempts),
-      });
+      return;
+    }
+  }
+
+  for (const { message, job, runId } of runs) {
+    try {
+      // oxlint-disable-next-line no-await-in-loop
+      await executeIngestionJob(env, job);
+      // oxlint-disable-next-line no-await-in-loop
+      await completeIngestionRun(env, runId);
+      message.ack();
+    } catch (error) {
+      // oxlint-disable-next-line no-await-in-loop
+      await failIngestionRun(env, runId, error);
+      handleIngestionFailure(message, job, error);
     }
   }
 }
 
-export async function consumeDeadLetters(batch: MessageBatch<unknown>, env: Bindings) {
+export async function consumeDeadLetters(
+  batch: MessageBatch<unknown>,
+  env: Bindings,
+) {
   const statements = batch.messages.map((message) => {
-    const job: IngestionJob | null = isIngestionJob(message.body) ? message.body : null;
+    const job: IngestionJob | null = isIngestionJob(message.body)
+      ? message.body
+      : null;
 
     return env.DB.prepare(
       `INSERT INTO ingestion_runs (id, job_type, subject_id, status, error, completed_at)
@@ -77,13 +138,21 @@ export async function consumeDeadLetters(batch: MessageBatch<unknown>, env: Bind
       await env.DB.batch(statements);
     }
 
-    console.error(JSON.stringify({ event: "dead_letters_recorded", count: statements.length }));
+    console.error(
+      JSON.stringify({
+        event: "dead_letters_recorded",
+        count: statements.length,
+      }),
+    );
   } catch (error) {
     console.error(
       JSON.stringify({
         event: "dead_letters_record_failed",
         count: statements.length,
-        detail: error instanceof Error ? error.message.slice(0, 300) : String(error).slice(0, 300),
+        detail:
+          error instanceof Error
+            ? error.message.slice(0, 300)
+            : String(error).slice(0, 300),
       }),
     );
   }
