@@ -74,10 +74,7 @@ export async function recordIngestionRun(env: Bindings, job: IngestionJob) {
       .bind(runId)
       .run();
   } catch (error) {
-    const detail =
-      error instanceof Error
-        ? error.message.slice(0, 500)
-        : "Unknown ingestion error";
+    const detail = error instanceof Error ? error.message.slice(0, 500) : "Unknown ingestion error";
 
     await env.DB.prepare(
       `UPDATE ingestion_runs

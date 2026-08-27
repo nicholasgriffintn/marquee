@@ -80,9 +80,7 @@ function personName(node: Record<string, unknown> | null) {
   return node ? stringAt(recordAt(node, "name") ?? {}, "full") : null;
 }
 
-export async function getAniListDetails(
-  anilistId: number,
-): Promise<AniListDetails | null> {
+export async function getAniListDetails(anilistId: number): Promise<AniListDetails | null> {
   await new Promise((resolve) => setTimeout(resolve, MIN_GAP_MS));
 
   const response = await upstreamFetch(API_URL, {

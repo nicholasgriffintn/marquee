@@ -87,9 +87,7 @@ export function CreditsBlock({ titleId }: { titleId: string }) {
         />
       )}
       {jobs.length === 0 && cast.length === 0 && (
-        <p className="detail-credits-empty">
-          {isLoading ? "Reading…" : "Not read yet."}
-        </p>
+        <p className="detail-credits-empty">{isLoading ? "Reading…" : "Not read yet."}</p>
       )}
       {jobs.length > 0 && (
         <dl className="detail-crew">
