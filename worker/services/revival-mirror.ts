@@ -1,4 +1,6 @@
 import { UPSTREAM_AGENT } from "../clients/fetch.ts";
+import { UpstreamError } from "../clients/upstream.ts";
+import { errorStatus, isPermanentHttpStatus } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
 import {
   completeMirror,
@@ -52,7 +54,7 @@ async function probeSource(url: string) {
   });
 
   if (!response.ok) {
-    throw new Error(`source responded ${response.status}`);
+    throw new UpstreamError(`source responded ${response.status}`, response.status);
   }
 
   const length = Number(response.headers.get("content-length") ?? "0");
@@ -73,7 +75,7 @@ async function copyWholeObject(env: Bindings, id: string, url: string, contentTy
   });
 
   if (!response.ok || !response.body) {
-    throw new Error(`source responded ${response.status}`);
+    throw new UpstreamError(`source responded ${response.status}`, response.status);
   }
 
   const body = await response.arrayBuffer();
@@ -119,6 +121,11 @@ export async function mirrorWork(env: Bindings, id: string) {
     return await mirrorInParts(env, row, source.bytes, source.contentType);
   } catch (error) {
     logError("revival_mirror_failed", error, { area: "revival", workId: id });
+
+    if (!isPermanentHttpStatus(errorStatus(error))) {
+      throw error;
+    }
+
     await failMirror(env.DB, id, error instanceof Error ? error.message : "mirror failed");
 
     return { id, bytes: 0, done: true };
@@ -138,7 +145,9 @@ async function mirrorInParts(
   const upload =
     row.mirrorUploadId && parts.length
       ? env.MEDIA.resumeMultipartUpload(key, row.mirrorUploadId)
-      : await env.MEDIA.createMultipartUpload(key, { httpMetadata: { contentType } });
+      : await env.MEDIA.createMultipartUpload(key, {
+          httpMetadata: { contentType },
+        });
   let offset = parts.length * PART_BYTES;
 
   for (let index = 0; index < PARTS_PER_RUN && offset < totalBytes; index += 1) {
@@ -146,12 +155,15 @@ async function mirrorInParts(
     // oxlint-disable-next-line no-await-in-loop
     const response = await fetch(url, {
       redirect: "follow",
-      headers: { range: `bytes=${offset}-${end}`, "user-agent": UPSTREAM_AGENT },
+      headers: {
+        range: `bytes=${offset}-${end}`,
+        "user-agent": UPSTREAM_AGENT,
+      },
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
 
     if (response.status !== 206 || !response.body) {
-      throw new Error(`range request responded ${response.status}`);
+      throw new UpstreamError(`range request responded ${response.status}`, response.status);
     }
 
     // oxlint-disable-next-line no-await-in-loop
@@ -193,7 +205,9 @@ export async function queueRevivalMirrors(env: Bindings, limit = 4) {
   }
 
   await env.REVIVAL_QUEUE.sendBatch(
-    ids.map((id) => ({ body: { type: "mirror-revival-work" as const, workId: id } })),
+    ids.map((id) => ({
+      body: { type: "mirror-revival-work" as const, workId: id },
+    })),
   );
 
   return ids.length;

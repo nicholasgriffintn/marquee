@@ -1,3 +1,5 @@
+import { errorStatus, isPermanentHttpStatus } from "../lib/http.ts";
+import { logError } from "../lib/logging.ts";
 import { isIngestionJob } from "../lib/validation.ts";
 import type { Bindings, IngestionJob } from "../types.ts";
 import {
@@ -8,23 +10,13 @@ import {
 } from "./ingestion-runs.ts";
 import { executeIngestionJob } from "./ingestion.ts";
 
-function errorStatus(error: unknown) {
-  if (error instanceof Error && "status" in error) {
-    const status = (error as { status?: unknown }).status;
-
-    return typeof status === "number" ? status : null;
-  }
-
-  return null;
-}
-
 function handleIngestionFailure(
   message: Message<unknown>,
   job: IngestionJob,
   error: unknown,
 ): void {
   const status = errorStatus(error);
-  const permanent = status !== null && status >= 400 && status < 500 && status !== 429;
+  const permanent = isPermanentHttpStatus(status);
 
   console.error(
     JSON.stringify({
@@ -89,13 +81,24 @@ export async function consumeIngestion(batch: MessageBatch<unknown>, env: Bindin
     try {
       // oxlint-disable-next-line no-await-in-loop
       await executeIngestionJob(env, job);
-      // oxlint-disable-next-line no-await-in-loop
-      await completeIngestionRun(env, runId);
-      message.ack();
     } catch (error) {
       // oxlint-disable-next-line no-await-in-loop
       await failIngestionRun(env, runId, error);
       handleIngestionFailure(message, job, error);
+      continue;
+    }
+
+    message.ack();
+
+    try {
+      // oxlint-disable-next-line no-await-in-loop
+      await completeIngestionRun(env, runId);
+    } catch (error) {
+      logError("ingestion_run_complete_failed", error, {
+        jobType: job.type,
+        subjectId: jobSubject(job),
+        runId,
+      });
     }
   }
 }
