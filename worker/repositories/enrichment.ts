@@ -3,7 +3,9 @@ import type { AnimeMapping } from "../clients/fribb.ts";
 import { logEvent } from "../lib/logging.ts";
 import { computeBlendedRating, computeWeightedRating } from "../lib/ratings.ts";
 import type { Bindings, EnrichmentSource } from "../types.ts";
+import { persistTitleExtensions } from "./catalog-arrays.ts";
 import { readRawItems } from "./catalog-reader.ts";
+import { titleScalarColumns } from "./catalog-writer.ts";
 
 type OmdbFields = Pick<MediaTitle, "ratings"> &
   Partial<
@@ -50,6 +52,44 @@ export const ENRICHMENT_WINDOWS = {
 
 export type EnrichedSource = keyof typeof ENRICHMENT_WINDOWS;
 
+function updateTitleScalars(db: D1Database, title: MediaTitle) {
+  const scalars = titleScalarColumns(title);
+
+  return db
+    .prepare(
+      `UPDATE catalog_titles
+       SET weighted_rating = ?, blended_rating = ?,
+           overview = ?, runtime_minutes = ?, number_of_seasons = ?, release_date = ?,
+           certification = ?, tmdb_score = ?, poster_url = ?, backdrop_url = ?,
+           watch_link = ?, status = ?, original_language = ?, revenue = ?,
+           collection_id = ?, collection_name = ?, mal_id = ?, anilist_id = ?,
+           wikidata_id = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+    )
+    .bind(
+      computeWeightedRating(title),
+      computeBlendedRating(title),
+      scalars.overview,
+      scalars.runtimeMinutes,
+      scalars.numberOfSeasons,
+      scalars.releaseDate,
+      scalars.certification,
+      scalars.tmdbScore,
+      scalars.posterUrl,
+      scalars.backdropUrl,
+      scalars.watchLink,
+      scalars.status,
+      scalars.originalLanguage,
+      scalars.revenue,
+      scalars.collectionId,
+      scalars.collectionName,
+      scalars.malId,
+      scalars.anilistId,
+      scalars.wikidataId,
+      title.id,
+    );
+}
+
 export async function storeEnrichment<S extends EnrichedSource>(
   env: Bindings,
   titleId: string,
@@ -65,21 +105,12 @@ export async function storeEnrichment<S extends EnrichedSource>(
 
   const { maxAgeDays } = ENRICHMENT_WINDOWS[source];
 
+  if (enrichedTitle) {
+    await persistTitleExtensions(env.DB, [enrichedTitle]);
+  }
+
   await env.DB.batch([
-    ...(enrichedTitle
-      ? [
-          env.DB.prepare(
-            `UPDATE catalog_titles
-             SET payload = ?, weighted_rating = ?, blended_rating = ?, updated_at = CURRENT_TIMESTAMP
-             WHERE id = ?`,
-          ).bind(
-            JSON.stringify(enrichedTitle),
-            computeWeightedRating(enrichedTitle),
-            computeBlendedRating(enrichedTitle),
-            titleId,
-          ),
-        ]
-      : []),
+    ...(enrichedTitle ? [updateTitleScalars(env.DB, enrichedTitle)] : []),
     env.DB.prepare(
       `INSERT INTO title_enrichment (title_id, source, payload, miss, attempts, next_check_at)
        VALUES (?, ?, ?, 0, 0, datetime('now', '+${maxAgeDays} days'))
@@ -152,31 +183,93 @@ export async function storeAnimeIds(db: D1Database, mappings: AnimeMapping[]) {
     return 0;
   }
 
-  const written = await db.batch(
-    mappings.map((mapping) =>
-      db
-        .prepare(
-          `UPDATE catalog_titles
-           SET payload = json_set(
-                 payload,
-                 '$.externalIds',
-                 json_patch(
-                   COALESCE(json_extract(payload, '$.externalIds'), json('{}')),
-                   json(?)
-                 )
-               ),
-               updated_at = CURRENT_TIMESTAMP
-           WHERE id = ?
-             AND json_patch(
-                   COALESCE(json_extract(payload, '$.externalIds'), json('{}')),
-                   json(?)
-                 ) <> COALESCE(json_extract(payload, '$.externalIds'), json('{}'))`,
-        )
-        .bind(JSON.stringify(mapping.ids), mapping.titleId, JSON.stringify(mapping.ids)),
-    ),
+  const titleUpdates = mappings.map((mapping) =>
+    db
+      .prepare(
+        `UPDATE catalog_titles
+         SET mal_id = COALESCE(?1, mal_id),
+             anilist_id = COALESCE(?2, anilist_id),
+             wikidata_id = COALESCE(?3, wikidata_id),
+             imdb_id = COALESCE(?4, imdb_id),
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?5
+           AND ((?1 IS NOT NULL AND mal_id IS NOT ?1)
+             OR (?2 IS NOT NULL AND anilist_id IS NOT ?2)
+             OR (?3 IS NOT NULL AND wikidata_id IS NOT ?3)
+             OR (?4 IS NOT NULL AND imdb_id IS NOT ?4))`,
+      )
+      .bind(
+        mapping.ids.malId ?? null,
+        mapping.ids.anilistId ?? null,
+        mapping.ids.wikidataId ?? null,
+        mapping.ids.imdbId ?? null,
+        mapping.titleId,
+      ),
   );
 
-  return written.reduce((sum, result) => sum + (result.meta.changes ?? 0), 0);
+  const extensionUpserts = mappings.flatMap((mapping) => {
+    const ids = mapping.ids;
+    const extras = [
+      ids.tvdbId,
+      ids.facebookId,
+      ids.instagramId,
+      ids.twitterId,
+      ids.anidbId,
+      ids.kitsuId,
+      ids.aniSearchId,
+      ids.animePlanetId,
+      ids.livechartId,
+      ids.animeNewsNetworkId,
+      ids.animeCountdownId,
+    ];
+
+    if (extras.every((value) => value === undefined || value === null)) {
+      return [];
+    }
+
+    return [
+      db
+        .prepare(
+          `INSERT INTO catalog_title_external_ids
+             (title_id, tvdb_id, facebook_id, instagram_id, twitter_id, anidb_id, kitsu_id,
+              ani_search_id, anime_planet_id, livechart_id, animenewsnetwork_id, animecountdown_id)
+           SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12
+             FROM catalog_titles WHERE id = ?1
+           ON CONFLICT (title_id) DO UPDATE SET
+             tvdb_id = COALESCE(excluded.tvdb_id, catalog_title_external_ids.tvdb_id),
+             facebook_id = COALESCE(excluded.facebook_id, catalog_title_external_ids.facebook_id),
+             instagram_id = COALESCE(excluded.instagram_id, catalog_title_external_ids.instagram_id),
+             twitter_id = COALESCE(excluded.twitter_id, catalog_title_external_ids.twitter_id),
+             anidb_id = COALESCE(excluded.anidb_id, catalog_title_external_ids.anidb_id),
+             kitsu_id = COALESCE(excluded.kitsu_id, catalog_title_external_ids.kitsu_id),
+             ani_search_id = COALESCE(excluded.ani_search_id, catalog_title_external_ids.ani_search_id),
+             anime_planet_id = COALESCE(excluded.anime_planet_id, catalog_title_external_ids.anime_planet_id),
+             livechart_id = COALESCE(excluded.livechart_id, catalog_title_external_ids.livechart_id),
+             animenewsnetwork_id = COALESCE(excluded.animenewsnetwork_id, catalog_title_external_ids.animenewsnetwork_id),
+             animecountdown_id = COALESCE(excluded.animecountdown_id, catalog_title_external_ids.animecountdown_id)`,
+        )
+        .bind(
+          mapping.titleId,
+          ids.tvdbId ?? null,
+          ids.facebookId ?? null,
+          ids.instagramId ?? null,
+          ids.twitterId ?? null,
+          ids.anidbId ?? null,
+          ids.kitsuId ?? null,
+          ids.aniSearchId ?? null,
+          ids.animePlanetId ?? null,
+          ids.livechartId ?? null,
+          ids.animeNewsNetworkId ?? null,
+          ids.animeCountdownId ?? null,
+        ),
+    ];
+  });
+
+  const written = await db.batch([...titleUpdates, ...extensionUpserts]);
+
+  return written
+    .slice(0, titleUpdates.length)
+    .reduce((sum, result) => sum + (result.meta.changes ?? 0), 0);
 }
 
 type CandidateRow = { titleId: string };
@@ -243,21 +336,11 @@ async function selectCandidates(
 }
 
 export async function selectAnimeCandidates(env: Bindings, limit: number) {
-  return selectCandidates(
-    env,
-    "mal",
-    limit,
-    "AND json_extract(t.payload, '$.externalIds.malId') IS NOT NULL",
-  );
+  return selectCandidates(env, "mal", limit, "AND t.mal_id IS NOT NULL");
 }
 
 export async function selectAniListCandidates(env: Bindings, limit: number) {
-  return selectCandidates(
-    env,
-    "anilist",
-    limit,
-    "AND json_extract(t.payload, '$.externalIds.anilistId') IS NOT NULL",
-  );
+  return selectCandidates(env, "anilist", limit, "AND t.anilist_id IS NOT NULL");
 }
 
 export async function selectUnenriched(env: Bindings, source: EnrichmentSource, limit: number) {
@@ -266,14 +349,8 @@ export async function selectUnenriched(env: Bindings, source: EnrichmentSource, 
 
 export async function storeImdbId(db: D1Database, titleId: string, imdbId: string) {
   await db
-    .prepare(
-      `UPDATE catalog_titles
-       SET payload = json_set(payload, '$.imdbUrl', ?),
-           imdb_id = ?,
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?`,
-    )
-    .bind(`https://www.imdb.com/title/${imdbId}/`, imdbId, titleId)
+    .prepare(`UPDATE catalog_titles SET imdb_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
+    .bind(imdbId, titleId)
     .run();
 }
 

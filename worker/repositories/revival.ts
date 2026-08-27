@@ -79,8 +79,8 @@ const WORK_COLUMNS = `w.id, w.source, w.source_url AS sourceUrl, w.title, w.year
    w.popularity, w.downloads, w.group_id AS groupId,
    w.stream_bytes AS streamBytes, w.width, w.height,
    t.poster_key AS posterKey,
-   json_extract(t.payload, '$.backdropUrl') AS catalogueBackdrop,
-   json_extract(t.payload, '$.posterUrl') AS cataloguePoster`;
+   t.backdrop_url AS catalogueBackdrop,
+   t.poster_url AS cataloguePoster`;
 
 const WORK_FROM = `FROM revival_works AS w LEFT JOIN catalog_titles AS t ON t.id = w.title_id`;
 
@@ -307,7 +307,7 @@ export async function readUncheckedRights(db: D1Database, limit = 60) {
     .prepare(
       `SELECT w.id, w.source, w.year, w.director, w.rights_basis AS rightsBasis,
               t.imdb_id AS imdbId,
-              json_extract(t.payload, '$.externalIds.wikidataId') AS wikidataId
+              t.wikidata_id AS wikidataId
        FROM revival_works AS w
        LEFT JOIN catalog_titles AS t ON t.id = w.title_id
        WHERE w.status <> 'rejected'

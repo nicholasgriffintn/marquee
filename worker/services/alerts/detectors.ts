@@ -195,7 +195,7 @@ const people: Detector = {
           WHERE (b.key LIKE 'rule:person:%' OR b.key LIKE 'person:%')
             AND b.revoked_at IS NULL
             AND (b.suspended_until IS NULL OR julianday(b.suspended_until) < julianday('now'))
-            AND julianday(COALESCE(json_extract(t.payload, '$.releaseDate'), '1900-01-01'))
+            AND julianday(COALESCE(t.release_date, '1900-01-01'))
                   > julianday('now', ?1)
             AND NOT EXISTS (
                   SELECT 1 FROM viewing_entries AS v

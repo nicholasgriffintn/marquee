@@ -1,5 +1,5 @@
 import type { SectionAudience } from "../../src/domain/catalog.ts";
-import { providerRegistryIds } from "../../src/domain/providers.ts";
+import { providerRegistry } from "../../src/domain/providers.ts";
 import { logError, logEvent } from "../lib/logging.ts";
 import { titleCase } from "../lib/text.ts";
 import { isKnownTitle } from "../lib/validation.ts";
@@ -27,13 +27,15 @@ type Section = {
 
 const SCORE = "blended_rating";
 const VOTES = "vote_count";
-const RUNTIME = `json_extract(payload, '$.runtimeMinutes')`;
-const SEASONS = `json_extract(payload, '$.numberOfSeasons')`;
-const CERT = `COALESCE(json_extract(payload, '$.certification'), '')`;
-const STATUS = `COALESCE(json_extract(payload, '$.status'), '')`;
-const LANGUAGE = `COALESCE(json_extract(payload, '$.originalLanguage'), '')`;
-const REVENUE = `COALESCE(json_extract(payload, '$.revenue'), 0)`;
-const AWARD_WINS = `COALESCE(json_extract(payload, '$.ratings.awardWins'), 0)`;
+const RUNTIME = "runtime_minutes";
+const SEASONS = "number_of_seasons";
+const CERT = "COALESCE(certification, '')";
+const STATUS = "COALESCE(status, '')";
+const LANGUAGE = "COALESCE(original_language, '')";
+const REVENUE = "COALESCE(revenue, 0)";
+const AWARD_WINS = `COALESCE(
+  (SELECT award_wins FROM catalog_title_ratings WHERE title_id = catalog_titles.id), 0
+)`;
 
 function dailySeed() {
   return Math.floor(Date.now() / 86_400_000);
@@ -85,16 +87,22 @@ async function scheduled(env: Bindings, used: Set<string>) {
     .slice(0, POOL_SIZE);
 }
 
-async function topValues(env: Bindings, path: string, minimum: number, limit: number) {
+async function topValues(
+  env: Bindings,
+  table: "catalog_title_genres" | "catalog_title_keywords",
+  column: "genre" | "keyword",
+  minimum: number,
+  limit: number,
+) {
   const rows = await env.DB.prepare(
-    `SELECT json_each.value AS value, count(*) AS uses
-     FROM catalog_titles, json_each(payload, ?)
-     GROUP BY json_each.value
+    `SELECT ${column} AS value, count(*) AS uses
+     FROM ${table}
+     GROUP BY ${column}
      HAVING uses >= ?
      ORDER BY uses DESC
      LIMIT ?`,
   )
-    .bind(path, minimum, limit)
+    .bind(minimum, limit)
     .all<{ value: unknown; uses: number }>();
 
   return rows.results
@@ -104,10 +112,11 @@ async function topValues(env: Bindings, path: string, minimum: number, limit: nu
 
 async function topStudios(env: Bindings, limit: number): Promise<string[]> {
   const rows = await env.DB.prepare(
-    `SELECT json_each.value AS value, count(*) AS uses
-     FROM catalog_titles, json_each(payload, '$.studios')
-     WHERE ${SCORE} >= 6.5
-     GROUP BY json_each.value
+    `SELECT s.studio AS value, count(*) AS uses
+     FROM catalog_title_studios AS s
+     JOIN catalog_titles AS t ON t.id = s.title_id
+     WHERE t.${SCORE} >= 6.5
+     GROUP BY s.studio
      HAVING uses BETWEEN 8 AND 400
      ORDER BY uses DESC
      LIMIT ?`,
@@ -150,27 +159,26 @@ async function cachedFacet<T>(
   return value;
 }
 
+const PROVIDER_NAMES = new Map(providerRegistry.map((provider) => [provider.id, provider.name]));
+
 async function topServices(env: Bindings, limit: number) {
   const rows = await env.DB.prepare(
-    `SELECT json_extract(offer.value, '$.id') AS providerId,
-            json_extract(offer.value, '$.name') AS providerName,
-            count(*) AS uses
-     FROM catalog_titles, json_each(payload, '$.providers') AS offer
-     WHERE offer.value LIKE '%Subscription%'
-     GROUP BY providerId
+    `SELECT provider_id AS providerId, count(DISTINCT title_id) AS uses
+     FROM catalog_title_provider_offers
+     WHERE offer_type = 'Subscription'
+     GROUP BY provider_id
      HAVING uses >= 40
      ORDER BY uses DESC
      LIMIT ?`,
   )
     .bind(limit)
-    .all<{ providerId: string; providerName: string }>();
+    .all<{ providerId: string; uses: number }>();
 
-  return rows.results
-    .filter((row) => providerRegistryIds.has(String(row.providerId)) && Boolean(row.providerName))
-    .map((row) => ({
-      id: String(row.providerId),
-      name: String(row.providerName),
-    }));
+  return rows.results.flatMap((row) => {
+    const name = PROVIDER_NAMES.get(row.providerId);
+
+    return name ? [{ id: row.providerId, name }] : [];
+  });
 }
 
 export async function buildSections(env: Bindings) {
@@ -272,8 +280,9 @@ export async function buildSections(env: Bindings) {
       used,
       `(${CERT} LIKE '%U' OR ${CERT} LIKE '%PG' OR ${CERT} LIKE '%G' OR ${CERT} LIKE '%TV-Y%')
        AND ${SCORE} >= 6.8 AND ${VOTES} >= 150
-       AND EXISTS (SELECT 1 FROM json_each(payload, '$.genres')
-                   WHERE json_each.value IN ('Family', 'Animation', 'Adventure'))`,
+       AND EXISTS (SELECT 1 FROM catalog_title_genres
+                   WHERE title_id = catalog_titles.id
+                     AND genre IN ('Family', 'Animation', 'Adventure'))`,
       "popularity DESC",
     ),
   });
@@ -357,7 +366,8 @@ export async function buildSections(env: Bindings) {
       env,
       used,
       `${SCORE} >= 6.8 AND ${VOTES} >= 120
-       AND EXISTS (SELECT 1 FROM json_each(provider_ids) WHERE json_each.value = ?)`,
+       AND EXISTS (SELECT 1 FROM catalog_title_providers
+                   WHERE title_id = catalog_titles.id AND provider_id = ?)`,
       "popularity DESC",
       [service.id],
     );
@@ -379,7 +389,8 @@ export async function buildSections(env: Bindings) {
       env,
       used,
       `${SCORE} >= 6.8 AND ${VOTES} >= 100
-       AND EXISTS (SELECT 1 FROM json_each(payload, '$.studios') WHERE json_each.value = ?)`,
+       AND EXISTS (SELECT 1 FROM catalog_title_studios
+                   WHERE title_id = catalog_titles.id AND studio = ?)`,
       `${SCORE} DESC`,
       [studio],
     );
@@ -392,7 +403,9 @@ export async function buildSections(env: Bindings) {
     });
   }
 
-  const genres = await cachedFacet(env, "genres", seed, () => topValues(env, "$.genres", 200, 16));
+  const genres = await cachedFacet(env, "genres", seed, () =>
+    topValues(env, "catalog_title_genres", "genre", 200, 16),
+  );
 
   for (const genre of rotate(genres, ROTATING_GENRES, seed)) {
     // oxlint-disable-next-line no-await-in-loop
@@ -400,7 +413,8 @@ export async function buildSections(env: Bindings) {
       env,
       used,
       `${SCORE} >= 6.8 AND ${VOTES} >= 200
-       AND EXISTS (SELECT 1 FROM json_each(payload, '$.genres') WHERE json_each.value = ?)`,
+       AND EXISTS (SELECT 1 FROM catalog_title_genres
+                   WHERE title_id = catalog_titles.id AND genre = ?)`,
       "popularity DESC",
       [genre],
     );
@@ -414,7 +428,9 @@ export async function buildSections(env: Bindings) {
   }
 
   const moods = (
-    await cachedFacet(env, "keywords", seed, () => topValues(env, "$.keywords", 60, 40))
+    await cachedFacet(env, "keywords", seed, () =>
+      topValues(env, "catalog_title_keywords", "keyword", 60, 40),
+    )
   ).filter((keyword) => !JUNK_KEYWORDS.has(keyword) && !keyword.startsWith("based on"));
 
   for (const mood of rotate(moods, ROTATING_MOODS, seed * 7)) {
@@ -423,7 +439,8 @@ export async function buildSections(env: Bindings) {
       env,
       used,
       `${SCORE} >= 6.5 AND ${VOTES} >= 120
-       AND EXISTS (SELECT 1 FROM json_each(payload, '$.keywords') WHERE json_each.value = ?)`,
+       AND EXISTS (SELECT 1 FROM catalog_title_keywords
+                   WHERE title_id = catalog_titles.id AND keyword = ?)`,
       `${SCORE} DESC`,
       [mood],
     );

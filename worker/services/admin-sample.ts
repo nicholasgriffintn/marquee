@@ -359,8 +359,12 @@ const COUNT_SAMPLES: Record<string, (db: D1Database) => Promise<SampleResult>> =
   movies: (db) => titleSample(db, "media_type = 'movie'"),
   shows: (db) => titleSample(db, "media_type = 'tv'"),
   posters: (db) => titleSample(db, "poster_key IS NOT NULL"),
-  animeIds: (db) => titleSample(db, "json_extract(payload, '$.externalIds.malId') IS NOT NULL"),
-  animeDetails: (db) => titleSample(db, "json_extract(payload, '$.anime') IS NOT NULL"),
+  animeIds: (db) => titleSample(db, "mal_id IS NOT NULL"),
+  animeDetails: (db) =>
+    titleSample(
+      db,
+      "EXISTS (SELECT 1 FROM catalog_title_anime WHERE title_id = catalog_titles.id)",
+    ),
   workingSet: (db) => workingSetSample(db, false),
   availabilityFresh: (db) => workingSetSample(db, true),
   embeddings: embeddingsSample,

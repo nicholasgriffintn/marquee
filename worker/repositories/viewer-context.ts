@@ -32,31 +32,40 @@ export async function readViewerContext(
 
 type AffinityRow = { value: string; weight: number };
 
-async function affinityFor(db: D1Database, viewerId: string, path: string, limit: number) {
+const AFFINITY_WEIGHT = `sum(CASE WHEN v.rating IS NULL THEN 1.0 ELSE v.rating / 2.5 END) AS weight`;
+
+function toAffinityValues(rows: AffinityRow[]) {
+  return rows.filter((row) => typeof row.value === "string" && row.value).map((row) => row.value);
+}
+
+async function affinityForTable(
+  db: D1Database,
+  viewerId: string,
+  table: "catalog_title_genres" | "catalog_title_keywords" | "catalog_title_people",
+  column: "genre" | "keyword" | "person",
+  limit: number,
+) {
   const rows = await db
     .prepare(
-      `SELECT json_each.value AS value,
-              sum(CASE WHEN v.rating IS NULL THEN 1.0 ELSE v.rating / 2.5 END) AS weight
+      `SELECT f.${column} AS value, ${AFFINITY_WEIGHT}
        FROM viewing_entries AS v
-       JOIN catalog_titles AS t ON t.id = v.title_id, json_each(t.payload, ?)
+       JOIN ${table} AS f ON f.title_id = v.title_id
        WHERE v.viewer_id = ? AND v.status != 'dropped'
-       GROUP BY json_each.value
+       GROUP BY f.${column}
        ORDER BY weight DESC
        LIMIT ?`,
     )
-    .bind(path, viewerId, limit)
+    .bind(viewerId, limit)
     .all<AffinityRow>();
 
-  return rows.results
-    .filter((row) => typeof row.value === "string" && row.value)
-    .map((row) => row.value);
+  return toAffinityValues(rows.results);
 }
 
 export async function readViewerAffinity(db: D1Database, viewerId: string) {
   const [genres, keywords, people] = await Promise.all([
-    affinityFor(db, viewerId, "$.genres", 6),
-    affinityFor(db, viewerId, "$.keywords", 12),
-    affinityFor(db, viewerId, "$.people", 8),
+    affinityForTable(db, viewerId, "catalog_title_genres", "genre", 6),
+    affinityForTable(db, viewerId, "catalog_title_keywords", "keyword", 12),
+    affinityForTable(db, viewerId, "catalog_title_people", "person", 8),
   ]);
 
   return { genres, keywords, people };
@@ -66,7 +75,9 @@ export async function readShelfDetail(db: D1Database, viewerId: string, limit = 
   const rows = await db
     .prepare(
       `SELECT t.title, t.year, v.status, v.rating, v.thoughts,
-              json_extract(t.payload, '$.genres') AS genres
+              (SELECT json_group_array(genre) FROM
+                (SELECT genre FROM catalog_title_genres
+                  WHERE title_id = t.id ORDER BY position)) AS genres
        FROM viewing_entries AS v
        JOIN catalog_titles AS t ON t.id = v.title_id
        WHERE v.viewer_id = ?

@@ -1,10 +1,14 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
 import { buzzScoreSql, MIN_TRENDING_VIEWS } from "../lib/buzz.ts";
-import { parseStoredTitle } from "../lib/catalog-payload.ts";
+import {
+  CATALOG_TITLE_COLUMNS,
+  catalogTitleColumns,
+  type CatalogTitleRow,
+  withStoredPoster,
+} from "../lib/catalog-payload.ts";
 import { clamp } from "../lib/numbers.ts";
 import { isKnownTitle, validProviderIds } from "../lib/validation.ts";
-
-type PayloadRow = { payload: string; posterKey?: string | null };
+import { hydrateTitleRows } from "./catalog-arrays.ts";
 
 export type CatalogueSort = "trending" | "popularity" | "score" | "recent" | "relevance";
 
@@ -66,14 +70,10 @@ function ftsMatchQuery(raw: string, scope: SearchScope = "everything", matchAny 
   return scope === "title" ? `{title original_title} : (${expression})` : expression;
 }
 
-function hydrate(rows: PayloadRow[]): MediaTitle[] {
-  return rows.flatMap((row) => {
-    const title = parseStoredTitle(row.payload);
+async function hydrate(db: D1Database, rows: CatalogTitleRow[]): Promise<MediaTitle[]> {
+  const hydrated = await hydrateTitleRows(db, rows);
 
-    return title
-      ? [row.posterKey ? { ...title, posterUrl: `/media/${row.posterKey}` } : title]
-      : [];
-  });
+  return hydrated.map((title, index) => withStoredPoster(title, rows[index]?.poster_key));
 }
 
 export async function searchCatalogue(db: D1Database, search: CatalogueSearch) {
@@ -114,8 +114,8 @@ export async function searchCatalogue(db: D1Database, search: CatalogueSearch) {
   if (genres.length) {
     conditions.push(
       `EXISTS (
-         SELECT 1 FROM json_each(t.payload, '$.genres')
-         WHERE lower(json_each.value) IN (${genres.map(() => "?").join(", ")})
+         SELECT 1 FROM catalog_title_genres AS g
+         WHERE g.title_id = t.id AND lower(g.genre) IN (${genres.map(() => "?").join(", ")})
        )`,
     );
     bindings.push(...genres);
@@ -129,8 +129,8 @@ export async function searchCatalogue(db: D1Database, search: CatalogueSearch) {
   if (keywords.length) {
     conditions.push(
       `EXISTS (
-         SELECT 1 FROM json_each(t.payload, '$.keywords')
-         WHERE lower(json_each.value) IN (${keywords.map(() => "?").join(", ")})
+         SELECT 1 FROM catalog_title_keywords AS k
+         WHERE k.title_id = t.id AND lower(k.keyword) IN (${keywords.map(() => "?").join(", ")})
        )`,
     );
     bindings.push(...keywords);
@@ -139,8 +139,8 @@ export async function searchCatalogue(db: D1Database, search: CatalogueSearch) {
   if (providerIds.length) {
     conditions.push(
       `EXISTS (
-         SELECT 1 FROM json_each(t.provider_ids)
-         WHERE json_each.value IN (SELECT value FROM json_each(?))
+         SELECT 1 FROM catalog_title_providers AS p
+         WHERE p.title_id = t.id AND p.provider_id IN (SELECT value FROM json_each(?))
        )`,
     );
     bindings.push(JSON.stringify(providerIds));
@@ -163,10 +163,7 @@ export async function searchCatalogue(db: D1Database, search: CatalogueSearch) {
   }
 
   if (Number.isFinite(search.maxRuntime)) {
-    conditions.push(
-      `(json_extract(t.payload, '$.runtimeMinutes') IS NULL
-        OR json_extract(t.payload, '$.runtimeMinutes') <= ?)`,
-    );
+    conditions.push(`(t.runtime_minutes IS NULL OR t.runtime_minutes <= ?)`);
     bindings.push(clamp(Math.trunc(search.maxRuntime ?? 600), 30, 600));
   }
 
@@ -196,16 +193,16 @@ export async function searchCatalogue(db: D1Database, search: CatalogueSearch) {
     : "catalog_titles AS t";
   const rows = await db
     .prepare(
-      `SELECT t.payload, t.poster_key AS posterKey
+      `SELECT ${catalogTitleColumns("t")}
        FROM ${from}
        ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
        ORDER BY ${orderBy}
        LIMIT ? OFFSET ?`,
     )
     .bind(...bindings, ...orderBindings, limit, offset)
-    .all<PayloadRow>();
+    .all<CatalogTitleRow>();
 
-  return hydrate(rows.results);
+  return hydrate(db, rows.results);
 }
 
 export async function searchTitlesFirst(db: D1Database, search: CatalogueSearch) {
@@ -215,7 +212,11 @@ export async function searchTitlesFirst(db: D1Database, search: CatalogueSearch)
     return searchCatalogue(db, search);
   }
 
-  const byTitle = await searchCatalogue(db, { ...search, scope: "title", limit });
+  const byTitle = await searchCatalogue(db, {
+    ...search,
+    scope: "title",
+    limit,
+  });
 
   if (byTitle.length >= limit) {
     return byTitle;
@@ -240,8 +241,6 @@ export type BrowseTrendingFilter = {
   minVotes: number;
 };
 
-type TrendingRow = PayloadRow & { id: string };
-
 async function trendingCandidates(db: D1Database, filter: BrowseTrendingFilter) {
   const conditions = [`b.article <> ''`, `b.views >= ${MIN_TRENDING_VIEWS}`];
   const bindings: unknown[] = [];
@@ -259,8 +258,8 @@ async function trendingCandidates(db: D1Database, filter: BrowseTrendingFilter) 
   if (genres.length) {
     conditions.push(
       `EXISTS (
-         SELECT 1 FROM json_each(t.payload, '$.genres')
-         WHERE lower(json_each.value) IN (${genres.map(() => "?").join(", ")})
+         SELECT 1 FROM catalog_title_genres AS g
+         WHERE g.title_id = t.id AND lower(g.genre) IN (${genres.map(() => "?").join(", ")})
        )`,
     );
     bindings.push(...genres);
@@ -274,8 +273,8 @@ async function trendingCandidates(db: D1Database, filter: BrowseTrendingFilter) 
   if (keywords.length) {
     conditions.push(
       `EXISTS (
-         SELECT 1 FROM json_each(t.payload, '$.keywords')
-         WHERE lower(json_each.value) IN (${keywords.map(() => "?").join(", ")})
+         SELECT 1 FROM catalog_title_keywords AS k
+         WHERE k.title_id = t.id AND lower(k.keyword) IN (${keywords.map(() => "?").join(", ")})
        )`,
     );
     bindings.push(...keywords);
@@ -286,8 +285,8 @@ async function trendingCandidates(db: D1Database, filter: BrowseTrendingFilter) 
   if (providerIds.length) {
     conditions.push(
       `EXISTS (
-         SELECT 1 FROM json_each(t.provider_ids)
-         WHERE json_each.value IN (SELECT value FROM json_each(?))
+         SELECT 1 FROM catalog_title_providers AS p
+         WHERE p.title_id = t.id AND p.provider_id IN (SELECT value FROM json_each(?))
        )`,
     );
     bindings.push(JSON.stringify(providerIds));
@@ -300,14 +299,14 @@ async function trendingCandidates(db: D1Database, filter: BrowseTrendingFilter) 
 
   const rows = await db
     .prepare(
-      `SELECT t.id, t.payload, t.poster_key AS posterKey
+      `SELECT ${catalogTitleColumns("t")}
        FROM title_buzz AS b
        JOIN catalog_titles AS t ON t.id = b.title_id
        WHERE ${conditions.join(" AND ")}
        ORDER BY b.score DESC, t.popularity DESC`,
     )
     .bind(...bindings)
-    .all<TrendingRow>();
+    .all<CatalogTitleRow>();
 
   return rows.results;
 }
@@ -322,7 +321,7 @@ export async function browseTrending(
   const page = candidates.slice(offset, offset + limit);
 
   if (page.length >= limit || offset + limit <= candidates.length) {
-    return hydrate(page);
+    return hydrate(db, page);
   }
 
   const rest = await searchCatalogue(db, {
@@ -337,7 +336,7 @@ export async function browseTrending(
     offset: Math.max(0, offset - candidates.length),
   });
 
-  return [...hydrate(page), ...rest];
+  return [...(await hydrate(db, page)), ...rest];
 }
 
 export async function readRanked(db: D1Database, ids: string[]) {
@@ -349,13 +348,13 @@ export async function readRanked(db: D1Database, ids: string[]) {
 
   const rows = await db
     .prepare(
-      `SELECT id, payload, poster_key AS posterKey
+      `SELECT ${CATALOG_TITLE_COLUMNS}
        FROM catalog_titles
        WHERE id IN (SELECT value FROM json_each(?))`,
     )
     .bind(JSON.stringify(uniqueIds))
-    .all<PayloadRow & { id: string }>();
-  const byId = new Map(hydrate(rows.results).map((title) => [title.id, title]));
+    .all<CatalogTitleRow>();
+  const byId = new Map((await hydrate(db, rows.results)).map((title) => [title.id, title]));
 
   return uniqueIds.flatMap((id) => {
     const title = byId.get(id);
@@ -367,9 +366,9 @@ export async function readRanked(db: D1Database, ids: string[]) {
 export async function readGenres(db: D1Database, limit = 100) {
   const rows = await db
     .prepare(
-      `SELECT json_each.value AS genre, count(*) AS titles
-       FROM catalog_titles, json_each(payload, '$.genres')
-       GROUP BY json_each.value
+      `SELECT genre, count(*) AS titles
+       FROM catalog_title_genres
+       GROUP BY genre
        HAVING titles >= 5
        ORDER BY titles DESC
        LIMIT ?`,
@@ -385,9 +384,9 @@ export async function readGenres(db: D1Database, limit = 100) {
 export async function readKeywords(db: D1Database, limit = 120) {
   const rows = await db
     .prepare(
-      `SELECT json_each.value AS keyword, count(*) AS titles
-       FROM catalog_titles, json_each(payload, '$.keywords')
-       GROUP BY json_each.value
+      `SELECT keyword, count(*) AS titles
+       FROM catalog_title_keywords
+       GROUP BY keyword
        HAVING titles >= 8
        ORDER BY titles DESC
        LIMIT ?`,

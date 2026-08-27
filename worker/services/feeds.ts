@@ -105,13 +105,13 @@ async function readAnnouncedEpisodes(env: Bindings, viewerId: string) {
 async function readReleases(env: Bindings, viewerId: string) {
   const rows = await env.DB.prepare(
     `SELECT v.title_id AS titleId,
-            substr(json_extract(t.payload, '$.releaseDate'), 1, 10) AS releaseDate
+            substr(t.release_date, 1, 10) AS releaseDate
        FROM viewing_entries AS v
        JOIN catalog_titles AS t ON t.id = v.title_id
       WHERE v.viewer_id = ?1
         AND v.status = 'watchlist'
-        AND json_extract(t.payload, '$.releaseDate') IS NOT NULL
-        AND substr(json_extract(t.payload, '$.releaseDate'), 1, 10) >= date('now')
+        AND t.release_date IS NOT NULL
+        AND substr(t.release_date, 1, 10) >= date('now')
       ORDER BY releaseDate
       LIMIT ${RELEASE_LIMIT}`,
   )

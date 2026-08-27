@@ -108,7 +108,7 @@ export async function findTitleForFilm(db: D1Database, film: UnmatchedFilm) {
   const rows = await db
     .prepare(
       `SELECT t.id, t.title, t.original_title AS originalTitle, t.year,
-              json_extract(t.payload, '$.runtimeMinutes') AS runtimeMinutes,
+              t.runtime_minutes AS runtimeMinutes,
               t.popularity
        FROM catalog_search AS s
        JOIN catalog_titles AS t ON t.id = s.title_id

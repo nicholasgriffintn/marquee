@@ -1,19 +1,16 @@
 import type { CatalogResponse, CatalogSection, MediaTitle } from "../../src/domain/catalog.ts";
 import {
+  CATALOG_TITLE_COLUMNS,
+  type CatalogTitleRow,
   parseSectionAudience,
-  parseStoredTitle,
   parseStoredTitleIds,
+  withStoredPoster,
 } from "../lib/catalog-payload.ts";
 import { logError } from "../lib/logging.ts";
 import { clamp } from "../lib/numbers.ts";
 import { isKnownTitle } from "../lib/validation.ts";
+import { hydrateTitleRows } from "./catalog-arrays.ts";
 import { searchTitlesFirst } from "./catalog-search.ts";
-
-type PayloadRow = { payload: string; posterKey?: string | null };
-
-function withStoredPoster(title: MediaTitle, posterKey?: string | null) {
-  return posterKey ? { ...title, posterUrl: `/media/${posterKey}` } : title;
-}
 
 type SectionRow = {
   id: string;
@@ -59,10 +56,13 @@ async function matchingTitleIds(db: D1Database, ids: string[], providerIds: stri
       `SELECT id FROM catalog_titles
         WHERE id IN (SELECT value FROM json_each(?1))
           AND (
-            json_array_length(provider_ids) = 0
+            NOT EXISTS (
+              SELECT 1 FROM catalog_title_providers WHERE title_id = catalog_titles.id
+            )
             OR EXISTS (
-              SELECT 1 FROM json_each(provider_ids)
-               WHERE json_each.value IN (SELECT value FROM json_each(?2))
+              SELECT 1 FROM catalog_title_providers
+               WHERE title_id = catalog_titles.id
+                 AND provider_id IN (SELECT value FROM json_each(?2))
             )
           )`,
     )
@@ -72,28 +72,32 @@ async function matchingTitleIds(db: D1Database, ids: string[], providerIds: stri
   return new Set(rows.results.map((row) => row.id));
 }
 
+async function servedTitles(db: D1Database, rows: CatalogTitleRow[]): Promise<MediaTitle[]> {
+  const hydrated = await hydrateTitleRows(db, rows);
+
+  return hydrated.map((title, index) => withStoredPoster(title, rows[index]?.poster_key));
+}
+
 export async function readRawItems(db: D1Database, ids: string[]) {
   const uniqueIds = [...new Set(ids.filter(isKnownTitle))];
-  const titles = new Map<string, MediaTitle>();
+  const rows: CatalogTitleRow[] = [];
 
   for (let index = 0; index < uniqueIds.length; index += READ_CHUNK) {
     const wave = uniqueIds.slice(index, index + READ_CHUNK);
     // oxlint-disable-next-line no-await-in-loop
-    const rows = await db
-      .prepare(`SELECT payload FROM catalog_titles WHERE id IN (${wave.map(() => "?").join(",")})`)
+    const result = await db
+      .prepare(
+        `SELECT ${CATALOG_TITLE_COLUMNS} FROM catalog_titles WHERE id IN (${wave.map(() => "?").join(",")})`,
+      )
       .bind(...wave)
-      .all<PayloadRow>();
+      .all<CatalogTitleRow>();
 
-    for (const row of rows.results) {
-      const title = parseStoredTitle(row.payload);
-
-      if (title) {
-        titles.set(title.id, title);
-      }
-    }
+    rows.push(...result.results);
   }
 
-  return titles;
+  const hydrated = await hydrateTitleRows(db, rows);
+
+  return new Map(hydrated.map((title) => [title.id, title]));
 }
 
 export async function readItems(db: D1Database, ids: string[], limit = 30) {
@@ -103,28 +107,23 @@ export async function readItems(db: D1Database, ids: string[], limit = 30) {
     return [];
   }
 
-  const titlesById = new Map<string, MediaTitle>();
+  const rows: CatalogTitleRow[] = [];
 
   for (let index = 0; index < uniqueIds.length; index += READ_CHUNK) {
     const wave = uniqueIds.slice(index, index + READ_CHUNK);
     // oxlint-disable-next-line no-await-in-loop
-    const rows = await db
+    const result = await db
       .prepare(
-        `SELECT payload, poster_key AS posterKey FROM catalog_titles WHERE id IN (${wave
-          .map(() => "?")
-          .join(",")})`,
+        `SELECT ${CATALOG_TITLE_COLUMNS}
+         FROM catalog_titles WHERE id IN (${wave.map(() => "?").join(",")})`,
       )
       .bind(...wave)
-      .all<PayloadRow>();
+      .all<CatalogTitleRow>();
 
-    for (const row of rows.results) {
-      const title = parseStoredTitle(row.payload);
-
-      if (title) {
-        titlesById.set(title.id, withStoredPoster(title, row.posterKey));
-      }
-    }
+    rows.push(...result.results);
   }
+
+  const titlesById = new Map((await servedTitles(db, rows)).map((title) => [title.id, title]));
 
   return uniqueIds.flatMap((id) => {
     const title = titlesById.get(id);
@@ -141,23 +140,24 @@ export async function readTitlesByMalId(db: D1Database, malIds: number[]) {
     return found;
   }
 
-  const rows = await db
+  const result = await db
     .prepare(
-      `SELECT payload, poster_key AS posterKey,
-              json_extract(payload, '$.externalIds.malId') AS malId
+      `SELECT ${CATALOG_TITLE_COLUMNS}, mal_id AS malId
        FROM catalog_titles
-       WHERE json_extract(payload, '$.externalIds.malId') IN (${unique.map(() => "?").join(",")})`,
+       WHERE mal_id IN (${unique.map(() => "?").join(",")})`,
     )
     .bind(...unique)
-    .all<PayloadRow & { malId: number }>();
+    .all<CatalogTitleRow & { malId: number }>();
 
-  for (const row of rows.results) {
-    const title = parseStoredTitle(row.payload);
+  const hydrated = await servedTitles(db, result.results);
 
-    if (title) {
-      found.set(row.malId, withStoredPoster(title, row.posterKey));
+  hydrated.forEach((title, index) => {
+    const row = result.results[index];
+
+    if (row) {
+      found.set(row.malId, title);
     }
-  }
+  });
 
   return found;
 }
@@ -220,7 +220,12 @@ export async function readCatalog(db: D1Database, query: string, providerIds: st
         });
       }
 
-      return { id: row.id, title: row.title, description: row.description, items };
+      return {
+        id: row.id,
+        title: row.title,
+        description: row.description,
+        items,
+      };
     })
     .filter((section) => section.items.length >= MIN_VISIBLE_ITEMS);
   const fetchedAt = rows.results.reduce(
@@ -281,8 +286,8 @@ export async function readCollectionTitleIds(
     .prepare(
       `SELECT id
        FROM catalog_titles
-       WHERE json_extract(payload, '$.collection.id') = ?1
-       ORDER BY COALESCE(json_extract(payload, '$.releaseDate'), '9999-12-31'), popularity DESC
+       WHERE collection_id = ?1
+       ORDER BY COALESCE(release_date, '9999-12-31'), popularity DESC
        LIMIT ?2 OFFSET ?3`,
     )
     .bind(collectionId, clamp(limit, 1, 48), Math.max(0, offset))
