@@ -11,12 +11,6 @@ import {
 
 const BASE = "https://www.myvue.com/api/microservice/showings";
 
-/**
- * Vue answers three collection endpoints anonymously and gates everything that
- * carries a clock time. `showingDates` sits in between: it answers, but only for
- * one exact query signature and under a tight rate limit, so a refusal there is
- * expected rather than exceptional and simply costs us precision.
- */
 const DATE_QUERY = (siteId: string, filmId: string) =>
   `${BASE}/showingDates?cinemaId=${encodeURIComponent(siteId)}&filmId=${encodeURIComponent(
     filmId,

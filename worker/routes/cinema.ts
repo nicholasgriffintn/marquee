@@ -15,11 +15,6 @@ import type { Bindings } from "../types.ts";
 
 export const cinemaRoutes = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
 
-/**
- * Everything here is signed-in only. The position never leaves the edge request
- * and is never written against an account, but a viewer who has not chosen to be
- * here should not have the building looking up where they are at all.
- */
 cinemaRoutes.use("*", requireAuthentication);
 
 cinemaRoutes.get("/near", async (context) => {

@@ -71,11 +71,6 @@ function nameFromSlug(slug: string) {
     .replace(/\bs\b/gu, "'s");
 }
 
-/**
- * Picturehouse publishes no cinema directory, so the venue list is read off the
- * index page and each venue page carries its own numeric site id. Coordinates
- * are not on the page at all; they arrive later from the geocoder.
- */
 async function listCinemas(): Promise<SourceCinema[]> {
   const index = await fetchText(`${ORIGIN}/cinemas`);
   const slugs = [...new Set([...index.matchAll(SLUG_PATTERN)].map((match) => match[1]))].filter(

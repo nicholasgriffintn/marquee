@@ -56,11 +56,6 @@ export const DEFAULT_RADIUS_KM = 16;
 export const MAX_RADIUS_KM = 80;
 export const SHOWING_HORIZON_DAYS = 7;
 
-/**
- * Only these are worth a chip. Chains mix genres and house-keeping into the same
- * attribute list, so anything unrecognised is dropped rather than guessed at.
- * "2d" is deliberately absent: it is the default, and labelling it says nothing.
- */
 const FORMAT_ORDER = [
   "imax",
   "4dx",

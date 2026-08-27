@@ -3,16 +3,6 @@ import type { UnmatchedFilm } from "../repositories/cinemas.ts";
 
 const MAX_TOKENS = 8;
 
-/**
- * Cinema listings carry showmanship the catalogue does not: format suffixes,
- * season labels, unlimited-screening banners, subtitled markers. Stripping them
- * before the search is most of what makes the match land.
- */
-/**
- * Whole event phrases, stripped before the single words below so that the
- * ordinal in "50th Anniversary" goes with it rather than being left behind as
- * a stray token. Anything matched here takes the rest of the clause with it.
- */
 const EVENT_PHRASE =
   /\b(\d{1,3}(st|nd|rd|th)\s+anniversary|anniversary\s+re[-\s]?release|in\s+concert|live\s+in\s+concert)\b/giu;
 
@@ -20,7 +10,6 @@ const DECORATION =
   /\b(imax|4dx|screenx|3d|2d|70mm|35mm|dbox|d-box|dolby(\s+cinema)?|atmos|hfr|ov|omu|subtitled|sub|audio\s+described|relaxed|autism\s+friendly|senior|kids?\s+club|toddler|parent\s*(and|&)\s*baby|unlimited\s+screening|secret\s+screening|members?\s+preview|preview|premiere|re[-\s]?release|anniversary|remastered|encore|singalong|sing[-\s]?a[-\s]?long)\b/giu;
 
 const BRACKETED = /[([{][^)\]}]*[)\]}]/gu;
-/** A guest clause after a separator is billing, not part of the title. */
 const GUEST_TAIL = /\s*[-–—|:]\s*(q\s*(and|&)\s*a\s*)?with\b[^-–—|]*$/iu;
 const QA_TAIL = /\s*[-–—|:]?\s*q\s*(and|&)\s*a\b.*$/iu;
 const TRAILING_YEAR = /\b(19|20)\d{2}\b\s*$/u;
@@ -59,11 +48,6 @@ type CandidateRow = {
   popularity: number;
 };
 
-/**
- * Confidence is deliberately conservative: a title alone is never enough, since
- * re-releases and same-name remakes are common in listings. A corroborating year
- * or runtime is what lifts a candidate over the bar.
- */
 export function scoreCandidate(film: UnmatchedFilm, candidate: CandidateRow) {
   const wanted = new Set(tokens(cleanFilmTitle(film.sourceTitle)));
 

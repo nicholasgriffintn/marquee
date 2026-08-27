@@ -43,14 +43,6 @@ const TRANSIENT_RETRY_CAP_HOURS = 24;
 
 export type EnrichmentWindow = { maxAgeDays: number; missBackoffDays: number };
 
-/**
- * Single source of truth for each source's enrichment scheduling window.
- * `queueEnrichment()` (worker/jobs/enrichment.ts) always calls the reader
- * functions below with these exact per-source constants, so the "due" instant
- * for a row can be computed once here at write time (`next_check_at`) instead
- * of being recomputed by scanning at read time. Keeping this map as the only
- * definition avoids the write-time and read-time windows drifting apart.
- */
 export const ENRICHMENT_WINDOWS = {
   omdb: { maxAgeDays: 14, missBackoffDays: 10 },
   poster: { maxAgeDays: 365, missBackoffDays: 30 },
@@ -282,12 +274,6 @@ export async function storeAnimeIds(db: D1Database, mappings: AnimeMapping[]) {
 
 type CandidateRow = { titleId: string };
 
-/**
- * Titles with no `title_enrichment` row yet for this source, ordered by
- * popularity. Driven by the `title_enrichment_source_title_idx (source,
- * title_id)` index for the NOT EXISTS check and the existing
- * `catalog_titles_popularity_idx` for ordering.
- */
 async function selectNeverEnriched(
   env: Bindings,
   source: EnrichmentSource,
@@ -310,11 +296,6 @@ async function selectNeverEnriched(
   return rows.results.map((row) => row.titleId);
 }
 
-/**
- * Titles whose precomputed `next_check_at` has passed, ordered most-overdue
- * first. Driven by the `title_enrichment_next_check_idx (source,
- * next_check_at)` index.
- */
 async function selectDue(
   env: Bindings,
   source: EnrichmentSource,
@@ -337,14 +318,6 @@ async function selectDue(
   return rows.results.map((row) => row.titleId);
 }
 
-/**
- * Combines never-enriched and due candidates for a source, up to `limit`.
- * Never-enriched titles (ordered by popularity) take priority; due titles
- * (ordered most-overdue first) fill the remaining budget. This is a
- * deliberate change from the old single popularity-ordered list, which
- * interleaved both categories strictly by popularity — see the PR
- * description for why this trade-off is acceptable for job scheduling.
- */
 async function selectCandidates(
   env: Bindings,
   source: EnrichmentSource,

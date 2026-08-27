@@ -3,10 +3,6 @@ import { picturehouseSource } from "./picturehouse.ts";
 import type { CinemaSource } from "./types.ts";
 import { vueSource } from "./vue.ts";
 
-/**
- * Every chain that publishes listings we are allowed to read. Adding one is a
- * new adapter file and a line here; nothing above this module knows the names.
- */
 export const CINEMA_SOURCES: CinemaSource[] = [cineworldSource, picturehouseSource, vueSource];
 
 export const CINEMA_SOURCE_IDS = CINEMA_SOURCES.map((source) => source.id);

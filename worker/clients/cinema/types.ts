@@ -40,14 +40,6 @@ export type SourceHarvest = {
   screenings: SourceScreening[];
 };
 
-/**
- * A cinema chain that publishes machine-readable listings.
- *
- * `harvest` is deliberately the only screening entry point: a source is free to
- * answer with whatever precision it can manage on the day, and to fall back to a
- * coarser precision when a finer endpoint stops answering. The surface above
- * never learns which chain it is talking to.
- */
 export type CinemaSource = {
   id: string;
   label: string;
