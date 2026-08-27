@@ -61,6 +61,12 @@ export function ReelPlayer({
     return () => video.removeEventListener("loadedmetadata", seek);
   }, []);
 
+  const fail = useCallback(() => {
+    raisingRef.current = false;
+    setRaising(false);
+    setError("That print will not thread. Try the source record below.");
+  }, []);
+
   const raise = useCallback(() => {
     const video = videoRef.current;
 
@@ -73,11 +79,9 @@ export function ReelPlayer({
     track("reel_play", { detail: work.id });
 
     if (video) {
-      void video.play().catch(() => {
-        setError("That print will not thread. Try the source record below.");
-      });
+      void video.play().catch(fail);
     }
-  }, [work.id]);
+  }, [fail, work.id]);
 
   const onPlaying = useCallback(() => {
     raise();
@@ -128,7 +132,7 @@ export function ReelPlayer({
           onTimeUpdate={onTimeUpdate}
           onEnded={onEnded}
           onPause={onPause}
-          onError={() => setError("That print will not thread. Try the source record below.")}
+          onError={fail}
         />
         {!started && (
           <button

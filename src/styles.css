@@ -584,6 +584,9 @@ svg .icon-fill {
   max-width: 420px;
   padding: 0 14px;
 }
+.browse-search:focus-within {
+  border-color: var(--acid);
+}
 .browse-search span {
   color: var(--acid);
   display: flex;
@@ -744,6 +747,9 @@ svg .icon-fill {
   min-width: 0;
   padding: 0 12px;
   width: 100%;
+}
+.search-box:focus-within {
+  border-color: var(--acid);
 }
 .search-box span {
   color: var(--acid);
