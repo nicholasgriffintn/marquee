@@ -4,6 +4,7 @@ import type {
   MediaTitle,
   MediaType,
 } from "../../src/domain/catalog.ts";
+import { logError } from "../lib/logging.ts";
 import { clamp } from "../lib/numbers.ts";
 import {
   parseTmdbProviders,
@@ -80,9 +81,18 @@ async function hydrateTitles(env: Bindings, summaries: TmdbSummary[]) {
     // oxlint-disable-next-line no-await-in-loop
     const settled = await Promise.allSettled(wave.map((summary) => getTitleDetails(env, summary)));
 
-    titles.push(
-      ...settled.flatMap((result) => (result.status === "fulfilled" ? [result.value] : [])),
-    );
+    for (const [offset, result] of settled.entries()) {
+      if (result.status === "fulfilled") {
+        titles.push(result.value);
+        continue;
+      }
+
+      const summary = wave[offset];
+
+      logError("tmdb_hydrate_failed", result.reason, {
+        titleId: summary ? `${summary.mediaType}:${summary.id}` : "unknown",
+      });
+    }
   }
 
   return titles;
