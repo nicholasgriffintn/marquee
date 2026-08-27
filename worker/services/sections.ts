@@ -118,6 +118,38 @@ async function topStudios(env: Bindings, limit: number): Promise<string[]> {
   return rows.results.map((row) => String(row.value)).filter((value) => value.length > 1);
 }
 
+async function cachedFacet<T>(
+  env: Bindings,
+  kind: string,
+  generation: number,
+  compute: () => Promise<T>,
+): Promise<T> {
+  const cached = await env.DB.prepare(
+    `SELECT generation, payload FROM catalog_section_facet_cache WHERE kind = ?`,
+  )
+    .bind(kind)
+    .first<{ generation: number; payload: string }>();
+
+  if (cached && cached.generation === generation) {
+    return JSON.parse(cached.payload) as T;
+  }
+
+  const value = await compute();
+
+  await env.DB.prepare(
+    `INSERT INTO catalog_section_facet_cache (kind, generation, payload, computed_at)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(kind) DO UPDATE SET
+       generation = excluded.generation,
+       payload = excluded.payload,
+       computed_at = excluded.computed_at`,
+  )
+    .bind(kind, generation, JSON.stringify(value), new Date().toISOString())
+    .run();
+
+  return value;
+}
+
 async function topServices(env: Bindings, limit: number) {
   const rows = await env.DB.prepare(
     `SELECT json_extract(offer.value, '$.id') AS providerId,
@@ -135,7 +167,10 @@ async function topServices(env: Bindings, limit: number) {
 
   return rows.results
     .filter((row) => providerRegistryIds.has(String(row.providerId)) && Boolean(row.providerName))
-    .map((row) => ({ id: String(row.providerId), name: String(row.providerName) }));
+    .map((row) => ({
+      id: String(row.providerId),
+      name: String(row.providerName),
+    }));
 }
 
 export async function buildSections(env: Bindings) {
@@ -287,7 +322,9 @@ export async function buildSections(env: Bindings) {
     ),
   });
 
-  for (const service of await topServices(env, SERVICE_ROWS)) {
+  for (const service of await cachedFacet(env, "services", seed, () =>
+    topServices(env, SERVICE_ROWS),
+  )) {
     const audience = { providerIds: [service.id] };
     const slug = service.id.replaceAll(/\W+/gu, "-");
 
@@ -334,8 +371,8 @@ export async function buildSections(env: Bindings) {
     });
   }
 
-  for (const studio of await topStudios(env, 24).then((studios) =>
-    rotate(studios, ROTATING_STUDIOS, seed * 11),
+  for (const studio of await cachedFacet(env, "studios", seed, () => topStudios(env, 24)).then(
+    (studios) => rotate(studios, ROTATING_STUDIOS, seed * 11),
   )) {
     // oxlint-disable-next-line no-await-in-loop
     const titleIds = await pick(
@@ -355,7 +392,7 @@ export async function buildSections(env: Bindings) {
     });
   }
 
-  const genres = await topValues(env, "$.genres", 200, 16);
+  const genres = await cachedFacet(env, "genres", seed, () => topValues(env, "$.genres", 200, 16));
 
   for (const genre of rotate(genres, ROTATING_GENRES, seed)) {
     // oxlint-disable-next-line no-await-in-loop
@@ -376,9 +413,9 @@ export async function buildSections(env: Bindings) {
     });
   }
 
-  const moods = (await topValues(env, "$.keywords", 60, 40)).filter(
-    (keyword) => !JUNK_KEYWORDS.has(keyword) && !keyword.startsWith("based on"),
-  );
+  const moods = (
+    await cachedFacet(env, "keywords", seed, () => topValues(env, "$.keywords", 60, 40))
+  ).filter((keyword) => !JUNK_KEYWORDS.has(keyword) && !keyword.startsWith("based on"));
 
   for (const mood of rotate(moods, ROTATING_MOODS, seed * 7)) {
     // oxlint-disable-next-line no-await-in-loop
