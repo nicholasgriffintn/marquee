@@ -1,0 +1,45 @@
+name: Verify
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+  push:
+    branches: [main]
+
+concurrency:
+  group: verify-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # worker-configuration.d.ts is generated and gitignored, so a clean
+      # checkout has to build it before either tsconfig will resolve Env.
+      - name: Generate worker types
+        run: pnpm types
+
+      - name: Type-check
+        run: pnpm check
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Build
+        run: pnpm build
