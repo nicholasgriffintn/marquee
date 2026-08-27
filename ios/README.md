@@ -2,6 +2,8 @@
 
 The iOS app is a native SwiftUI client for the Marquee app.
 
+You can try it out yourself on TestFlight here: https://testflight.apple.com/join/gbhHDCrV.
+
 ## Run it
 
 1. Open `Marquee.xcodeproj` in Xcode.
