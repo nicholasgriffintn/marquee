@@ -165,6 +165,7 @@ export function App() {
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    // oxlint-disable-next-line exhaustive-effect-dependencies -- rerun on navigation
   }, [pagePath]);
 
   const openTitleId = routedTitleId || (legacyMatch?.params.titleId ?? "");

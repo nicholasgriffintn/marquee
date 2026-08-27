@@ -70,7 +70,7 @@ export function clusterPrints(works: GroupCandidate[]) {
   const clusters: GroupCandidate[][] = [];
 
   for (const items of byTitle.values()) {
-    const ordered = [...items].sort(
+    const ordered = items.toSorted(
       (left, right) =>
         (left.runtimeSeconds ?? 0) - (right.runtimeSeconds ?? 0) ||
         (left.year ?? 0) - (right.year ?? 0),

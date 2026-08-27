@@ -287,7 +287,9 @@ export async function readWeekAhead(env: Bindings, viewerId: string, days = 7) {
       network: null,
     }));
 
-  return [...timed, ...dated, ...out].sort((left, right) => left.when.localeCompare(right.when));
+  return [...timed, ...dated, ...out].toSorted((left, right) =>
+    left.when.localeCompare(right.when),
+  );
 }
 
 export async function buildDiaryCalendar(env: Bindings, viewerId: string, origin: string) {
@@ -401,7 +403,7 @@ export async function buildAlertFeed(
     ...alertEntries(alerts, new Map(titles.map((t) => [t.id, t])), origin),
     ...digest,
   ]
-    .sort((left: FeedEntry, right: FeedEntry) => right.updated.localeCompare(left.updated))
+    .toSorted((left: FeedEntry, right: FeedEntry) => right.updated.localeCompare(left.updated))
     .slice(0, 50);
 
   return buildAtom({

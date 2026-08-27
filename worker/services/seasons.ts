@@ -262,7 +262,7 @@ export async function getShowProgress(
         : null,
     };
   });
-  const ordered = [...watched].sort(
+  const ordered = watched.toSorted(
     (left, right) => right.season - left.season || right.episode - left.episode,
   );
   const furthest = ordered[0] ? { season: ordered[0].season, episode: ordered[0].episode } : null;

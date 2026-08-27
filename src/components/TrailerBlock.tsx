@@ -41,6 +41,7 @@ export function TrailerBlock({ item }: { item: MediaTitle }) {
             src={`https://www.youtube-nocookie.com/embed/${active.key}?autoplay=1&rel=0&modestbranding=1`}
             title={`${item.title} — ${active.name}`}
             allow="accelerometer; autoplay; encrypted-media; picture-in-picture"
+            // oxlint-disable-next-line iframe-missing-sandbox -- cross-origin embed; the player needs both flags and our origin stays protected
             sandbox="allow-scripts allow-same-origin allow-presentation allow-popups"
             allowFullScreen
           />

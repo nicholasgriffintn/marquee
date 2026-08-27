@@ -465,7 +465,7 @@ function affinityFor(title) {
 
 const scored = titles
   .map((title) => ({ ...title, affinity: affinityFor(title) }))
-  .sort((left, right) => right.affinity - left.affinity);
+  .toSorted((left, right) => right.affinity - left.affinity);
 
 const byId = new Map(scored.map((title) => [title.id, title]));
 const movies = scored.filter((title) => title.mediaType === "movie");
@@ -569,7 +569,7 @@ const disliked = scored
 
     return lowered.some((genre) => (GENRE_WEIGHTS[genre] ?? 0) <= -0.7);
   })
-  .sort((left, right) => right.popularity - left.popularity);
+  .toSorted((left, right) => right.popularity - left.popularity);
 
 const droppedTitles = [
   ...take(disliked, Math.round(TARGETS.dropped * 0.72), { spread: 0.5 }),

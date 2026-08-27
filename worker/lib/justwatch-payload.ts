@@ -78,7 +78,7 @@ export function parseJustwatchAvailability(
 
   const providers = new Map<string, ProviderAvailability>();
 
-  const offers = [...records(match.offers)].sort(
+  const offers = [...records(match.offers)].toSorted(
     (left, right) => resellerRank(left) - resellerRank(right),
   );
 
