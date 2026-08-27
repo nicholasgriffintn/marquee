@@ -221,19 +221,12 @@ function videosOf(value: unknown): AnimeVideo[] {
 
 function countAt(value: Record<string, unknown> | null, key: string) {
   const raw = value?.[key];
-  const parsed =
-    typeof raw === "number"
-      ? raw
-      : typeof raw === "string"
-        ? Number(raw)
-        : Number.NaN;
+  const parsed = typeof raw === "number" ? raw : typeof raw === "string" ? Number(raw) : Number.NaN;
 
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function statusBreakdownOf(
-  status: Record<string, unknown> | null,
-): AnimeStatusBreakdown | null {
+function statusBreakdownOf(status: Record<string, unknown> | null): AnimeStatusBreakdown | null {
   if (!status) {
     return null;
   }
@@ -326,9 +319,7 @@ export async function getMalAnimeDetails(
     members: numberAt(record, "num_list_users"),
     favorites: numberAt(record, "num_favorites"),
     videos: videosOf(record.videos),
-    statusBreakdown: statusBreakdownOf(
-      statistics ? recordAt(statistics, "status") : null,
-    ),
+    statusBreakdown: statusBreakdownOf(statistics ? recordAt(statistics, "status") : null),
     keyVisualUrl: mainPicture
       ? (stringAt(mainPicture, "large") ?? stringAt(mainPicture, "medium"))
       : null,
@@ -339,21 +330,15 @@ export async function getMalAnimeDetails(
       format: mediaType ? (FORMAT_LABELS[mediaType] ?? null) : null,
       airing: status === "currently_airing",
       episodes: numberAt(record, "num_episodes") || null,
-      durationMinutes: averageEpisodeDuration
-        ? Math.round(averageEpisodeDuration / 60)
-        : null,
-      season: startSeason
-        ? (stringAt(startSeason, "season")?.toUpperCase() ?? null)
-        : null,
+      durationMinutes: averageEpisodeDuration ? Math.round(averageEpisodeDuration / 60) : null,
+      season: startSeason ? (stringAt(startSeason, "season")?.toUpperCase() ?? null) : null,
       seasonYear: startSeason ? numberAt(startSeason, "year") : null,
       source: source ? (SOURCE_LABELS[source] ?? source) : null,
       synonyms: alternativeTitles
         ? stringList(alternativeTitles.synonyms, { limit: SYNONYM_LIMIT })
         : [],
       romajiTitle: stringAt(record, "title"),
-      englishTitle: alternativeTitles
-        ? stringAt(alternativeTitles, "en")
-        : null,
+      englishTitle: alternativeTitles ? stringAt(alternativeTitles, "en") : null,
       nativeTitle: alternativeTitles ? stringAt(alternativeTitles, "ja") : null,
       openings: themeList(record.opening_themes),
       endings: themeList(record.ending_themes),

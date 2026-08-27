@@ -1,10 +1,6 @@
 import { useState } from "react";
 
-import type {
-  AnimeCharacter,
-  AnimeStaffMember,
-  MediaTitle,
-} from "../../domain/catalog";
+import type { AnimeCharacter, AnimeStaffMember, MediaTitle } from "../../domain/catalog";
 import { ChevronIcon } from "../ui";
 
 const SHOWN = 6;
@@ -27,11 +23,7 @@ function CharacterList({ characters }: { characters: AnimeCharacter[] }) {
         ))}
       </ol>
       {held > 0 && !showAll && (
-        <button
-          type="button"
-          className="watch-more"
-          onClick={() => setShowAll(true)}
-        >
+        <button type="button" className="watch-more" onClick={() => setShowAll(true)}>
           Show {held} more
           <ChevronIcon />
         </button>
@@ -57,11 +49,7 @@ function StaffList({ staff }: { staff: AnimeStaffMember[] }) {
         ))}
       </ol>
       {held > 0 && !showAll && (
-        <button
-          type="button"
-          className="watch-more"
-          onClick={() => setShowAll(true)}
-        >
+        <button type="button" className="watch-more" onClick={() => setShowAll(true)}>
           Show {held} more
           <ChevronIcon />
         </button>

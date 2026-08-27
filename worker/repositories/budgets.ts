@@ -64,10 +64,7 @@ export async function ensureBudgets(env: Bindings) {
       ).bind(source, configured.windowKind, configured.callLimit);
     }),
   );
-  const reconciled = results.reduce(
-    (total, result) => total + (result.meta.changes ?? 0),
-    0,
-  );
+  const reconciled = results.reduce((total, result) => total + (result.meta.changes ?? 0), 0);
   const dropped = await env.DB.prepare(
     `DELETE FROM source_budgets
      WHERE source NOT IN (${sources.map(() => "?").join(",")})`,
@@ -132,9 +129,7 @@ export async function readBudgetPace(env: Bindings, source: EnrichmentSource) {
     .first<{ room: number; hoursLeft: number }>();
 
   if (!row) {
-    return Math.floor(
-      configured.callLimit / Math.ceil(windowHours / SWEEP_HOURS),
-    );
+    return Math.floor(configured.callLimit / Math.ceil(windowHours / SWEEP_HOURS));
   }
 
   const sweeps = Math.max(1, Math.ceil(row.hoursLeft / SWEEP_HOURS));
@@ -142,11 +137,7 @@ export async function readBudgetPace(env: Bindings, source: EnrichmentSource) {
   return Math.floor(row.room / sweeps);
 }
 
-export async function claimBudget(
-  env: Bindings,
-  source: EnrichmentSource,
-  reserve = 0,
-) {
+export async function claimBudget(env: Bindings, source: EnrichmentSource, reserve = 0) {
   const resolved = budgetSource(source);
   const expression = windowExpression(SOURCE_BUDGETS[resolved].windowKind);
   const protectedCalls = Math.max(0, Math.trunc(reserve));
@@ -191,11 +182,7 @@ export async function claimBudget(
   return (await claim()).meta.changes > 0;
 }
 
-export async function pauseSource(
-  env: Bindings,
-  source: EnrichmentSource,
-  policy: BackoffPolicy,
-) {
+export async function pauseSource(env: Bindings, source: EnrichmentSource, policy: BackoffPolicy) {
   const resolved = budgetSource(source);
   const current = await env.DB.prepare(
     `SELECT consecutive_pauses AS consecutivePauses FROM source_budgets WHERE source = ?`,
