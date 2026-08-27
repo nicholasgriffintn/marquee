@@ -1,10 +1,14 @@
 import { DurableObject } from "cloudflare:workers";
 
 import { logError } from "../lib/logging.ts";
+import { isRecord } from "../lib/values.ts";
 import { curateStream, type CuratorTurn } from "../services/curator.ts";
 import type { Bindings } from "../types.ts";
 
 const MAX_TURNS = 8;
+const MAX_PROMPT = 1_000;
+const MAX_VIEWER_ID = 128;
+const MAX_PROVIDER_IDS = 24;
 const IDLE_MINUTES = 60;
 
 type AskRequest = {
@@ -14,6 +18,39 @@ type AskRequest = {
   hour?: number;
   isWeekend?: boolean;
 };
+
+async function readAsk(request: Request): Promise<AskRequest | null> {
+  let raw: unknown;
+
+  try {
+    raw = await request.json();
+  } catch {
+    return null;
+  }
+
+  if (!isRecord(raw)) {
+    return null;
+  }
+
+  const prompt = typeof raw.prompt === "string" ? raw.prompt.trim().slice(0, MAX_PROMPT) : "";
+  const viewerId = typeof raw.viewerId === "string" ? raw.viewerId.slice(0, MAX_VIEWER_ID) : "";
+
+  if (!prompt) {
+    return null;
+  }
+
+  return {
+    prompt,
+    viewerId,
+    providerIds: Array.isArray(raw.providerIds)
+      ? raw.providerIds
+          .filter((value): value is string => typeof value === "string")
+          .slice(0, MAX_PROVIDER_IDS)
+      : [],
+    hour: typeof raw.hour === "number" && Number.isFinite(raw.hour) ? raw.hour : undefined,
+    isWeekend: typeof raw.isWeekend === "boolean" ? raw.isWeekend : undefined,
+  };
+}
 
 export class CuratorSession extends DurableObject<Bindings> {
   async fetch(request: Request) {
@@ -25,7 +62,12 @@ export class CuratorSession extends DurableObject<Bindings> {
       return new Response(null, { status: 204 });
     }
 
-    const body = (await request.json()) as AskRequest;
+    const body = await readAsk(request);
+
+    if (!body) {
+      return new Response(null, { status: 400 });
+    }
+
     const turns = (await this.ctx.storage.get<CuratorTurn[]>("turns")) ?? [];
     const { readable, writable } = new TransformStream();
     const writer = writable.getWriter();
