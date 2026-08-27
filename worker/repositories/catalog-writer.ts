@@ -118,9 +118,6 @@ export async function storeCatalog(db: D1Database, catalogue: CatalogResponse) {
   return titles;
 }
 
-// D1 rejects statements with more than 100 bound parameters
-// (https://developers.cloudflare.com/d1/platform/limits/), so each multi-row
-// VALUES statement must keep columns * rows comfortably under that ceiling.
 const PEOPLE_ROWS_PER_STATEMENT = 12; // 12 * 7 columns = 84 bound params
 const CREDIT_ROWS_PER_STATEMENT = 9; // 9 * 10 columns = 90 bound params
 const STATEMENTS_PER_BATCH = 10;
