@@ -30,8 +30,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # worker-configuration.d.ts is generated and gitignored, so a clean
-      # checkout has to build it before either tsconfig will resolve Env.
       - name: Generate worker types
         run: pnpm types
 
