@@ -53,36 +53,56 @@ export function jobSubject(job: IngestionJob) {
   return null;
 }
 
-export async function recordIngestionRun(env: Bindings, job: IngestionJob) {
-  const runId = crypto.randomUUID();
-  const subjectId = jobSubject(job);
-
-  await env.DB.prepare(
+export function ingestionRunStartStatement(
+  env: Bindings,
+  runId: string,
+  job: IngestionJob,
+) {
+  return env.DB.prepare(
     `INSERT INTO ingestion_runs (id, job_type, subject_id, status)
      VALUES (?, ?, ?, 'running')`,
+  ).bind(runId, job.type, jobSubject(job));
+}
+
+export async function completeIngestionRun(env: Bindings, runId: string) {
+  await env.DB.prepare(
+    `UPDATE ingestion_runs
+     SET status = 'completed', completed_at = CURRENT_TIMESTAMP
+     WHERE id = ?`,
   )
-    .bind(runId, job.type, subjectId)
+    .bind(runId)
     .run();
+}
+
+export async function failIngestionRun(
+  env: Bindings,
+  runId: string,
+  error: unknown,
+) {
+  const detail =
+    error instanceof Error
+      ? error.message.slice(0, 500)
+      : "Unknown ingestion error";
+
+  await env.DB.prepare(
+    `UPDATE ingestion_runs
+     SET status = 'failed', error = ?, completed_at = CURRENT_TIMESTAMP
+     WHERE id = ?`,
+  )
+    .bind(detail, runId)
+    .run();
+}
+
+export async function recordIngestionRun(env: Bindings, job: IngestionJob) {
+  const runId = crypto.randomUUID();
+
+  await ingestionRunStartStatement(env, runId, job).run();
 
   try {
     await executeIngestionJob(env, job);
-    await env.DB.prepare(
-      `UPDATE ingestion_runs
-       SET status = 'completed', completed_at = CURRENT_TIMESTAMP
-       WHERE id = ?`,
-    )
-      .bind(runId)
-      .run();
+    await completeIngestionRun(env, runId);
   } catch (error) {
-    const detail = error instanceof Error ? error.message.slice(0, 500) : "Unknown ingestion error";
-
-    await env.DB.prepare(
-      `UPDATE ingestion_runs
-       SET status = 'failed', error = ?, completed_at = CURRENT_TIMESTAMP
-       WHERE id = ?`,
-    )
-      .bind(detail, runId)
-      .run();
+    await failIngestionRun(env, runId, error);
     throw error;
   }
 }
