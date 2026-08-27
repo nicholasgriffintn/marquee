@@ -7,6 +7,7 @@
     "build": "tsc -p tsconfig.worker.json --noEmit && vite build",
     "cf:login": "wrangler login",
     "check": "tsc --noEmit && tsc -p tsconfig.worker.json --noEmit",
+    "check:migrations": "node scripts/check-migrations.mjs",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
     "deploy": "pnpm check && pnpm build && wrangler deploy",
