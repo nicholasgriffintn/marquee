@@ -1,17 +1,9 @@
 import type { BackoffPolicy } from "../lib/backoff.ts";
 import { logEvent } from "../lib/logging.ts";
-import {
-  isRateLimited,
-  isRefused,
-  pauseSource,
-  resetBackoff,
-} from "../repositories/budgets.ts";
+import { isRateLimited, isRefused, pauseSource, resetBackoff } from "../repositories/budgets.ts";
 import type { Bindings, EnrichmentSource } from "../types.ts";
 
-const BACKOFF: Record<
-  EnrichmentSource,
-  { rateLimited: BackoffPolicy; refused: BackoffPolicy }
-> = {
+const BACKOFF: Record<EnrichmentSource, { rateLimited: BackoffPolicy; refused: BackoffPolicy }> = {
   mal: {
     rateLimited: { baseMinutes: 60, capMinutes: 60 * 12 },
     refused: { baseMinutes: 60 * 24 * 7, capMinutes: 60 * 24 * 7 },
@@ -84,8 +76,8 @@ export function titleParts(titleId: string) {
 
   return match
     ? {
-      mediaType: match[1] === "movie" ? ("movie" as const) : ("tv" as const),
-      tmdbId: Number(match[2]),
-    }
+        mediaType: match[1] === "movie" ? ("movie" as const) : ("tv" as const),
+        tmdbId: Number(match[2]),
+      }
     : null;
 }

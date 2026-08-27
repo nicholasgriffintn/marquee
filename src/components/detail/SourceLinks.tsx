@@ -4,29 +4,21 @@ import type { MediaTitle } from "../../domain/catalog";
 import { ArrowIcon } from "../ui";
 import type { Exit } from "../usher/ExitDoor";
 
-type LeaveHandler = (
-  exit: Exit,
-) => (event: MouseEvent<HTMLAnchorElement>) => void;
+type LeaveHandler = (exit: Exit) => (event: MouseEvent<HTMLAnchorElement>) => void;
 
 function animeDatabaseLinks(item: MediaTitle): Exit[] {
   const ids = item.externalIds;
 
   return [
-    ids?.anidbId
-      ? { href: `https://anidb.net/anime/${ids.anidbId}`, label: "AniDB" }
-      : null,
+    ids?.anidbId ? { href: `https://anidb.net/anime/${ids.anidbId}`, label: "AniDB" } : null,
     ids?.animeNewsNetworkId
       ? {
           href: `https://www.animenewsnetwork.com/encyclopedia/anime.php?id=${ids.animeNewsNetworkId}`,
           label: "Anime News Network",
         }
       : null,
-    ids?.anilistId
-      ? { href: `https://anilist.co/anime/${ids.anilistId}`, label: "AniList" }
-      : null,
-    ids?.kitsuId
-      ? { href: `https://kitsu.app/anime/${ids.kitsuId}`, label: "Kitsu" }
-      : null,
+    ids?.anilistId ? { href: `https://anilist.co/anime/${ids.anilistId}`, label: "AniList" } : null,
+    ids?.kitsuId ? { href: `https://kitsu.app/anime/${ids.kitsuId}`, label: "Kitsu" } : null,
     ids?.aniSearchId
       ? {
           href: `https://www.anisearch.com/anime/${ids.aniSearchId}`,
@@ -48,13 +40,7 @@ function animeDatabaseLinks(item: MediaTitle): Exit[] {
   ].flatMap((entry) => (entry ? [{ ...entry, kind: "other" as const }] : []));
 }
 
-export function SourceLinks({
-  item,
-  onLeave,
-}: {
-  item: MediaTitle;
-  onLeave: LeaveHandler;
-}) {
+export function SourceLinks({ item, onLeave }: { item: MediaTitle; onLeave: LeaveHandler }) {
   const exits: Exit[] = [
     ...(item.trailerKey
       ? [
@@ -75,9 +61,7 @@ export function SourceLinks({
           },
         ]
       : []),
-    ...(item.imdbUrl
-      ? [{ href: item.imdbUrl, label: "IMDb", kind: "imdb" as const }]
-      : []),
+    ...(item.imdbUrl ? [{ href: item.imdbUrl, label: "IMDb", kind: "imdb" as const }] : []),
     ...(item.anime?.links ?? []).map((link) => ({
       href: link.url,
       label: link.name,

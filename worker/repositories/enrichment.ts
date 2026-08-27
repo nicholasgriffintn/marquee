@@ -29,10 +29,7 @@ type FieldsFor<S extends EnrichmentSource> = S extends "omdb"
   : S extends "mal"
     ? Pick<MediaTitle, "keywords" | "ratings" | "anime"> &
         Partial<
-          Pick<
-            MediaTitle,
-            "status" | "certification" | "lastAirDate" | "studios" | "posterUrl"
-          >
+          Pick<MediaTitle, "status" | "certification" | "lastAirDate" | "studios" | "posterUrl">
         >
     : S extends "anilist"
       ? Pick<MediaTitle, "anime">
@@ -45,9 +42,7 @@ export async function storeEnrichment<S extends EnrichmentSource>(
   fields: FieldsFor<S>,
 ) {
   const title = (await readRawItems(env.DB, [titleId])).get(titleId);
-  const enrichedTitle = title
-    ? ({ ...title, ...fields } satisfies MediaTitle)
-    : null;
+  const enrichedTitle = title ? ({ ...title, ...fields } satisfies MediaTitle) : null;
 
   if (!enrichedTitle) {
     logEvent("enrichment_title_unreadable", { titleId, source });
@@ -166,11 +161,7 @@ export async function storeAnimeIds(db: D1Database, mappings: AnimeMapping[]) {
                    json(?)
                  ) <> COALESCE(json_extract(payload, '$.externalIds'), json('{}'))`,
         )
-        .bind(
-          JSON.stringify(mapping.ids),
-          mapping.titleId,
-          JSON.stringify(mapping.ids),
-        ),
+        .bind(JSON.stringify(mapping.ids), mapping.titleId, JSON.stringify(mapping.ids)),
     ),
   );
 
@@ -238,11 +229,7 @@ export async function selectUnenriched(
   return rows.results.map((row) => row.titleId);
 }
 
-export async function storeImdbId(
-  db: D1Database,
-  titleId: string,
-  imdbId: string,
-) {
+export async function storeImdbId(db: D1Database, titleId: string, imdbId: string) {
   await db
     .prepare(
       `UPDATE catalog_titles

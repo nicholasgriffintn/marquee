@@ -165,12 +165,7 @@ export async function readPerson(db: D1Database, name: string): Promise<PersonRe
   }
 }
 
-export async function readPersonTitleIds(
-  db: D1Database,
-  personId: number,
-  limit = 48,
-  offset = 0,
-) {
+export async function readPersonTitleIds(db: D1Database, personId: number, limit = 48, offset = 0) {
   try {
     const rows = await db
       .prepare(

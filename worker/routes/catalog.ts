@@ -1,27 +1,15 @@
 import { Hono } from "hono";
 
-import {
-  requireAuthentication,
-  sessionPrincipal,
-  type AuthVariables,
-} from "../auth/session.ts";
+import { requireAuthentication, sessionPrincipal, type AuthVariables } from "../auth/session.ts";
 import { refreshTitleAvailability } from "../jobs/availability.ts";
 import { edgeCache } from "../lib/cache.ts";
 import { recordEvent } from "../lib/events.ts";
 import { edgeOrigin } from "../lib/geo.ts";
 import { logError } from "../lib/logging.ts";
-import {
-  pathInteger,
-  queryInteger,
-  queryList,
-  queryText,
-} from "../lib/params.ts";
+import { pathInteger, queryInteger, queryList, queryText } from "../lib/params.ts";
 import { canonicalOrigin } from "../lib/security.ts";
 import { isKnownTitle, validProviderIds } from "../lib/validation.ts";
-import {
-  readCollectionTitleIds,
-  readItems,
-} from "../repositories/catalog-reader.ts";
+import { readCollectionTitleIds, readItems } from "../repositories/catalog-reader.ts";
 import {
   readCreditSeasons,
   readPerson,
@@ -66,9 +54,7 @@ export const catalogRoutes = new Hono<{
 }>();
 
 catalogRoutes.get("/", edgeCache(900), async (context) => {
-  const providerIds = validProviderIds(
-    queryList(context, "providers", PROVIDER_LIMIT),
-  );
+  const providerIds = validProviderIds(queryList(context, "providers", PROVIDER_LIMIT));
 
   try {
     const catalogue = await getCatalogue(context.env, providerIds);
@@ -91,11 +77,7 @@ catalogRoutes.get("/rails", requireAuthentication, async (context) => {
   const user = context.get("authenticatedUser");
 
   try {
-    const sections = await getPersonalRails(
-      context.env,
-      user.id,
-      edgeOrigin(context.req.raw),
-    );
+    const sections = await getPersonalRails(context.env, user.id, edgeOrigin(context.req.raw));
 
     context.header("cache-control", "private, max-age=120");
 
@@ -108,9 +90,7 @@ catalogRoutes.get("/rails", requireAuthentication, async (context) => {
 });
 
 catalogRoutes.get("/featured", async (context) => {
-  const providerIds = validProviderIds(
-    queryList(context, "providers", PROVIDER_LIMIT),
-  );
+  const providerIds = validProviderIds(queryList(context, "providers", PROVIDER_LIMIT));
   const principal = await sessionPrincipal(context.env, context.req.raw);
 
   try {
@@ -133,9 +113,7 @@ catalogRoutes.get("/featured", async (context) => {
 
 catalogRoutes.get("/search", async (context) => {
   const query = queryText(context, "query", QUERY_LIMIT);
-  const providerIds = validProviderIds(
-    queryList(context, "providers", PROVIDER_LIMIT),
-  );
+  const providerIds = validProviderIds(queryList(context, "providers", PROVIDER_LIMIT));
   const hybrid = context.req.query("mode") === "hybrid";
 
   if (!query) {
@@ -246,19 +224,13 @@ catalogRoutes.get("/browse", edgeCache(120), async (context) => {
     return context.json(
       await browseCatalogue(context.env, {
         mediaType:
-          mediaTypeParam === "movie" || mediaTypeParam === "tv"
-            ? mediaTypeParam
-            : undefined,
+          mediaTypeParam === "movie" || mediaTypeParam === "tv" ? mediaTypeParam : undefined,
         genres: queryList(context, "genres", FACET_LIMIT),
         keywords: queryList(context, "keywords", FACET_LIMIT),
-        providerIds: validProviderIds(
-          queryList(context, "providers", PROVIDER_LIMIT),
-        ),
+        providerIds: validProviderIds(queryList(context, "providers", PROVIDER_LIMIT)),
         query: queryText(context, "query", QUERY_LIMIT),
         sort:
-          sortParam === "score" ||
-          sortParam === "recent" ||
-          sortParam === "trending"
+          sortParam === "score" || sortParam === "recent" || sortParam === "trending"
             ? sortParam
             : "popularity",
         page: queryInteger(context, "page", 0, 0, MAX_BROWSE_PAGE),
@@ -303,22 +275,13 @@ catalogRoutes.get("/people/:name", async (context) => {
 
     const principal = await sessionPrincipal(context.env, context.req.raw);
     const [ids, shelf] = await Promise.all([
-      readPersonTitleIds(
-        context.env.DB,
-        person.personId,
-        PERSON_LIMIT + 1,
-        page * PERSON_LIMIT,
-      ),
+      readPersonTitleIds(context.env.DB, person.personId, PERSON_LIMIT + 1, page * PERSON_LIMIT),
       principal?.user
         ? readPersonShelf(context.env.DB, principal.user.id, person.personId)
         : Promise.resolve({ shelved: 0, watched: 0 }),
     ]);
     const hasMore = ids.length > PERSON_LIMIT;
-    const items = await readItems(
-      context.env.DB,
-      ids.slice(0, PERSON_LIMIT),
-      PERSON_LIMIT,
-    );
+    const items = await readItems(context.env.DB, ids.slice(0, PERSON_LIMIT), PERSON_LIMIT);
 
     return context.json({ person, items, shelf, page, hasMore });
   } catch (error) {
@@ -345,11 +308,7 @@ catalogRoutes.get("/collections/:id", edgeCache(3_600), async (context) => {
       page * COLLECTION_LIMIT,
     );
     const hasMore = ids.length > COLLECTION_LIMIT;
-    const items = await readItems(
-      context.env.DB,
-      ids.slice(0, COLLECTION_LIMIT),
-      COLLECTION_LIMIT,
-    );
+    const items = await readItems(context.env.DB, ids.slice(0, COLLECTION_LIMIT), COLLECTION_LIMIT);
 
     context.header("cache-control", "public, max-age=3600");
 
@@ -369,10 +328,7 @@ catalogRoutes.get("/providers", edgeCache(300), async (context) => {
       return context.json({ error: "Provider catalogue is warming up" }, 503);
     }
 
-    context.header(
-      "cache-control",
-      "public, max-age=300, stale-while-revalidate=21600",
-    );
+    context.header("cache-control", "public, max-age=300, stale-while-revalidate=21600");
 
     return context.json(providers);
   } catch (error) {
@@ -387,10 +343,7 @@ const CREDIT_PAGE = 40;
 function creditNumber(raw: string | undefined) {
   const value = Number(raw);
 
-  return raw !== undefined &&
-    Number.isInteger(value) &&
-    value >= 0 &&
-    value <= 10_000
+  return raw !== undefined && Number.isInteger(value) && value >= 0 && value <= 10_000
     ? value
     : null;
 }
@@ -399,96 +352,82 @@ function sortBySeason(left: { season: number }, right: { season: number }) {
   return left.season - right.season;
 }
 
-catalogRoutes.get(
-  "/titles/:titleId/credits",
-  edgeCache(3_600),
-  async (context) => {
-    const titleId = context.req.param("titleId");
-    const empty = { cast: [], crew: [], seasons: [], total: 0, hasMore: false };
+catalogRoutes.get("/titles/:titleId/credits", edgeCache(3_600), async (context) => {
+  const titleId = context.req.param("titleId");
+  const empty = { cast: [], crew: [], seasons: [], total: 0, hasMore: false };
 
-    if (!isKnownTitle(titleId)) {
-      return context.json(empty);
+  if (!isKnownTitle(titleId)) {
+    return context.json(empty);
+  }
+
+  const page = creditNumber(context.req.query("page")) ?? 1;
+  const scope = {
+    season: creditNumber(context.req.query("season")),
+    episode: creditNumber(context.req.query("episode")),
+  };
+
+  try {
+    if (titleId.startsWith("tv:") && scope.season !== null) {
+      await getSeason(context.env, titleId, scope.season);
     }
 
-    const page = creditNumber(context.req.query("page")) ?? 1;
-    const scope = {
-      season: creditNumber(context.req.query("season")),
-      episode: creditNumber(context.req.query("episode")),
-    };
+    const [credits, creditSeasons, seasonIndex] = await Promise.all([
+      readTitleCredits(
+        context.env.DB,
+        titleId,
+        scope,
+        CREDIT_PAGE,
+        Math.max(0, page - 1) * CREDIT_PAGE,
+      ),
+      readCreditSeasons(context.env.DB, titleId),
+      titleId.startsWith("tv:") ? getSeasonIndex(context.env, titleId) : null,
+    ]);
+    const known = new Set(creditSeasons.map((entry) => entry.season));
+    const merged = [
+      ...creditSeasons,
+      ...(seasonIndex?.seasons
+        .filter((entry) => !known.has(entry.seasonNumber))
+        .map((entry) => ({
+          season: entry.seasonNumber,
+          credits: 0,
+          episodes: 0,
+        })) ?? []),
+    ];
+    // The project targets ES2022, before Array.prototype.toSorted.
+    // oxlint-disable-next-line unicorn/no-array-sort
+    const seasons = seasonIndex ? merged.sort(sortBySeason) : creditSeasons;
 
-    try {
-      if (titleId.startsWith("tv:") && scope.season !== null) {
-        await getSeason(context.env, titleId, scope.season);
-      }
+    return context.json({ ...credits, page, seasons });
+  } catch (error) {
+    logError("title_credits_failed", error, { area: "catalogue", titleId });
 
-      const [credits, creditSeasons, seasonIndex] = await Promise.all([
-        readTitleCredits(
-          context.env.DB,
-          titleId,
-          scope,
-          CREDIT_PAGE,
-          Math.max(0, page - 1) * CREDIT_PAGE,
-        ),
-        readCreditSeasons(context.env.DB, titleId),
-        titleId.startsWith("tv:") ? getSeasonIndex(context.env, titleId) : null,
-      ]);
-      const known = new Set(creditSeasons.map((entry) => entry.season));
-      const merged = [
-        ...creditSeasons,
-        ...(seasonIndex?.seasons
-          .filter((entry) => !known.has(entry.seasonNumber))
-          .map((entry) => ({
-            season: entry.seasonNumber,
-            credits: 0,
-            episodes: 0,
-          })) ?? []),
-      ];
-      // The project targets ES2022, before Array.prototype.toSorted.
-      // oxlint-disable-next-line unicorn/no-array-sort
-      const seasons = seasonIndex ? merged.sort(sortBySeason) : creditSeasons;
+    return context.json(empty);
+  }
+});
 
-      return context.json({ ...credits, page, seasons });
-    } catch (error) {
-      logError("title_credits_failed", error, { area: "catalogue", titleId });
+catalogRoutes.get("/titles/:titleId/watch-order", edgeCache(3_600), async (context) => {
+  const titleId = context.req.param("titleId");
 
-      return context.json(empty);
-    }
-  },
-);
+  try {
+    return context.json(await getAnimeWatchOrder(context.env.DB, titleId));
+  } catch (error) {
+    logError("watch_order_read_failed", error, { area: "anime" });
 
-catalogRoutes.get(
-  "/titles/:titleId/watch-order",
-  edgeCache(3_600),
-  async (context) => {
-    const titleId = context.req.param("titleId");
+    return context.json({ related: [] });
+  }
+});
 
-    try {
-      return context.json(await getAnimeWatchOrder(context.env.DB, titleId));
-    } catch (error) {
-      logError("watch_order_read_failed", error, { area: "anime" });
+catalogRoutes.get("/titles/:titleId/anime-recommendations", edgeCache(3_600), async (context) => {
+  const titleId = context.req.param("titleId");
 
-      return context.json({ related: [] });
-    }
-  },
-);
+  try {
+    return context.json(await getAnimeRecommendations(context.env.DB, titleId));
+  } catch (error) {
+    logError("anime_recommendations_read_failed", error, { area: "anime" });
 
-catalogRoutes.get(
-  "/titles/:titleId/anime-recommendations",
-  edgeCache(3_600),
-  async (context) => {
-    const titleId = context.req.param("titleId");
-
-    try {
-      return context.json(
-        await getAnimeRecommendations(context.env.DB, titleId),
-      );
-    } catch (error) {
-      logError("anime_recommendations_read_failed", error, { area: "anime" });
-
-      return context.json({ items: [] });
-    }
-  },
-);
+    return context.json({ items: [] });
+  }
+});
 
 catalogRoutes.get("/tv/:tmdbId/seasons", edgeCache(3_600), async (context) => {
   const tmdbId = pathInteger(context, "tmdbId", 1, MAX_TMDB_ID);
@@ -510,97 +449,80 @@ catalogRoutes.get("/tv/:tmdbId/seasons", edgeCache(3_600), async (context) => {
   }
 });
 
-catalogRoutes.get(
-  "/tv/:tmdbId/seasons/:seasonNumber",
-  edgeCache(3_600),
-  async (context) => {
-    const tmdbId = pathInteger(context, "tmdbId", 1, MAX_TMDB_ID);
-    const seasonNumber = pathInteger(context, "seasonNumber", 0, SEASON_LIMIT);
+catalogRoutes.get("/tv/:tmdbId/seasons/:seasonNumber", edgeCache(3_600), async (context) => {
+  const tmdbId = pathInteger(context, "tmdbId", 1, MAX_TMDB_ID);
+  const seasonNumber = pathInteger(context, "seasonNumber", 0, SEASON_LIMIT);
 
-    if (tmdbId === null || seasonNumber === null) {
+  if (tmdbId === null || seasonNumber === null) {
+    return context.json({ error: "Unknown season" }, 404);
+  }
+
+  try {
+    const season = await getSeason(context.env, `tv:${tmdbId}`, seasonNumber);
+
+    if (!season) {
       return context.json({ error: "Unknown season" }, 404);
     }
 
-    try {
-      const season = await getSeason(context.env, `tv:${tmdbId}`, seasonNumber);
+    context.header("cache-control", "public, max-age=3600");
 
-      if (!season) {
-        return context.json({ error: "Unknown season" }, 404);
-      }
+    return context.json(season);
+  } catch (error) {
+    logError("season_read_failed", error, { area: "seasons" });
 
-      context.header("cache-control", "public, max-age=3600");
+    return context.json({ error: "That season is unavailable" }, 500);
+  }
+});
 
-      return context.json(season);
-    } catch (error) {
-      logError("season_read_failed", error, { area: "seasons" });
+catalogRoutes.get("/:mediaType/:tmdbId/availability", edgeCache(900), async (context) => {
+  const mediaType = context.req.param("mediaType");
+  const tmdbId = pathInteger(context, "tmdbId", 1, MAX_TMDB_ID);
 
-      return context.json({ error: "That season is unavailable" }, 500);
-    }
-  },
-);
+  if ((mediaType !== "movie" && mediaType !== "tv") || tmdbId === null) {
+    return context.json({ error: "Unknown title" }, 404);
+  }
 
-catalogRoutes.get(
-  "/:mediaType/:tmdbId/availability",
-  edgeCache(900),
-  async (context) => {
-    const mediaType = context.req.param("mediaType");
-    const tmdbId = pathInteger(context, "tmdbId", 1, MAX_TMDB_ID);
+  try {
+    const availability = await getTitleAvailability(context.env, `${mediaType}:${tmdbId}`);
 
-    if ((mediaType !== "movie" && mediaType !== "tv") || tmdbId === null) {
+    if (!availability) {
       return context.json({ error: "Unknown title" }, 404);
     }
 
-    try {
-      const availability = await getTitleAvailability(
-        context.env,
-        `${mediaType}:${tmdbId}`,
-      );
+    recordEvent(context.env, {
+      name: "title_view",
+      titleId: `${mediaType}:${tmdbId}`,
+    });
 
-      if (!availability) {
-        return context.json({ error: "Unknown title" }, 404);
-      }
+    context.header("cache-control", "public, max-age=900");
 
-      recordEvent(context.env, {
-        name: "title_view",
-        titleId: `${mediaType}:${tmdbId}`,
-      });
+    return context.json(availability);
+  } catch (error) {
+    logError("catalogue_read_failed", error, { area: "availability" });
 
-      context.header("cache-control", "public, max-age=900");
+    return context.json({ error: "Availability is unavailable" }, 500);
+  }
+});
 
-      return context.json(availability);
-    } catch (error) {
-      logError("catalogue_read_failed", error, { area: "availability" });
+catalogRoutes.post("/:mediaType/:tmdbId/availability/refresh", async (context) => {
+  const mediaType = context.req.param("mediaType");
+  const tmdbId = pathInteger(context, "tmdbId", 1, MAX_TMDB_ID);
 
-      return context.json({ error: "Availability is unavailable" }, 500);
-    }
-  },
-);
+  if ((mediaType !== "movie" && mediaType !== "tv") || tmdbId === null) {
+    return context.json({ error: "Unknown title" }, 404);
+  }
 
-catalogRoutes.post(
-  "/:mediaType/:tmdbId/availability/refresh",
-  async (context) => {
-    const mediaType = context.req.param("mediaType");
-    const tmdbId = pathInteger(context, "tmdbId", 1, MAX_TMDB_ID);
+  try {
+    const availability = await refreshTitleAvailability(context.env, `${mediaType}:${tmdbId}`);
 
-    if ((mediaType !== "movie" && mediaType !== "tv") || tmdbId === null) {
+    if (!availability) {
       return context.json({ error: "Unknown title" }, 404);
     }
 
-    try {
-      const availability = await refreshTitleAvailability(
-        context.env,
-        `${mediaType}:${tmdbId}`,
-      );
+    return context.json(availability);
+  } catch (error) {
+    logError("catalogue_refresh_failed", error, { area: "availability" });
 
-      if (!availability) {
-        return context.json({ error: "Unknown title" }, 404);
-      }
-
-      return context.json(availability);
-    } catch (error) {
-      logError("catalogue_refresh_failed", error, { area: "availability" });
-
-      return context.json({ error: "Availability is unavailable" }, 500);
-    }
-  },
-);
+    return context.json({ error: "Availability is unavailable" }, 500);
+  }
+});

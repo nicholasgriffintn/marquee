@@ -662,9 +662,7 @@ export async function searchApproved(db: D1Database, query: string, limit = 60, 
 
 export async function readWork(db: D1Database, id: string) {
   const row = await db
-    .prepare(
-      `SELECT ${WORK_COLUMNS} ${WORK_FROM} WHERE w.id = ? AND w.status = 'approved'`,
-    )
+    .prepare(`SELECT ${WORK_COLUMNS} ${WORK_FROM} WHERE w.id = ? AND w.status = 'approved'`)
     .bind(id)
     .first<WorkRow>();
 
@@ -716,9 +714,7 @@ export async function readReelTarget(db: D1Database, id: string) {
 
 export async function readStillSource(db: D1Database, id: string) {
   const row = await db
-    .prepare(
-      `SELECT still_url AS stillUrl FROM revival_works WHERE id = ? AND status = 'approved'`,
-    )
+    .prepare(`SELECT still_url AS stillUrl FROM revival_works WHERE id = ? AND status = 'approved'`)
     .bind(id)
     .first<{ stillUrl: string | null }>();
 
