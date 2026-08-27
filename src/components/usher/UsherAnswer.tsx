@@ -229,9 +229,21 @@ function PeopleAnswer({
             ))}
           </div>
         )}
-        {isSearching && <p className="usher-note">Looking…</p>}
-        {noMatches && <p className="usher-note">Nobody by that name in the catalogue.</p>}
-        {term.length === 1 && <p className="usher-note">Keep going, two letters at least.</p>}
+        {isSearching && (
+          <p className="usher-note" aria-live="polite">
+            Looking…
+          </p>
+        )}
+        {noMatches && (
+          <p className="usher-note" aria-live="polite">
+            Nobody by that name in the catalogue.
+          </p>
+        )}
+        {term.length === 1 && (
+          <p className="usher-note" aria-live="polite">
+            Keep going, two letters at least.
+          </p>
+        )}
       </div>
 
       {!term && !isFull && offered.length > 0 && (

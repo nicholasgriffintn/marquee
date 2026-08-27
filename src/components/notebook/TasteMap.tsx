@@ -119,6 +119,7 @@ export function TasteMap({ isSignedIn }: { isSignedIn: boolean }) {
   const [hovered, setHovered] = useState<MapPoint | null>(null);
   const [pinned, setPinned] = useState<MapPoint | null>(null);
   const [artId, setArtId] = useState("");
+  const [pickSignal, setPickSignal] = useState(0);
 
   useEffect(() => {
     if (!isSignedIn) {
@@ -219,6 +220,7 @@ export function TasteMap({ isSignedIn }: { isSignedIn: boolean }) {
       if (point) {
         setHovered(null);
         setPinned(point);
+        setPickSignal((current) => current + 1);
       }
     },
     [byTitleId],
@@ -270,6 +272,7 @@ export function TasteMap({ isSignedIn }: { isSignedIn: boolean }) {
               axes={axes}
               artReady={artId === active.titleId}
               onPick={pickNeighbour}
+              focusSignal={pickSignal}
             />
           ) : (
             <MapSummary map={map} landed={landed} />

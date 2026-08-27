@@ -70,6 +70,7 @@ export function TrailerBlock({ item }: { item: MediaTitle }) {
               type="button"
               key={video.key}
               className={active?.key === video.key ? "selected" : ""}
+              aria-pressed={active?.key === video.key}
               onClick={() => setActive(video)}
             >
               {video.name.length > 26 ? `${video.name.slice(0, 26)}…` : video.name}
