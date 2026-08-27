@@ -15,6 +15,7 @@ export type Bindings = {
   WRITE_RATE_LIMITER: RateLimit;
   TELEMETRY_RATE_LIMITER: RateLimit;
   MEDIA_RATE_LIMITER: RateLimit;
+  REEL_RATE_LIMITER: RateLimit;
   BOT_PROTECTION?: string;
   LOCAL_DEV?: string;
   LOCAL_SYNC?: string;
