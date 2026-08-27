@@ -483,6 +483,7 @@ export async function enrichAnime(env: Bindings, titleId: string) {
 
   await storeEnrichment(env, titleId, "mal", {
     anime: {
+      ...title?.anime,
       ...details.anime,
       broadcast: details.broadcast,
       background: details.background,
