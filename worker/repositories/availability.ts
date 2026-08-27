@@ -2,6 +2,7 @@ import type { MediaTitle, ProviderAvailability } from "../../src/domain/catalog.
 import { recordProviderState } from "./arrivals.ts";
 import { writeProviderRows } from "./catalog-providers.ts";
 import { readRawItems } from "./catalog-reader.ts";
+import { EXTERNAL_PROVIDER_SOURCES } from "./catalog-writer.ts";
 
 export async function markAvailabilityChecked(db: D1Database, titleId: string) {
   await db
@@ -52,21 +53,22 @@ export async function enrichAvailability(
     return false;
   }
 
-  const mergedProviders = new Map(title.providers.map((provider) => [provider.id, provider]));
+  const storedById = new Map(title.providers.map((provider) => [provider.id, provider]));
+  const freshIds = new Set(availability.map((provider) => provider.id));
 
-  for (const provider of availability) {
-    const existing = mergedProviders.get(provider.id);
-
-    mergedProviders.set(provider.id, {
+  const mergedProviders = [
+    ...availability.map((provider) => ({
       ...provider,
-      webUrl: provider.webUrl ?? existing?.webUrl ?? title.watchLink,
-      offerTypes: [...new Set([...(existing?.offerTypes ?? []), ...provider.offerTypes])],
-    });
-  }
+      webUrl: provider.webUrl ?? storedById.get(provider.id)?.webUrl ?? title.watchLink,
+    })),
+    ...title.providers.filter(
+      (provider) => !EXTERNAL_PROVIDER_SOURCES.has(provider.source) && !freshIds.has(provider.id),
+    ),
+  ];
 
   const enrichedTitle = {
     ...title,
-    providers: [...mergedProviders.values()],
+    providers: mergedProviders,
   } satisfies MediaTitle;
 
   await writeProviderRows(db, [enrichedTitle]);
