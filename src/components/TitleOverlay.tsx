@@ -79,7 +79,7 @@ function MissingContent({ onRetry }: { onRetry?: () => void }) {
   return (
     <div className="detail-copy search-empty lost">
       <UsherMark face="unimpressed" crop="head" />
-      <h2>{onRetry ? "The programme slipped." : "Not in the building."}</h2>
+      <h2 id="detail-title">{onRetry ? "The programme slipped." : "Not in the building."}</h2>
       <p>
         {onRetry
           ? "I could not check the catalogue just now. Nothing has been marked missing."
@@ -97,7 +97,9 @@ function MissingContent({ onRetry }: { onRetry?: () => void }) {
 function LoadingContent() {
   return (
     <div className="detail-copy">
-      <span className="visually-hidden">Loading title details…</span>
+      <span className="visually-hidden" id="detail-title">
+        Loading title details…
+      </span>
       <div className="hero-skeleton" aria-hidden="true">
         <span className="skeleton skeleton-title" />
         <span className="skeleton skeleton-meta" />
@@ -226,6 +228,7 @@ export function TitleOverlay({
         panelRef={panelRef}
         closeRef={closeRef}
         panelClassName="detail-panel detail-panel-missing"
+        labelledBy="detail-title"
         onClose={onClose}
       >
         {titleError ? (

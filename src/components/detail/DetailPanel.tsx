@@ -179,6 +179,7 @@ export function DetailPanel({
 
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
+        event.preventDefault();
         onClose();
 
         return;
