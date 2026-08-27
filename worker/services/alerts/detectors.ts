@@ -19,7 +19,7 @@ function pathFor(titleId: string, title: string) {
 const arrivals: Detector = {
   kind: "arrival",
   priority: 2,
-  async find(env) {
+  async find(env, options) {
     const found = await confirmedArrivals(env.DB);
 
     if (found.length === 0) {
@@ -57,7 +57,9 @@ const arrivals: Detector = {
       }
     }
 
-    await settleAnnounced(env.DB, found);
+    if (options.send) {
+      await settleAnnounced(env.DB, found);
+    }
 
     return candidates;
   },
@@ -75,7 +77,7 @@ type SeasonRow = {
 const seasons: Detector = {
   kind: "season",
   priority: 1,
-  async find(env) {
+  async find(env, _options) {
     try {
       const rows = await env.DB.prepare(
         `SELECT v.viewer_id AS viewerId, s.title_id AS titleId, s.show_name AS showName,
@@ -133,7 +135,7 @@ type CinemaRow = {
 const cinema: Detector = {
   kind: "cinema",
   priority: 0,
-  async find(env) {
+  async find(env, _options) {
     try {
       const rows = await env.DB.prepare(
         `SELECT v.viewer_id AS viewerId, c.title_id AS titleId, t.title AS title,
@@ -182,7 +184,7 @@ type PersonRow = { viewerId: string; titleId: string; title: string; person: str
 const people: Detector = {
   kind: "person",
   priority: 3,
-  async find(env) {
+  async find(env, _options) {
     try {
       const rows = await env.DB.prepare(
         `SELECT DISTINCT b.viewer_id AS viewerId, t.id AS titleId, t.title AS title,
