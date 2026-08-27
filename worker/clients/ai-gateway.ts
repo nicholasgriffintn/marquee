@@ -143,16 +143,27 @@ async function completeOnce(
     );
   }
 
-  const payload = await response.json();
+  let payload: unknown;
+
+  try {
+    payload = await response.json();
+  } catch (error) {
+    throw new AiGatewayError(
+      `Cloudflare AI returned a body that is not JSON (model: ${model}, ${String(error)})`,
+      502,
+    );
+  }
+
   const message = parseAssistantMessage(payload);
 
   if (!message) {
-    throw new Error("Cloudflare AI returned an invalid response");
+    throw new AiGatewayError(`Cloudflare AI returned an invalid response (model: ${model})`, 502);
   }
 
   if (!message.content && !message.tool_calls?.length) {
-    throw new Error(
+    throw new AiGatewayError(
       `Cloudflare AI returned no content (finish_reason: ${finishReason(payload) ?? "unknown"}, model: ${model})`,
+      502,
     );
   }
 
