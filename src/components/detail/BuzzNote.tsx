@@ -22,7 +22,7 @@ export function BuzzNote({ buzz }: { buzz: TitleBuzz }) {
         <a href={buzz.articleUrl} target="_blank" rel="noreferrer">
           {buzz.article}
         </a>{" "}
-        · matched by {buzz.match === "wikidata" ? "Wikidata IMDb link" : "title search"} · measured{" "}
+        · matched by {buzz.match === "wikidata" ? "Wikidata entity" : "title search"} · measured{" "}
         {measuredOn(buzz.measuredAt)}
       </small>
     </div>

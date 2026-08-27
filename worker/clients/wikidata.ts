@@ -1,3 +1,4 @@
+import type { MediaType } from "../../src/domain/catalog.ts";
 import { isRecord, records, stringAt } from "../lib/values.ts";
 import { upstreamFetch, UPSTREAM_AGENT } from "./fetch.ts";
 import { upstreamError } from "./upstream.ts";
@@ -6,9 +7,15 @@ const TIMEOUT_MS = 20_000;
 const CACHE_TTL = 604_800;
 
 const SPARQL_ENDPOINT = "https://query.wikidata.org/sparql";
-const BATCH = 60;
+const BATCH = 80;
+
+const TMDB_PROPERTY: Record<MediaType, string> = { movie: "P4947", tv: "P4983" };
 
 export const WikidataError = upstreamError("WikidataError");
+
+export type EntityRef = { titleId: string; mediaType: MediaType; tmdbId: number };
+
+export type TitleEntity = { entityId: string; article: string | null };
 
 function articleTitle(url: string) {
   const match = /\/wiki\/(.+)$/u.exec(url);
@@ -16,12 +23,38 @@ function articleTitle(url: string) {
   return match ? decodeURIComponent(match[1]).replaceAll("_", " ") : null;
 }
 
-async function queryBatch(imdbIds: string[]) {
-  const values = imdbIds.map((id) => `"${id}"`).join(" ");
-  const query = `SELECT ?imdb ?article WHERE {
-  VALUES ?imdb { ${values} }
-  ?item wdt:P345 ?imdb .
-  ?article schema:about ?item ; schema:isPartOf <https://en.wikipedia.org/> .
+function entityId(url: string) {
+  const match = /\/(Q\d+)$/u.exec(url);
+
+  return match ? match[1] : null;
+}
+
+function refKey(ref: EntityRef) {
+  return `${ref.mediaType}:${ref.tmdbId}`;
+}
+
+function branch(mediaType: MediaType, refs: EntityRef[]) {
+  const variable = mediaType === "movie" ? "movie" : "show";
+  const values = refs.map((ref) => `"${ref.tmdbId}"`).join(" ");
+
+  return `{
+    VALUES ?${variable} { ${values} }
+    ?item wdt:${TMDB_PROPERTY[mediaType]} ?${variable} .
+    BIND(CONCAT("${mediaType}:", ?${variable}) AS ?key)
+  }`;
+}
+
+async function queryBatch(refs: EntityRef[]) {
+  const byType = new Map<MediaType, EntityRef[]>();
+
+  for (const ref of refs) {
+    byType.set(ref.mediaType, [...(byType.get(ref.mediaType) ?? []), ref]);
+  }
+
+  const branches = [...byType].map(([mediaType, group]) => branch(mediaType, group));
+  const query = `SELECT ?key ?item ?article WHERE {
+  ${branches.join("\n  UNION\n  ")}
+  OPTIONAL { ?article schema:about ?item ; schema:isPartOf <https://en.wikipedia.org/> . }
 }`;
   const url = new URL(SPARQL_ENDPOINT);
 
@@ -39,31 +72,46 @@ async function queryBatch(imdbIds: string[]) {
 
   const payload = await response.json();
   const bindings = isRecord(payload) && isRecord(payload.results) ? payload.results.bindings : [];
-  const matched = new Map<string, string>();
+  const titleIds = new Map(refs.map((ref) => [refKey(ref), ref.titleId]));
+  const matched = new Map<string, TitleEntity>();
 
   for (const binding of records(bindings)) {
-    const imdb = isRecord(binding.imdb) ? stringAt(binding.imdb, "value") : null;
-    const article = isRecord(binding.article) ? stringAt(binding.article, "value") : null;
-    const title = article ? articleTitle(article) : null;
+    const key = isRecord(binding.key) ? stringAt(binding.key, "value") : null;
+    const item = isRecord(binding.item) ? stringAt(binding.item, "value") : null;
+    const titleId = key ? titleIds.get(key) : null;
+    const entity = item ? entityId(item) : null;
 
-    if (imdb && title && !matched.has(imdb)) {
-      matched.set(imdb, title);
+    if (!titleId || !entity) {
+      continue;
+    }
+
+    const found = isRecord(binding.article) ? stringAt(binding.article, "value") : null;
+    const article = found ? articleTitle(found) : null;
+    const seen = matched.get(titleId);
+
+    if (!seen || (!seen.article && article)) {
+      matched.set(titleId, { entityId: entity, article });
     }
   }
 
   return matched;
 }
 
-export async function articlesForImdbIds(imdbIds: string[]) {
-  const unique = [...new Set(imdbIds.filter((id) => /^tt\d+$/u.test(id)))];
-  const matched = new Map<string, string>();
+export async function resolveEntities(refs: EntityRef[]) {
+  const unique = new Map(
+    refs
+      .filter((ref) => Number.isInteger(ref.tmdbId) && ref.tmdbId > 0)
+      .map((ref) => [ref.titleId, ref]),
+  );
+  const usable = [...unique.values()];
+  const matched = new Map<string, TitleEntity>();
 
-  for (let index = 0; index < unique.length; index += BATCH) {
+  for (let index = 0; index < usable.length; index += BATCH) {
     // oxlint-disable-next-line no-await-in-loop
-    const wave = await queryBatch(unique.slice(index, index + BATCH));
+    const wave = await queryBatch(usable.slice(index, index + BATCH));
 
-    for (const [imdb, article] of wave) {
-      matched.set(imdb, article);
+    for (const [titleId, entity] of wave) {
+      matched.set(titleId, entity);
     }
   }
 
