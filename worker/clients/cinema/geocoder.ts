@@ -18,10 +18,6 @@ type OverpassElement = {
   tags?: Record<string, string>;
 };
 
-/**
- * Chains that publish listings without coordinates get them from OpenStreetMap,
- * matched on brand. Data is ODbL — see the attribution on the Sources page.
- */
 export async function geocodeChain(brand: string): Promise<GeocodedVenue[]> {
   const query = `[out:json][timeout:50];nwr["amenity"="cinema"]["brand"~"${brand.replaceAll(
     /[^\w\s-]/gu,
@@ -84,12 +80,6 @@ export function normaliseVenueName(value: string) {
     .trim();
 }
 
-/**
- * Venue names never match exactly across sources, so this scores on shared
- * significant words rather than string distance: "Vue Accrington" against
- * "Vue Cinema Accrington" should land, "Vue Bury" against "Vue Bury St Edmunds"
- * should not win outright over an exact "Vue Bury".
- */
 export function matchVenue(name: string, venues: GeocodedVenue[]) {
   const wanted = new Set(normaliseVenueName(name).split(" ").filter(Boolean));
 

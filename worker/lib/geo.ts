@@ -22,10 +22,6 @@ export function haversineKm(
   return 2 * EARTH_RADIUS_KM * Math.asin(Math.min(1, Math.sqrt(a)));
 }
 
-/**
- * D1 has no spatial index, so a bounding box narrows the row scan before the
- * exact haversine runs in memory. The longitude span widens as latitude rises.
- */
 export function boundingBox(origin: { latitude: number; longitude: number }, radiusKm: number) {
   const latitudeSpan = radiusKm / DEGREE_KM;
   const cosine = Math.max(0.01, Math.cos((origin.latitude * Math.PI) / 180));
@@ -52,12 +48,6 @@ function coordinate(value: unknown) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-/**
- * Cloudflare hands every request a coarse position at the edge, which is exactly
- * the precision this feature wants: enough to find the cinemas in your town,
- * never enough to find your street. Nothing is asked of the viewer and nothing
- * is stored against them.
- */
 export function edgeOrigin(request: Request): ViewerOrigin | null {
   const cf = (request as { cf?: Record<string, unknown> }).cf;
 

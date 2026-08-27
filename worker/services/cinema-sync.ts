@@ -39,11 +39,6 @@ export async function syncCinemaDirectory(env: Bindings, sourceId: string) {
   return stored;
 }
 
-/**
- * Chains that publish listings without coordinates are placed from OpenStreetMap.
- * A venue that cannot be placed simply never shows up in a nearby search, which
- * is a better failure than pinning it to the wrong town.
- */
 async function locateCinemas(env: Bindings, sourceId: string, chain: string) {
   const pending = await readUnlocatedCinemas(env.DB, sourceId);
 
@@ -149,10 +144,6 @@ export async function matchFilms(env: Bindings, sourceId: string) {
   return matched;
 }
 
-/**
- * Only cinemas near somewhere a viewer has actually looked from get refreshed.
- * The work scales with the audience rather than with the country.
- */
 export async function queueCinemaScreenings(env: Bindings) {
   const cells = await readInterestCells(env.DB);
 
