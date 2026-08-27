@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import type { MediaTitle, Provider } from "../../domain/catalog";
 import type { UsherQuestion } from "../../domain/usher";
+import { useActiveOption } from "../../hooks/useActiveOption";
 import { requestJson } from "../../lib/api";
 import { TitleArt } from "../TitleArt";
 import { CheckIcon, CloseIcon, ProviderBadge } from "../ui";
@@ -129,6 +130,7 @@ function PeopleAnswer({
 }) {
   const [picked, setPicked] = useState<string[]>([]);
   const [query, setQuery] = useState("");
+  const [isOpen, setIsOpen] = useState(true);
   const [results, setResults] = useState<{ term: string; people: string[] }>({
     term: "",
     people: [],
@@ -142,6 +144,8 @@ function PeopleAnswer({
   const isSearching = term.length >= 2 && !hasResults;
   const noMatches = term.length >= 2 && hasResults && results.people.length === 0;
   const offered = suggestions.filter((name) => !picked.includes(name)).slice(0, 6);
+  const showMatches = matches.length > 0 && isOpen;
+  const { active, setActive, move, reset, optionRefs } = useActiveOption(matches.length);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -181,6 +185,7 @@ function PeopleAnswer({
       current.includes(name) || current.length >= limit ? current : [...current, name],
     );
     setQuery("");
+    reset();
   }
 
   return (
@@ -208,22 +213,75 @@ function PeopleAnswer({
           placeholder={isFull ? `That's ${limit}, the most I'll take` : "Start typing a name…"}
           aria-label={question.line}
           disabled={isSaving || isFull}
+          role="combobox"
+          aria-expanded={showMatches}
+          aria-controls="usher-matches"
+          aria-autocomplete="list"
+          aria-activedescendant={
+            active >= 0 && matches[active] ? `usher-match-${active}` : undefined
+          }
+          autoComplete="off"
+          onFocus={() => setIsOpen(true)}
           onKeyDown={(event) => {
-            if (event.key === "Enter" && matches[0]) {
+            if (event.key === "Escape") {
+              setIsOpen(false);
+
+              return;
+            }
+
+            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+              if (matches.length === 0) {
+                return;
+              }
+
               event.preventDefault();
-              add(matches[0]);
+              setIsOpen(true);
+              move(event.key === "ArrowDown" ? "down" : "up");
+
+              return;
+            }
+
+            if (event.key === "Enter") {
+              const chosen = matches[active] ?? matches[0];
+
+              if (chosen) {
+                event.preventDefault();
+                add(chosen);
+              }
             }
           }}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            reset();
+            setIsOpen(true);
+          }}
         />
         <small className="usher-count">
           {picked.length} of {limit}
         </small>
 
-        {matches.length > 0 && (
-          <div className="usher-matches">
-            {matches.map((name) => (
-              <button key={name} type="button" onClick={() => add(name)}>
+        {showMatches && (
+          <div
+            className="usher-matches"
+            id="usher-matches"
+            role="listbox"
+            aria-label="Matching people"
+          >
+            {matches.map((name, index) => (
+              <button
+                key={name}
+                type="button"
+                id={`usher-match-${index}`}
+                ref={(node) => {
+                  optionRefs.current[index] = node;
+                }}
+                role="option"
+                tabIndex={-1}
+                aria-selected={index === active}
+                className={index === active ? "active" : ""}
+                onMouseEnter={() => setActive(index)}
+                onClick={() => add(name)}
+              >
                 {name}
               </button>
             ))}
