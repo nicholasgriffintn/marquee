@@ -1,12 +1,12 @@
 import { isIngestionJob } from "../lib/validation.ts";
 import type { Bindings, IngestionJob } from "../types.ts";
-import { executeIngestionJob } from "./ingestion.ts";
 import {
   completeIngestionRun,
   failIngestionRun,
   ingestionRunStartStatement,
   jobSubject,
 } from "./ingestion-runs.ts";
+import { executeIngestionJob } from "./ingestion.ts";
 
 function errorStatus(error: unknown) {
   if (error instanceof Error && "status" in error) {
@@ -24,8 +24,7 @@ function handleIngestionFailure(
   error: unknown,
 ): void {
   const status = errorStatus(error);
-  const permanent =
-    status !== null && status >= 400 && status < 500 && status !== 429;
+  const permanent = status !== null && status >= 400 && status < 500 && status !== 429;
 
   console.error(
     JSON.stringify({
@@ -36,10 +35,7 @@ function handleIngestionFailure(
       kind: error instanceof Error ? error.name : "UnknownError",
       status,
       permanent,
-      detail:
-        error instanceof Error
-          ? error.message.slice(0, 300)
-          : String(error).slice(0, 300),
+      detail: error instanceof Error ? error.message.slice(0, 300) : String(error).slice(0, 300),
     }),
   );
 
@@ -51,16 +47,11 @@ function handleIngestionFailure(
 
   message.retry({
     delaySeconds:
-      status === 429
-        ? Math.min(900, 180 * message.attempts)
-        : Math.min(300, 30 * message.attempts),
+      status === 429 ? Math.min(900, 180 * message.attempts) : Math.min(300, 30 * message.attempts),
   });
 }
 
-export async function consumeIngestion(
-  batch: MessageBatch<unknown>,
-  env: Bindings,
-) {
+export async function consumeIngestion(batch: MessageBatch<unknown>, env: Bindings) {
   const runs: {
     message: Message<unknown>;
     job: IngestionJob;
@@ -84,11 +75,7 @@ export async function consumeIngestion(
 
   if (runs.length) {
     try {
-      await env.DB.batch(
-        runs.map(({ job, runId }) =>
-          ingestionRunStartStatement(env, runId, job),
-        ),
-      );
+      await env.DB.batch(runs.map(({ job, runId }) => ingestionRunStartStatement(env, runId, job)));
     } catch (error) {
       for (const { message, job } of runs) {
         handleIngestionFailure(message, job, error);
@@ -113,14 +100,9 @@ export async function consumeIngestion(
   }
 }
 
-export async function consumeDeadLetters(
-  batch: MessageBatch<unknown>,
-  env: Bindings,
-) {
+export async function consumeDeadLetters(batch: MessageBatch<unknown>, env: Bindings) {
   const statements = batch.messages.map((message) => {
-    const job: IngestionJob | null = isIngestionJob(message.body)
-      ? message.body
-      : null;
+    const job: IngestionJob | null = isIngestionJob(message.body) ? message.body : null;
 
     return env.DB.prepare(
       `INSERT INTO ingestion_runs (id, job_type, subject_id, status, error, completed_at)
@@ -149,10 +131,7 @@ export async function consumeDeadLetters(
       JSON.stringify({
         event: "dead_letters_record_failed",
         count: statements.length,
-        detail:
-          error instanceof Error
-            ? error.message.slice(0, 300)
-            : String(error).slice(0, 300),
+        detail: error instanceof Error ? error.message.slice(0, 300) : String(error).slice(0, 300),
       }),
     );
   }

@@ -53,9 +53,7 @@ const SignInPage = lazy(() =>
 const SourcesPage = lazy(() =>
   import("./pages/SourcesPage").then((m) => ({ default: m.SourcesPage })),
 );
-const UsherPage = lazy(() =>
-  import("./pages/UsherPage").then((m) => ({ default: m.UsherPage })),
-);
+const UsherPage = lazy(() => import("./pages/UsherPage").then((m) => ({ default: m.UsherPage })));
 const AdminPage = lazy(() => import("./pages/AdminPage").then((m) => ({ default: m.AdminPage })));
 const RevivalPage = lazy(() =>
   import("./pages/RevivalPage").then((m) => ({ default: m.RevivalPage })),
@@ -546,7 +544,9 @@ export function App() {
 
               <Route
                 path="/sign-in"
-                element={<SignInPage isSignedIn={isSignedIn} isSessionLoading={session.isLoading} />}
+                element={
+                  <SignInPage isSignedIn={isSignedIn} isSessionLoading={session.isLoading} />
+                }
               />
 
               <Route

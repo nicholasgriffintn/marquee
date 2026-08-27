@@ -53,11 +53,7 @@ export function jobSubject(job: IngestionJob) {
   return null;
 }
 
-export function ingestionRunStartStatement(
-  env: Bindings,
-  runId: string,
-  job: IngestionJob,
-) {
+export function ingestionRunStartStatement(env: Bindings, runId: string, job: IngestionJob) {
   return env.DB.prepare(
     `INSERT INTO ingestion_runs (id, job_type, subject_id, status)
      VALUES (?, ?, ?, 'running')`,
@@ -74,15 +70,8 @@ export async function completeIngestionRun(env: Bindings, runId: string) {
     .run();
 }
 
-export async function failIngestionRun(
-  env: Bindings,
-  runId: string,
-  error: unknown,
-) {
-  const detail =
-    error instanceof Error
-      ? error.message.slice(0, 500)
-      : "Unknown ingestion error";
+export async function failIngestionRun(env: Bindings, runId: string, error: unknown) {
+  const detail = error instanceof Error ? error.message.slice(0, 500) : "Unknown ingestion error";
 
   await env.DB.prepare(
     `UPDATE ingestion_runs

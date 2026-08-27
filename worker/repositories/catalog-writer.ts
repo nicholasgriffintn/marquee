@@ -11,9 +11,7 @@ import { readRawItems } from "./catalog-reader.ts";
 const READ_CHUNK = 80;
 const KEYWORD_LIMIT = 40;
 
-const EXTERNAL_PROVIDER_SOURCES = new Set<ProviderAvailability["source"]>([
-  "JustWatch",
-]);
+const EXTERNAL_PROVIDER_SOURCES = new Set<ProviderAvailability["source"]>(["JustWatch"]);
 
 function canonical(value: unknown): string {
   if (Array.isArray(value)) {
@@ -35,9 +33,7 @@ function canonical(value: unknown): string {
 }
 
 function mergeProviders(fresh: MediaTitle, stored: MediaTitle) {
-  const providers = new Map(
-    fresh.providers.map((provider) => [provider.id, provider]),
-  );
+  const providers = new Map(fresh.providers.map((provider) => [provider.id, provider]));
 
   for (const provider of stored.providers) {
     if (!EXTERNAL_PROVIDER_SOURCES.has(provider.source)) {
@@ -51,9 +47,7 @@ function mergeProviders(fresh: MediaTitle, stored: MediaTitle) {
       existing
         ? {
             ...provider,
-            offerTypes: [
-              ...new Set([...existing.offerTypes, ...provider.offerTypes]),
-            ],
+            offerTypes: [...new Set([...existing.offerTypes, ...provider.offerTypes])],
             webUrl: provider.webUrl ?? existing.webUrl,
           }
         : provider,
@@ -63,10 +57,7 @@ function mergeProviders(fresh: MediaTitle, stored: MediaTitle) {
   return [...providers.values()];
 }
 
-function mergeWithStored(
-  fresh: MediaTitle,
-  stored: MediaTitle | null,
-): MediaTitle {
+function mergeWithStored(fresh: MediaTitle, stored: MediaTitle | null): MediaTitle {
   if (!stored) {
     return fresh;
   }
@@ -88,9 +79,10 @@ function mergeWithStored(
     languages: fresh.languages?.length ? fresh.languages : stored.languages,
     providers: mergeProviders(fresh, stored),
     watchLink: fresh.watchLink ?? stored.watchLink,
-    keywords: [
-      ...new Set([...(fresh.keywords ?? []), ...(stored.keywords ?? [])]),
-    ].slice(0, KEYWORD_LIMIT),
+    keywords: [...new Set([...(fresh.keywords ?? []), ...(stored.keywords ?? [])])].slice(
+      0,
+      KEYWORD_LIMIT,
+    ),
     ratings: stored.ratings ?? fresh.ratings,
     externalIds: mergeExternalIds(fresh, stored),
     status: fresh.status ?? stored.status,
@@ -108,20 +100,16 @@ function mergeExternalIds(fresh: MediaTitle, stored: MediaTitle) {
   return {
     imdbId: fresh.externalIds?.imdbId ?? stored.externalIds?.imdbId ?? null,
     tvdbId: fresh.externalIds?.tvdbId ?? stored.externalIds?.tvdbId ?? null,
-    wikidataId:
-      fresh.externalIds?.wikidataId ?? stored.externalIds?.wikidataId ?? null,
+    wikidataId: fresh.externalIds?.wikidataId ?? stored.externalIds?.wikidataId ?? null,
     malId: stored.externalIds?.malId ?? fresh.externalIds?.malId ?? null,
-    anilistId:
-      stored.externalIds?.anilistId ?? fresh.externalIds?.anilistId ?? null,
+    anilistId: stored.externalIds?.anilistId ?? fresh.externalIds?.anilistId ?? null,
   };
 }
 
 export async function storeCatalog(db: D1Database, catalogue: CatalogResponse) {
   const titles = [
     ...new Map(
-      catalogue.sections
-        .flatMap((section) => section.items)
-        .map((title) => [title.id, title]),
+      catalogue.sections.flatMap((section) => section.items).map((title) => [title.id, title]),
     ).values(),
   ];
 
@@ -167,13 +155,8 @@ function upsertPeopleStatement(db: D1Database, who: TitleCredit["person"][]) {
     .bind(...params);
 }
 
-function upsertCreditsStatement(
-  db: D1Database,
-  rows: { titleId: string; entry: TitleCredit }[],
-) {
-  const placeholders = rows
-    .map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-    .join(", ");
+function upsertCreditsStatement(db: D1Database, rows: { titleId: string; entry: TitleCredit }[]) {
+  const placeholders = rows.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
   const params = rows.flatMap(({ titleId, entry }) => [
     entry.creditId,
     titleId,
@@ -228,16 +211,9 @@ export async function storeCredits(db: D1Database, credits: TitleCredits[]) {
     const chunk = roster.slice(index, index + PEOPLE_CHUNK);
     const statements = [];
 
-    for (
-      let offset = 0;
-      offset < chunk.length;
-      offset += PEOPLE_ROWS_PER_STATEMENT
-    ) {
+    for (let offset = 0; offset < chunk.length; offset += PEOPLE_ROWS_PER_STATEMENT) {
       statements.push(
-        upsertPeopleStatement(
-          db,
-          chunk.slice(offset, offset + PEOPLE_ROWS_PER_STATEMENT),
-        ),
+        upsertPeopleStatement(db, chunk.slice(offset, offset + PEOPLE_ROWS_PER_STATEMENT)),
       );
     }
 
@@ -249,16 +225,9 @@ export async function storeCredits(db: D1Database, credits: TitleCredits[]) {
     const chunk = entries.slice(index, index + CREDIT_CHUNK);
     const statements = [];
 
-    for (
-      let offset = 0;
-      offset < chunk.length;
-      offset += CREDIT_ROWS_PER_STATEMENT
-    ) {
+    for (let offset = 0; offset < chunk.length; offset += CREDIT_ROWS_PER_STATEMENT) {
       statements.push(
-        upsertCreditsStatement(
-          db,
-          chunk.slice(offset, offset + CREDIT_ROWS_PER_STATEMENT),
-        ),
+        upsertCreditsStatement(db, chunk.slice(offset, offset + CREDIT_ROWS_PER_STATEMENT)),
       );
     }
 
@@ -269,11 +238,7 @@ export async function storeCredits(db: D1Database, credits: TitleCredits[]) {
   return entries.length;
 }
 
-export async function storeItems(
-  db: D1Database,
-  items: MediaTitle[],
-  sourceUpdatedAt: string,
-) {
+export async function storeItems(db: D1Database, items: MediaTitle[], sourceUpdatedAt: string) {
   if (items.length === 0) {
     return;
   }
@@ -287,9 +252,7 @@ export async function storeItems(
     const previous = stored.get(title.id) ?? null;
     const merged = mergeWithStored(title, previous);
 
-    return previous && canonical(merged) === canonical(previous)
-      ? []
-      : [merged];
+    return previous && canonical(merged) === canonical(previous) ? [] : [merged];
   });
 
   if (changed.length === 0) {
@@ -308,9 +271,7 @@ export async function storeItems(
   await storeCredits(
     db,
     changed.flatMap((title) =>
-      title.credits?.length
-        ? [{ titleId: title.id, entries: title.credits }]
-        : [],
+      title.credits?.length ? [{ titleId: title.id, entries: title.credits }] : [],
     ),
   );
 }
@@ -321,11 +282,7 @@ function withoutCredits(title: MediaTitle) {
   return rest;
 }
 
-function upsertTitle(
-  db: D1Database,
-  title: MediaTitle,
-  sourceUpdatedAt: string,
-) {
+function upsertTitle(db: D1Database, title: MediaTitle, sourceUpdatedAt: string) {
   return db
     .prepare(
       `INSERT INTO catalog_titles
