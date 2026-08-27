@@ -2,7 +2,7 @@ import { Hono } from "hono";
 
 import { requireAuthentication, type AuthVariables } from "../auth/session.ts";
 import { edgeOrigin } from "../lib/geo.ts";
-import { logError } from "../lib/logging.ts";
+import { logError, logRejection } from "../lib/logging.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import {
   clampRadius,
@@ -27,7 +27,11 @@ cinemaRoutes.get("/near", async (context) => {
   const radiusKm = clampRadius(context.req.query("radius"));
 
   try {
-    context.executionCtx.waitUntil(rememberInterest(context.env, origin));
+    context.executionCtx.waitUntil(
+      logRejection(rememberInterest(context.env, origin), "cinema_interest_failed", {
+        area: "cinema",
+      }),
+    );
 
     return context.json(await getNearbyCinemas(context.env, origin, radiusKm));
   } catch (error) {
@@ -42,7 +46,11 @@ cinemaRoutes.get("/showing", async (context) => {
   const radiusKm = clampRadius(context.req.query("radius"));
 
   try {
-    context.executionCtx.waitUntil(rememberInterest(context.env, origin));
+    context.executionCtx.waitUntil(
+      logRejection(rememberInterest(context.env, origin), "cinema_interest_failed", {
+        area: "cinema",
+      }),
+    );
 
     return context.json(await getLocalShowings(context.env, origin, radiusKm));
   } catch (error) {
@@ -63,7 +71,11 @@ cinemaRoutes.get("/titles/:mediaType/:tmdbId", async (context) => {
   try {
     const origin = edgeOrigin(context.req.raw);
 
-    context.executionCtx.waitUntil(rememberInterest(context.env, origin));
+    context.executionCtx.waitUntil(
+      logRejection(rememberInterest(context.env, origin), "cinema_interest_failed", {
+        area: "cinema",
+      }),
+    );
 
     return context.json(await getTitleShowings(context.env, titleId, origin, radiusKm));
   } catch (error) {

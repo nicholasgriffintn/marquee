@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 
 import { UPSTREAM_AGENT } from "../clients/fetch.ts";
-import { logError } from "../lib/logging.ts";
+import { logError, logRejection } from "../lib/logging.ts";
 import {
   isRevivalId,
   readReelTarget,
@@ -213,7 +213,9 @@ reelRoutes.get("/:workId", async (context) => {
   const range = context.req.header("range");
 
   if (!range) {
-    context.executionCtx.waitUntil(recordPlay(context.env.DB, workId));
+    context.executionCtx.waitUntil(
+      logRejection(recordPlay(context.env.DB, workId), "reel_play_record_failed", { workId }),
+    );
   }
 
   try {

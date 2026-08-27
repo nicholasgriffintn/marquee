@@ -5,7 +5,7 @@ import type { DiaryRow } from "../../src/lib/letterboxd.ts";
 import { requireAuthentication, type AuthVariables } from "../auth/session.ts";
 import { recordEvent } from "../lib/events.ts";
 import { jsonResponse, readJsonObject } from "../lib/http.ts";
-import { logError } from "../lib/logging.ts";
+import { logError, logRejection } from "../lib/logging.ts";
 import { queryInteger, queryText } from "../lib/params.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { calendarDate, isRecord } from "../lib/values.ts";
@@ -131,7 +131,11 @@ profileRoutes.post("/", async (context) => {
       });
 
       if (body.status === "watched" && isKnownTitle(body.titleId)) {
-        context.executionCtx.waitUntil(creditJourney(context.env, user.id, body.titleId));
+        context.executionCtx.waitUntil(
+          logRejection(creditJourney(context.env, user.id, body.titleId), "journey_credit_failed", {
+            titleId: body.titleId,
+          }),
+        );
       }
     }
 

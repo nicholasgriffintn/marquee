@@ -12,3 +12,16 @@ export function logError(event: string, error: unknown, detail: Record<string, u
     }),
   );
 }
+
+export function logRejection(
+  task: Promise<unknown>,
+  event: string,
+  detail: Record<string, unknown> = {},
+): Promise<void> {
+  return task.then(
+    () => undefined,
+    (error: unknown) => {
+      logError(event, error, detail);
+    },
+  );
+}

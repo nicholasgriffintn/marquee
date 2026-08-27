@@ -122,6 +122,7 @@ export async function storeEnrichmentTransient(
 
 const MISS_BACKOFF_CAP_DAYS = 120;
 const TRANSIENT_RETRY_HOURS = 1;
+const TRANSIENT_RETRY_CAP_HOURS = 24;
 
 export type EnrichmentWindow = { maxAgeDays: number; missBackoffDays: number };
 
@@ -133,7 +134,11 @@ function dueForEnrichment(window: EnrichmentWindow) {
              'now',
              '-' || min(e.attempts * ${window.missBackoffDays}, ${MISS_BACKOFF_CAP_DAYS}) || ' days'
            ))
-       OR (e.miss = 2 AND e.fetched_at < datetime('now', '-${TRANSIENT_RETRY_HOURS} hours'))`;
+       OR (e.miss = 2
+           AND e.fetched_at < datetime(
+             'now',
+             '-' || min(e.attempts * ${TRANSIENT_RETRY_HOURS}, ${TRANSIENT_RETRY_CAP_HOURS}) || ' hours'
+           ))`;
 }
 
 export async function storeAnimeIds(db: D1Database, mappings: AnimeMapping[]) {

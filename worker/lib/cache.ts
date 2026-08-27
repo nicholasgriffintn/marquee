@@ -1,6 +1,7 @@
 import type { MiddlewareHandler } from "hono";
 
 import type { Bindings } from "../types.ts";
+import { logRejection } from "./logging.ts";
 
 const edgeCaches = caches as unknown as { default: Cache };
 
@@ -65,7 +66,9 @@ export function edgeCache(seconds: number): MiddlewareHandler<{ Bindings: Bindin
     const stored = new Response(response.clone().body, response);
 
     stored.headers.set("cache-control", `public, max-age=${seconds}`);
-    context.executionCtx.waitUntil(cache.put(cacheKey, stored));
+    context.executionCtx.waitUntil(
+      logRejection(cache.put(cacheKey, stored), "edge_cache_put_failed", { cacheKey }),
+    );
 
     return response;
   };

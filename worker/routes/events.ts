@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { sessionPrincipal } from "../auth/session.ts";
 import { recordEvent, type MarqueeEvent } from "../lib/events.ts";
 import { readJsonObject } from "../lib/http.ts";
+import { logRejection } from "../lib/logging.ts";
 import { isKnownTitle, validProviderIds } from "../lib/validation.ts";
 import { recordSignal } from "../repositories/signals.ts";
 import type { Bindings } from "../types.ts";
@@ -56,17 +57,21 @@ eventRoutes.post("/", async (context) => {
 
   if (name === "provider_exit" && principal && titleId) {
     context.executionCtx.waitUntil(
-      recordSignal(context.env.DB, principal.user.id, {
-        type: "provider_exit",
-        titleId,
-        ...(event.journeyId ? { journeyId: event.journeyId } : {}),
-        context: {
-          source: event.source ?? "",
-          providerId: providerId ?? "",
-          monetization: event.monetization ?? "",
-        },
-        expiresInDays: EXIT_SIGNAL_DAYS,
-      }),
+      logRejection(
+        recordSignal(context.env.DB, principal.user.id, {
+          type: "provider_exit",
+          titleId,
+          ...(event.journeyId ? { journeyId: event.journeyId } : {}),
+          context: {
+            source: event.source ?? "",
+            providerId: providerId ?? "",
+            monetization: event.monetization ?? "",
+          },
+          expiresInDays: EXIT_SIGNAL_DAYS,
+        }),
+        "provider_exit_signal_failed",
+        { titleId },
+      ),
     );
   }
 

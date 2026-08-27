@@ -7,7 +7,7 @@ import { consumeDeadLetters, consumeIngestion } from "./jobs/ingestion-consumer.
 import { scheduleIngestion } from "./jobs/ingestion-scheduler.ts";
 import { automatedSyncAllowed } from "./lib/environment.ts";
 import { hasTrustedOrigin } from "./lib/http.ts";
-import { logEvent } from "./lib/logging.ts";
+import { logError, logEvent, logRejection } from "./lib/logging.ts";
 import { canonicalOrigin } from "./lib/security.ts";
 import { withPageMetadata } from "./lib/share.ts";
 import { adminRoutes } from "./routes/admin.ts";
@@ -124,7 +124,10 @@ app.notFound(async (context) => {
 });
 
 app.onError((error, context) => {
-  console.error(JSON.stringify({ event: "unhandled_request_error", detail: error.message }));
+  logError("unhandled_request_error", error, {
+    method: context.req.method,
+    path: context.req.path,
+  });
 
   return context.json({ error: "Unexpected server error" }, 500);
 });
@@ -140,13 +143,21 @@ export default {
       return;
     }
 
-    context.waitUntil(scheduleIngestion(env, controller.cron));
+    context.waitUntil(
+      logRejection(scheduleIngestion(env, controller.cron), "scheduled_run_failed", {
+        cron: controller.cron,
+      }),
+    );
   },
   queue(batch, env, context) {
     context.waitUntil(
-      batch.queue === "marquee-ingestion-dead-letter"
-        ? consumeDeadLetters(batch, env)
-        : consumeIngestion(batch, env),
+      logRejection(
+        batch.queue === "marquee-ingestion-dead-letter"
+          ? consumeDeadLetters(batch, env)
+          : consumeIngestion(batch, env),
+        "queue_batch_failed",
+        { queue: batch.queue, batchSize: batch.messages.length },
+      ),
     );
   },
 } satisfies ExportedHandler<Bindings, IngestionJob>;

@@ -4,7 +4,7 @@ import { isBeliefScope } from "../../src/domain/notebook.ts";
 import { requireAuthentication, type AuthVariables } from "../auth/session.ts";
 import { sendAddressConfirmation } from "../clients/email.ts";
 import { jsonResponse, readJsonObject } from "../lib/http.ts";
-import { logError } from "../lib/logging.ts";
+import { logError, logRejection } from "../lib/logging.ts";
 import { retryTransient } from "../lib/retry.ts";
 import { canonicalOrigin } from "../lib/security.ts";
 import { stringList } from "../lib/values.ts";
@@ -222,10 +222,12 @@ notebookRoutes.get("/map", async (context) => {
 
   try {
     const schedule = (task: Promise<unknown>) => {
+      const logged = logRejection(task, "taste_map_task_failed");
+
       try {
-        context.executionCtx.waitUntil(task);
+        context.executionCtx.waitUntil(logged);
       } catch {
-        void task;
+        void logged;
       }
     };
 
