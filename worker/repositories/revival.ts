@@ -843,15 +843,16 @@ export async function listForReview(db: D1Database, status: RevivalStatus, limit
     .bind(status, Math.min(limit, 200))
     .all<ReviewRow>();
 
-  return rows.results.map((row) => ({
-    ...toWork(row),
-    status: row.status as RevivalStatus,
-    mirrorState: row.mirrorState as RevivalMirrorState,
-    streamUrl: row.streamUrl,
-    streamBytes: row.streamBytes,
-    discoveredAt: row.discoveredAt,
-    mirrorError: row.mirrorError,
-  }));
+  return rows.results.map((row) =>
+    Object.assign(toWork(row), {
+      status: row.status as RevivalStatus,
+      mirrorState: row.mirrorState as RevivalMirrorState,
+      streamUrl: row.streamUrl,
+      streamBytes: row.streamBytes,
+      discoveredAt: row.discoveredAt,
+      mirrorError: row.mirrorError,
+    }),
+  );
 }
 
 export async function setWorkStatus(

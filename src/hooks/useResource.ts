@@ -75,6 +75,7 @@ export function useResource<T>(path: string | null, options: ResourceOptions = {
       window.clearTimeout(timer);
       controller.abort();
     };
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- version is a deliberate reload() trigger, not read in the body
   }, [active, debounceMs, errorMessage, identity, path, version]);
 
   const settled = loaded.path === identity;

@@ -1,6 +1,5 @@
 import { logEvent } from "../lib/logging.ts";
 import type { Bindings, IngestionJob } from "../types.ts";
-import { executeIngestionJob } from "./ingestion.ts";
 
 export function jobSubject(job: IngestionJob) {
   if (
@@ -80,20 +79,6 @@ export async function failIngestionRun(env: Bindings, runId: string, error: unkn
   )
     .bind(detail, runId)
     .run();
-}
-
-export async function recordIngestionRun(env: Bindings, job: IngestionJob) {
-  const runId = crypto.randomUUID();
-
-  await ingestionRunStartStatement(env, runId, job).run();
-
-  try {
-    await executeIngestionJob(env, job);
-    await completeIngestionRun(env, runId);
-  } catch (error) {
-    await failIngestionRun(env, runId, error);
-    throw error;
-  }
 }
 
 const RUN_RETENTION_DAYS = 7;

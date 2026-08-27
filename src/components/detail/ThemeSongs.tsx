@@ -15,6 +15,7 @@ function ThemeList({ label, songs }: { label: string; songs: AnimeTheme[] }) {
       <span>{label}</span>
       <ol>
         {visible.map((song, index) => (
+          // oxlint-disable-next-line react/no-array-index-key -- AnimeTheme has no stable id, list order is API-fixed
           <li key={`${song.title}-${index}`}>
             <b>{song.title}</b>
             {song.artist ? <i>{song.artist}</i> : null}

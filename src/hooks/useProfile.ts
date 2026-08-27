@@ -81,6 +81,7 @@ export function useProfile(isSignedIn: boolean) {
     void loadProfile();
 
     return () => controller.abort();
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- version is a deliberate refresh() trigger, not read in the body
   }, [announce, isSignedIn, version]);
 
   const refresh = useCallback(() => setVersion((current) => current + 1), []);

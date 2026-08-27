@@ -69,6 +69,7 @@ export async function computeAngleScores(env: Bindings) {
     totals.set(row.source, current);
   }
 
+  // oxlint-disable-next-line no-map-spread -- one entry per distinct rail angle, a small handful at most
   const scores = [...totals.values()].map((entry) => ({
     ...entry,
     score: scoreFor(entry.impressions, entry.clicks, entry.exits, entry.watched),

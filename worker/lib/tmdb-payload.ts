@@ -3,6 +3,7 @@ import type {
   MediaTitle,
   MediaType,
   ProviderAvailability,
+  TitleCredit,
   TitleCredits,
 } from "../../src/domain/catalog.ts";
 import {
@@ -393,7 +394,7 @@ export function parseTmdbSeasonCredits(titleId: string, value: unknown): TitleCr
       return [];
     }
 
-    const crew = records(episode.crew).flatMap((member) => {
+    const crew = records(episode.crew).flatMap((member): TitleCredit[] => {
       const who = person(member);
       const creditId = stringAt(member, "credit_id");
       const job = stringAt(member, "job");
@@ -414,7 +415,7 @@ export function parseTmdbSeasonCredits(titleId: string, value: unknown): TitleCr
           ]
         : [];
     });
-    const guests = records(episode.guest_stars).flatMap((member, index) => {
+    const guests = records(episode.guest_stars).flatMap((member, index): TitleCredit[] => {
       const who = person(member);
       const creditId = stringAt(member, "credit_id");
 
@@ -435,7 +436,7 @@ export function parseTmdbSeasonCredits(titleId: string, value: unknown): TitleCr
         : [];
     });
 
-    return [...crew, ...guests];
+    return crew.concat(guests);
   });
 
   return entries.length > 0 ? { titleId, entries } : null;
@@ -564,7 +565,10 @@ export function parseTmdbTitle(mediaType: MediaType, value: unknown): MediaTitle
     imdbUrl: imdbId && /^tt\d+$/u.test(imdbId) ? `https://www.imdb.com/title/${imdbId}/` : null,
     externalIds: parseExternalIds(externalIds, imdbId),
     homepage: httpsUrl(stringAt(value, "homepage")),
-    originCountries: stringList(value.origin_country, { limit: 6, itemLength: 8 }),
+    originCountries: stringList(value.origin_country, {
+      limit: 6,
+      itemLength: 8,
+    }),
     productionCountries: records(value.production_countries)
       .flatMap((entry) => [stringAt(entry, "name")].filter(Boolean))
       .slice(0, 6) as string[],

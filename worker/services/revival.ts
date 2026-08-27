@@ -699,6 +699,7 @@ export async function drawBill(db: D1Database, day: string) {
     }
   }
 
+  // oxlint-disable-next-line no-map-spread -- one entry per programme slot for the day, a small bounded list
   return drawn.map((entry) => ({ ...entry, work: toCard(entry.work) }));
 }
 

@@ -466,7 +466,7 @@ function affinityFor(title) {
 }
 
 const scored = titles
-  .map((title) => ({ ...title, affinity: affinityFor(title) }))
+  .map((title) => Object.assign({ affinity: affinityFor(title) }, title))
   .toSorted((left, right) => right.affinity - left.affinity);
 
 const byId = new Map(scored.map((title) => [title.id, title]));

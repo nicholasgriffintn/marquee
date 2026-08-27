@@ -114,6 +114,7 @@ export function SignInPage({
                       recovery: false,
                       signOut: false,
                     },
+                    // oxlint-disable-next-line no-map-spread -- a handful of auth providers, spread is clearest
                     providers: methods.providers.map((provider) => ({
                       ...provider,
                       values: { returnTo },

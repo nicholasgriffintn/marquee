@@ -213,6 +213,7 @@ export function Dropdown({
     <div className={`dropdown${className ? ` ${className}` : ""}`} ref={wrapRef} onBlur={onBlur}>
       <button
         type="button"
+        // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- select/datalist can't implement an aria-activedescendant combobox
         role="combobox"
         className="dropdown-trigger"
         aria-haspopup="listbox"
@@ -227,7 +228,13 @@ export function Dropdown({
         <ChevronIcon />
       </button>
       {isOpen && (
-        <div className="dropdown-panel" id={panelId} role="listbox" aria-label={label}>
+        <div
+          className="dropdown-panel"
+          id={panelId}
+          // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- select/datalist can't implement an aria-activedescendant combobox
+          role="listbox"
+          aria-label={label}
+        >
           {options.map((option, index) => (
             <button
               type="button"
@@ -237,6 +244,7 @@ export function Dropdown({
               ref={(node) => {
                 optionRefs.current[index] = node;
               }}
+              // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- select/datalist can't implement an aria-activedescendant combobox
               role="option"
               aria-selected={option.selected}
               className={`dropdown-option${option.selected ? " selected" : ""}${index === active ? " active" : ""}`}

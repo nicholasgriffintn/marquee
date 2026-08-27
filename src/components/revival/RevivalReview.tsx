@@ -88,6 +88,7 @@ export function RevivalReview({ revision: outerRevision = 0 }: { revision?: numb
       });
 
     return () => controller.abort();
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- outerRevision/revision are deliberate refetch triggers, not read in the body
   }, [outerRevision, revision, status]);
 
   const decide = useCallback(async (workId: string, decision: "approve" | "reject" | "mirror") => {

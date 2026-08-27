@@ -109,7 +109,10 @@ export async function syncSchedule(env: Bindings) {
     );
   }
 
-  logEvent("schedule_synced", { fetched: entries.length, matched: known.length });
+  logEvent("schedule_synced", {
+    fetched: entries.length,
+    matched: known.length,
+  });
 
   return known.length;
 }
@@ -163,6 +166,7 @@ export async function readTonight(
   );
   const byId = new Map(titles.map((title) => [title.id, title]));
 
+  // oxlint-disable-next-line no-map-spread -- rows are capped by the caller's small `limit`, spread is clearest
   return rows.map((row) => ({
     ...row,
     item: row.titleId ? (byId.get(row.titleId) ?? null) : null,

@@ -35,6 +35,7 @@ export function ImportPanel({ onImported }: { onImported: () => void }) {
         setStatus(`Reading ${Math.min(index + BATCH, rows.length)} of ${rows.length}…`);
 
         try {
+          // oxlint-disable-next-line no-await-in-loop -- batches must post in order so status/progress stays accurate
           const outcome = await requestJson<{
             matched: number;
             queued: number;

@@ -79,6 +79,7 @@ export function useAvailability(item: MediaTitle, enabled: boolean) {
 
     const fallbackById = new Map(listed.map((provider) => [provider.id, provider]));
 
+    // oxlint-disable-next-line no-map-spread -- provider list is a handful of items, spread keeps this readable
     return (live?.providers ?? []).map((provider) => ({
       ...provider,
       webUrl: provider.webUrl ?? fallbackById.get(provider.id)?.webUrl ?? watchLink,

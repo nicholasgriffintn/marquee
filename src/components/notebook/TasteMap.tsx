@@ -47,6 +47,7 @@ const TastePoint = memo(function TastePoint({
     <g
       className={`taste-point${point.weight >= 0 ? " liked" : " cooled"}${active ? " active" : ""}`}
       tabIndex={0}
+      // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- svg <g> point, a native button can't render inside svg
       role="button"
       aria-label={pointLabel(point)}
       aria-pressed={pinned}
@@ -280,6 +281,7 @@ export function TasteMap({ isSignedIn }: { isSignedIn: boolean }) {
         </div>
         <svg
           viewBox={`0 0 ${SIZE} ${SIZE}`}
+          // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- groups an svg chart, no semantic tag fits an svg container
           role="group"
           aria-label="Your shelf, laid out so that alike things sit together"
         >

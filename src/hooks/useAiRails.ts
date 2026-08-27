@@ -14,7 +14,10 @@ const SHELF_CHANGE_DEBOUNCE_MS = 4_000;
 export function useAiRails(isSignedIn: boolean, savedKey: string) {
   const [sections, setSections] = useState<CatalogSection[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [settled, setSettled] = useState<{ done: boolean; sections: CatalogSection[] }>({
+  const [settled, setSettled] = useState<{
+    done: boolean;
+    sections: CatalogSection[];
+  }>({
     done: false,
     sections: [],
   });
@@ -77,6 +80,7 @@ export function useAiRails(isSignedIn: boolean, savedKey: string) {
       window.clearTimeout(timer);
       controller.abort();
     };
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- savedKey is a deliberate regenerate-on-shelf-change trigger, not read in the body
   }, [isSignedIn, savedKey]);
 
   return {
