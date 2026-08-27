@@ -1,10 +1,6 @@
 import { readdirSync } from "node:fs";
 
-const GRANDFATHERED = new Map([
-  ["0016", 2],
-  ["0048", 2],
-  ["0055", 2],
-]);
+const GRANDFATHERED = new Map([]);
 
 const byPrefix = new Map();
 
