@@ -260,8 +260,8 @@ export async function storePoster(
     env.DB.prepare(
       `UPDATE catalog_titles
        SET poster_key = ?, updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?`,
-    ).bind(key, titleId),
+       WHERE id = ? AND poster_key IS NOT ?`,
+    ).bind(key, titleId, key),
     env.DB.prepare(
       `INSERT INTO title_enrichment (title_id, source, payload, miss, attempts)
        VALUES (?, 'poster', ?, 0, 0)
