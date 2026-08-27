@@ -34,7 +34,7 @@ export function useBrowse(filters: BrowseFilters) {
     filters.keywords.join(","),
     filters.providerIds.join(","),
     filters.query.trim(),
-  ].join("|");
+  ].join("\u0000");
   const page = pageState.key === key ? pageState.page : 0;
 
   useEffect(() => {
@@ -45,7 +45,7 @@ export function useBrowse(filters: BrowseFilters) {
         async function load() {
           setIsLoading(true);
 
-          const [mediaType, sort, genres, keywords, providers, query] = key.split("|");
+          const [mediaType, sort, genres, keywords, providers, query] = key.split("\u0000");
           const parameters = new URLSearchParams({ sort, page: String(page) });
 
           if (mediaType) {
