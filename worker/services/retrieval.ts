@@ -18,10 +18,6 @@ function reranker(env: Bindings) {
 }
 
 const VECTOR_TOP_K = 60;
-// Vectorize returns its nearest neighbours however far away they are, so a query that
-// matches nothing still comes back with a full page of unrelated titles. Measured cosine
-// scores separate cleanly: nonsense queries peak around 0.35, queries that match
-// something peak at 0.47 or above.
 const VECTOR_MIN_SCORE = 0.4;
 const KEYWORD_CANDIDATES = 30;
 const RERANK_CANDIDATES = 48;

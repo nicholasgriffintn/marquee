@@ -103,8 +103,6 @@ async function harvest(cinema: SourceCinema, horizon: number): Promise<SourceHar
     const days = await daysFor(cinema.siteId, film.filmId).catch(() => null);
 
     if (days === null) {
-      // The dates endpoint has stood us down. Fall back to the far more durable
-      // listing: we know it is on there, just not which day.
       screenings.push({
         siteId: cinema.siteId,
         filmId: film.filmId,

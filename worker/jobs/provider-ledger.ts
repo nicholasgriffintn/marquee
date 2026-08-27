@@ -26,8 +26,6 @@ function configuredProviders(): Provider[] {
   }));
 }
 
-// Aggregator names arrive with stray whitespace ("Pongalo Amazon Channel  "), which reads as a
-// repeated row next to the tidy spelling of the same service.
 function tidyName(name: string) {
   return name.replace(/\s+/gu, " ").trim();
 }
@@ -41,9 +39,6 @@ function dynamicMark(name: string) {
     .toUpperCase();
 }
 
-// Aggregator names for one service vary ("Shudder", "Shudder Amazon Channel", "Shudder (Via
-// Amazon Prime)"), so long-tail entries are indexed by their canonical name to keep the ledger
-// to one row per service.
 function indexProviders(byId: Map<string, Provider>) {
   const byCanonicalName = new Map<string, Provider>();
 
@@ -76,8 +71,6 @@ function addSourceId(ids: number[], id: number) {
   }
 }
 
-// Reseller and tier variants carry longer names than the service itself, so the shortest name
-// seen is the one worth showing.
 function preferName(provider: Provider, name: string) {
   if (name.length < provider.name.length) {
     provider.name = name;

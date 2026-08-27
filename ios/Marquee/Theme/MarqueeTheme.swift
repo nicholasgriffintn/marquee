@@ -15,7 +15,6 @@ enum MarqueeTheme {
   static let coral = Color(red: 1.0, green: 0.431, blue: 0.337)
   static let white = Color(red: 1.0, green: 0.996, blue: 0.973)
 
-  // Web headings inherit Avenir Next. Iowan is reserved for editorial asides and taglines.
   static func display(_ size: CGFloat) -> Font { sans(size) }
   static func serif(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
     .custom("Iowan Old Style", size: size).weight(weight)

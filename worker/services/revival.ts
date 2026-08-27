@@ -285,7 +285,7 @@ export async function queueRevivalSources(env: Bindings) {
 
 export async function recheckArchiveWorks(env: Bindings, limit = 80) {
   const cutoff = usPublicDomainCutoff();
-  const pending = await selectArchiveForRecheck(env.DB, limit);
+  const pending = await selectArchiveForRecheck(env.DB, limit, KNOWN_FRESH_DAYS);
   const deadline = Date.now() + ARCHIVE_BUDGET_MS;
   const counts = { checked: 0, removed: 0, skipped: 0, refreshed: 0 };
 
@@ -333,7 +333,9 @@ export async function recheckArchiveWorks(env: Bindings, limit = 80) {
     }
   }
 
-  return { ...counts, exhausted: pending.length < limit };
+  const progressed = counts.refreshed + counts.removed > 0;
+
+  return { ...counts, exhausted: pending.length < limit || !progressed };
 }
 
 export async function matchRevivalWorks(env: Bindings, limit = MATCH_BATCH) {

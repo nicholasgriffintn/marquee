@@ -1,5 +1,3 @@
-// Provider logos are vendored under public/providers so the app never leans on an aggregator CDN
-// for brand art. Refresh them with: node scripts/fetch-provider-logos.mjs
 const PROVIDER_LOGO_FILES: Record<string, string> = {
   "acorn-tv": "acorn-tv.png",
   aha: "aha.png",

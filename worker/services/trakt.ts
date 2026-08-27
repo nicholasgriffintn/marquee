@@ -266,9 +266,6 @@ export async function exportTraktShelf(env: Bindings, viewerId: string, origin: 
     .all<ShelfRow>();
   const page = rows.results;
   const boundary = page.at(-1)?.updatedAt;
-  // The cursor is a timestamp, so a full page that splits a group of rows sharing one
-  // updated_at would strand the rest of that group behind a strict `>` forever. Hold
-  // them back for the next run instead, unless the whole page is one such group.
   const trimmed =
     page.length === PUSH_LIMIT && boundary
       ? page.filter((row) => row.updatedAt !== boundary)

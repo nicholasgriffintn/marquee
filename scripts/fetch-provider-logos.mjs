@@ -1,10 +1,3 @@
-// Vendors each service's own icon into public/providers so the app never renders brand art from
-// an aggregator CDN. Sources live in scripts/provider-logo-sources.json.
-//
-//   node scripts/fetch-provider-logos.mjs [provider-id ...]
-//
-// Icons are validated by magic bytes (an HTML error page served as .png is common), rejected
-// below 32px, converted to PNG with sips and capped at 128px. SVGs are kept as vectors.
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -78,8 +71,6 @@ async function download(url) {
   return { buffer: Buffer.from(await response.arrayBuffer()), url: response.url };
 }
 
-// Site-declared icons first, largest wins; Safari mask icons are monochrome silhouettes that read
-// as a black square on a dark page, so they rank last.
 function declaredIcons(html, baseUrl) {
   const icons = [];
 
