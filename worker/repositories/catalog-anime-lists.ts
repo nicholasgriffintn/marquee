@@ -42,7 +42,7 @@ export async function writeAnimeSynonymRows(db: D1Database, titles: MediaTitle[]
     30,
     rows,
     (chunk) =>
-      `INSERT INTO catalog_title_anime_synonyms (title_id, synonym, position)
+      `INSERT OR IGNORE INTO catalog_title_anime_synonyms (title_id, synonym, position)
        VALUES ${chunk.map(() => "(?, ?, ?)").join(", ")}`,
   );
 }
@@ -105,7 +105,7 @@ export async function writeAnimeCompanyRows(db: D1Database, titles: MediaTitle[]
     22,
     rows,
     (chunk) =>
-      `INSERT INTO catalog_title_anime_companies (title_id, kind, name, position)
+      `INSERT OR IGNORE INTO catalog_title_anime_companies (title_id, kind, name, position)
        VALUES ${chunk.map(() => "(?, ?, ?, ?)").join(", ")}`,
   );
 }

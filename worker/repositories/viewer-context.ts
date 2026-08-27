@@ -75,8 +75,9 @@ export async function readShelfDetail(db: D1Database, viewerId: string, limit = 
   const rows = await db
     .prepare(
       `SELECT t.title, t.year, v.status, v.rating, v.thoughts,
-              (SELECT json_group_array(genre) FROM catalog_title_genres
-                WHERE title_id = t.id ORDER BY position) AS genres
+              (SELECT json_group_array(genre) FROM
+                (SELECT genre FROM catalog_title_genres
+                  WHERE title_id = t.id ORDER BY position)) AS genres
        FROM viewing_entries AS v
        JOIN catalog_titles AS t ON t.id = v.title_id
        WHERE v.viewer_id = ?

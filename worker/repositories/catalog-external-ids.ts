@@ -45,21 +45,8 @@ export async function writeExternalIdsRows(db: D1Database, titles: MediaTitle[])
 
   const rows = titles.flatMap((title): unknown[][] => {
     const ids = title.externalIds;
-    const hasAny =
-      ids &&
-      (ids.tvdbId ??
-        ids.facebookId ??
-        ids.instagramId ??
-        ids.twitterId ??
-        ids.anidbId ??
-        ids.kitsuId ??
-        ids.aniSearchId ??
-        ids.animePlanetId ??
-        ids.livechartId ??
-        ids.animeNewsNetworkId ??
-        ids.animeCountdownId) !== undefined;
 
-    return ids && hasAny
+    return ids
       ? [
           [
             title.id,

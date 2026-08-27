@@ -51,7 +51,7 @@ export async function writeAnimeRelationRows(db: D1Database, titles: MediaTitle[
     12,
     rows,
     (chunk) =>
-      `INSERT INTO catalog_title_anime_relations (title_id, mal_id, relation, format, title, year, position)
+      `INSERT OR IGNORE INTO catalog_title_anime_relations (title_id, mal_id, relation, format, title, year, position)
        VALUES ${chunk.map(() => "(?, ?, ?, ?, ?, ?, ?)").join(", ")}`,
   );
 }
@@ -101,7 +101,7 @@ export async function writeAnimeRecommendationRows(db: D1Database, titles: Media
     30,
     rows,
     (chunk) =>
-      `INSERT INTO catalog_title_anime_recommendations (title_id, mal_id, position)
+      `INSERT OR IGNORE INTO catalog_title_anime_recommendations (title_id, mal_id, position)
        VALUES ${chunk.map(() => "(?, ?, ?)").join(", ")}`,
   );
 }
@@ -152,7 +152,7 @@ export async function writeAnimeLinkRows(db: D1Database, titles: MediaTitle[]) {
     22,
     rows,
     (chunk) =>
-      `INSERT INTO catalog_title_anime_links (title_id, name, url, position)
+      `INSERT OR IGNORE INTO catalog_title_anime_links (title_id, name, url, position)
        VALUES ${chunk.map(() => "(?, ?, ?, ?)").join(", ")}`,
   );
 }

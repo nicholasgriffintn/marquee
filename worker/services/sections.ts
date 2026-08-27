@@ -164,8 +164,8 @@ const PROVIDER_NAMES = new Map(providerRegistry.map((provider) => [provider.id, 
 async function topServices(env: Bindings, limit: number) {
   const rows = await env.DB.prepare(
     `SELECT provider_id AS providerId, count(DISTINCT title_id) AS uses
-     FROM title_provider_state
-     WHERE offer_kind = 'streaming'
+     FROM catalog_title_provider_offers
+     WHERE offer_type = 'Subscription'
      GROUP BY provider_id
      HAVING uses >= 40
      ORDER BY uses DESC

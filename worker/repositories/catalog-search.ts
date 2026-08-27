@@ -1,7 +1,6 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
 import { buzzScoreSql, MIN_TRENDING_VIEWS } from "../lib/buzz.ts";
 import {
-  buildTitleFromRow,
   CATALOG_TITLE_COLUMNS,
   catalogTitleColumns,
   type CatalogTitleRow,
@@ -9,9 +8,7 @@ import {
 } from "../lib/catalog-payload.ts";
 import { clamp } from "../lib/numbers.ts";
 import { isKnownTitle, validProviderIds } from "../lib/validation.ts";
-import { attachTitleExtensions } from "./catalog-arrays.ts";
-
-type TitleRow = CatalogTitleRow;
+import { hydrateTitleRows } from "./catalog-arrays.ts";
 
 export type CatalogueSort = "trending" | "popularity" | "score" | "recent" | "relevance";
 
@@ -73,17 +70,10 @@ function ftsMatchQuery(raw: string, scope: SearchScope = "everything", matchAny 
   return scope === "title" ? `{title original_title} : (${expression})` : expression;
 }
 
-async function hydrate(db: D1Database, rows: TitleRow[]): Promise<MediaTitle[]> {
-  const built = rows.map((row) => ({
-    title: buildTitleFromRow(row),
-    posterKey: row.poster_key,
-  }));
-  const attached = await attachTitleExtensions(
-    db,
-    built.map((entry) => entry.title),
-  );
+async function hydrate(db: D1Database, rows: CatalogTitleRow[]): Promise<MediaTitle[]> {
+  const hydrated = await hydrateTitleRows(db, rows);
 
-  return attached.map((title, index) => withStoredPoster(title, built[index]?.posterKey));
+  return hydrated.map((title, index) => withStoredPoster(title, rows[index]?.poster_key));
 }
 
 export async function searchCatalogue(db: D1Database, search: CatalogueSearch) {
@@ -210,7 +200,7 @@ export async function searchCatalogue(db: D1Database, search: CatalogueSearch) {
        LIMIT ? OFFSET ?`,
     )
     .bind(...bindings, ...orderBindings, limit, offset)
-    .all<TitleRow>();
+    .all<CatalogTitleRow>();
 
   return hydrate(db, rows.results);
 }
@@ -250,8 +240,6 @@ export type BrowseTrendingFilter = {
   providerIds: string[];
   minVotes: number;
 };
-
-type TrendingRow = CatalogTitleRow;
 
 async function trendingCandidates(db: D1Database, filter: BrowseTrendingFilter) {
   const conditions = [`b.article <> ''`, `b.views >= ${MIN_TRENDING_VIEWS}`];
@@ -318,7 +306,7 @@ async function trendingCandidates(db: D1Database, filter: BrowseTrendingFilter) 
        ORDER BY b.score DESC, t.popularity DESC`,
     )
     .bind(...bindings)
-    .all<TrendingRow>();
+    .all<CatalogTitleRow>();
 
   return rows.results;
 }
@@ -365,7 +353,7 @@ export async function readRanked(db: D1Database, ids: string[]) {
        WHERE id IN (SELECT value FROM json_each(?))`,
     )
     .bind(JSON.stringify(uniqueIds))
-    .all<TitleRow>();
+    .all<CatalogTitleRow>();
   const byId = new Map((await hydrate(db, rows.results)).map((title) => [title.id, title]));
 
   return uniqueIds.flatMap((id) => {

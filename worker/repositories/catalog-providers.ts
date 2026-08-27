@@ -29,7 +29,8 @@ export async function readProviderMap(db: D1Database, ids: string[]) {
         .prepare(
           `SELECT title_id AS titleId, provider_id AS providerId, offer_type AS offerType
            FROM catalog_title_provider_offers
-           WHERE title_id IN (${wave.map(() => "?").join(",")})`,
+           WHERE title_id IN (${wave.map(() => "?").join(",")})
+           ORDER BY title_id, provider_id, position`,
         )
         .bind(...wave)
         .all<OfferRow>()
@@ -107,21 +108,23 @@ export async function writeProviderRows(db: D1Database, titles: MediaTitle[]) {
 
   const offerRows = titles.flatMap((title) =>
     title.providers.flatMap((provider) =>
-      [...new Set(provider.offerTypes)].map((offerType): unknown[] => [
+      [...new Set(provider.offerTypes)].map((offerType, position): unknown[] => [
         title.id,
         provider.id,
         offerType,
+        position,
       ]),
     ),
   );
 
   await insertRows(
     db,
-    3,
-    30,
+    4,
+    22,
     offerRows,
     (chunk) =>
-      `INSERT OR IGNORE INTO catalog_title_provider_offers (title_id, provider_id, offer_type)
-       VALUES ${chunk.map(() => "(?, ?, ?)").join(", ")}`,
+      `INSERT OR IGNORE INTO catalog_title_provider_offers
+         (title_id, provider_id, offer_type, position)
+       VALUES ${chunk.map(() => "(?, ?, ?, ?)").join(", ")}`,
   );
 }

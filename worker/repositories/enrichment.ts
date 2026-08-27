@@ -60,6 +60,44 @@ export const ENRICHMENT_WINDOWS = {
 
 export type EnrichedSource = keyof typeof ENRICHMENT_WINDOWS;
 
+function updateTitleScalars(db: D1Database, title: MediaTitle) {
+  const scalars = titleScalarColumns(title);
+
+  return db
+    .prepare(
+      `UPDATE catalog_titles
+       SET weighted_rating = ?, blended_rating = ?,
+           overview = ?, runtime_minutes = ?, number_of_seasons = ?, release_date = ?,
+           certification = ?, tmdb_score = ?, poster_url = ?, backdrop_url = ?,
+           watch_link = ?, status = ?, original_language = ?, revenue = ?,
+           collection_id = ?, collection_name = ?, mal_id = ?, anilist_id = ?,
+           wikidata_id = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+    )
+    .bind(
+      computeWeightedRating(title),
+      computeBlendedRating(title),
+      scalars.overview,
+      scalars.runtimeMinutes,
+      scalars.numberOfSeasons,
+      scalars.releaseDate,
+      scalars.certification,
+      scalars.tmdbScore,
+      scalars.posterUrl,
+      scalars.backdropUrl,
+      scalars.watchLink,
+      scalars.status,
+      scalars.originalLanguage,
+      scalars.revenue,
+      scalars.collectionId,
+      scalars.collectionName,
+      scalars.malId,
+      scalars.anilistId,
+      scalars.wikidataId,
+      title.id,
+    );
+}
+
 export async function storeEnrichment<S extends EnrichedSource>(
   env: Bindings,
   titleId: string,
@@ -79,44 +117,8 @@ export async function storeEnrichment<S extends EnrichedSource>(
     await persistTitleExtensions(env.DB, [enrichedTitle]);
   }
 
-  const scalars = enrichedTitle ? titleScalarColumns(enrichedTitle) : null;
-
   await env.DB.batch([
-    ...(enrichedTitle && scalars
-      ? [
-          env.DB.prepare(
-            `UPDATE catalog_titles
-             SET weighted_rating = ?, blended_rating = ?,
-                 overview = ?, runtime_minutes = ?, number_of_seasons = ?, release_date = ?,
-                 certification = ?, tmdb_score = ?, poster_url = ?, backdrop_url = ?,
-                 watch_link = ?, status = ?, original_language = ?, revenue = ?,
-                 collection_id = ?, collection_name = ?, mal_id = ?, anilist_id = ?,
-                 wikidata_id = ?, updated_at = CURRENT_TIMESTAMP
-             WHERE id = ?`,
-          ).bind(
-            computeWeightedRating(enrichedTitle),
-            computeBlendedRating(enrichedTitle),
-            scalars.overview,
-            scalars.runtimeMinutes,
-            scalars.numberOfSeasons,
-            scalars.releaseDate,
-            scalars.certification,
-            scalars.tmdbScore,
-            scalars.posterUrl,
-            scalars.backdropUrl,
-            scalars.watchLink,
-            scalars.status,
-            scalars.originalLanguage,
-            scalars.revenue,
-            scalars.collectionId,
-            scalars.collectionName,
-            scalars.malId,
-            scalars.anilistId,
-            scalars.wikidataId,
-            titleId,
-          ),
-        ]
-      : []),
+    ...(enrichedTitle ? [updateTitleScalars(env.DB, enrichedTitle)] : []),
     env.DB.prepare(
       `INSERT INTO title_enrichment (title_id, source, payload, miss, attempts, next_check_at)
        VALUES (?, ?, ?, 0, 0, datetime('now', '+${maxAgeDays} days'))
@@ -189,33 +191,58 @@ export async function storeAnimeIds(db: D1Database, mappings: AnimeMapping[]) {
     return 0;
   }
 
-  const statements = mappings.flatMap((mapping) => {
+  const titleUpdates = mappings.map((mapping) =>
+    db
+      .prepare(
+        `UPDATE catalog_titles
+         SET mal_id = COALESCE(?1, mal_id),
+             anilist_id = COALESCE(?2, anilist_id),
+             wikidata_id = COALESCE(?3, wikidata_id),
+             imdb_id = COALESCE(?4, imdb_id),
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?5
+           AND ((?1 IS NOT NULL AND mal_id IS NOT ?1)
+             OR (?2 IS NOT NULL AND anilist_id IS NOT ?2)
+             OR (?3 IS NOT NULL AND wikidata_id IS NOT ?3)
+             OR (?4 IS NOT NULL AND imdb_id IS NOT ?4))`,
+      )
+      .bind(
+        mapping.ids.malId ?? null,
+        mapping.ids.anilistId ?? null,
+        mapping.ids.wikidataId ?? null,
+        mapping.ids.imdbId ?? null,
+        mapping.titleId,
+      ),
+  );
+
+  const extensionUpserts = mappings.flatMap((mapping) => {
     const ids = mapping.ids;
+    const extras = [
+      ids.tvdbId,
+      ids.facebookId,
+      ids.instagramId,
+      ids.twitterId,
+      ids.anidbId,
+      ids.kitsuId,
+      ids.aniSearchId,
+      ids.animePlanetId,
+      ids.livechartId,
+      ids.animeNewsNetworkId,
+      ids.animeCountdownId,
+    ];
+
+    if (extras.every((value) => value === undefined || value === null)) {
+      return [];
+    }
 
     return [
-      db
-        .prepare(
-          `UPDATE catalog_titles
-           SET mal_id = COALESCE(?1, mal_id),
-               anilist_id = COALESCE(?2, anilist_id),
-               wikidata_id = COALESCE(?3, wikidata_id),
-               imdb_id = COALESCE(?4, imdb_id),
-               updated_at = CURRENT_TIMESTAMP
-           WHERE id = ?5`,
-        )
-        .bind(
-          ids.malId ?? null,
-          ids.anilistId ?? null,
-          ids.wikidataId ?? null,
-          ids.imdbId ?? null,
-          mapping.titleId,
-        ),
       db
         .prepare(
           `INSERT INTO catalog_title_external_ids
              (title_id, tvdb_id, facebook_id, instagram_id, twitter_id, anidb_id, kitsu_id,
               ani_search_id, anime_planet_id, livechart_id, animenewsnetwork_id, animecountdown_id)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12
+             FROM catalog_titles WHERE id = ?1
            ON CONFLICT (title_id) DO UPDATE SET
              tvdb_id = COALESCE(excluded.tvdb_id, catalog_title_external_ids.tvdb_id),
              facebook_id = COALESCE(excluded.facebook_id, catalog_title_external_ids.facebook_id),
@@ -246,9 +273,11 @@ export async function storeAnimeIds(db: D1Database, mappings: AnimeMapping[]) {
     ];
   });
 
-  const written = await db.batch(statements);
+  const written = await db.batch([...titleUpdates, ...extensionUpserts]);
 
-  return written.reduce((sum, result) => sum + (result.meta.changes ?? 0), 0);
+  return written
+    .slice(0, titleUpdates.length)
+    .reduce((sum, result) => sum + (result.meta.changes ?? 0), 0);
 }
 
 type CandidateRow = { titleId: string };

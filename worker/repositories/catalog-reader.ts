@@ -1,6 +1,5 @@
 import type { CatalogResponse, CatalogSection, MediaTitle } from "../../src/domain/catalog.ts";
 import {
-  buildTitleFromRow,
   CATALOG_TITLE_COLUMNS,
   type CatalogTitleRow,
   parseSectionAudience,
@@ -10,10 +9,8 @@ import {
 import { logError } from "../lib/logging.ts";
 import { clamp } from "../lib/numbers.ts";
 import { isKnownTitle } from "../lib/validation.ts";
-import { attachTitleExtensions } from "./catalog-arrays.ts";
+import { hydrateTitleRows } from "./catalog-arrays.ts";
 import { searchTitlesFirst } from "./catalog-search.ts";
-
-type TitleRow = CatalogTitleRow & { posterKey?: string | null };
 
 type SectionRow = {
   id: string;
@@ -75,22 +72,15 @@ async function matchingTitleIds(db: D1Database, ids: string[], providerIds: stri
   return new Set(rows.results.map((row) => row.id));
 }
 
-async function hydrateRows(db: D1Database, rows: TitleRow[]): Promise<MediaTitle[]> {
-  const built = rows.map((row) => ({
-    title: buildTitleFromRow(row),
-    posterKey: row.posterKey,
-  }));
-  const attached = await attachTitleExtensions(
-    db,
-    built.map((entry) => entry.title),
-  );
+async function servedTitles(db: D1Database, rows: CatalogTitleRow[]): Promise<MediaTitle[]> {
+  const hydrated = await hydrateTitleRows(db, rows);
 
-  return attached.map((title, index) => withStoredPoster(title, built[index]?.posterKey));
+  return hydrated.map((title, index) => withStoredPoster(title, rows[index]?.poster_key));
 }
 
 export async function readRawItems(db: D1Database, ids: string[]) {
   const uniqueIds = [...new Set(ids.filter(isKnownTitle))];
-  const rows: TitleRow[] = [];
+  const rows: CatalogTitleRow[] = [];
 
   for (let index = 0; index < uniqueIds.length; index += READ_CHUNK) {
     const wave = uniqueIds.slice(index, index + READ_CHUNK);
@@ -100,12 +90,12 @@ export async function readRawItems(db: D1Database, ids: string[]) {
         `SELECT ${CATALOG_TITLE_COLUMNS} FROM catalog_titles WHERE id IN (${wave.map(() => "?").join(",")})`,
       )
       .bind(...wave)
-      .all<TitleRow>();
+      .all<CatalogTitleRow>();
 
     rows.push(...result.results);
   }
 
-  const hydrated = await hydrateRows(db, rows);
+  const hydrated = await hydrateTitleRows(db, rows);
 
   return new Map(hydrated.map((title) => [title.id, title]));
 }
@@ -117,24 +107,23 @@ export async function readItems(db: D1Database, ids: string[], limit = 30) {
     return [];
   }
 
-  const rows: TitleRow[] = [];
+  const rows: CatalogTitleRow[] = [];
 
   for (let index = 0; index < uniqueIds.length; index += READ_CHUNK) {
     const wave = uniqueIds.slice(index, index + READ_CHUNK);
     // oxlint-disable-next-line no-await-in-loop
     const result = await db
       .prepare(
-        `SELECT ${CATALOG_TITLE_COLUMNS}, poster_key AS posterKey
+        `SELECT ${CATALOG_TITLE_COLUMNS}
          FROM catalog_titles WHERE id IN (${wave.map(() => "?").join(",")})`,
       )
       .bind(...wave)
-      .all<TitleRow>();
+      .all<CatalogTitleRow>();
 
     rows.push(...result.results);
   }
 
-  const hydrated = await hydrateRows(db, rows);
-  const titlesById = new Map(hydrated.map((title) => [title.id, title]));
+  const titlesById = new Map((await servedTitles(db, rows)).map((title) => [title.id, title]));
 
   return uniqueIds.flatMap((id) => {
     const title = titlesById.get(id);
@@ -153,14 +142,14 @@ export async function readTitlesByMalId(db: D1Database, malIds: number[]) {
 
   const result = await db
     .prepare(
-      `SELECT ${CATALOG_TITLE_COLUMNS}, poster_key AS posterKey, mal_id AS malId
+      `SELECT ${CATALOG_TITLE_COLUMNS}, mal_id AS malId
        FROM catalog_titles
        WHERE mal_id IN (${unique.map(() => "?").join(",")})`,
     )
     .bind(...unique)
-    .all<TitleRow & { malId: number }>();
+    .all<CatalogTitleRow & { malId: number }>();
 
-  const hydrated = await hydrateRows(db, result.results);
+  const hydrated = await servedTitles(db, result.results);
 
   hydrated.forEach((title, index) => {
     const row = result.results[index];

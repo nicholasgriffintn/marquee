@@ -2,11 +2,11 @@ import type { MediaTitle } from "../../src/domain/catalog.ts";
 import type { ShelfSort } from "../../src/domain/shelf.ts";
 import type { EntryStatus, ViewingEntry } from "../../src/types.ts";
 import {
-  buildTitleFromRow,
   catalogTitleColumns,
   type CatalogTitleRow,
+  withStoredPoster,
 } from "../lib/catalog-payload.ts";
-import { attachTitleExtensions } from "./catalog-arrays.ts";
+import { hydrateTitleRows } from "./catalog-arrays.ts";
 
 export type ShelfPageQuery = {
   status: EntryStatus | null;
@@ -22,7 +22,7 @@ export type ShelfRow = { entry: ViewingEntry; title: MediaTitle };
 type JoinedRow = CatalogTitleRow & {
   entryId: string;
   titleId: string;
-  status: string;
+  entryStatus: string;
   rating: number | null;
   thoughts: string | null;
   season: number | null;
@@ -79,7 +79,7 @@ function toEntry(row: JoinedRow) {
   return {
     id: row.entryId,
     titleId: row.titleId,
-    status: row.status as EntryStatus,
+    status: row.entryStatus as EntryStatus,
     rating: row.rating,
     thoughts: row.thoughts ?? "",
     season: row.season,
@@ -89,29 +89,13 @@ function toEntry(row: JoinedRow) {
 }
 
 async function toRows(db: D1Database, rows: JoinedRow[]): Promise<ShelfRow[]> {
-  const built = rows.map((row) => ({ row, title: buildTitleFromRow(row) }));
-  const hydrated = await attachTitleExtensions(
-    db,
-    built.map((entry) => entry.title),
-  );
-  const result: ShelfRow[] = [];
+  const hydrated = await hydrateTitleRows(db, rows);
 
-  for (const [index, title] of hydrated.entries()) {
-    const entry = built[index];
+  return hydrated.flatMap((title, index) => {
+    const row = rows[index];
 
-    if (!entry) {
-      continue;
-    }
-
-    result.push({
-      entry: toEntry(entry.row),
-      title: entry.row.poster_key
-        ? { ...title, posterUrl: `/media/${entry.row.poster_key}` }
-        : title,
-    });
-  }
-
-  return result;
+    return row ? [{ entry: toEntry(row), title: withStoredPoster(title, row.poster_key) }] : [];
+  });
 }
 
 export async function readShelfPage(db: D1Database, viewerId: string, query: ShelfPageQuery) {
@@ -119,7 +103,7 @@ export async function readShelfPage(db: D1Database, viewerId: string, query: She
   const [rows, totals] = await Promise.all([
     db
       .prepare(
-        `SELECT e.id AS entryId, e.title_id AS titleId, e.status, e.rating, e.thoughts,
+        `SELECT e.id AS entryId, e.title_id AS titleId, e.status AS entryStatus, e.rating, e.thoughts,
                 ${PROGRESS_COLUMNS}, e.updated_at AS updatedAt,
                 ${catalogTitleColumns("t")}
            FROM viewing_entries AS e
@@ -174,7 +158,7 @@ export async function readLostProperty(
 ) {
   const rows = await db
     .prepare(
-      `SELECT e.id AS entryId, e.title_id AS titleId, e.status, e.rating, e.thoughts,
+      `SELECT e.id AS entryId, e.title_id AS titleId, e.status AS entryStatus, e.rating, e.thoughts,
               ${PROGRESS_COLUMNS}, e.updated_at AS updatedAt,
               ${catalogTitleColumns("t")}
          FROM viewing_entries AS e

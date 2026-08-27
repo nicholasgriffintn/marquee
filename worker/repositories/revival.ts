@@ -324,12 +324,7 @@ export async function readUncheckedRights(db: D1Database, limit = 60) {
 export async function storeUkRights(
   db: D1Database,
   id: string,
-  verdict: {
-    clear: boolean;
-    expiresYear: number | null;
-    basis: RevivalRightsBasis;
-    note: string;
-  },
+  verdict: { clear: boolean; expiresYear: number | null; basis: RevivalRightsBasis; note: string },
 ) {
   await db
     .prepare(
@@ -821,12 +816,7 @@ export async function selectUnmatched(db: D1Database, limit = 400) {
        LIMIT ?`,
     )
     .bind(Math.min(limit, 600))
-    .all<{
-      id: string;
-      title: string;
-      year: number | null;
-      runtimeSeconds: number | null;
-    }>();
+    .all<{ id: string; title: string; year: number | null; runtimeSeconds: number | null }>();
 
   return rows.results;
 }
@@ -876,11 +866,7 @@ export async function selectKnownSourceIds(
 export async function refreshPopularity(
   db: D1Database,
   source: RevivalSource,
-  entries: {
-    sourceId: string;
-    popularity: number | null;
-    downloads: number | null;
-  }[],
+  entries: { sourceId: string; popularity: number | null; downloads: number | null }[],
 ) {
   const scored = entries.filter((entry) => entry.popularity !== null);
 
@@ -1011,10 +997,7 @@ export async function readProgress(db: D1Database, viewerId: string, workId: str
     .bind(viewerId, workId)
     .first<{ positionSeconds: number; finished: number }>();
 
-  return {
-    positionSeconds: row?.positionSeconds ?? 0,
-    finished: Boolean(row?.finished),
-  };
+  return { positionSeconds: row?.positionSeconds ?? 0, finished: Boolean(row?.finished) };
 }
 
 export async function saveProgress(

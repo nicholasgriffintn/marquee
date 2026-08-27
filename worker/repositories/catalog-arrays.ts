@@ -1,4 +1,5 @@
 import type { AnimeDetails, MediaTitle } from "../../src/domain/catalog.ts";
+import { buildTitleFromRow, type CatalogTitleRow } from "../lib/catalog-payload.ts";
 import { readAnimeCoreMap, writeAnimeCoreRows } from "./catalog-anime-core.ts";
 import {
   readAnimeCompanyMap,
@@ -175,6 +176,13 @@ export async function attachTitleExtensions<T extends MediaTitle>(
   });
 }
 
+export function hydrateTitleRows(db: D1Database, rows: CatalogTitleRow[]) {
+  return attachTitleExtensions(
+    db,
+    rows.map((row) => buildTitleFromRow(row)),
+  );
+}
+
 export async function persistTitleExtensions(db: D1Database, titles: MediaTitle[]) {
   if (titles.length === 0) {
     return;
@@ -193,8 +201,4 @@ export async function persistTitleExtensions(db: D1Database, titles: MediaTitle[
   await writeExternalIdsRows(db, titles);
   await writeDetailsRows(db, titles);
   await persistAnime(db, titles);
-}
-
-export async function persistProviders(db: D1Database, titles: MediaTitle[]) {
-  return writeProviderRows(db, titles);
 }

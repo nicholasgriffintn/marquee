@@ -49,7 +49,7 @@ export async function writeAnimeCharacterRows(db: D1Database, titles: MediaTitle
     18,
     rows,
     (chunk) =>
-      `INSERT INTO catalog_title_anime_characters (title_id, name, role, voice_actor, position)
+      `INSERT OR IGNORE INTO catalog_title_anime_characters (title_id, name, role, voice_actor, position)
        VALUES ${chunk.map(() => "(?, ?, ?, ?, ?)").join(", ")}`,
   );
 }
@@ -100,7 +100,7 @@ export async function writeAnimeStaffRows(db: D1Database, titles: MediaTitle[]) 
     22,
     rows,
     (chunk) =>
-      `INSERT INTO catalog_title_anime_staff (title_id, name, role, position)
+      `INSERT OR IGNORE INTO catalog_title_anime_staff (title_id, name, role, position)
        VALUES ${chunk.map(() => "(?, ?, ?, ?)").join(", ")}`,
   );
 }

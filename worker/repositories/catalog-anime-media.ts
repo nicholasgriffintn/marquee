@@ -47,7 +47,7 @@ export async function writeAnimeStreamRows(db: D1Database, titles: MediaTitle[])
     22,
     rows,
     (chunk) =>
-      `INSERT INTO catalog_title_anime_streams (title_id, site, url, position)
+      `INSERT OR IGNORE INTO catalog_title_anime_streams (title_id, site, url, position)
        VALUES ${chunk.map(() => "(?, ?, ?, ?)").join(", ")}`,
   );
 }
@@ -115,7 +115,7 @@ export async function writeAnimeThemeRows(db: D1Database, titles: MediaTitle[]) 
     15,
     rows,
     (chunk) =>
-      `INSERT INTO catalog_title_anime_themes (title_id, kind, title, artist, episodes, position)
+      `INSERT OR IGNORE INTO catalog_title_anime_themes (title_id, kind, title, artist, episodes, position)
        VALUES ${chunk.map(() => "(?, ?, ?, ?, ?, ?)").join(", ")}`,
   );
 }
@@ -166,7 +166,7 @@ export async function writeAnimeVideoRows(db: D1Database, titles: MediaTitle[]) 
     22,
     rows,
     (chunk) =>
-      `INSERT INTO catalog_title_anime_videos (title_id, video_key, name, position)
+      `INSERT OR IGNORE INTO catalog_title_anime_videos (title_id, video_key, name, position)
        VALUES ${chunk.map(() => "(?, ?, ?, ?)").join(", ")}`,
   );
 }

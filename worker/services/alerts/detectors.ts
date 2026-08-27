@@ -12,11 +12,7 @@ function pathFor(titleId: string, title: string) {
   const [mediaType, tmdbId] = titleId.split(":");
 
   return mediaType && tmdbId
-    ? titlePath({
-        mediaType: mediaType === "tv" ? "tv" : "movie",
-        tmdbId: Number(tmdbId),
-        title,
-      })
+    ? titlePath({ mediaType: mediaType === "tv" ? "tv" : "movie", tmdbId: Number(tmdbId), title })
     : "/";
 }
 
@@ -106,11 +102,7 @@ const seasons: Detector = {
         const when = new Date(row.airsAt);
         const day = Number.isNaN(when.getTime())
           ? "soon"
-          : when.toLocaleDateString("en-GB", {
-              weekday: "long",
-              day: "numeric",
-              month: "long",
-            });
+          : when.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
 
         return {
           kind: "season",
@@ -165,11 +157,7 @@ const cinema: Detector = {
         const when = new Date(row.businessDay);
         const day = Number.isNaN(when.getTime())
           ? "this week"
-          : when.toLocaleDateString("en-GB", {
-              weekday: "long",
-              day: "numeric",
-              month: "long",
-            });
+          : when.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
 
         return {
           kind: "cinema",
@@ -189,12 +177,7 @@ const cinema: Detector = {
   },
 };
 
-type PersonRow = {
-  viewerId: string;
-  titleId: string;
-  title: string;
-  person: string;
-};
+type PersonRow = { viewerId: string; titleId: string; title: string; person: string };
 
 const people: Detector = {
   kind: "person",

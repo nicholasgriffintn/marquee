@@ -84,7 +84,7 @@ export function catalogTitleColumns(alias: string) {
   return CATALOG_TITLE_COLUMN_NAMES.map((column) => `${alias}.${column}`).join(", ");
 }
 
-export function titleUrls(row: Pick<CatalogTitleRow, "media_type" | "tmdb_id" | "imdb_id">) {
+function titleUrls(row: Pick<CatalogTitleRow, "media_type" | "tmdb_id" | "imdb_id">) {
   return {
     tmdbUrl: `https://www.themoviedb.org/${row.media_type}/${row.tmdb_id}`,
     imdbUrl: row.imdb_id ? `https://www.imdb.com/title/${row.imdb_id}/` : null,
