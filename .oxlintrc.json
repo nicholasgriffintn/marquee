@@ -35,8 +35,7 @@
     "**/coverage/**",
     "**/.wrangler/**",
     "**/generated/**",
-    "**/worker-configuration.d.ts",
-    "apps/api/src/data-model/models/**"
+    "**/worker-configuration.d.ts"
   ],
   "rules": {
     "curly": ["error", "all"],
@@ -125,14 +124,6 @@
     "jsx-a11y/no-static-element-interactions": "warn"
   },
   "overrides": [
-    {
-      "files": ["apps/api/**"],
-      "rules": {
-        "typescript/no-unnecessary-boolean-literal-compare": "off",
-        "typescript/no-useless-default-assignment": "off",
-        "typescript/consistent-type-assertions": "off"
-      }
-    },
     {
       "files": [
         "**/*.test.ts",

@@ -23,11 +23,7 @@ function ThemeList({ label, songs }: { label: string; songs: AnimeTheme[] }) {
         ))}
       </ol>
       {held > 0 && !showAll && (
-        <button
-          type="button"
-          className="watch-more"
-          onClick={() => setShowAll(true)}
-        >
+        <button type="button" className="watch-more" onClick={() => setShowAll(true)}>
           Show {held} more
           <ChevronIcon />
         </button>

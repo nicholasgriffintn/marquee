@@ -54,13 +54,7 @@ export type Bindings = {
 
 export type CatalogSweepParameters = { deep?: boolean };
 
-export type EnrichmentSource =
-  | "tmdb"
-  | "justwatch"
-  | "omdb"
-  | "poster"
-  | "mal"
-  | "anilist";
+export type EnrichmentSource = "tmdb" | "justwatch" | "omdb" | "poster" | "mal" | "anilist";
 
 export type TitleRatings = {
   imdbScore: number | null;

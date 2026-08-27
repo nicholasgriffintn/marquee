@@ -1,8 +1,4 @@
-import type {
-  ProviderCategory,
-  ProviderIntegration,
-  ProviderStatus,
-} from "./providers";
+import type { ProviderCategory, ProviderIntegration, ProviderStatus } from "./providers";
 import { slugify } from "./slug";
 
 export type MediaType = "movie" | "tv";
@@ -283,9 +279,7 @@ function titleSlug(title: string) {
   return slugify(title) || "title";
 }
 
-export function titlePath(
-  item: Pick<MediaTitle, "mediaType" | "tmdbId" | "title">,
-) {
+export function titlePath(item: Pick<MediaTitle, "mediaType" | "tmdbId" | "title">) {
   return `/${item.mediaType}/${item.tmdbId}/${titleSlug(item.title)}`;
 }
 
@@ -319,8 +313,7 @@ export function weaveSections(
   for (const [index, section] of general.entries()) {
     push(section);
 
-    const next =
-      (index + 1) % PERSONAL_SPACING === 0 ? queue.shift() : undefined;
+    const next = (index + 1) % PERSONAL_SPACING === 0 ? queue.shift() : undefined;
 
     if (next) {
       push(next);
