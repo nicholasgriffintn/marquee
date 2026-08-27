@@ -164,8 +164,8 @@ export async function advanceDiscoverFrontier(env: Bindings) {
     cursors.push({ id: partition.id, nextPage: partition.nextPage + take });
   }
 
-  await advancePartitionCursors(env.DB, cursors);
   await enqueue(env.INGESTION_QUEUE, jobs);
+  await advancePartitionCursors(env.DB, cursors);
 
   const pages = PAGES_PER_SWEEP - remaining;
 

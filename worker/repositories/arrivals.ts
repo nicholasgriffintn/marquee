@@ -84,7 +84,7 @@ export async function confirmedArrivals(db: D1Database, sinceHours = 72): Promis
   }
 }
 
-export async function markAnnounced(db: D1Database, arrivals: Arrival[]) {
+export async function settleAnnounced(db: D1Database, arrivals: Arrival[]) {
   if (arrivals.length === 0) {
     return;
   }
@@ -95,13 +95,30 @@ export async function markAnnounced(db: D1Database, arrivals: Arrival[]) {
         db
           .prepare(
             `UPDATE title_provider_state SET announced_at = CURRENT_TIMESTAMP
-              WHERE title_id = ?1 AND provider_id = ?2`,
+              WHERE title_id = ?1 AND provider_id = ?2
+                AND announced_at IS NULL
+                AND NOT EXISTS (
+                  SELECT 1 FROM viewing_entries AS v
+                    JOIN users AS u ON u.id = v.viewer_id
+                   WHERE v.title_id = title_provider_state.title_id
+                     AND v.status IN ('watchlist', 'watching')
+                     AND u.email IS NOT NULL AND u.email != ''
+                     AND NOT EXISTS (
+                       SELECT 1 FROM viewer_alert_settings AS s
+                        WHERE s.viewer_id = v.viewer_id
+                          AND s.kind = 'arrival' AND s.enabled = 0)
+                     AND NOT EXISTS (
+                       SELECT 1 FROM viewer_alerts AS a
+                        WHERE a.viewer_id = v.viewer_id
+                          AND a.kind = 'arrival'
+                          AND a.alert_key = title_provider_state.title_id
+                                            || ':' || title_provider_state.provider_id))`,
           )
           .bind(arrival.titleId, arrival.providerId),
       ),
     );
   } catch (error) {
-    logError("arrivals_mark_failed", error);
+    logError("arrivals_settle_failed", error);
   }
 }
 

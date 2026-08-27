@@ -1,6 +1,6 @@
 import { titlePath } from "../../../src/domain/catalog.ts";
 import { logError } from "../../lib/logging.ts";
-import { confirmedArrivals, markAnnounced, waitingViewers } from "../../repositories/arrivals.ts";
+import { confirmedArrivals, settleAnnounced, waitingViewers } from "../../repositories/arrivals.ts";
 import { readItems } from "../../repositories/catalog-reader.ts";
 import type { AlertCandidate, Detector } from "./types.ts";
 
@@ -57,7 +57,7 @@ const arrivals: Detector = {
       }
     }
 
-    await markAnnounced(env.DB, found);
+    await settleAnnounced(env.DB, found);
 
     return candidates;
   },
