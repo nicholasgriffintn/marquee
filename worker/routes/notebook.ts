@@ -30,6 +30,7 @@ import {
 import {
   GUEST_LIMIT,
   guestCount,
+  guestOwned,
   readGuests,
   removeGuest,
   saveGuest,
@@ -255,7 +256,9 @@ notebookRoutes.post("/guests", async (context) => {
   }
 
   try {
-    const id = typeof body?.id === "string" ? body.id : undefined;
+    const requested = typeof body?.id === "string" ? body.id : undefined;
+    const id =
+      requested && (await guestOwned(context.env.DB, user.id, requested)) ? requested : undefined;
 
     if (!id && (await guestCount(context.env.DB, user.id)) >= GUEST_LIMIT) {
       return jsonResponse({ error: "That is a full row already." }, 400);
