@@ -1,11 +1,13 @@
 import type {
   CatalogResponse,
+  ExternalIds,
   MediaTitle,
   ProviderAvailability,
   TitleCredit,
   TitleCredits,
 } from "../../src/domain/catalog.ts";
 import { computeBlendedRating, computeWeightedRating } from "../lib/ratings.ts";
+import { persistTitleExtensions } from "./catalog-arrays.ts";
 import { readRawItems } from "./catalog-reader.ts";
 
 const READ_CHUNK = 80;
@@ -57,6 +59,45 @@ function mergeProviders(fresh: MediaTitle, stored: MediaTitle) {
   return [...providers.values()];
 }
 
+// malId/anilistId only ever arrive via MAL/AniList enrichment, so a plain TMDB refresh must not clobber them.
+const STORED_FIRST_EXTERNAL_ID_FIELDS = new Set<keyof ExternalIds>(["malId", "anilistId"]);
+
+function mergeExternalIds(fresh: MediaTitle, stored: MediaTitle) {
+  if (!fresh.externalIds && !stored.externalIds) {
+    return undefined;
+  }
+
+  const fields: (keyof ExternalIds)[] = [
+    "imdbId",
+    "tvdbId",
+    "wikidataId",
+    "malId",
+    "anilistId",
+    "anidbId",
+    "kitsuId",
+    "aniSearchId",
+    "animePlanetId",
+    "livechartId",
+    "animeNewsNetworkId",
+    "animeCountdownId",
+    "facebookId",
+    "instagramId",
+    "twitterId",
+  ];
+  const merged: ExternalIds = {};
+
+  for (const field of fields) {
+    const freshValue = fresh.externalIds?.[field];
+    const storedValue = stored.externalIds?.[field];
+
+    (merged as Record<string, unknown>)[field] = STORED_FIRST_EXTERNAL_ID_FIELDS.has(field)
+      ? (storedValue ?? freshValue ?? null)
+      : (freshValue ?? storedValue ?? null);
+  }
+
+  return merged;
+}
+
 function mergeWithStored(fresh: MediaTitle, stored: MediaTitle | null): MediaTitle {
   if (!stored) {
     return fresh;
@@ -72,13 +113,32 @@ function mergeWithStored(fresh: MediaTitle, stored: MediaTitle | null): MediaTit
     genres: fresh.genres.length > 0 ? fresh.genres : stored.genres,
     certification: fresh.certification ?? stored.certification,
     posterUrl: fresh.posterUrl ?? stored.posterUrl,
+    backdropUrl: fresh.backdropUrl ?? stored.backdropUrl,
+    tmdbScore: fresh.tmdbScore ?? stored.tmdbScore,
     people: fresh.people?.length ? fresh.people : stored.people,
     credits: fresh.credits?.length ? fresh.credits : stored.credits,
     studios: fresh.studios?.length ? fresh.studios : stored.studios,
     countries: fresh.countries?.length ? fresh.countries : stored.countries,
     languages: fresh.languages?.length ? fresh.languages : stored.languages,
+    originCountries: fresh.originCountries?.length ? fresh.originCountries : stored.originCountries,
+    productionCountries: fresh.productionCountries?.length
+      ? fresh.productionCountries
+      : stored.productionCountries,
+    spokenLanguages: fresh.spokenLanguages?.length ? fresh.spokenLanguages : stored.spokenLanguages,
+    videos: fresh.videos?.length ? fresh.videos : stored.videos,
+    recommendationIds: fresh.recommendationIds?.length
+      ? fresh.recommendationIds
+      : stored.recommendationIds,
     providers: mergeProviders(fresh, stored),
     watchLink: fresh.watchLink ?? stored.watchLink,
+    homepage: fresh.homepage ?? stored.homepage,
+    trailerKey: fresh.trailerKey ?? stored.trailerKey,
+    tagline: fresh.tagline ?? stored.tagline,
+    budget: fresh.budget ?? stored.budget,
+    episodeCount: fresh.episodeCount ?? stored.episodeCount,
+    lastAirDate: fresh.lastAirDate ?? stored.lastAirDate,
+    nextAirDate: fresh.nextAirDate ?? stored.nextAirDate,
+    pending: fresh.pending ?? stored.pending,
     keywords: [...new Set([...(fresh.keywords ?? []), ...(stored.keywords ?? [])])].slice(
       0,
       KEYWORD_LIMIT,
@@ -86,23 +146,7 @@ function mergeWithStored(fresh: MediaTitle, stored: MediaTitle | null): MediaTit
     ratings: stored.ratings ?? fresh.ratings,
     externalIds: mergeExternalIds(fresh, stored),
     status: fresh.status ?? stored.status,
-    lastAirDate: fresh.lastAirDate ?? stored.lastAirDate,
-    trailerKey: fresh.trailerKey ?? stored.trailerKey,
     anime: fresh.anime ?? stored.anime,
-  };
-}
-
-function mergeExternalIds(fresh: MediaTitle, stored: MediaTitle) {
-  if (!fresh.externalIds && !stored.externalIds) {
-    return undefined;
-  }
-
-  return {
-    imdbId: fresh.externalIds?.imdbId ?? stored.externalIds?.imdbId ?? null,
-    tvdbId: fresh.externalIds?.tvdbId ?? stored.externalIds?.tvdbId ?? null,
-    wikidataId: fresh.externalIds?.wikidataId ?? stored.externalIds?.wikidataId ?? null,
-    malId: stored.externalIds?.malId ?? fresh.externalIds?.malId ?? null,
-    anilistId: stored.externalIds?.anilistId ?? fresh.externalIds?.anilistId ?? null,
   };
 }
 
@@ -257,12 +301,13 @@ export async function storeItems(db: D1Database, items: MediaTitle[], sourceUpda
   }
 
   for (let index = 0; index < changed.length; index += READ_CHUNK) {
+    const wave = changed.slice(index, index + READ_CHUNK);
+
+    // Extension tables must commit before catalog_titles: the search triggers read them.
     // oxlint-disable-next-line no-await-in-loop
-    await db.batch(
-      changed
-        .slice(index, index + READ_CHUNK)
-        .map((title) => upsertTitle(db, title, sourceUpdatedAt)),
-    );
+    await persistTitleExtensions(db, wave);
+    // oxlint-disable-next-line no-await-in-loop
+    await db.batch(wave.map((title) => upsertTitle(db, title, sourceUpdatedAt)));
   }
 
   await storeCredits(
@@ -273,20 +318,40 @@ export async function storeItems(db: D1Database, items: MediaTitle[], sourceUpda
   );
 }
 
-function withoutCredits(title: MediaTitle) {
-  const { credits: _credits, ...rest } = title;
-
-  return rest;
+export function titleScalarColumns(title: MediaTitle) {
+  return {
+    overview: title.overview,
+    runtimeMinutes: title.runtimeMinutes,
+    numberOfSeasons: title.numberOfSeasons,
+    releaseDate: title.releaseDate,
+    certification: title.certification,
+    tmdbScore: title.tmdbScore,
+    posterUrl: title.posterUrl,
+    backdropUrl: title.backdropUrl,
+    watchLink: title.watchLink,
+    status: title.status ?? null,
+    originalLanguage: title.originalLanguage ?? null,
+    revenue: title.revenue ?? null,
+    collectionId: title.collection?.id ?? null,
+    collectionName: title.collection?.name ?? null,
+    malId: title.externalIds?.malId ?? null,
+    anilistId: title.externalIds?.anilistId ?? null,
+    wikidataId: title.externalIds?.wikidataId ?? null,
+  };
 }
 
 function upsertTitle(db: D1Database, title: MediaTitle, sourceUpdatedAt: string) {
+  const scalars = titleScalarColumns(title);
+
   return db
     .prepare(
       `INSERT INTO catalog_titles
          (id, media_type, tmdb_id, title, original_title, year, popularity,
-          provider_ids, payload, source_updated_at, imdb_id,
-          vote_count, weighted_rating, blended_rating)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          source_updated_at, imdb_id, vote_count, weighted_rating, blended_rating,
+          overview, runtime_minutes, number_of_seasons, release_date, certification,
+          tmdb_score, poster_url, backdrop_url, watch_link, status, original_language,
+          revenue, collection_id, collection_name, mal_id, anilist_id, wikidata_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          media_type = excluded.media_type,
          tmdb_id = excluded.tmdb_id,
@@ -294,13 +359,28 @@ function upsertTitle(db: D1Database, title: MediaTitle, sourceUpdatedAt: string)
          original_title = excluded.original_title,
          year = excluded.year,
          popularity = excluded.popularity,
-         provider_ids = excluded.provider_ids,
-         payload = excluded.payload,
          source_updated_at = excluded.source_updated_at,
          imdb_id = excluded.imdb_id,
          vote_count = excluded.vote_count,
          weighted_rating = excluded.weighted_rating,
          blended_rating = excluded.blended_rating,
+         overview = excluded.overview,
+         runtime_minutes = excluded.runtime_minutes,
+         number_of_seasons = excluded.number_of_seasons,
+         release_date = excluded.release_date,
+         certification = excluded.certification,
+         tmdb_score = excluded.tmdb_score,
+         poster_url = excluded.poster_url,
+         backdrop_url = excluded.backdrop_url,
+         watch_link = excluded.watch_link,
+         status = excluded.status,
+         original_language = excluded.original_language,
+         revenue = excluded.revenue,
+         collection_id = excluded.collection_id,
+         collection_name = excluded.collection_name,
+         mal_id = excluded.mal_id,
+         anilist_id = excluded.anilist_id,
+         wikidata_id = excluded.wikidata_id,
          updated_at = CURRENT_TIMESTAMP`,
     )
     .bind(
@@ -311,12 +391,27 @@ function upsertTitle(db: D1Database, title: MediaTitle, sourceUpdatedAt: string)
       title.originalTitle,
       title.year,
       title.popularity,
-      JSON.stringify(title.providers.map((provider) => provider.id)),
-      JSON.stringify(withoutCredits(title)),
       sourceUpdatedAt,
       title.imdbUrl ? (/\/(tt\d+)/u.exec(title.imdbUrl)?.[1] ?? null) : null,
       Math.max(0, title.tmdbVoteCount),
       computeWeightedRating(title),
       computeBlendedRating(title),
+      scalars.overview,
+      scalars.runtimeMinutes,
+      scalars.numberOfSeasons,
+      scalars.releaseDate,
+      scalars.certification,
+      scalars.tmdbScore,
+      scalars.posterUrl,
+      scalars.backdropUrl,
+      scalars.watchLink,
+      scalars.status,
+      scalars.originalLanguage,
+      scalars.revenue,
+      scalars.collectionId,
+      scalars.collectionName,
+      scalars.malId,
+      scalars.anilistId,
+      scalars.wikidataId,
     );
 }

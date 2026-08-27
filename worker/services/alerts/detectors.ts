@@ -12,7 +12,11 @@ function pathFor(titleId: string, title: string) {
   const [mediaType, tmdbId] = titleId.split(":");
 
   return mediaType && tmdbId
-    ? titlePath({ mediaType: mediaType === "tv" ? "tv" : "movie", tmdbId: Number(tmdbId), title })
+    ? titlePath({
+        mediaType: mediaType === "tv" ? "tv" : "movie",
+        tmdbId: Number(tmdbId),
+        title,
+      })
     : "/";
 }
 
@@ -102,7 +106,11 @@ const seasons: Detector = {
         const when = new Date(row.airsAt);
         const day = Number.isNaN(when.getTime())
           ? "soon"
-          : when.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+          : when.toLocaleDateString("en-GB", {
+              weekday: "long",
+              day: "numeric",
+              month: "long",
+            });
 
         return {
           kind: "season",
@@ -157,7 +165,11 @@ const cinema: Detector = {
         const when = new Date(row.businessDay);
         const day = Number.isNaN(when.getTime())
           ? "this week"
-          : when.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+          : when.toLocaleDateString("en-GB", {
+              weekday: "long",
+              day: "numeric",
+              month: "long",
+            });
 
         return {
           kind: "cinema",
@@ -177,7 +189,12 @@ const cinema: Detector = {
   },
 };
 
-type PersonRow = { viewerId: string; titleId: string; title: string; person: string };
+type PersonRow = {
+  viewerId: string;
+  titleId: string;
+  title: string;
+  person: string;
+};
 
 const people: Detector = {
   kind: "person",
@@ -195,7 +212,7 @@ const people: Detector = {
           WHERE (b.key LIKE 'rule:person:%' OR b.key LIKE 'person:%')
             AND b.revoked_at IS NULL
             AND (b.suspended_until IS NULL OR julianday(b.suspended_until) < julianday('now'))
-            AND julianday(COALESCE(json_extract(t.payload, '$.releaseDate'), '1900-01-01'))
+            AND julianday(COALESCE(t.release_date, '1900-01-01'))
                   > julianday('now', ?1)
             AND NOT EXISTS (
                   SELECT 1 FROM viewing_entries AS v

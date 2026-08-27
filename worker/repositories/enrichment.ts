@@ -3,7 +3,9 @@ import type { AnimeMapping } from "../clients/fribb.ts";
 import { logEvent } from "../lib/logging.ts";
 import { computeBlendedRating, computeWeightedRating } from "../lib/ratings.ts";
 import type { Bindings, EnrichmentSource } from "../types.ts";
+import { persistTitleExtensions } from "./catalog-arrays.ts";
 import { readRawItems } from "./catalog-reader.ts";
+import { titleScalarColumns } from "./catalog-writer.ts";
 
 type OmdbFields = Pick<MediaTitle, "ratings"> &
   Partial<
@@ -29,10 +31,7 @@ type FieldsFor<S extends EnrichmentSource> = S extends "omdb"
   : S extends "mal"
     ? Pick<MediaTitle, "keywords" | "ratings" | "anime"> &
         Partial<
-          Pick<
-            MediaTitle,
-            "status" | "certification" | "lastAirDate" | "studios" | "posterUrl"
-          >
+          Pick<MediaTitle, "status" | "certification" | "lastAirDate" | "studios" | "posterUrl">
         >
     : S extends "anilist"
       ? Pick<MediaTitle, "anime">
@@ -68,9 +67,7 @@ export async function storeEnrichment<S extends EnrichedSource>(
   fields: FieldsFor<S>,
 ) {
   const title = (await readRawItems(env.DB, [titleId])).get(titleId);
-  const enrichedTitle = title
-    ? ({ ...title, ...fields } satisfies MediaTitle)
-    : null;
+  const enrichedTitle = title ? ({ ...title, ...fields } satisfies MediaTitle) : null;
 
   if (!enrichedTitle) {
     logEvent("enrichment_title_unreadable", { titleId, source });
@@ -78,17 +75,44 @@ export async function storeEnrichment<S extends EnrichedSource>(
 
   const { maxAgeDays } = ENRICHMENT_WINDOWS[source];
 
+  if (enrichedTitle) {
+    await persistTitleExtensions(env.DB, [enrichedTitle]);
+  }
+
+  const scalars = enrichedTitle ? titleScalarColumns(enrichedTitle) : null;
+
   await env.DB.batch([
-    ...(enrichedTitle
+    ...(enrichedTitle && scalars
       ? [
           env.DB.prepare(
             `UPDATE catalog_titles
-             SET payload = ?, weighted_rating = ?, blended_rating = ?, updated_at = CURRENT_TIMESTAMP
+             SET weighted_rating = ?, blended_rating = ?,
+                 overview = ?, runtime_minutes = ?, number_of_seasons = ?, release_date = ?,
+                 certification = ?, tmdb_score = ?, poster_url = ?, backdrop_url = ?,
+                 watch_link = ?, status = ?, original_language = ?, revenue = ?,
+                 collection_id = ?, collection_name = ?, mal_id = ?, anilist_id = ?,
+                 wikidata_id = ?, updated_at = CURRENT_TIMESTAMP
              WHERE id = ?`,
           ).bind(
-            JSON.stringify(enrichedTitle),
             computeWeightedRating(enrichedTitle),
             computeBlendedRating(enrichedTitle),
+            scalars.overview,
+            scalars.runtimeMinutes,
+            scalars.numberOfSeasons,
+            scalars.releaseDate,
+            scalars.certification,
+            scalars.tmdbScore,
+            scalars.posterUrl,
+            scalars.backdropUrl,
+            scalars.watchLink,
+            scalars.status,
+            scalars.originalLanguage,
+            scalars.revenue,
+            scalars.collectionId,
+            scalars.collectionName,
+            scalars.malId,
+            scalars.anilistId,
+            scalars.wikidataId,
             titleId,
           ),
         ]
@@ -165,33 +189,64 @@ export async function storeAnimeIds(db: D1Database, mappings: AnimeMapping[]) {
     return 0;
   }
 
-  const written = await db.batch(
-    mappings.map((mapping) =>
+  const statements = mappings.flatMap((mapping) => {
+    const ids = mapping.ids;
+
+    return [
       db
         .prepare(
           `UPDATE catalog_titles
-           SET payload = json_set(
-                 payload,
-                 '$.externalIds',
-                 json_patch(
-                   COALESCE(json_extract(payload, '$.externalIds'), json('{}')),
-                   json(?)
-                 )
-               ),
+           SET mal_id = COALESCE(?1, mal_id),
+               anilist_id = COALESCE(?2, anilist_id),
+               wikidata_id = COALESCE(?3, wikidata_id),
+               imdb_id = COALESCE(?4, imdb_id),
                updated_at = CURRENT_TIMESTAMP
-           WHERE id = ?
-             AND json_patch(
-                   COALESCE(json_extract(payload, '$.externalIds'), json('{}')),
-                   json(?)
-                 ) <> COALESCE(json_extract(payload, '$.externalIds'), json('{}'))`,
+           WHERE id = ?5`,
         )
         .bind(
-          JSON.stringify(mapping.ids),
+          ids.malId ?? null,
+          ids.anilistId ?? null,
+          ids.wikidataId ?? null,
+          ids.imdbId ?? null,
           mapping.titleId,
-          JSON.stringify(mapping.ids),
         ),
-    ),
-  );
+      db
+        .prepare(
+          `INSERT INTO catalog_title_external_ids
+             (title_id, tvdb_id, facebook_id, instagram_id, twitter_id, anidb_id, kitsu_id,
+              ani_search_id, anime_planet_id, livechart_id, animenewsnetwork_id, animecountdown_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT (title_id) DO UPDATE SET
+             tvdb_id = COALESCE(excluded.tvdb_id, catalog_title_external_ids.tvdb_id),
+             facebook_id = COALESCE(excluded.facebook_id, catalog_title_external_ids.facebook_id),
+             instagram_id = COALESCE(excluded.instagram_id, catalog_title_external_ids.instagram_id),
+             twitter_id = COALESCE(excluded.twitter_id, catalog_title_external_ids.twitter_id),
+             anidb_id = COALESCE(excluded.anidb_id, catalog_title_external_ids.anidb_id),
+             kitsu_id = COALESCE(excluded.kitsu_id, catalog_title_external_ids.kitsu_id),
+             ani_search_id = COALESCE(excluded.ani_search_id, catalog_title_external_ids.ani_search_id),
+             anime_planet_id = COALESCE(excluded.anime_planet_id, catalog_title_external_ids.anime_planet_id),
+             livechart_id = COALESCE(excluded.livechart_id, catalog_title_external_ids.livechart_id),
+             animenewsnetwork_id = COALESCE(excluded.animenewsnetwork_id, catalog_title_external_ids.animenewsnetwork_id),
+             animecountdown_id = COALESCE(excluded.animecountdown_id, catalog_title_external_ids.animecountdown_id)`,
+        )
+        .bind(
+          mapping.titleId,
+          ids.tvdbId ?? null,
+          ids.facebookId ?? null,
+          ids.instagramId ?? null,
+          ids.twitterId ?? null,
+          ids.anidbId ?? null,
+          ids.kitsuId ?? null,
+          ids.aniSearchId ?? null,
+          ids.animePlanetId ?? null,
+          ids.livechartId ?? null,
+          ids.animeNewsNetworkId ?? null,
+          ids.animeCountdownId ?? null,
+        ),
+    ];
+  });
+
+  const written = await db.batch(statements);
 
   return written.reduce((sum, result) => sum + (result.meta.changes ?? 0), 0);
 }
@@ -267,67 +322,33 @@ async function selectCandidates(
   limit: number,
   extraCondition = "",
 ) {
-  const neverEnriched = await selectNeverEnriched(
-    env,
-    source,
-    limit,
-    extraCondition,
-  );
+  const neverEnriched = await selectNeverEnriched(env, source, limit, extraCondition);
 
   if (neverEnriched.length >= limit) {
     return neverEnriched;
   }
 
-  const due = await selectDue(
-    env,
-    source,
-    limit - neverEnriched.length,
-    extraCondition,
-  );
+  const due = await selectDue(env, source, limit - neverEnriched.length, extraCondition);
 
   return [...neverEnriched, ...due];
 }
 
 export async function selectAnimeCandidates(env: Bindings, limit: number) {
-  return selectCandidates(
-    env,
-    "mal",
-    limit,
-    "AND json_extract(t.payload, '$.externalIds.malId') IS NOT NULL",
-  );
+  return selectCandidates(env, "mal", limit, "AND t.mal_id IS NOT NULL");
 }
 
 export async function selectAniListCandidates(env: Bindings, limit: number) {
-  return selectCandidates(
-    env,
-    "anilist",
-    limit,
-    "AND json_extract(t.payload, '$.externalIds.anilistId') IS NOT NULL",
-  );
+  return selectCandidates(env, "anilist", limit, "AND t.anilist_id IS NOT NULL");
 }
 
-export async function selectUnenriched(
-  env: Bindings,
-  source: EnrichmentSource,
-  limit: number,
-) {
+export async function selectUnenriched(env: Bindings, source: EnrichmentSource, limit: number) {
   return selectCandidates(env, source, limit);
 }
 
-export async function storeImdbId(
-  db: D1Database,
-  titleId: string,
-  imdbId: string,
-) {
+export async function storeImdbId(db: D1Database, titleId: string, imdbId: string) {
   await db
-    .prepare(
-      `UPDATE catalog_titles
-       SET payload = json_set(payload, '$.imdbUrl', ?),
-           imdb_id = ?,
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?`,
-    )
-    .bind(`https://www.imdb.com/title/${imdbId}/`, imdbId, titleId)
+    .prepare(`UPDATE catalog_titles SET imdb_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
+    .bind(imdbId, titleId)
     .run();
 }
 

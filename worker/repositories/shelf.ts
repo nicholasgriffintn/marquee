@@ -1,7 +1,12 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
 import type { ShelfSort } from "../../src/domain/shelf.ts";
 import type { EntryStatus, ViewingEntry } from "../../src/types.ts";
-import { parseStoredTitle } from "../lib/catalog-payload.ts";
+import {
+  buildTitleFromRow,
+  catalogTitleColumns,
+  type CatalogTitleRow,
+} from "../lib/catalog-payload.ts";
+import { attachTitleExtensions } from "./catalog-arrays.ts";
 
 export type ShelfPageQuery = {
   status: EntryStatus | null;
@@ -14,8 +19,8 @@ export type ShelfPageQuery = {
 
 export type ShelfRow = { entry: ViewingEntry; title: MediaTitle };
 
-type JoinedRow = {
-  id: string;
+type JoinedRow = CatalogTitleRow & {
+  entryId: string;
   titleId: string;
   status: string;
   rating: number | null;
@@ -23,9 +28,9 @@ type JoinedRow = {
   season: number | null;
   episode: number | null;
   updatedAt: string;
-  payload: string;
-  posterKey: string | null;
 };
+
+const FIRST_GENRE = `(SELECT genre FROM catalog_title_genres WHERE title_id = t.id AND position = 0)`;
 
 const ORDER_BY: Record<ShelfSort, string> = {
   added: "e.updated_at DESC, e.id",
@@ -37,9 +42,7 @@ const ORDER_BY: Record<ShelfSort, string> = {
              ELSE 3
            END, t.title COLLATE NOCASE, e.id`,
   year: "t.year IS NULL, t.year DESC, t.title COLLATE NOCASE, e.id",
-  genre: `json_extract(t.payload, '$.genres[0]') IS NULL,
-          json_extract(t.payload, '$.genres[0]') COLLATE NOCASE,
-          t.title COLLATE NOCASE, e.id`,
+  genre: `${FIRST_GENRE} IS NULL, ${FIRST_GENRE} COLLATE NOCASE, t.title COLLATE NOCASE, e.id`,
 };
 
 const FURTHEST_EPISODE = `viewing_episode_entries
@@ -65,33 +68,50 @@ function conditions(query: ShelfPageQuery) {
   }
 
   if (query.genre) {
-    where.push(`EXISTS (SELECT 1 FROM json_each(t.payload, '$.genres') WHERE json_each.value = ?)`);
+    where.push(`EXISTS (SELECT 1 FROM catalog_title_genres WHERE title_id = t.id AND genre = ?)`);
     bindings.push(query.genre);
   }
 
   return { where: where.join(" AND "), bindings };
 }
 
-function toRow(row: JoinedRow): ShelfRow | null {
-  const title = parseStoredTitle(row.payload);
+function toEntry(row: JoinedRow) {
+  return {
+    id: row.entryId,
+    titleId: row.titleId,
+    status: row.status as EntryStatus,
+    rating: row.rating,
+    thoughts: row.thoughts ?? "",
+    season: row.season,
+    episode: row.episode,
+    updatedAt: row.updatedAt,
+  };
+}
 
-  if (!title) {
-    return null;
+async function toRows(db: D1Database, rows: JoinedRow[]): Promise<ShelfRow[]> {
+  const built = rows.map((row) => ({ row, title: buildTitleFromRow(row) }));
+  const hydrated = await attachTitleExtensions(
+    db,
+    built.map((entry) => entry.title),
+  );
+  const result: ShelfRow[] = [];
+
+  for (const [index, title] of hydrated.entries()) {
+    const entry = built[index];
+
+    if (!entry) {
+      continue;
+    }
+
+    result.push({
+      entry: toEntry(entry.row),
+      title: entry.row.poster_key
+        ? { ...title, posterUrl: `/media/${entry.row.poster_key}` }
+        : title,
+    });
   }
 
-  return {
-    entry: {
-      id: row.id,
-      titleId: row.titleId,
-      status: row.status as EntryStatus,
-      rating: row.rating,
-      thoughts: row.thoughts ?? "",
-      season: row.season,
-      episode: row.episode,
-      updatedAt: row.updatedAt,
-    },
-    title: row.posterKey ? { ...title, posterUrl: `/media/${row.posterKey}` } : title,
-  };
+  return result;
 }
 
 export async function readShelfPage(db: D1Database, viewerId: string, query: ShelfPageQuery) {
@@ -99,9 +119,9 @@ export async function readShelfPage(db: D1Database, viewerId: string, query: She
   const [rows, totals] = await Promise.all([
     db
       .prepare(
-        `SELECT e.id, e.title_id AS titleId, e.status, e.rating, e.thoughts,
+        `SELECT e.id AS entryId, e.title_id AS titleId, e.status, e.rating, e.thoughts,
                 ${PROGRESS_COLUMNS}, e.updated_at AS updatedAt,
-                t.payload, t.poster_key AS posterKey
+                ${catalogTitleColumns("t")}
            FROM viewing_entries AS e
            JOIN catalog_titles AS t ON t.id = e.title_id
           WHERE ${where}
@@ -122,11 +142,7 @@ export async function readShelfPage(db: D1Database, viewerId: string, query: She
       .first<{ matched: number; shelved: number }>(),
   ]);
 
-  const items = rows.results.flatMap((row) => {
-    const parsed = toRow(row);
-
-    return parsed ? [parsed] : [];
-  });
+  const items = await toRows(db, rows.results);
 
   return {
     items,
@@ -138,10 +154,9 @@ export async function readShelfPage(db: D1Database, viewerId: string, query: She
 export async function readShelfGenres(db: D1Database, viewerId: string) {
   const rows = await db
     .prepare(
-      `SELECT DISTINCT json_each.value AS genre
+      `SELECT DISTINCT g.genre AS genre
          FROM viewing_entries AS e
-         JOIN catalog_titles AS t ON t.id = e.title_id,
-              json_each(t.payload, '$.genres')
+         JOIN catalog_title_genres AS g ON g.title_id = e.title_id
         WHERE e.viewer_id = ?
         ORDER BY genre COLLATE NOCASE`,
     )
@@ -159,9 +174,9 @@ export async function readLostProperty(
 ) {
   const rows = await db
     .prepare(
-      `SELECT e.id, e.title_id AS titleId, e.status, e.rating, e.thoughts,
+      `SELECT e.id AS entryId, e.title_id AS titleId, e.status, e.rating, e.thoughts,
               ${PROGRESS_COLUMNS}, e.updated_at AS updatedAt,
-              t.payload, t.poster_key AS posterKey
+              ${catalogTitleColumns("t")}
          FROM viewing_entries AS e
          JOIN catalog_titles AS t ON t.id = e.title_id
         WHERE e.viewer_id = ?
@@ -173,9 +188,5 @@ export async function readLostProperty(
     .bind(viewerId, staleDays, limit)
     .all<JoinedRow>();
 
-  return rows.results.flatMap((row) => {
-    const parsed = toRow(row);
-
-    return parsed ? [parsed] : [];
-  });
+  return toRows(db, rows.results);
 }

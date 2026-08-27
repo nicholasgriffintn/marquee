@@ -1,5 +1,6 @@
 import type { MediaTitle, ProviderAvailability } from "../../src/domain/catalog.ts";
 import { recordProviderState } from "./arrivals.ts";
+import { persistProviders } from "./catalog-arrays.ts";
 import { readRawItems } from "./catalog-reader.ts";
 
 export async function markAvailabilityChecked(db: D1Database, titleId: string) {
@@ -68,21 +69,14 @@ export async function enrichAvailability(
     providers: [...mergedProviders.values()],
   } satisfies MediaTitle;
 
+  await persistProviders(db, [enrichedTitle]);
   await db
     .prepare(
       `UPDATE catalog_titles
-       SET
-         provider_ids = ?,
-         payload = ?,
-         enriched_at = CURRENT_TIMESTAMP,
-         updated_at = CURRENT_TIMESTAMP
+       SET enriched_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
        WHERE id = ?`,
     )
-    .bind(
-      JSON.stringify(enrichedTitle.providers.map((provider) => provider.id)),
-      JSON.stringify(enrichedTitle),
-      titleId,
-    )
+    .bind(titleId)
     .run();
 
   await recordProviderState(db, titleId, enrichedTitle.providers, !previous?.enrichedAt);

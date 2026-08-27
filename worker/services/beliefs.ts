@@ -44,7 +44,12 @@ type TitleFacts = {
   runtimeMinutes: number | null;
 };
 
-type FactRow = { id: string; genres: string | null; people: string | null; runtime: number | null };
+type FactRow = {
+  id: string;
+  genres: string | null;
+  people: string | null;
+  runtime: number | null;
+};
 
 async function factsFor(db: D1Database, titleIds: string[]): Promise<TitleFacts[]> {
   if (titleIds.length === 0) {
@@ -54,9 +59,11 @@ async function factsFor(db: D1Database, titleIds: string[]): Promise<TitleFacts[
   const rows = await db
     .prepare(
       `SELECT id,
-              json_extract(payload, '$.genres') AS genres,
-              json_extract(payload, '$.people') AS people,
-              json_extract(payload, '$.runtimeMinutes') AS runtime
+              (SELECT json_group_array(genre) FROM catalog_title_genres
+                WHERE title_id = catalog_titles.id ORDER BY position) AS genres,
+              (SELECT json_group_array(person) FROM catalog_title_people
+                WHERE title_id = catalog_titles.id ORDER BY position) AS people,
+              runtime_minutes AS runtime
          FROM catalog_titles
         WHERE id IN (${titleIds.map(() => "?").join(",")})`,
     )

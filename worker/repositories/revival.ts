@@ -79,8 +79,8 @@ const WORK_COLUMNS = `w.id, w.source, w.source_url AS sourceUrl, w.title, w.year
    w.popularity, w.downloads, w.group_id AS groupId,
    w.stream_bytes AS streamBytes, w.width, w.height,
    t.poster_key AS posterKey,
-   json_extract(t.payload, '$.backdropUrl') AS catalogueBackdrop,
-   json_extract(t.payload, '$.posterUrl') AS cataloguePoster`;
+   t.backdrop_url AS catalogueBackdrop,
+   t.poster_url AS cataloguePoster`;
 
 const WORK_FROM = `FROM revival_works AS w LEFT JOIN catalog_titles AS t ON t.id = w.title_id`;
 
@@ -307,7 +307,7 @@ export async function readUncheckedRights(db: D1Database, limit = 60) {
     .prepare(
       `SELECT w.id, w.source, w.year, w.director, w.rights_basis AS rightsBasis,
               t.imdb_id AS imdbId,
-              json_extract(t.payload, '$.externalIds.wikidataId') AS wikidataId
+              t.wikidata_id AS wikidataId
        FROM revival_works AS w
        LEFT JOIN catalog_titles AS t ON t.id = w.title_id
        WHERE w.status <> 'rejected'
@@ -324,7 +324,12 @@ export async function readUncheckedRights(db: D1Database, limit = 60) {
 export async function storeUkRights(
   db: D1Database,
   id: string,
-  verdict: { clear: boolean; expiresYear: number | null; basis: RevivalRightsBasis; note: string },
+  verdict: {
+    clear: boolean;
+    expiresYear: number | null;
+    basis: RevivalRightsBasis;
+    note: string;
+  },
 ) {
   await db
     .prepare(
@@ -816,7 +821,12 @@ export async function selectUnmatched(db: D1Database, limit = 400) {
        LIMIT ?`,
     )
     .bind(Math.min(limit, 600))
-    .all<{ id: string; title: string; year: number | null; runtimeSeconds: number | null }>();
+    .all<{
+      id: string;
+      title: string;
+      year: number | null;
+      runtimeSeconds: number | null;
+    }>();
 
   return rows.results;
 }
@@ -866,7 +876,11 @@ export async function selectKnownSourceIds(
 export async function refreshPopularity(
   db: D1Database,
   source: RevivalSource,
-  entries: { sourceId: string; popularity: number | null; downloads: number | null }[],
+  entries: {
+    sourceId: string;
+    popularity: number | null;
+    downloads: number | null;
+  }[],
 ) {
   const scored = entries.filter((entry) => entry.popularity !== null);
 
@@ -997,7 +1011,10 @@ export async function readProgress(db: D1Database, viewerId: string, workId: str
     .bind(viewerId, workId)
     .first<{ positionSeconds: number; finished: number }>();
 
-  return { positionSeconds: row?.positionSeconds ?? 0, finished: Boolean(row?.finished) };
+  return {
+    positionSeconds: row?.positionSeconds ?? 0,
+    finished: Boolean(row?.finished),
+  };
 }
 
 export async function saveProgress(

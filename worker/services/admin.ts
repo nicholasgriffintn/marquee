@@ -97,8 +97,8 @@ async function catalogueStats(env: Bindings) {
             sum(CASE WHEN media_type = 'movie' THEN 1 ELSE 0 END) AS movies,
             sum(CASE WHEN media_type = 'tv' THEN 1 ELSE 0 END) AS shows,
             sum(CASE WHEN poster_key IS NOT NULL THEN 1 ELSE 0 END) AS posters,
-            sum(CASE WHEN json_extract(payload, '$.externalIds.malId') IS NOT NULL THEN 1 ELSE 0 END) AS animeIds,
-            sum(CASE WHEN json_extract(payload, '$.anime') IS NOT NULL THEN 1 ELSE 0 END) AS animeDetails
+            sum(CASE WHEN mal_id IS NOT NULL THEN 1 ELSE 0 END) AS animeIds,
+            (SELECT count(*) FROM catalog_title_anime) AS animeDetails
           FROM catalog_titles) AS tt,
          (SELECT
             count(*) AS cinemas,
@@ -179,8 +179,12 @@ async function enrichmentStats(env: Bindings) {
     }>(),
     env.DB.prepare(
       `SELECT
-         sum(CASE WHEN json_array_length(COALESCE(json_extract(payload, '$.providers'), json('[]'))) > 0 THEN 1 ELSE 0 END) AS titles,
-         sum(CASE WHEN json_array_length(COALESCE(json_extract(payload, '$.providers'), json('[]'))) = 0 THEN 1 ELSE 0 END) AS misses,
+         sum(CASE WHEN EXISTS (
+           SELECT 1 FROM catalog_title_providers WHERE title_id = catalog_titles.id
+         ) THEN 1 ELSE 0 END) AS titles,
+         sum(CASE WHEN NOT EXISTS (
+           SELECT 1 FROM catalog_title_providers WHERE title_id = catalog_titles.id
+         ) THEN 1 ELSE 0 END) AS misses,
          max(enriched_at) AS newest
        FROM catalog_titles
        WHERE enriched_at IS NOT NULL`,
@@ -206,8 +210,12 @@ async function enrichmentStats(env: Bindings) {
       .all<{ source: string; titles: number; misses: number }>(),
     env.DB.prepare(
       `SELECT
-         sum(CASE WHEN json_array_length(COALESCE(json_extract(payload, '$.providers'), json('[]'))) > 0 THEN 1 ELSE 0 END) AS titles,
-         sum(CASE WHEN json_array_length(COALESCE(json_extract(payload, '$.providers'), json('[]'))) = 0 THEN 1 ELSE 0 END) AS misses
+         sum(CASE WHEN EXISTS (
+           SELECT 1 FROM catalog_title_providers WHERE title_id = catalog_titles.id
+         ) THEN 1 ELSE 0 END) AS titles,
+         sum(CASE WHEN NOT EXISTS (
+           SELECT 1 FROM catalog_title_providers WHERE title_id = catalog_titles.id
+         ) THEN 1 ELSE 0 END) AS misses
        FROM catalog_titles
        WHERE enriched_at > datetime('now', ?)`,
     )
