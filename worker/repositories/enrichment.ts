@@ -29,24 +29,54 @@ type FieldsFor<S extends EnrichmentSource> = S extends "omdb"
   : S extends "mal"
     ? Pick<MediaTitle, "keywords" | "ratings" | "anime"> &
         Partial<
-          Pick<MediaTitle, "status" | "certification" | "lastAirDate" | "studios" | "posterUrl">
+          Pick<
+            MediaTitle,
+            "status" | "certification" | "lastAirDate" | "studios" | "posterUrl"
+          >
         >
     : S extends "anilist"
       ? Pick<MediaTitle, "anime">
       : Pick<MediaTitle, "externalIds">;
 
-export async function storeEnrichment<S extends EnrichmentSource>(
+const MISS_BACKOFF_CAP_DAYS = 120;
+const TRANSIENT_RETRY_HOURS = 1;
+const TRANSIENT_RETRY_CAP_HOURS = 24;
+
+export type EnrichmentWindow = { maxAgeDays: number; missBackoffDays: number };
+
+/**
+ * Single source of truth for each source's enrichment scheduling window.
+ * `queueEnrichment()` (worker/jobs/enrichment.ts) always calls the reader
+ * functions below with these exact per-source constants, so the "due" instant
+ * for a row can be computed once here at write time (`next_check_at`) instead
+ * of being recomputed by scanning at read time. Keeping this map as the only
+ * definition avoids the write-time and read-time windows drifting apart.
+ */
+export const ENRICHMENT_WINDOWS = {
+  omdb: { maxAgeDays: 14, missBackoffDays: 10 },
+  poster: { maxAgeDays: 365, missBackoffDays: 30 },
+  mal: { maxAgeDays: 14, missBackoffDays: 3 },
+  anilist: { maxAgeDays: 1, missBackoffDays: 3 },
+} as const satisfies Record<string, EnrichmentWindow>;
+
+export type EnrichedSource = keyof typeof ENRICHMENT_WINDOWS;
+
+export async function storeEnrichment<S extends EnrichedSource>(
   env: Bindings,
   titleId: string,
   source: S,
   fields: FieldsFor<S>,
 ) {
   const title = (await readRawItems(env.DB, [titleId])).get(titleId);
-  const enrichedTitle = title ? ({ ...title, ...fields } satisfies MediaTitle) : null;
+  const enrichedTitle = title
+    ? ({ ...title, ...fields } satisfies MediaTitle)
+    : null;
 
   if (!enrichedTitle) {
     logEvent("enrichment_title_unreadable", { titleId, source });
   }
+
+  const { maxAgeDays } = ENRICHMENT_WINDOWS[source];
 
   await env.DB.batch([
     ...(enrichedTitle
@@ -64,13 +94,14 @@ export async function storeEnrichment<S extends EnrichmentSource>(
         ]
       : []),
     env.DB.prepare(
-      `INSERT INTO title_enrichment (title_id, source, payload, miss, attempts)
-       VALUES (?, ?, ?, 0, 0)
+      `INSERT INTO title_enrichment (title_id, source, payload, miss, attempts, next_check_at)
+       VALUES (?, ?, ?, 0, 0, datetime('now', '+${maxAgeDays} days'))
        ON CONFLICT(title_id, source) DO UPDATE SET
          payload = excluded.payload,
          miss = 0,
          attempts = 0,
-         fetched_at = CURRENT_TIMESTAMP`,
+         fetched_at = CURRENT_TIMESTAMP,
+         next_check_at = datetime('now', '+${maxAgeDays} days')`,
     ).bind(titleId, source, JSON.stringify(fields)),
   ]);
 
@@ -80,17 +111,23 @@ export async function storeEnrichment<S extends EnrichmentSource>(
 export async function storeEnrichmentMiss(
   env: Bindings,
   titleId: string,
-  source: EnrichmentSource,
+  source: EnrichedSource,
   reason: string,
 ) {
+  const { missBackoffDays } = ENRICHMENT_WINDOWS[source];
+
   await env.DB.prepare(
-    `INSERT INTO title_enrichment (title_id, source, payload, miss, attempts)
-     VALUES (?, ?, ?, 1, 1)
+    `INSERT INTO title_enrichment (title_id, source, payload, miss, attempts, next_check_at)
+     VALUES (?, ?, ?, 1, 1, datetime('now', '+' || min(${missBackoffDays}, ${MISS_BACKOFF_CAP_DAYS}) || ' days'))
      ON CONFLICT(title_id, source) DO UPDATE SET
        payload = excluded.payload,
        miss = 1,
        attempts = title_enrichment.attempts + 1,
-       fetched_at = CURRENT_TIMESTAMP`,
+       fetched_at = CURRENT_TIMESTAMP,
+       next_check_at = datetime(
+         'now',
+         '+' || min((title_enrichment.attempts + 1) * ${missBackoffDays}, ${MISS_BACKOFF_CAP_DAYS}) || ' days'
+       )`,
   )
     .bind(titleId, source, JSON.stringify({ miss: reason }))
     .run();
@@ -99,41 +136,28 @@ export async function storeEnrichmentMiss(
 export async function storeEnrichmentTransient(
   env: Bindings,
   titleId: string,
-  source: EnrichmentSource,
+  source: EnrichedSource,
   reason: string,
 ) {
   await env.DB.prepare(
-    `INSERT INTO title_enrichment (title_id, source, payload, miss, attempts)
-     VALUES (?, ?, ?, 2, 1)
+    `INSERT INTO title_enrichment (title_id, source, payload, miss, attempts, next_check_at)
+     VALUES (
+       ?, ?, ?, 2, 1,
+       datetime('now', '+' || min(${TRANSIENT_RETRY_HOURS}, ${TRANSIENT_RETRY_CAP_HOURS}) || ' hours')
+     )
      ON CONFLICT(title_id, source) DO UPDATE SET
        payload = excluded.payload,
        miss = 2,
        attempts = title_enrichment.attempts + 1,
-       fetched_at = CURRENT_TIMESTAMP`,
+       fetched_at = CURRENT_TIMESTAMP,
+       next_check_at = datetime(
+         'now',
+         '+' || min((title_enrichment.attempts + 1) * ${TRANSIENT_RETRY_HOURS}, ${TRANSIENT_RETRY_CAP_HOURS})
+           || ' hours'
+       )`,
   )
     .bind(titleId, source, JSON.stringify({ transient: reason }))
     .run();
-}
-
-const MISS_BACKOFF_CAP_DAYS = 120;
-const TRANSIENT_RETRY_HOURS = 1;
-const TRANSIENT_RETRY_CAP_HOURS = 24;
-
-export type EnrichmentWindow = { maxAgeDays: number; missBackoffDays: number };
-
-function dueForEnrichment(window: EnrichmentWindow) {
-  return `e.title_id IS NULL
-       OR (e.miss = 0 AND e.fetched_at < datetime('now', ?))
-       OR (e.miss = 1
-           AND e.fetched_at < datetime(
-             'now',
-             '-' || min(e.attempts * ${window.missBackoffDays}, ${MISS_BACKOFF_CAP_DAYS}) || ' days'
-           ))
-       OR (e.miss = 2
-           AND e.fetched_at < datetime(
-             'now',
-             '-' || min(e.attempts * ${TRANSIENT_RETRY_HOURS}, ${TRANSIENT_RETRY_CAP_HOURS}) || ' hours'
-           ))`;
 }
 
 export async function storeAnimeIds(db: D1Database, mappings: AnimeMapping[]) {
@@ -161,75 +185,140 @@ export async function storeAnimeIds(db: D1Database, mappings: AnimeMapping[]) {
                    json(?)
                  ) <> COALESCE(json_extract(payload, '$.externalIds'), json('{}'))`,
         )
-        .bind(JSON.stringify(mapping.ids), mapping.titleId, JSON.stringify(mapping.ids)),
+        .bind(
+          JSON.stringify(mapping.ids),
+          mapping.titleId,
+          JSON.stringify(mapping.ids),
+        ),
     ),
   );
 
   return written.reduce((sum, result) => sum + (result.meta.changes ?? 0), 0);
 }
 
-export async function selectAnimeCandidates(
+type CandidateRow = { titleId: string };
+
+/**
+ * Titles with no `title_enrichment` row yet for this source, ordered by
+ * popularity. Driven by the `title_enrichment_source_title_idx (source,
+ * title_id)` index for the NOT EXISTS check and the existing
+ * `catalog_titles_popularity_idx` for ordering.
+ */
+async function selectNeverEnriched(
   env: Bindings,
-  window: EnrichmentWindow,
+  source: EnrichmentSource,
   limit: number,
+  extraCondition: string,
 ) {
   const rows = await env.DB.prepare(
     `SELECT t.id AS titleId
      FROM catalog_titles AS t
-     LEFT JOIN title_enrichment AS e ON e.title_id = t.id AND e.source = 'mal'
-     WHERE json_extract(t.payload, '$.externalIds.malId') IS NOT NULL
-       AND (${dueForEnrichment(window)})
+     WHERE NOT EXISTS (
+       SELECT 1 FROM title_enrichment AS e WHERE e.source = ? AND e.title_id = t.id
+     )
+     ${extraCondition}
      ORDER BY t.popularity DESC
      LIMIT ?`,
   )
-    .bind(`-${window.maxAgeDays} days`, limit)
-    .all<{ titleId: string }>();
+    .bind(source, limit)
+    .all<CandidateRow>();
 
   return rows.results.map((row) => row.titleId);
 }
 
-export async function selectAniListCandidates(
+/**
+ * Titles whose precomputed `next_check_at` has passed, ordered most-overdue
+ * first. Driven by the `title_enrichment_next_check_idx (source,
+ * next_check_at)` index.
+ */
+async function selectDue(
   env: Bindings,
-  window: EnrichmentWindow,
+  source: EnrichmentSource,
   limit: number,
+  extraCondition: string,
 ) {
   const rows = await env.DB.prepare(
     `SELECT t.id AS titleId
-     FROM catalog_titles AS t
-     LEFT JOIN title_enrichment AS e ON e.title_id = t.id AND e.source = 'anilist'
-     WHERE json_extract(t.payload, '$.externalIds.anilistId') IS NOT NULL
-       AND (${dueForEnrichment(window)})
-     ORDER BY t.popularity DESC
+     FROM title_enrichment AS e
+     JOIN catalog_titles AS t ON t.id = e.title_id
+     WHERE e.source = ?
+       AND e.next_check_at <= CURRENT_TIMESTAMP
+       ${extraCondition}
+     ORDER BY e.next_check_at ASC
      LIMIT ?`,
   )
-    .bind(`-${window.maxAgeDays} days`, limit)
-    .all<{ titleId: string }>();
+    .bind(source, limit)
+    .all<CandidateRow>();
 
   return rows.results.map((row) => row.titleId);
+}
+
+/**
+ * Combines never-enriched and due candidates for a source, up to `limit`.
+ * Never-enriched titles (ordered by popularity) take priority; due titles
+ * (ordered most-overdue first) fill the remaining budget. This is a
+ * deliberate change from the old single popularity-ordered list, which
+ * interleaved both categories strictly by popularity — see the PR
+ * description for why this trade-off is acceptable for job scheduling.
+ */
+async function selectCandidates(
+  env: Bindings,
+  source: EnrichmentSource,
+  limit: number,
+  extraCondition = "",
+) {
+  const neverEnriched = await selectNeverEnriched(
+    env,
+    source,
+    limit,
+    extraCondition,
+  );
+
+  if (neverEnriched.length >= limit) {
+    return neverEnriched;
+  }
+
+  const due = await selectDue(
+    env,
+    source,
+    limit - neverEnriched.length,
+    extraCondition,
+  );
+
+  return [...neverEnriched, ...due];
+}
+
+export async function selectAnimeCandidates(env: Bindings, limit: number) {
+  return selectCandidates(
+    env,
+    "mal",
+    limit,
+    "AND json_extract(t.payload, '$.externalIds.malId') IS NOT NULL",
+  );
+}
+
+export async function selectAniListCandidates(env: Bindings, limit: number) {
+  return selectCandidates(
+    env,
+    "anilist",
+    limit,
+    "AND json_extract(t.payload, '$.externalIds.anilistId') IS NOT NULL",
+  );
 }
 
 export async function selectUnenriched(
   env: Bindings,
   source: EnrichmentSource,
-  window: EnrichmentWindow,
   limit: number,
 ) {
-  const rows = await env.DB.prepare(
-    `SELECT t.id AS titleId
-     FROM catalog_titles AS t
-     LEFT JOIN title_enrichment AS e
-       ON e.title_id = t.id AND e.source = ?
-     WHERE ${dueForEnrichment(window)}
-     ORDER BY t.popularity DESC
-     LIMIT ?`,
-  )
-    .bind(source, `-${window.maxAgeDays} days`, limit)
-    .all<{ titleId: string }>();
-
-  return rows.results.map((row) => row.titleId);
+  return selectCandidates(env, source, limit);
 }
 
-export async function storeImdbId(db: D1Database, titleId: string, imdbId: string) {
+export async function storeImdbId(
+  db: D1Database,
+  titleId: string,
+  imdbId: string,
+) {
   await db
     .prepare(
       `UPDATE catalog_titles
@@ -253,6 +342,7 @@ export async function storePoster(
   contentType: string,
 ) {
   const key = posterKey(titleId);
+  const { maxAgeDays } = ENRICHMENT_WINDOWS.poster;
 
   await env.MEDIA.put(key, body, { httpMetadata: { contentType } });
 
@@ -263,13 +353,14 @@ export async function storePoster(
        WHERE id = ? AND poster_key IS NOT ?`,
     ).bind(key, titleId, key),
     env.DB.prepare(
-      `INSERT INTO title_enrichment (title_id, source, payload, miss, attempts)
-       VALUES (?, 'poster', ?, 0, 0)
+      `INSERT INTO title_enrichment (title_id, source, payload, miss, attempts, next_check_at)
+       VALUES (?, 'poster', ?, 0, 0, datetime('now', '+${maxAgeDays} days'))
        ON CONFLICT(title_id, source) DO UPDATE SET
          payload = excluded.payload,
          miss = 0,
          attempts = 0,
-         fetched_at = CURRENT_TIMESTAMP`,
+         fetched_at = CURRENT_TIMESTAMP,
+         next_check_at = datetime('now', '+${maxAgeDays} days')`,
     ).bind(titleId, JSON.stringify({ key, contentType })),
   ]);
 
