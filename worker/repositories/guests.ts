@@ -58,7 +58,8 @@ export async function saveGuest(
        ON CONFLICT (id) DO UPDATE SET
          name = excluded.name,
          vetoes = excluded.vetoes,
-         leanings = excluded.leanings`,
+         leanings = excluded.leanings
+       WHERE viewer_guests.viewer_id = excluded.viewer_id`,
     )
     .bind(
       id,
@@ -79,6 +80,15 @@ export async function removeGuest(db: D1Database, viewerId: string, guestId: str
     .run();
 
   return (result.meta.changes ?? 0) > 0;
+}
+
+export async function guestOwned(db: D1Database, viewerId: string, guestId: string) {
+  const row = await db
+    .prepare(`SELECT 1 AS found FROM viewer_guests WHERE id = ?1 AND viewer_id = ?2`)
+    .bind(guestId, viewerId)
+    .first<{ found: number }>();
+
+  return Boolean(row);
 }
 
 export async function guestCount(db: D1Database, viewerId: string) {
