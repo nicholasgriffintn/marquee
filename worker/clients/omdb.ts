@@ -1,11 +1,12 @@
 import type { MediaType } from "../../src/domain/catalog.ts";
 import { isRecord } from "../lib/values.ts";
 import type { Bindings, TitleRatings } from "../types.ts";
-import { upstreamFetch } from "./fetch.ts";
+import { readCappedArrayBuffer, upstreamFetch } from "./fetch.ts";
 import { upstreamError } from "./upstream.ts";
 
 const TIMEOUT_MS = 12_000;
 const POSTER_TIMEOUT_MS = 20_000;
+const MAX_POSTER_BYTES = 12_000_000;
 const SEARCH_TIMEOUT_MS = 8_000;
 const RATINGS_CACHE_TTL = 86_400;
 const SEARCH_CACHE_TTL = 3_600;
@@ -356,9 +357,9 @@ export async function getOmdbPoster(env: Bindings, imdbId: string, height = POST
     return null;
   }
 
-  const body = await response.arrayBuffer();
+  const body = await readCappedArrayBuffer(response, MAX_POSTER_BYTES);
 
-  return body.byteLength > 0 ? { body, contentType } : null;
+  return body && body.byteLength > 0 ? { body, contentType } : null;
 }
 
 export type OmdbSearchResult = {

@@ -1,4 +1,4 @@
-import { UPSTREAM_AGENT } from "../clients/fetch.ts";
+import { readCappedArrayBuffer, UPSTREAM_AGENT } from "../clients/fetch.ts";
 import { getOmdbPoster } from "../clients/omdb.ts";
 import { imdbIdFrom } from "../lib/text.ts";
 import { claimBudget } from "../repositories/budgets.ts";
@@ -7,6 +7,7 @@ import { storeEnrichmentMiss, storePoster } from "../repositories/enrichment.ts"
 import type { Bindings } from "../types.ts";
 
 const MIN_POSTER_BYTES = 40_000;
+const MAX_POSTER_BYTES = 12_000_000;
 const FETCH_TIMEOUT_MS = 20_000;
 
 function originPosterUrl(url: string | null | undefined) {
@@ -38,9 +39,9 @@ async function fetchImage(url: string) {
     return null;
   }
 
-  const body = await response.arrayBuffer();
+  const body = await readCappedArrayBuffer(response, MAX_POSTER_BYTES);
 
-  return body.byteLength > 0 ? { body, contentType } : null;
+  return body && body.byteLength > 0 ? { body, contentType } : null;
 }
 
 export async function cachePoster(env: Bindings, titleId: string) {
