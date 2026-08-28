@@ -81,6 +81,11 @@ export const POLICIES = {
     member: { limiter: "MEDIA_RATE_LIMITER", message: STEADY_ON },
     bots: "crawlers",
   },
+  reel: {
+    anonymous: { limiter: "REEL_RATE_LIMITER", message: STEADY_ON },
+    member: { limiter: "REEL_RATE_LIMITER", message: STEADY_ON },
+    bots: "strict",
+  },
   feed: {
     anonymous: { limiter: "PUBLIC_RATE_LIMITER", message: STEADY_ON },
     member: { limiter: "MEMBER_RATE_LIMITER", message: STEADY_ON },
@@ -120,6 +125,7 @@ export const RULES: readonly Rule[] = [
   { path: "/feeds/*", policy: "feed" },
   { path: "/mcp", policy: "machine" },
   { path: "/mcp/*", policy: "machine" },
+  { path: "/media/reel/*", policy: "reel" },
   { path: "/media/*", policy: "media" },
   { path: "/api/*", methods: WRITE_METHODS, policy: "write" },
   { path: "/api/*", policy: "read" },
