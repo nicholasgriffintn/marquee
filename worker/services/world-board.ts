@@ -218,4 +218,3 @@ export async function syncWorldBoard(env: Bindings, titleIds: string[]) {
 
   return rows.length;
 }
-

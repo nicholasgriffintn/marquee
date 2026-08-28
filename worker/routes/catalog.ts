@@ -19,8 +19,8 @@ import {
   readPersonTitleIds,
   readTitleCredits,
 } from "../repositories/people.ts";
-import { getTitleAdaptations } from "../services/adaptations.ts";
 import { readPlacesForTitle } from "../repositories/title-places.ts";
+import { getTitleAdaptations } from "../services/adaptations.ts";
 import {
   browseCatalogue,
   getCatalogue,
