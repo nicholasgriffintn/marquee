@@ -19,6 +19,7 @@ import {
   readPersonTitleIds,
   readTitleCredits,
 } from "../repositories/people.ts";
+import { getTitleAdaptations } from "../services/adaptations.ts";
 import {
   browseCatalogue,
   getCatalogue,
@@ -439,6 +440,18 @@ catalogRoutes.get("/titles/:titleId/anime-recommendations", edgeCache(3_600), as
     logError("anime_recommendations_read_failed", error, { area: "anime" });
 
     return context.json({ items: [] });
+  }
+});
+
+catalogRoutes.get("/titles/:titleId/adaptations", edgeCache(3_600), async (context) => {
+  const titleId = context.req.param("titleId");
+
+  try {
+    return context.json(await getTitleAdaptations(context.env.DB, titleId));
+  } catch (error) {
+    logError("adaptations_read_failed", error, { area: "adaptations" });
+
+    return context.json({ source: null, items: [] });
   }
 });
 

@@ -1,5 +1,5 @@
 import { animeMeta } from "../domain/anime";
-import type { MediaTitle } from "../domain/catalog";
+import type { MediaTitle, SourceWork } from "../domain/catalog";
 
 const POSTER_WIDTHS = [160, 320, 500, 780];
 const TMDB_POSTER_SIZES = [92, 154, 185, 342, 500, 780];
@@ -63,6 +63,14 @@ export function mediaMeta(item: MediaTitle) {
   ];
 
   return values.filter(Boolean).join(" · ");
+}
+
+export function sourceWorkMeta(source: SourceWork) {
+  const provenance = [source.workType, source.publishedYear?.toString()].filter(Boolean).join(", ");
+
+  return [`Adapted from ${source.label}`, source.authors.join(", ") || null, provenance || null]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 const RUN_STATUS: Record<string, string> = {

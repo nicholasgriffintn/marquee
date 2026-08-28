@@ -15,6 +15,7 @@ import { storeProviders } from "../repositories/providers.ts";
 import { rebuildPeopleIndex } from "../repositories/usher.ts";
 import { rebuildWorkingSet } from "../repositories/working-set.ts";
 import { syncAwards } from "../services/awards.ts";
+import { syncAdaptations } from "../services/adaptations.ts";
 import { syncBuzz } from "../services/buzz.ts";
 import { queueCinemaDirectories, queueCinemaScreenings } from "../services/cinema-sync.ts";
 import { advanceDiscoverFrontier } from "../services/discover.ts";
@@ -93,6 +94,8 @@ export class CatalogSweep extends WorkflowEntrypoint<Bindings, CatalogSweepParam
     await step.do("sync visual format", { retries: RETRIES }, async () =>
       syncVisualFormat(this.env),
     );
+
+    await step.do("sync adaptations", { retries: RETRIES }, async () => syncAdaptations(this.env));
 
     await step.do("queue embeddings", { retries: RETRIES }, async () => {
       await queueEmbeddings(this.env);

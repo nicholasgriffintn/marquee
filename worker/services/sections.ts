@@ -414,6 +414,24 @@ export async function buildSections(env: Bindings) {
   });
 
   add({
+    id: "adaptations",
+    title: "The same story, again",
+    description: "Books, plays and films the screen keeps coming back to",
+    titleIds: await pick(
+      env,
+      used,
+      `${VOTES} >= 60
+       AND EXISTS (
+         SELECT 1 FROM title_source_works AS link
+          WHERE link.title_id = catalog_titles.id
+            AND (SELECT count(*) FROM title_source_works AS peer
+                  WHERE peer.work_entity_id = link.work_entity_id) >= 2
+       )`,
+      "popularity DESC",
+    ),
+  });
+
+  add({
     id: "boxoffice",
     title: "Everyone went to see it",
     description: "The films that filled cinemas, by what they took",

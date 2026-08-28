@@ -41,6 +41,14 @@ export type TitleVisualFormat = {
   aspectRatios: string[];
 };
 
+export type SourceWork = {
+  entityId: string;
+  label: string;
+  workType: string | null;
+  publishedYear: number | null;
+  authors: string[];
+};
+
 export type AnimeLink = {
   name: string;
   url: string;
