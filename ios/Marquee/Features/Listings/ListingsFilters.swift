@@ -36,6 +36,15 @@ struct ListingsFilters: View {
             }
           }
         }
+        if !model.places.isEmpty {
+          facet("Shot in") {
+            ForEach(model.places, id: \.self) { place in
+              chip(place, selected: model.selectedPlaces.contains(place)) {
+                model.togglePlace(place)
+              }
+            }
+          }
+        }
         if !model.providers.isEmpty { sourceFacet }
         advancedToggle("Show less filters", systemImage: "chevron.up") {
           showsAdvanced = false
@@ -62,7 +71,8 @@ struct ListingsFilters: View {
   }
 
   private var hasAdvancedFacets: Bool {
-    !model.genres.isEmpty || !model.keywords.isEmpty || !model.providers.isEmpty
+    !model.genres.isEmpty || !model.keywords.isEmpty || !model.places.isEmpty
+      || !model.providers.isEmpty
   }
 
   private var search: some View {

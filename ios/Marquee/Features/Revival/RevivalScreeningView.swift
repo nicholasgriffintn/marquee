@@ -36,10 +36,11 @@ struct RevivalScreeningView: View {
           RevivalPrintConditionView(condition: screening.work.condition)
             .padding(.bottom, 18)
           if !screening.work.synopsis.isEmpty {
-            Text(screening.work.synopsis)
-              .font(MarqueeTheme.sans(15))
-              .lineSpacing(5)
-              .padding(.bottom, 18)
+            RevivalSynopsisView(
+              pendingDestination: $pendingDestination,
+              work: screening.work
+            )
+            .padding(.bottom, 18)
           }
           if screening.work.tags.contains(where: { $0.kind != "language" }) {
             RevivalTagsView(tags: screening.work.tags)

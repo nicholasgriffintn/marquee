@@ -3,22 +3,55 @@ import Foundation
 
 @MainActor
 final class RevivalModel: ObservableObject {
-  @Published private(set) var programme: RevivalProgramme?
+  @Published private(set) var total = 0
+  @Published private(set) var bill: [RevivalBillSlot] = []
+  @Published private(set) var shelves: [RevivalShelf] = []
+  @Published private(set) var hasProgramme = false
   @Published private(set) var isLoading = true
   @Published private(set) var error = ""
   @Published private(set) var searchResults: [RevivalCard] = []
   @Published private(set) var isSearching = false
   private var searchTask: Task<Void, Never>?
 
-  func load(api: APIClient) async {
+  func load(api: APIClient, isSignedIn: Bool) async {
     isLoading = true
+
+    async let billRequest: RevivalBillResponse = api.get("/api/revival/bill")
+    async let shelvesRequest: RevivalShelvesResponse = api.get("/api/revival/shelves")
+    async let vaultRequest: RevivalVaultResponse? = try? await api.get("/api/revival/vault")
+    async let resumeRequest = resumeWorks(api: api, isSignedIn: isSignedIn)
+
     do {
-      programme = try await api.get("/api/revival")
+      let (billResponse, shelvesResponse, vaultResponse, resuming) = try await (
+        billRequest, shelvesRequest, vaultRequest, resumeRequest
+      )
+      bill = billResponse.bill
+      shelves = resumeShelf(works: resuming) + shelvesResponse.shelves
+      total = vaultResponse?.total ?? 0
+      hasProgramme = true
       error = ""
     } catch {
       self.error = error.localizedDescription
     }
     isLoading = false
+  }
+
+  private func resumeWorks(api: APIClient, isSignedIn: Bool) async -> [RevivalCard] {
+    guard isSignedIn else { return [] }
+    let response: RevivalResumeResponse? = try? await api.get("/api/revival/resume")
+    return response?.works ?? []
+  }
+
+  private func resumeShelf(works: [RevivalCard]) -> [RevivalShelf] {
+    guard !works.isEmpty else { return [] }
+    return [
+      RevivalShelf(
+        id: "resume",
+        title: "Where you left off",
+        description: "The lights are still down on these.",
+        works: works
+      )
+    ]
   }
 
   func search(query: String, api: APIClient) {

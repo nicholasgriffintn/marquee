@@ -12,32 +12,32 @@ struct RevivalView: View {
   var body: some View {
     ScrollView {
       LazyVStack(alignment: .leading, spacing: 0) {
-        RevivalPageTitle(total: model.programme?.total ?? 0)
+        RevivalPageTitle(total: model.total)
           .padding(.bottom, 28)
         RevivalVaultSearch(
           query: $query,
           resultCount: model.searchResults.count,
-          total: model.programme?.total ?? 0,
+          total: model.total,
           isSearching: model.isSearching
         )
         .padding(.bottom, 54)
 
-        if model.isLoading && model.programme == nil {
+        if model.isLoading && !model.hasProgramme {
           LoadingHouse(label: "Threading the projector…")
-        } else if let programme = model.programme {
+        } else if model.hasProgramme {
           if isSearchActive {
             RevivalSearchResultsView(results: model.searchResults, isSearching: model.isSearching)
               .padding(.bottom, 54)
           } else {
-            RevivalBillView(bill: programme.bill)
+            RevivalBillView(bill: model.bill)
               .padding(.bottom, 54)
-            ForEach(programme.shelves) { shelf in
+            ForEach(model.shelves) { shelf in
               RevivalShelfView(shelf: shelf)
                 .padding(.bottom, 54)
             }
           }
-          if !programme.shelves.isEmpty {
-            RevivalProjectionNote(seed: programme.total)
+          if !model.shelves.isEmpty {
+            RevivalProjectionNote(seed: model.total)
               .padding(.bottom, 28)
             RevivalRightsNote()
           }
@@ -55,8 +55,10 @@ struct RevivalView: View {
       .padding(.top, 30)
       .padding(.bottom, 95)
     }
-    .task { await model.load(api: appState.api) }
-    .refreshable { await model.load(api: appState.api) }
+    .task(id: appState.isSignedIn) {
+      await model.load(api: appState.api, isSignedIn: appState.isSignedIn)
+    }
+    .refreshable { await model.load(api: appState.api, isSignedIn: appState.isSignedIn) }
     .onChange(of: query) { model.search(query: query, api: appState.api) }
     .marqueeRootPage()
   }

@@ -235,6 +235,140 @@ struct TitleAirStatusView: View {
   }
 }
 
+struct TitleAwardsView: View {
+  let awards: AwardSummary
+
+  private let shown = 3
+
+  var body: some View {
+    if !awards.isEmpty {
+      VStack(alignment: .leading, spacing: 5) {
+        TitleDetailSectionLabel("AWARDS CABINET")
+        if awards.entries.isEmpty {
+          if let summary = awards.summary {
+            Text(summary).font(MarqueeTheme.sans(13))
+            credit("Counted by OMDb, which does not name them")
+          }
+        } else {
+          Text(awardTally(awards)).font(MarqueeTheme.sans(13))
+          if !listed.isEmpty {
+            Text(listed.map(awardLine).joined(separator: " · ") + heldBack)
+              .font(MarqueeTheme.mono(10))
+              .lineSpacing(3)
+              .foregroundStyle(MarqueeTheme.mutedOnPaper)
+          }
+          credit("Named awards from Wikidata")
+        }
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .foregroundStyle(MarqueeTheme.ink)
+      .padding(.leading, 12)
+      .overlay(alignment: .leading) { Rectangle().fill(MarqueeTheme.acid).frame(width: 2) }
+    }
+  }
+
+  private var won: [AwardEntry] { awards.entries.filter { $0.outcome == "won" } }
+
+  private var listed: [AwardEntry] { Array(won.prefix(shown)) }
+
+  private var heldBack: String {
+    let held = won.count - listed.count
+    return held > 0 ? " · and \(held) more won" : ""
+  }
+
+  private func credit(_ label: String) -> some View {
+    Text(label)
+      .font(MarqueeTheme.mono(9))
+      .foregroundStyle(MarqueeTheme.mutedOnPaper)
+  }
+}
+
+struct TitleVisualFormatView: View {
+  let format: TitleVisualFormat?
+
+  var body: some View {
+    if let format, !titleVisualFormatLabel(format).isEmpty {
+      VStack(alignment: .leading, spacing: 4) {
+        (Text("SHOT IN ")
+          .font(MarqueeTheme.mono(10, weight: .bold))
+          .foregroundStyle(MarqueeTheme.blue)
+          + Text(titleVisualFormatLabel(format)).font(MarqueeTheme.sans(13)))
+        Text("Visual format from Wikidata")
+          .font(MarqueeTheme.mono(9))
+          .foregroundStyle(MarqueeTheme.mutedOnPaper)
+      }
+      .foregroundStyle(MarqueeTheme.ink)
+      .padding(.leading, 12)
+      .overlay(alignment: .leading) { Rectangle().fill(MarqueeTheme.blue).frame(width: 2) }
+    }
+  }
+}
+
+struct TitleGroundView: View {
+  let places: TitlePlaces
+
+  private let namesShown = 10
+
+  var body: some View {
+    if !places.filming.isEmpty {
+      ground(sentence: "Shot at \(sentenceList(labels(places.filming))).", note: filmingNote)
+    } else if !places.narrative.isEmpty {
+      ground(
+        sentence:
+          "Nobody has filed where this was shot. It is set in \(sentenceList(labels(places.narrative))), which is a different thing.",
+        note: ""
+      )
+    }
+  }
+
+  private func ground(sentence: String, note: String) -> some View {
+    VStack(alignment: .leading, spacing: 5) {
+      TitleDetailSectionLabel("GROUND")
+      Text(sentence)
+        .font(MarqueeTheme.sans(13))
+        .lineSpacing(3)
+      if !note.isEmpty {
+        Text(note)
+          .font(MarqueeTheme.mono(9))
+          .lineSpacing(3)
+          .foregroundStyle(MarqueeTheme.mutedOnPaper)
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .foregroundStyle(MarqueeTheme.ink)
+  }
+
+  private func labels(_ places: [TitlePlace]) -> [String] {
+    places.prefix(namesShown).map(\.label)
+  }
+
+  private var filmingNote: String {
+    let broad = places.filming.filter(\.isVague).count
+    let unnamed = places.filming.count - min(places.filming.count, namesShown)
+    let counted =
+      "\(places.filming.count) \(places.filming.count == 1 ? "place" : "places") on Wikidata"
+      + (unnamed > 0 ? ", \(unnamed) of them not listed here" : "")
+
+    return broad > 0
+      ? counted
+        + " · \(broad) named no finer than a country or a region, so read them as directions rather than addresses"
+      : counted + " · every one of them pinned to somewhere you could stand"
+  }
+}
+
+struct TitleSourceWorkLine: View {
+  let source: SourceWork?
+
+  var body: some View {
+    if let source {
+      Text(sourceWorkMeta(source))
+        .font(MarqueeTheme.sans(13))
+        .foregroundStyle(MarqueeTheme.mutedOnPaper)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+  }
+}
+
 struct TitleCreditsView: View {
   let credits: CreditsResponse
   let seasons: [CreditSeason]

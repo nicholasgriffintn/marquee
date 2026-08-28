@@ -67,6 +67,53 @@ struct RevivalPrintConditionView: View {
   }
 }
 
+struct RevivalSynopsisView: View {
+  @Binding var pendingDestination: ExternalDestination?
+  let work: RevivalWork
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      Text(work.synopsis)
+        .font(MarqueeTheme.sans(15))
+        .lineSpacing(5)
+      if let credit = work.synopsisCredit {
+        VStack(alignment: .leading, spacing: 8) {
+          Text(
+            "Extract from the Wikipedia article \(credit.article), used under \(WikipediaTextLicence.name) and passed on to you under the same licence."
+          )
+          .font(MarqueeTheme.mono(10))
+          .lineSpacing(3)
+          .foregroundStyle(MarqueeTheme.muted)
+          FlowLayout(spacing: 12) {
+            creditLink(label: credit.article, url: credit.url, kind: .wikipedia)
+            if let licence = WikipediaTextLicence.url {
+              creditLink(label: WikipediaTextLicence.name, url: licence, kind: .other)
+            }
+          }
+        }
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  private func creditLink(
+    label: String, url: URL, kind: ExternalDestination.Kind
+  ) -> some View {
+    ExternalLinkButton(
+      pendingDestination: $pendingDestination,
+      destination: ExternalDestination(url: url, label: label, kind: kind)
+    ) {
+      HStack(spacing: 5) {
+        Text(label)
+        Image(systemName: "arrow.up.right")
+      }
+      .font(MarqueeTheme.sans(12))
+      .foregroundStyle(MarqueeTheme.acid)
+    }
+    .buttonStyle(.plain)
+  }
+}
+
 struct RevivalTagsView: View {
   let tags: [RevivalTag]
 

@@ -53,6 +53,59 @@ struct CreditsResponse: Codable {
   }
 }
 
+struct AwardEntry: Codable, Identifiable {
+  var id: String { "\(awardId)-\(ceremonyYear ?? 0)-\(outcome)" }
+  let awardId: String
+  let label: String
+  let ceremonyYear: Int?
+  let outcome: String
+}
+
+struct AwardSummary: Codable {
+  let wins: Int
+  let nominations: Int
+  let entries: [AwardEntry]
+  let summary: String?
+
+  static let empty = AwardSummary(wins: 0, nominations: 0, entries: [], summary: nil)
+
+  var isEmpty: Bool { entries.isEmpty && summary == nil }
+}
+
+struct TitlePlace: Codable, Identifiable {
+  var id: String { entityId }
+  let entityId: String
+  let label: String
+  let kind: String
+  let latitude: Double
+  let longitude: Double
+  let pin: String
+  let country: String?
+  let isCountry: Bool
+
+  var isVague: Bool { isCountry || pin == "centroid" }
+}
+
+struct TitlePlaces: Codable {
+  let filming: [TitlePlace]
+  let narrative: [TitlePlace]
+
+  static let empty = TitlePlaces(filming: [], narrative: [])
+}
+
+struct SourceWork: Codable {
+  let workId: String
+  let label: String
+  let workType: String?
+  let publishedYear: Int?
+  let authors: [String]
+}
+
+struct AdaptationsResponse: Codable {
+  let source: SourceWork?
+  let items: [MediaTitle]
+}
+
 struct TitleItemsResponse: Codable {
   let items: [MediaTitle]
 }

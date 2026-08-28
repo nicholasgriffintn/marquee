@@ -93,8 +93,14 @@ func revivalSourceLabel(_ source: String) -> String {
   switch source {
   case "loc": "Library of Congress"
   case "europeana": "Europeana"
+  case "wikidata": "Wikimedia Commons"
   default: "Internet Archive"
   }
+}
+
+enum WikipediaTextLicence {
+  static let name = "CC BY-SA 4.0"
+  static let url = URL(string: "https://creativecommons.org/licenses/by-sa/4.0/")
 }
 
 func revivalClockLabel(_ seconds: Int) -> String {

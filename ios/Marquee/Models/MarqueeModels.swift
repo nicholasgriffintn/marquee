@@ -47,6 +47,18 @@ struct TitleCollection: Codable {
   let name: String
 }
 
+struct TitleVisualFormat: Codable {
+  let colours: [String]
+  let aspectRatios: [String]
+}
+
+struct TitleExternalIds: Codable {
+  let letterboxdId: String?
+  let rottenTomatoesId: String?
+  let metacriticId: String?
+  let traktId: String?
+}
+
 struct TitleVideo: Codable, Identifiable {
   var id: String { key }
   let key: String
@@ -94,6 +106,8 @@ struct MediaTitle: Codable, Identifiable {
   let nextAirDate: String?
   let recommendationIds: [String]?
   let videos: [TitleVideo]?
+  let visualFormat: TitleVisualFormat?
+  let externalIds: TitleExternalIds?
 }
 
 struct CatalogSection: Codable, Identifiable {
@@ -154,6 +168,8 @@ struct BrowseResponse: Codable {
 struct GenresResponse: Codable { let genres: [String] }
 
 struct KeywordsResponse: Codable { let keywords: [String] }
+
+struct FilmingPlacesResponse: Codable { let places: [String] }
 
 struct SearchResponse: Codable {
   let items: [MediaTitle]
@@ -292,12 +308,23 @@ struct RevivalShelf: Codable, Identifiable {
   let works: [RevivalCard]
 }
 
-struct RevivalProgramme: Codable {
+struct RevivalVaultResponse: Codable {
+  let total: Int
+}
+
+struct RevivalBillResponse: Codable {
   let bill: [RevivalBillSlot]
   let billDate: String
-  let shelves: [RevivalShelf]
-  let total: Int
   let fetchedAt: String
+}
+
+struct RevivalShelvesResponse: Codable {
+  let shelves: [RevivalShelf]
+  let fetchedAt: String
+}
+
+struct RevivalResumeResponse: Codable {
+  let works: [RevivalCard]
 }
 
 struct RevivalSearchResponse: Codable {
@@ -311,6 +338,11 @@ struct RevivalTag: Codable, Identifiable {
   let label: String
 }
 
+struct RevivalSynopsisCredit: Codable {
+  let article: String
+  let url: URL
+}
+
 struct RevivalWork: Codable, Identifiable {
   let id: String
   let source: String
@@ -319,6 +351,7 @@ struct RevivalWork: Codable, Identifiable {
   let year: Int?
   let director: String?
   let synopsis: String
+  let synopsisCredit: RevivalSynopsisCredit?
   let kind: String
   let runtimeSeconds: Int?
   let stillUrl: URL?

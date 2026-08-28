@@ -16,6 +16,10 @@ final class TitleDetailModel: ObservableObject {
   @Published private(set) var collectionItems: [MediaTitle] = []
   @Published private(set) var availabilityProviders: [ProviderAvailability]?
   @Published private(set) var nextEpisode: TitleNextEpisode?
+  @Published private(set) var awards = AwardSummary.empty
+  @Published private(set) var places = TitlePlaces.empty
+  @Published private(set) var sourceWork: SourceWork?
+  @Published private(set) var adaptations: [MediaTitle] = []
   @Published var message = ""
 
   init(titleID: String) {
@@ -90,9 +94,18 @@ final class TitleDetailModel: ObservableObject {
     async let collectionRequest = collectionItems(item: item, api: api)
     async let availabilityRequest: TitleAvailabilityResponse? = try? await api.get(
       "/api/catalog/\(item.mediaType)/\(item.tmdbId)/availability")
+    async let awardsRequest: AwardSummary? = try? await api.get(
+      "/api/catalog/titles/\(item.id)/awards")
+    async let placesRequest: TitlePlaces? = try? await api.get(
+      "/api/catalog/titles/\(item.id)/places")
+    async let adaptationsRequest: AdaptationsResponse? = try? await api.get(
+      "/api/catalog/titles/\(item.id)/adaptations")
 
     let (insightResponse, creditsResponse, recommended, collection, availability) = await (
       insightRequest, creditsRequest, recommendationRequest, collectionRequest, availabilityRequest
+    )
+    let (awardsResponse, placesResponse, adaptationsResponse) = await (
+      awardsRequest, placesRequest, adaptationsRequest
     )
     insight = insightResponse?.insight
     insightPairs = insightResponse?.pairs ?? []
@@ -106,6 +119,10 @@ final class TitleDetailModel: ObservableObject {
       availabilityProviders = availability.providers
       nextEpisode = availability.nextEpisode
     }
+    awards = awardsResponse ?? .empty
+    places = placesResponse ?? .empty
+    sourceWork = adaptationsResponse?.source
+    adaptations = adaptationsResponse?.items ?? []
   }
 
   private func loadShelf(api: APIClient, isSignedIn: Bool) async {

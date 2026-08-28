@@ -21,6 +21,7 @@ struct TitleDetailView: View {
           TitleDetailHero(item: item)
           VStack(alignment: .leading, spacing: 28) {
             TitleOverview(item: item)
+            TitleSourceWorkLine(source: model.sourceWork)
             TitleInsightView(insight: model.insight, isLoading: model.isLoadingDetails)
             if appState.isSignedIn {
               TitleShelfEditor(
@@ -45,9 +46,12 @@ struct TitleDetailView: View {
             )
             TitleTrailerView(item: item, pendingDestination: $pendingDestination)
             TitleScoreView(item: item)
+            TitleAwardsView(awards: model.awards)
             if let buzz = item.buzz {
               TitleBuzzView(buzz: buzz, pendingDestination: $pendingDestination)
             }
+            TitleVisualFormatView(format: item.visualFormat)
+            TitleGroundView(places: model.places)
             TitleCreditsView(
               credits: model.credits,
               seasons: model.creditSeasons,
@@ -60,6 +64,13 @@ struct TitleDetailView: View {
             .id("title-credits")
             TitleKeywordsView(keywords: item.keywords ?? [])
             TitleInsightRail(pairs: model.insightPairs)
+            if let source = model.sourceWork, model.adaptations.count > 1 {
+              TitleDetailRail(
+                label: "Every version of \(source.label)",
+                items: model.adaptations,
+                currentID: item.id
+              )
+            }
             if let collection = item.collection {
               TitleDetailRail(
                 label: collection.name, items: model.collectionItems, currentID: item.id)

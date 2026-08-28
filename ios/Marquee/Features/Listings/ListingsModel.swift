@@ -24,10 +24,12 @@ final class ListingsModel: ObservableObject {
   @Published var sort = Sort.popularity
   @Published var selectedGenres: Set<String> = []
   @Published var selectedKeywords: Set<String> = []
+  @Published var selectedPlaces: Set<String> = []
   @Published var selectedProviderIDs: Set<String> = []
   @Published private(set) var items: [MediaTitle] = []
   @Published private(set) var genres: [String] = []
   @Published private(set) var keywords: [String] = []
+  @Published private(set) var places: [String] = []
   @Published private(set) var providers: [MarqueeProvider] = []
   @Published private(set) var hasMore = false
   @Published private(set) var isLoading = false
@@ -40,6 +42,7 @@ final class ListingsModel: ObservableObject {
     [
       query, mediaType, sort.rawValue, selectedGenres.sorted().joined(separator: ","),
       selectedKeywords.sorted().joined(separator: ","),
+      selectedPlaces.sorted().joined(separator: ","),
       selectedProviderIDs.sorted().joined(separator: ","),
     ].joined(separator: "|")
   }
@@ -47,13 +50,14 @@ final class ListingsModel: ObservableObject {
   var hasFilters: Bool {
     !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !mediaType.isEmpty
       || sort != .popularity || !selectedGenres.isEmpty || !selectedKeywords.isEmpty
-      || !selectedProviderIDs.isEmpty
+      || !selectedPlaces.isEmpty || !selectedProviderIDs.isEmpty
   }
 
   var ranksResults: Bool { sort == .popularity || sort == .trending }
 
   var hasAdvancedFilters: Bool {
-    !selectedGenres.isEmpty || !selectedKeywords.isEmpty || !selectedProviderIDs.isEmpty
+    !selectedGenres.isEmpty || !selectedKeywords.isEmpty || !selectedPlaces.isEmpty
+      || !selectedProviderIDs.isEmpty
   }
 
   func loadFacets(api: APIClient) async {
@@ -63,13 +67,15 @@ final class ListingsModel: ObservableObject {
 
     async let genreValues = fetchGenres(api: api)
     async let keywordValues = fetchKeywords(api: api)
+    async let placeValues = fetchPlaces(api: api)
     async let providerValues = fetchProviders(api: api)
 
-    let values = await (genreValues, keywordValues, providerValues)
+    let values = await (genreValues, keywordValues, placeValues, providerValues)
     guard !Task.isCancelled else { return }
     genres = values.0
     keywords = values.1
-    providers = values.2.filter {
+    places = values.2
+    providers = values.3.filter {
       $0.status == "feed" && !($0.tmdbProviderIds ?? []).isEmpty
     }
     loadedFacets = true
@@ -107,6 +113,14 @@ final class ListingsModel: ObservableObject {
     }
   }
 
+  func togglePlace(_ place: String) {
+    if selectedPlaces.contains(place) {
+      selectedPlaces.remove(place)
+    } else {
+      selectedPlaces.insert(place)
+    }
+  }
+
   func toggleProvider(_ id: String) {
     if selectedProviderIDs.contains(id) {
       selectedProviderIDs.remove(id)
@@ -121,6 +135,7 @@ final class ListingsModel: ObservableObject {
     sort = .popularity
     selectedGenres = []
     selectedKeywords = []
+    selectedPlaces = []
     selectedProviderIDs = []
   }
 
@@ -143,6 +158,10 @@ final class ListingsModel: ObservableObject {
     if !selectedKeywords.isEmpty {
       queryItems.append(
         URLQueryItem(name: "keywords", value: selectedKeywords.sorted().joined(separator: ",")))
+    }
+    if !selectedPlaces.isEmpty {
+      queryItems.append(
+        URLQueryItem(name: "places", value: selectedPlaces.sorted().joined(separator: ",")))
     }
     if !selectedProviderIDs.isEmpty {
       queryItems.append(
@@ -176,6 +195,16 @@ final class ListingsModel: ObservableObject {
       let response: KeywordsResponse = try await api.get(
         "/api/catalog/keywords", query: [URLQueryItem(name: "limit", value: "28")])
       return response.keywords
+    } catch {
+      return []
+    }
+  }
+
+  private func fetchPlaces(api: APIClient) async -> [String] {
+    do {
+      let response: FilmingPlacesResponse = try await api.get(
+        "/api/catalog/places", query: [URLQueryItem(name: "limit", value: "24")])
+      return response.places
     } catch {
       return []
     }

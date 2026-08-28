@@ -270,7 +270,7 @@ struct TitleSourceLinks: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
       TitleDetailSectionLabel("SOURCE LINKS")
-      HStack(spacing: 9) {
+      FlowLayout(spacing: 9) {
         ForEach(destinations, id: \.label) { destination in
           ExternalLinkButton(
             pendingDestination: $pendingDestination,
@@ -307,6 +307,10 @@ struct TitleSourceLinks: View {
     if let imdb = item.imdbUrl {
       destinations.append(ExternalDestination(url: imdb, label: "IMDb", kind: .imdb))
     }
+    destinations.append(
+      contentsOf: titleIdentifierLinks(item.externalIds).map {
+        ExternalDestination(url: $0.url, label: $0.label, kind: .other)
+      })
     return destinations
   }
 }
