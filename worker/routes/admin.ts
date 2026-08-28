@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 
+import { ADMIN_ACTIONS, isAdminAction } from "../../src/domain/admin.ts";
 import { requireAdmin, type AuthVariables } from "../auth/session.ts";
 import { readJsonObject } from "../lib/http.ts";
 import { logError, logEvent } from "../lib/logging.ts";
@@ -14,9 +15,7 @@ import {
 import { readOverviewSample } from "../services/admin-sample.ts";
 import { setUserRole } from "../services/admin-users.ts";
 import {
-  ADMIN_ACTIONS,
   clearSourcePause,
-  isAdminAction,
   listAdminUsers,
   readAdminListings,
   readAdminOverview,

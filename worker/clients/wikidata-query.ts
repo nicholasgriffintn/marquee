@@ -3,6 +3,13 @@ import { upstreamFetch, UPSTREAM_AGENT } from "./fetch.ts";
 import { upstreamError } from "./upstream.ts";
 
 const SPARQL_ENDPOINT = "https://query.wikidata.org/sparql";
+const RETRY_STATUSES = new Set([429, 502, 503, 504]);
+const MAX_ATTEMPTS = 3;
+const BASE_BACKOFF_MS = 1_000;
+const MAX_BACKOFF_MS = 8_000;
+const COOLDOWN_MS = 60_000;
+
+let coolingUntil = 0;
 
 export const WikidataError = upstreamError("WikidataError");
 
@@ -34,21 +41,62 @@ export function yearFrom(value: string | undefined) {
   return match ? Number(match[1]) : null;
 }
 
+function backoffFor(attempt: number, retryAfter: string | null) {
+  const seconds = Number(retryAfter);
+
+  if (Number.isFinite(seconds) && seconds > 0) {
+    return Math.min(seconds * 1_000, MAX_BACKOFF_MS);
+  }
+
+  return Math.min(BASE_BACKOFF_MS * 2 ** attempt, MAX_BACKOFF_MS);
+}
+
+async function fetchQuery(url: URL, options: QueryOptions) {
+  let last: InstanceType<typeof WikidataError> | null = null;
+
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+    // oxlint-disable-next-line no-await-in-loop
+    const response = await upstreamFetch(url, {
+      headers: { accept: "application/sparql-results+json", "user-agent": UPSTREAM_AGENT },
+      timeoutMs: options.timeoutMs,
+      cacheTtl: options.cacheTtl,
+    });
+
+    if (response.ok) {
+      return response;
+    }
+
+    last = new WikidataError(`Wikidata query failed (${response.status})`, response.status);
+
+    if (!RETRY_STATUSES.has(response.status)) {
+      throw last;
+    }
+
+    if (response.status === 429) {
+      coolingUntil = Date.now() + COOLDOWN_MS;
+    }
+
+    const retryAfter = response.headers.get("retry-after");
+
+    if (attempt < MAX_ATTEMPTS - 1) {
+      // oxlint-disable-next-line no-await-in-loop
+      await new Promise((resolve) => setTimeout(resolve, backoffFor(attempt, retryAfter)));
+    }
+  }
+
+  throw last ?? new WikidataError("Wikidata query failed", 502);
+}
+
 export async function queryWikidata(query: string, options: QueryOptions) {
+  if (Date.now() < coolingUntil) {
+    throw new WikidataError("Wikidata is rate limiting; cooling off", 429);
+  }
+
   const url = new URL(SPARQL_ENDPOINT);
 
   url.search = new URLSearchParams({ query, format: "json" }).toString();
 
-  const response = await upstreamFetch(url, {
-    headers: { accept: "application/sparql-results+json", "user-agent": UPSTREAM_AGENT },
-    timeoutMs: options.timeoutMs,
-    cacheTtl: options.cacheTtl,
-  });
-
-  if (!response.ok) {
-    throw new WikidataError(`Wikidata query failed (${response.status})`, response.status);
-  }
-
+  const response = await fetchQuery(url, options);
   const payload = await response.json();
   const bindings = isRecord(payload) && isRecord(payload.results) ? payload.results.bindings : [];
 

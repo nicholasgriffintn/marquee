@@ -5,7 +5,7 @@ import { entityIdFrom, queryWikidata } from "./wikidata-query.ts";
 
 const TIMEOUT_MS = 30_000;
 const CACHE_TTL = 2_592_000;
-const BATCH = 30;
+const BATCH = 20;
 const COUNTRY_BATCH = 120;
 const LABEL_LIMIT = 90;
 const WIDEST_DEGREES = 1;
@@ -34,13 +34,13 @@ export type TitlePlaceResult = { rows: TitlePlaceRow[]; countries: PlaceRecord[]
 
 function clauses(refs: PlaceRef[]) {
   const byTmdb = refs.flatMap((ref) =>
-    !ref.wikidataId && ref.tmdbId ? [{ mediaType: ref.mediaType, tmdbId: ref.tmdbId }] : [],
+    ref.tmdbId ? [{ mediaType: ref.mediaType, tmdbId: ref.tmdbId }] : [],
   );
 
   return tmdbBranches(byTmdb, {
     subject: "film",
     key: "tmdbKey",
-    entities: refs.flatMap((ref) => (ref.wikidataId ? [ref.wikidataId] : [])),
+    entities: refs.flatMap((ref) => (ref.wikidataId && !ref.tmdbId ? [ref.wikidataId] : [])),
   });
 }
 
