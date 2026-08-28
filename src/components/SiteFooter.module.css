@@ -9,7 +9,7 @@
   padding: var(--space-6) var(--gutter);
 }
 
-.credits {
+.creditsWrapper {
   flex: 1;
 }
 
