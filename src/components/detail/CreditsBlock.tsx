@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
+import { personPath } from "../../domain/catalog";
 import { useTitleCredits, type CreditSeason, type TitleCredit } from "../../hooks/useTitleCredits";
 import { Dropdown, Heading, StatusNote, type DropdownOption } from "../../ui";
 
@@ -104,7 +105,7 @@ export function CreditsBlock({ titleId }: { titleId: string }) {
                 {names.map((name, index) => (
                   <span key={`${job}-${name}`}>
                     {index > 0 ? ", " : ""}
-                    <Link to={`/person/${encodeURIComponent(name)}`}>{name}</Link>
+                    <Link to={personPath(name)}>{name}</Link>
                   </span>
                 ))}
               </dd>
@@ -116,7 +117,7 @@ export function CreditsBlock({ titleId }: { titleId: string }) {
         <ul className={styles.cast}>
           {cast.map((credit) => (
             <li key={`${credit.personId}-${credit.episodeNumber ?? "s"}`}>
-              <Link to={`/person/${encodeURIComponent(credit.name)}`}>
+              <Link to={personPath(credit.name)}>
                 <strong>{credit.name}</strong>
                 {credit.character ? <small>{credit.character}</small> : null}
                 {credit.episodeNumber !== null ? (

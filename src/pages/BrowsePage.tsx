@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { ErrorBoundary } from "../components/ErrorBoundary";
@@ -6,7 +7,10 @@ import { ProviderBadge } from "../components/ProviderBadge";
 import { LoadMore, ResultsGrid, ResultsSkeleton } from "../components/ResultsGrid";
 import { SearchField } from "../components/SearchField";
 import { TitleCard } from "../components/TitleCard";
+import { UsherCard } from "../components/usher/UsherCard";
+import { UsherSearchHit } from "../components/usher/UsherSearchHit";
 import type { MediaTitle, Provider } from "../domain/catalog";
+import type { UsherMoment } from "../domain/usher";
 import { useBrowse, useFilmingPlaces, useGenres, useKeywords } from "../hooks/useBrowse";
 import { Chip, EmptyState, Page, PageHeader } from "../ui";
 
@@ -41,11 +45,19 @@ function toggle(values: string[], value: string) {
 export function BrowsePage({
   preset,
   providers,
+  usherMoment,
   onOpen,
+  onUsherRequest,
+  onUsherAction,
+  onUsherDismiss,
 }: {
   preset: BrowsePreset;
   providers: Provider[];
+  usherMoment: UsherMoment | null;
   onOpen: (item: MediaTitle) => void;
+  onUsherRequest: (query: string) => void;
+  onUsherAction: (moment: UsherMoment, actionId: string) => void;
+  onUsherDismiss: (scope: "once" | "kind") => void;
 }) {
   const [params, setParams] = useSearchParams();
   const genres = useGenres(BROWSE_GENRES);
@@ -59,6 +71,7 @@ export function BrowsePage({
   const selectedProviders = (params.get("providers") ?? "").split(",").filter(Boolean);
   const selectedPlaces = (params.get("places") ?? "").split(",").filter(Boolean);
   const query = params.get("q") ?? "";
+  const trimmedQuery = query.trim();
   const sortParam = params.get("sort");
   const sort: BrowsePreset["sort"] =
     sortParam === "score" ||
@@ -110,10 +123,33 @@ export function BrowsePage({
     selectedProviders.length > 0 ||
     Boolean(query) ||
     sort !== preset.sort;
+  const isEmpty = !browse.isLoading && browse.items.length === 0;
+  const foundNothing = isEmpty && trimmedQuery.length > 0 && !browse.error;
+  const pendingCount = browse.items.filter((item) => item.pending).length;
+  const resultCount = browse.items.length - pendingCount;
+
+  useEffect(() => {
+    if (foundNothing) {
+      onUsherRequest(trimmedQuery);
+    }
+  }, [foundNothing, onUsherRequest, trimmedQuery]);
 
   return (
     <Page>
-      <PageHeader heading={preset.title} description={preset.description} />
+      <PageHeader
+        heading={trimmedQuery ? `“${trimmedQuery}”` : preset.title}
+        description={
+          trimmedQuery
+            ? browse.isLoading && browse.items.length === 0
+              ? "Searching the catalogue…"
+              : `${resultCount}${browse.hasMore ? "+" : ""} result${
+                  resultCount === 1 ? "" : "s"
+                }${pendingCount ? ` · ${pendingCount} being fetched` : ""}. Narrow it down below.`
+            : preset.description
+        }
+      />
+
+      <UsherSearchHit query={query} />
 
       <FilterBar>
         <SearchField
@@ -254,7 +290,11 @@ export function BrowsePage({
                 key={item.id}
                 item={item}
                 onOpen={onOpen}
-                rank={sort === "popularity" || sort === "trending" ? index + 1 : undefined}
+                rank={
+                  !trimmedQuery && (sort === "popularity" || sort === "trending")
+                    ? index + 1
+                    : undefined
+                }
               />
             ))}
           </ResultsGrid>
@@ -263,11 +303,24 @@ export function BrowsePage({
 
       {browse.isLoading && browse.items.length === 0 && <ResultsSkeleton count={8} />}
 
-      {!browse.isLoading && browse.items.length === 0 && (
+      {isEmpty && (
         <EmptyState
-          heading={browse.error || "Nothing matches those filters."}
-          description="Try removing a genre or a source."
-        />
+          heading={
+            browse.error ||
+            (trimmedQuery
+              ? `Nothing found for “${trimmedQuery}”.`
+              : "Nothing matches those filters.")
+          }
+          description={
+            trimmedQuery
+              ? "Try a different spelling, or loosen the filters."
+              : "Try removing a genre or a source."
+          }
+        >
+          {foundNothing && usherMoment && (
+            <UsherCard moment={usherMoment} onAction={onUsherAction} onDismiss={onUsherDismiss} />
+          )}
+        </EmptyState>
       )}
 
       {browse.hasMore && <LoadMore isLoading={browse.isLoading} onClick={browse.loadMore} />}

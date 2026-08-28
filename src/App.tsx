@@ -13,6 +13,7 @@ import { useAiRails } from "./hooks/useAiRails";
 import { useCatalog } from "./hooks/useCatalog";
 import { useCurator } from "./hooks/useCurator";
 import { useFeaturedTitle } from "./hooks/useFeaturedTitle";
+import { usePageMetadata } from "./hooks/usePageMetadata";
 import { usePersonalRails } from "./hooks/usePersonalRails";
 import { usePinned } from "./hooks/usePinned";
 import { useProfile } from "./hooks/useProfile";
@@ -23,10 +24,12 @@ import { useTitle } from "./hooks/useTitle";
 import { useTonight } from "./hooks/useTonight";
 import { useTrending } from "./hooks/useTrending";
 import { useUsher } from "./hooks/useUsher";
+import { aliasTarget, ROUTE_ALIASES } from "./lib/aliases";
 import { classNames } from "./lib/class-names";
 import { APP_INSTANCE } from "./lib/navigation";
 import { titleForItem, titleForRoute } from "./lib/page-title";
 import type { BrowsePreset } from "./pages/BrowsePage";
+import { DirectoryPage } from "./pages/DirectoryPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { SignedOutShelf } from "./pages/SignedOutShelf";
 import { TonightPage } from "./pages/TonightPage";
@@ -49,12 +52,13 @@ const LibraryPage = lazy(() =>
 const PersonPage = lazy(() =>
   import("./pages/PersonPage").then((m) => ({ default: m.PersonPage })),
 );
-const SearchPage = lazy(() =>
-  import("./pages/SearchPage").then((m) => ({ default: m.SearchPage })),
-);
 const SignInPage = lazy(() =>
   import("./pages/SignInPage").then((m) => ({ default: m.SignInPage })),
 );
+const PrivacyPolicyPage = lazy(() =>
+  import("./pages/PrivacyPolicyPage").then((m) => ({ default: m.PrivacyPolicyPage })),
+);
+const TermsPage = lazy(() => import("./pages/TermsPage").then((m) => ({ default: m.TermsPage })));
 const SourcesPage = lazy(() =>
   import("./pages/SourcesPage").then((m) => ({ default: m.SourcesPage })),
 );
@@ -89,22 +93,10 @@ function isTitlePath(pathname: string) {
   );
 }
 
-const LEGACY_BROWSE: Record<string, string> = {
-  "/films": "type=movie",
-  "/series": "type=tv",
-  "/new": "sort=recent",
-  "/popular": "sort=popularity",
-};
-
-function LegacyBrowse({ preset }: { preset: string }) {
+function AliasRedirect({ alias }: { alias: string }) {
   const { search } = useLocation();
-  const merged = new URLSearchParams(search);
 
-  for (const [key, value] of new URLSearchParams(preset)) {
-    merged.set(key, value);
-  }
-
-  return <Navigate to={`/listings?${merged.toString()}`} replace />;
+  return <Navigate to={aliasTarget(alias, search) ?? "/"} replace />;
 }
 
 const LISTINGS: BrowsePreset = {
@@ -116,18 +108,7 @@ const LISTINGS: BrowsePreset = {
 export function App() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [query, setQuery] = useState(() =>
-    location.pathname === "/search" ? (new URLSearchParams(location.search).get("q") ?? "") : "",
-  );
-  const [queryLocationKey, setQueryLocationKey] = useState(location.key);
-
-  if (queryLocationKey !== location.key) {
-    setQueryLocationKey(location.key);
-
-    if (location.pathname === "/search") {
-      setQuery(new URLSearchParams(location.search).get("q") ?? "");
-    }
-  }
+  const [query, setQuery] = useState("");
 
   const session = useSession();
   const isSignedIn = Boolean(session.user);
@@ -186,32 +167,24 @@ export function App() {
   const openDetails = useTitle(openTitleId || undefined, knownTitles);
 
   const requestMoment = usher.request;
-  const trimmedQuery = query.trim();
+  const pageQuery = (new URLSearchParams(pageLocation.search).get("q") ?? "").trim();
 
-  useEffect(() => {
-    if (openTitleId) {
-      if (openDetails.title) {
-        document.title = titleForItem(openDetails.title);
-      }
+  const fallbackTitle = openTitleId
+    ? openDetails.title
+      ? titleForItem(openDetails.title)
+      : ""
+    : titleForRoute(pagePath, pageQuery);
 
-      return;
-    }
+  usePageMetadata(`${location.pathname}${location.search}`, fallbackTitle);
 
-    document.title = titleForRoute(pagePath, trimmedQuery);
-  }, [openDetails.title, openTitleId, pagePath, trimmedQuery]);
-
-  const hasEmptySearch =
-    pagePath === "/search" &&
-    Boolean(trimmedQuery) &&
-    !search.isSearching &&
-    !search.isRefining &&
-    !search.items.length;
-
-  useEffect(() => {
-    if (hasEmptySearch) {
-      void requestMoment("search-empty", { query: trimmedQuery });
-    }
-  }, [hasEmptySearch, requestMoment, trimmedQuery]);
+  const rescueQueryRef = useRef("");
+  const onEmptyListings = useCallback(
+    (emptyQuery: string) => {
+      rescueQueryRef.current = emptyQuery;
+      void requestMoment("search-empty", { query: emptyQuery });
+    },
+    [requestMoment],
+  );
 
   const wantsDrip = isSignedIn && isHome && isViewerReady && !usher.isOnboarding;
 
@@ -340,7 +313,7 @@ export function App() {
 
       if (moment.kind === "search-rescue" && actionId === "rescue") {
         void usher.dismiss("acknowledged");
-        void askCurator(query);
+        void askCurator(rescueQueryRef.current);
 
         return;
       }
@@ -359,7 +332,7 @@ export function App() {
 
       void usher.dismiss("acknowledged");
     },
-    [askCurator, profile, query, usher],
+    [askCurator, profile, usher],
   );
 
   const askForTicket = useCallback(() => {
@@ -472,10 +445,10 @@ export function App() {
               onQueryChange={setQuery}
               onOpen={openTitle}
               onSubmit={() => {
-                if (query.trim()) {
-                  curator.clear();
-                  void navigate(`/search?q=${encodeURIComponent(query.trim())}`);
-                }
+                const trimmed = query.trim();
+
+                curator.clear();
+                void navigate(trimmed ? `/listings?q=${encodeURIComponent(trimmed)}` : "/listings");
               }}
             />
           </ErrorBoundary>
@@ -596,6 +569,10 @@ export function App() {
                 }
               />
 
+              <Route path="/privacy" element={<PrivacyPolicyPage />} />
+
+              <Route path="/terms" element={<TermsPage />} />
+
               <Route
                 path="/this-week"
                 element={
@@ -603,27 +580,6 @@ export function App() {
                     isSignedIn={isSignedIn}
                     isSessionLoading={session.isLoading}
                     onOpen={openTitle}
-                  />
-                }
-              />
-
-              <Route
-                path="/search"
-                element={
-                  <SearchPage
-                    query={query}
-                    items={search.items}
-                    error={search.error}
-                    isSearching={search.isSearching}
-                    isRefining={search.isRefining}
-                    usherMoment={usher.moment?.surface === "search-empty" ? usher.moment : null}
-                    onUsherAction={onUsherAction}
-                    onUsherDismiss={(scope) => void usher.dismiss(scope)}
-                    onOpen={openTitle}
-                    onShowTonight={() => {
-                      setQuery("");
-                      void navigate("/");
-                    }}
                   />
                 }
               />
@@ -656,6 +612,8 @@ export function App() {
 
               <Route path="/collection/:id" element={<CollectionPage onOpen={openTitle} />} />
 
+              <Route path="/directory" element={<DirectoryPage />} />
+
               <Route
                 path="/sources"
                 element={
@@ -683,7 +641,15 @@ export function App() {
               <Route
                 path="/listings"
                 element={
-                  <BrowsePage preset={LISTINGS} providers={catalog.providers} onOpen={openTitle} />
+                  <BrowsePage
+                    preset={LISTINGS}
+                    providers={catalog.providers}
+                    usherMoment={usher.moment?.surface === "search-empty" ? usher.moment : null}
+                    onOpen={openTitle}
+                    onUsherRequest={onEmptyListings}
+                    onUsherAction={onUsherAction}
+                    onUsherDismiss={(scope) => void usher.dismiss(scope)}
+                  />
                 }
               />
 
@@ -691,8 +657,8 @@ export function App() {
               <Route path="/tv/:tmdbId/*" element={titleView} />
               <Route path="/title/:titleId" element={titleView} />
 
-              {Object.entries(LEGACY_BROWSE).map(([path, preset]) => (
-                <Route key={path} path={path} element={<LegacyBrowse preset={preset} />} />
+              {Object.keys(ROUTE_ALIASES).map((path) => (
+                <Route key={path} path={path} element={<AliasRedirect alias={path} />} />
               ))}
 
               <Route path="*" element={<NotFoundPage />} />

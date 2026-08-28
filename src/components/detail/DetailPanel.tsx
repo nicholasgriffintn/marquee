@@ -308,13 +308,6 @@ export function DetailPanel({
           )}
           <MarqueeRead insight={insight} isLoading={isInsightLoading} />
           <AirLine item={item} nextEpisode={nextEpisode} />
-          {isSeries && (
-            <SeasonsRail
-              seasons={seasons}
-              onOpenSeason={openSeason}
-              onOpenAll={() => setTab("episodes")}
-            />
-          )}
           {continueAt && (
             <button type="button" className={styles.continue} onClick={resumeWatching}>
               <span>
@@ -322,6 +315,29 @@ export function DetailPanel({
               </span>
               <ArrowIcon />
             </button>
+          )}
+          {isSeries && (
+            <SeasonsRail
+              seasons={seasons}
+              onOpenSeason={openSeason}
+              onOpenAll={() => setTab("episodes")}
+            />
+          )}
+          {item.collection && collection.items.length > 1 && (
+            <TitleTrack
+              label={item.collection.name}
+              items={collection.items}
+              currentId={item.id}
+              caption={collectionCaption}
+              onOpen={onOpen}
+              footer={
+                collection.hasMore ? (
+                  <Link className={styles.collectionLink} to={collectionPath(item.collection.id)}>
+                    See the whole collection
+                  </Link>
+                ) : undefined
+              }
+            />
           )}
           {canSave && (
             <ErrorBoundary label="The shelf card">
@@ -407,22 +423,6 @@ export function DetailPanel({
           <ErrorBoundary label="The trailer">
             <TrailerBlock item={item} />
           </ErrorBoundary>
-          {item.collection && collection.items.length > 1 && (
-            <TitleTrack
-              label={item.collection.name}
-              items={collection.items}
-              currentId={item.id}
-              caption={collectionCaption}
-              onOpen={onOpen}
-              footer={
-                collection.hasMore ? (
-                  <Link className={styles.collectionLink} to={collectionPath(item.collection.id)}>
-                    See the whole collection
-                  </Link>
-                ) : undefined
-              }
-            />
-          )}
           {usherSlot}
           <ScoreRow item={item} />
           <TitleAwards titleId={item.id} />

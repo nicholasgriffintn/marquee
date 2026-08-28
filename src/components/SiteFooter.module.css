@@ -13,6 +13,14 @@
   flex: 1;
 }
 
+.legal {
+  display: flex;
+  flex: 0 0 auto;
+  font: var(--type-label-sm) var(--mono);
+  gap: var(--space-3);
+  text-transform: uppercase;
+}
+
 .egg {
   font: var(--type-label-sm) var(--mono);
   text-transform: uppercase;

@@ -276,6 +276,44 @@ async function readSearchResults(db: D1Database, query: string, providerIds: str
   } satisfies CatalogResponse;
 }
 
+export type CollectionRecord = { id: number; name: string; titles: number };
+
+export async function listCollections(
+  db: D1Database,
+  query: string,
+  limit = 60,
+  offset = 0,
+): Promise<CollectionRecord[]> {
+  const term = query.trim().toLowerCase();
+  const size = clamp(limit, 1, 120);
+  const skip = Math.max(0, offset);
+  const rows = term
+    ? await db
+        .prepare(
+          `SELECT collection_id AS id, max(collection_name) AS name, count(*) AS titles
+             FROM catalog_titles
+            WHERE collection_id IS NOT NULL AND lower(collection_name) LIKE ?1
+            GROUP BY collection_id
+            ORDER BY titles DESC, name
+            LIMIT ?2 OFFSET ?3`,
+        )
+        .bind(`%${term}%`, size, skip)
+        .all<CollectionRecord>()
+    : await db
+        .prepare(
+          `SELECT collection_id AS id, max(collection_name) AS name, count(*) AS titles
+             FROM catalog_titles
+            WHERE collection_id IS NOT NULL
+            GROUP BY collection_id
+            ORDER BY titles DESC, name
+            LIMIT ?1 OFFSET ?2`,
+        )
+        .bind(size, skip)
+        .all<CollectionRecord>();
+
+  return rows.results.filter((row) => Boolean(row.name));
+}
+
 export async function readCollectionTitleIds(
   db: D1Database,
   collectionId: number,

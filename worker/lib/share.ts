@@ -7,7 +7,7 @@ import { readWork } from "../repositories/revival.ts";
 import type { Bindings } from "../types.ts";
 import { isKnownTitle } from "./validation.ts";
 
-type PageCard = {
+export type PageCard = {
   title: string;
   description: string;
   image: string | null;
@@ -26,7 +26,7 @@ const LISTING_KINDS: Record<string, { one: string; many: string }> = {
   all: { one: "film or TV series", many: "films and TV" },
 };
 
-const NOINDEX_PATHS = new Set(["/search", "/sign-in", "/shelf", "/admin", "/notebook"]);
+export const NOINDEX_PATHS = new Set(["/search", "/sign-in", "/shelf", "/admin", "/notebook"]);
 
 const STATIC_CARDS: Record<string, { title: string; description: string }> = {
   "/": {
@@ -372,6 +372,45 @@ async function listingsCard(env: Bindings, url: URL, origin: string): Promise<Pa
   };
 }
 
+const DIRECTORY_CARDS = {
+  people: {
+    title: "Every actor, director and writer in the catalogue · Marquee",
+    description:
+      "Every name on the credits at Marquee, with everything we hold for each one and where to stream it in the UK.",
+  },
+  collections: {
+    title: "Every film collection, in release order · Marquee",
+    description:
+      "Every collection in the Marquee catalogue — sequels, trilogies and long-running series — each one in release order with UK streaming options.",
+  },
+};
+
+function directoryCard(url: URL, origin: string): PageCard {
+  const collections = url.searchParams.get("tab") === "collections";
+  const copy = collections ? DIRECTORY_CARDS.collections : DIRECTORY_CARDS.people;
+  const canonical = `${origin}/directory${collections ? "?tab=collections" : ""}`;
+
+  return {
+    title: copy.title,
+    description: copy.description,
+    image: null,
+    canonical,
+    ogType: "website",
+    index: !url.searchParams.get("q"),
+    structuredData: [
+      breadcrumbs(
+        origin,
+        collections
+          ? [
+              { name: "The index", item: `${origin}/directory` },
+              { name: "Collections", item: canonical },
+            ]
+          : [{ name: "The index", item: canonical }],
+      ),
+    ],
+  };
+}
+
 function staticCard(path: string, origin: string): PageCard | null {
   const copy = STATIC_CARDS[path];
 
@@ -390,7 +429,7 @@ function staticCard(path: string, origin: string): PageCard | null {
   };
 }
 
-async function cardFor(env: Bindings, url: URL, origin: string): Promise<PageCard | null> {
+export async function cardFor(env: Bindings, url: URL, origin: string): Promise<PageCard | null> {
   const path = url.pathname;
   const routed = /^\/(movie|tv)\/([1-9][0-9]*)(?:\/|$)/u.exec(path);
 
@@ -424,6 +463,10 @@ async function cardFor(env: Bindings, url: URL, origin: string): Promise<PageCar
 
   if (path === "/listings") {
     return listingsCard(env, url, origin);
+  }
+
+  if (path === "/directory") {
+    return directoryCard(url, origin);
   }
 
   return staticCard(path, origin);

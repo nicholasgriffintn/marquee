@@ -135,6 +135,18 @@
   max-width: 46ch;
 }
 
+.small a {
+  color: #2a4bc9;
+  font-weight: var(--weight-bold);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.small a:hover,
+.small a:focus-visible {
+  color: var(--ink);
+}
+
 .status {
   background-color: var(--acid);
   color: var(--blue);

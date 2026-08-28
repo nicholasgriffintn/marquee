@@ -50,11 +50,6 @@
   width: 20px;
 }
 
-.moment {
-  margin-top: var(--space-5);
-  width: min(440px, 100%);
-}
-
 @media (prefers-reduced-motion: reduce) {
   .usher {
     transition: none;

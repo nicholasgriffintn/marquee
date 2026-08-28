@@ -11,8 +11,13 @@ import { pathInteger, queryInteger, queryList, queryText } from "../lib/params.t
 import { canonicalOrigin } from "../lib/security.ts";
 import { isKnownTitle, validProviderIds } from "../lib/validation.ts";
 import { readPersonAwards, readTitleAwards } from "../repositories/awards.ts";
-import { readCollectionTitleIds, readItems } from "../repositories/catalog-reader.ts";
 import {
+  listCollections,
+  readCollectionTitleIds,
+  readItems,
+} from "../repositories/catalog-reader.ts";
+import {
+  listPeople,
   readCreditSeasons,
   readPerson,
   readPersonShelf,
@@ -279,8 +284,62 @@ catalogRoutes.get("/items", edgeCache(900), async (context) => {
 
 const PERSON_LIMIT = 48;
 const COLLECTION_LIMIT = 24;
+const DIRECTORY_LIMIT = 60;
 const MAX_PERSON_PAGE = 200;
 const MAX_COLLECTION_PAGE = 200;
+const MAX_DIRECTORY_PAGE = 200;
+
+catalogRoutes.get("/people", edgeCache(3_600), async (context) => {
+  const query = queryText(context, "query", QUERY_LIMIT);
+  const page = queryInteger(context, "page", 0, 0, MAX_DIRECTORY_PAGE);
+
+  try {
+    const people = await listPeople(
+      context.env.DB,
+      query,
+      DIRECTORY_LIMIT + 1,
+      page * DIRECTORY_LIMIT,
+    );
+
+    context.header("cache-control", "public, max-age=3600");
+
+    return context.json({
+      items: people.slice(0, DIRECTORY_LIMIT),
+      page,
+      hasMore: people.length > DIRECTORY_LIMIT,
+    });
+  } catch (error) {
+    logError("catalogue_read_failed", error, { area: "people" });
+
+    return context.json({ error: "The book of names is out of reach" }, 500);
+  }
+});
+
+catalogRoutes.get("/collections", edgeCache(3_600), async (context) => {
+  const query = queryText(context, "query", QUERY_LIMIT);
+  const page = queryInteger(context, "page", 0, 0, MAX_DIRECTORY_PAGE);
+
+  try {
+    const collections = await listCollections(
+      context.env.DB,
+      query,
+      DIRECTORY_LIMIT + 1,
+      page * DIRECTORY_LIMIT,
+    );
+
+    context.header("cache-control", "public, max-age=3600");
+
+    return context.json({
+      items: collections.slice(0, DIRECTORY_LIMIT),
+      page,
+      hasMore: collections.length > DIRECTORY_LIMIT,
+    });
+  } catch (error) {
+    logError("catalogue_read_failed", error, { area: "collections" });
+
+    return context.json({ error: "The collections are out of reach" }, 500);
+  }
+});
 
 catalogRoutes.get("/people/:name", async (context) => {
   const name = decodeURIComponent(context.req.param("name")).slice(0, 120);

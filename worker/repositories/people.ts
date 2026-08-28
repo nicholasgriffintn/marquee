@@ -165,6 +165,47 @@ export async function readPerson(db: D1Database, name: string): Promise<PersonRe
   }
 }
 
+export async function listPeople(
+  db: D1Database,
+  query: string,
+  limit = 60,
+  offset = 0,
+): Promise<PersonRecord[]> {
+  const term = query.trim().toLowerCase();
+  const size = clamp(limit, 1, 120);
+  const skip = Math.max(0, offset);
+
+  try {
+    const rows = term
+      ? await db
+          .prepare(
+            `SELECT person_id AS personId, name, titles
+               FROM catalog_people
+              WHERE titles > 0 AND lower(name) LIKE ?1
+              ORDER BY CASE WHEN lower(name) LIKE ?2 THEN 0 ELSE 1 END, titles DESC, name
+              LIMIT ?3 OFFSET ?4`,
+          )
+          .bind(`%${term}%`, `${term}%`, size, skip)
+          .all<PersonRecord>()
+      : await db
+          .prepare(
+            `SELECT person_id AS personId, name, titles
+               FROM catalog_people
+              WHERE titles > 0
+              ORDER BY titles DESC, name
+              LIMIT ?1 OFFSET ?2`,
+          )
+          .bind(size, skip)
+          .all<PersonRecord>();
+
+    return rows.results;
+  } catch (error) {
+    logError("people_list_failed", error);
+
+    return [];
+  }
+}
+
 export async function readPersonTitleIds(db: D1Database, personId: number, limit = 48, offset = 0) {
   try {
     const rows = await db

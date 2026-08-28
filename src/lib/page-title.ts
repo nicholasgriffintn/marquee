@@ -10,9 +10,13 @@ const ROUTE_TITLES: Record<string, string> = {
   "/notebook": "The notebook · Marquee",
   "/revival": "The revival house · Marquee",
   "/sources": "Where it comes from · Marquee",
+  "/directory": "The index · Marquee",
   "/admin": "Admin · Marquee",
   "/sign-in": "Box office · Marquee",
+  "/privacy": "Privacy policy · Marquee",
+  "/terms": "Terms of use · Marquee",
   "/usher": "The Usher (1974) — Marquee",
+  "/search": "Listings · Marquee",
   "/films": "Listings · Marquee",
   "/series": "Listings · Marquee",
   "/new": "Listings · Marquee",
@@ -30,8 +34,8 @@ const PREFIX_TITLES: [string, string][] = [
 ];
 
 export function titleForRoute(pathname: string, query: string) {
-  if (pathname === "/search") {
-    return query ? `${query} · Search · Marquee` : "Search · Marquee";
+  if (pathname === "/listings" && query) {
+    return `${query} · Listings · Marquee`;
   }
 
   const prefixed = PREFIX_TITLES.find(([prefix]) => pathname.startsWith(prefix));

@@ -34,8 +34,11 @@
   border: 0;
   font-size: var(--type-xs);
   min-width: 0;
-  outline: 0;
   width: 100%;
+}
+
+.input:focus-visible {
+  outline: none;
 }
 
 .input::placeholder {

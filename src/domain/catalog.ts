@@ -326,6 +326,10 @@ export function collectionPath(collectionId: number) {
   return `/collection/${collectionId}`;
 }
 
+export function personPath(name: string) {
+  return `/person/${encodeURIComponent(name)}`;
+}
+
 const PERSONAL_SPACING = 3;
 
 export function weaveSections(

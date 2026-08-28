@@ -227,6 +227,38 @@ async function browseByPopularityOrScore(env: Bindings, browse: BrowseQuery, min
   return browse.query ? searchTitlesFirst(env.DB, search) : queryCatalogue(env.DB, search);
 }
 
+function isNarrowed(browse: BrowseQuery) {
+  return (
+    browse.genres.length > 0 ||
+    browse.keywords.length > 0 ||
+    browse.places.length > 0 ||
+    browse.providerIds.length > 0
+  );
+}
+
+async function pendingForBrowse(
+  env: Bindings,
+  browse: BrowseQuery,
+  found: MediaTitle[],
+  hasMore: boolean,
+) {
+  if (!browse.query || browse.page > 0 || hasMore || isNarrowed(browse)) {
+    return [];
+  }
+
+  try {
+    const pending = await findPendingTitles(env, browse.query, found);
+
+    return browse.mediaType
+      ? pending.filter((title) => title.mediaType === browse.mediaType)
+      : pending;
+  } catch (error) {
+    logError("pending_lookup_failed", error, { area: "browse" });
+
+    return [];
+  }
+}
+
 export async function browseCatalogue(env: Bindings, browse: BrowseQuery) {
   const minVotes = browse.sort === "recent" ? 0 : BROWSE_MIN_VOTES;
   const items =
@@ -246,9 +278,12 @@ export async function browseCatalogue(env: Bindings, browse: BrowseQuery) {
         )
       : await browseByPopularityOrScore(env, browse, minVotes);
 
+  const hasMore = items.length > PAGE_SIZE;
+  const found = await withBuzz(env.DB, items.slice(0, PAGE_SIZE));
+
   return {
-    items: await withBuzz(env.DB, items.slice(0, PAGE_SIZE)),
-    hasMore: items.length > PAGE_SIZE,
+    items: [...found, ...(await pendingForBrowse(env, browse, found, hasMore))],
+    hasMore,
     page: browse.page,
   };
 }

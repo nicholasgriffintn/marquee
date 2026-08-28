@@ -27,9 +27,12 @@
   border: 0;
   color: var(--white);
   min-width: 0;
-  outline: 0;
   padding: 13px 0;
   width: 100%;
+}
+
+.input:focus-visible {
+  outline: none;
 }
 
 .input::placeholder {

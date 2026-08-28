@@ -11,6 +11,7 @@ import { logError, logEvent, logRejection } from "./lib/logging.ts";
 import { canonicalOrigin } from "./lib/security.ts";
 import { withPageMetadata } from "./lib/share.ts";
 import { adminRoutes } from "./routes/admin.ts";
+import { aliasRoutes } from "./routes/aliases.ts";
 import { catalogRoutes } from "./routes/catalog.ts";
 import { cinemaRoutes } from "./routes/cinema.ts";
 import { curatorRoutes } from "./routes/curator.ts";
@@ -21,6 +22,7 @@ import { linkRoutes } from "./routes/links.ts";
 import { mcpRoutes } from "./routes/mcp.ts";
 import { mediaRoutes } from "./routes/media.ts";
 import { notebookRoutes } from "./routes/notebook.ts";
+import { pageMetadataRoutes } from "./routes/page-metadata.ts";
 import { profileRoutes } from "./routes/profile.ts";
 import { reelRoutes } from "./routes/reel.ts";
 import { revivalRoutes } from "./routes/revival.ts";
@@ -61,6 +63,8 @@ app.get("/health", (context) => context.json({ ok: true, service: "marquee" }));
 
 app.route("/", sitemapRoutes);
 
+app.route("/", aliasRoutes);
+
 app.route("/media/reel", reelRoutes);
 
 app.route("/media", mediaRoutes);
@@ -88,6 +92,8 @@ app.route("/api/notebook", notebookRoutes);
 app.route("/api/links", linkRoutes);
 
 app.route("/api/events", eventRoutes);
+
+app.route("/api/page-metadata", pageMetadataRoutes);
 
 app.route("/feeds", feedRoutes);
 

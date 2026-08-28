@@ -171,12 +171,6 @@
   }
 }
 
-@media (max-width: 1100px) {
-  .console {
-    width: min(520px, 58vw);
-  }
-}
-
 @media (max-width: 860px) {
   .row {
     justify-content: flex-start;

@@ -1,5 +1,5 @@
 import { AuthFlow, AuthProvider, type ExternalAuthProvider } from "@ngriffin_uk/auth-react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { UsherMark } from "../components/usher/UsherMark";
 import { useResource } from "../hooks/useResource";
@@ -127,7 +127,9 @@ export function SignInPage({
               )}
 
               <p className={styles.small}>
-                We keep your name and avatar, nothing else. Your shelf stays yours.
+                Signing in lets Marquee keep your shelf, ratings, notes and viewing preferences. By
+                continuing, you agree to the <Link to="/terms">terms of use</Link> and acknowledge
+                the <Link to="/privacy">privacy policy</Link>.
               </p>
             </div>
           )}
