@@ -9,5 +9,3 @@ worker-configuration.d.ts
 xcuserdata/
 *.sqlite-shm
 *.sqlite-wal
-
-backups/
