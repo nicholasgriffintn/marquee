@@ -264,6 +264,7 @@ function PeopleAnswer({
           <div
             className="usher-matches"
             id="usher-matches"
+            // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- select/datalist can't implement an aria-activedescendant combobox
             role="listbox"
             aria-label="Matching people"
           >
@@ -275,6 +276,7 @@ function PeopleAnswer({
                 ref={(node) => {
                   optionRefs.current[index] = node;
                 }}
+                // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- select/datalist can't implement an aria-activedescendant combobox
                 role="option"
                 tabIndex={-1}
                 aria-selected={index === active}
@@ -287,21 +289,15 @@ function PeopleAnswer({
             ))}
           </div>
         )}
-        {isSearching && (
-          <p className="usher-note" aria-live="polite">
-            Looking…
-          </p>
-        )}
-        {noMatches && (
-          <p className="usher-note" aria-live="polite">
-            Nobody by that name in the catalogue.
-          </p>
-        )}
-        {term.length === 1 && (
-          <p className="usher-note" aria-live="polite">
-            Keep going, two letters at least.
-          </p>
-        )}
+        <p className="usher-note" aria-live="polite">
+          {isSearching
+            ? "Looking…"
+            : noMatches
+              ? "Nobody by that name in the catalogue."
+              : term.length === 1
+                ? "Keep going, two letters at least."
+                : ""}
+        </p>
       </div>
 
       {!term && !isFull && offered.length > 0 && (

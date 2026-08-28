@@ -4453,6 +4453,10 @@ h2 em {
   font: 400 12px/1 var(--sans);
   margin: 8px 0 0;
 }
+.usher-note:empty,
+.search-suggestion-empty:empty {
+  display: none;
+}
 .usher-suggests {
   margin-bottom: 16px;
 }

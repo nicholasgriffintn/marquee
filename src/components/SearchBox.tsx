@@ -106,6 +106,7 @@ export function SearchBox({
       </label>
 
       {showPanel && (
+        // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- select/datalist can't implement an aria-activedescendant combobox
         <div className="search-suggestions" id="search-suggestions" role="listbox">
           {suggestions.map((item, index) => (
             <button
@@ -116,6 +117,7 @@ export function SearchBox({
               ref={(node) => {
                 optionRefs.current[index] = node;
               }}
+              // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- select/datalist can't implement an aria-activedescendant combobox
               role="option"
               aria-selected={index === active}
               className={`search-suggestion${index === active ? " active" : ""}`}
@@ -141,15 +143,15 @@ export function SearchBox({
             </button>
           ))}
 
-          {suggestions.length === 0 && (
-            <p className="search-suggestion-empty" aria-live="polite">
-              {isSearching
+          <p className="search-suggestion-empty" aria-live="polite">
+            {suggestions.length > 0
+              ? ""
+              : isSearching
                 ? "Searching…"
                 : isRefining
                   ? "Reading a little wider…"
                   : "No matches yet."}
-            </p>
-          )}
+          </p>
 
           <button type="button" tabIndex={-1} className="search-suggestion-all" onClick={submit}>
             See all results for “{query.trim()}” <ArrowIcon />
