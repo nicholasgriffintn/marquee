@@ -28,8 +28,7 @@ async function queryAuthors(refs: FilmRef[]) {
   const rows = await queryWikidata(
     `SELECT ?film ?imdb ?person ?death WHERE {
   ${clauses(refs)}
-  VALUES ?prop { wdt:P57 wdt:P58 wdt:P86 }
-  ?film ?prop ?person .
+  { ?film wdt:P57 ?person } UNION { ?film wdt:P58 ?person } UNION { ?film wdt:P86 ?person }
   OPTIONAL { ?person wdt:P570 ?death . }
 }`,
     { timeoutMs: TIMEOUT_MS, cacheTtl: CACHE_TTL },

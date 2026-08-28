@@ -19,6 +19,7 @@ import {
 import type { Bindings } from "../types.ts";
 
 const SAMPLE_SIZE = 40;
+const REFRESH_DAYS = 7;
 const CONCURRENCY = 8;
 const VOLUME_DAYS = 7;
 const VOLUME_MAX_AGE_DAYS = 7;
@@ -39,7 +40,7 @@ function languagesFor(candidate: Candidate) {
   return own && !BOARD_LANGUAGES.includes(own) ? [...BOARD_LANGUAGES, own] : BOARD_LANGUAGES;
 }
 
-async function candidates(env: Bindings, titleIds: string[]) {
+async function candidates(env: Bindings) {
   const rows = await env.DB.prepare(
     `SELECT b.title_id AS titleId, t.wikidata_id AS entityId,
             t.original_language AS originalLanguage
@@ -47,11 +48,14 @@ async function candidates(env: Bindings, titleIds: string[]) {
      JOIN catalog_titles AS t ON t.id = b.title_id
      WHERE b.article <> '' AND b.views >= ${MIN_TRENDING_VIEWS}
        AND t.wikidata_id IS NOT NULL
-       AND b.title_id IN (SELECT value FROM json_each(?))
+       AND NOT EXISTS (
+         SELECT 1 FROM title_language_buzz AS l
+         WHERE l.title_id = b.title_id AND l.measured_at > datetime('now', ?1)
+       )
      ORDER BY b.views DESC
-     LIMIT ?`,
+     LIMIT ?2`,
   )
-    .bind(JSON.stringify(titleIds), SAMPLE_SIZE)
+    .bind(`-${REFRESH_DAYS} days`, SAMPLE_SIZE)
     .all<Candidate>();
 
   return rows.results;
@@ -149,8 +153,8 @@ function groupByTitle(readings: Reading[]) {
   return grouped;
 }
 
-export async function syncWorldBoard(env: Bindings, titleIds: string[]) {
-  const pending = await candidates(env, titleIds);
+export async function syncWorldBoard(env: Bindings) {
+  const pending = await candidates(env);
 
   if (pending.length === 0) {
     return 0;

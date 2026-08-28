@@ -118,14 +118,14 @@ async function sectionsSample(db: D1Database): Promise<SampleResult> {
 async function peopleSample(db: D1Database): Promise<SampleResult> {
   const rows = await db
     .prepare(
-      `SELECT name, titles, updated_at AS updatedAt
+      `SELECT name, known_for AS knownFor, titles, popularity
        FROM catalog_people
-       ORDER BY updated_at DESC
+       ORDER BY popularity DESC
        LIMIT ${SAMPLE_LIMIT}`,
     )
     .all<SampleRow>();
 
-  return { columns: ["name", "titles", "updatedAt"], rows: rows.results };
+  return { columns: ["name", "knownFor", "titles", "popularity"], rows: rows.results };
 }
 
 async function seasonsSample(db: D1Database): Promise<SampleResult> {
@@ -354,6 +354,126 @@ async function beliefsSample(db: D1Database): Promise<SampleResult> {
   };
 }
 
+async function titleAwardsSample(db: D1Database): Promise<SampleResult> {
+  const rows = await db
+    .prepare(
+      `SELECT t.title, a.label AS award, link.ceremony_year AS year,
+              link.outcome, link.source
+       FROM title_awards AS link
+       JOIN awards AS a ON a.award_id = link.award_id
+       JOIN catalog_titles AS t ON t.id = link.title_id
+       ORDER BY link.ceremony_year DESC, t.title
+       LIMIT ${SAMPLE_LIMIT}`,
+    )
+    .all<SampleRow>();
+
+  return { columns: ["title", "award", "year", "outcome", "source"], rows: rows.results };
+}
+
+async function personAwardsSample(db: D1Database): Promise<SampleResult> {
+  const rows = await db
+    .prepare(
+      `SELECT p.name, a.label AS award, link.ceremony_year AS year, link.outcome
+       FROM person_awards AS link
+       JOIN awards AS a ON a.award_id = link.award_id
+       JOIN catalog_people AS p ON p.person_id = link.person_id
+       ORDER BY link.ceremony_year DESC, p.name
+       LIMIT ${SAMPLE_LIMIT}`,
+    )
+    .all<SampleRow>();
+
+  return { columns: ["name", "award", "year", "outcome"], rows: rows.results };
+}
+
+async function letterboxdSample(db: D1Database): Promise<SampleResult> {
+  const rows = await db
+    .prepare(
+      `SELECT t.title, t.year, e.letterboxd_id AS letterboxdId,
+              e.rotten_tomatoes_id AS rottenTomatoesId, e.trakt_id AS traktId
+       FROM catalog_title_external_ids AS e
+       JOIN catalog_titles AS t ON t.id = e.title_id
+       WHERE e.letterboxd_id IS NOT NULL
+       ORDER BY t.popularity DESC
+       LIMIT ${SAMPLE_LIMIT}`,
+    )
+    .all<SampleRow>();
+
+  return {
+    columns: ["title", "year", "letterboxdId", "rottenTomatoesId", "traktId"],
+    rows: rows.results,
+  };
+}
+
+async function visualFormatSample(db: D1Database): Promise<SampleResult> {
+  const rows = await db
+    .prepare(
+      `SELECT t.title, t.year, f.kind, f.value, f.source
+       FROM title_visual_format AS f
+       JOIN catalog_titles AS t ON t.id = f.title_id
+       ORDER BY t.popularity DESC
+       LIMIT ${SAMPLE_LIMIT}`,
+    )
+    .all<SampleRow>();
+
+  return { columns: ["title", "year", "kind", "value", "source"], rows: rows.results };
+}
+
+async function placesSample(db: D1Database): Promise<SampleResult> {
+  const rows = await db
+    .prepare(
+      `SELECT t.title, tp.kind, p.label AS place, p.latitude, p.longitude, tp.source
+       FROM catalog_title_places AS tp
+       JOIN catalog_places AS p ON p.entity_id = tp.place_id
+       JOIN catalog_titles AS t ON t.id = tp.title_id
+       ORDER BY t.popularity DESC
+       LIMIT ${SAMPLE_LIMIT}`,
+    )
+    .all<SampleRow>();
+
+  return {
+    columns: ["title", "kind", "place", "latitude", "longitude", "source"],
+    rows: rows.results,
+  };
+}
+
+async function adaptationsSample(db: D1Database): Promise<SampleResult> {
+  const rows = await db
+    .prepare(
+      `SELECT t.title, w.label AS sourceWork, w.work_type AS workType,
+              w.published_year AS published, link.source
+       FROM title_source_works AS link
+       JOIN source_works AS w ON w.work_id = link.work_id
+       JOIN catalog_titles AS t ON t.id = link.title_id
+       ORDER BY t.popularity DESC
+       LIMIT ${SAMPLE_LIMIT}`,
+    )
+    .all<SampleRow>();
+
+  return {
+    columns: ["title", "sourceWork", "workType", "published", "source"],
+    rows: rows.results,
+  };
+}
+
+async function worldBoardSample(db: D1Database): Promise<SampleResult> {
+  const rows = await db
+    .prepare(
+      `SELECT t.title, l.language, l.article, l.views,
+              round(l.share * 100, 1) AS sharePercent
+       FROM title_language_buzz AS l
+       JOIN catalog_titles AS t ON t.id = l.title_id
+       WHERE l.views > 0
+       ORDER BY l.share DESC
+       LIMIT ${SAMPLE_LIMIT}`,
+    )
+    .all<SampleRow>();
+
+  return {
+    columns: ["title", "language", "article", "views", "sharePercent"],
+    rows: rows.results,
+  };
+}
+
 const COUNT_SAMPLES: Record<string, (db: D1Database) => Promise<SampleResult>> = {
   titles: (db) => titleSample(db, "1 = 1"),
   movies: (db) => titleSample(db, "media_type = 'movie'"),
@@ -372,6 +492,13 @@ const COUNT_SAMPLES: Record<string, (db: D1Database) => Promise<SampleResult>> =
   upcoming: upcomingSample,
   sections: sectionsSample,
   people: peopleSample,
+  titleAwards: titleAwardsSample,
+  personAwards: personAwardsSample,
+  letterboxdIds: letterboxdSample,
+  visualFormat: visualFormatSample,
+  placedTitles: placesSample,
+  adaptedTitles: adaptationsSample,
+  worldBoards: worldBoardSample,
   seasons: seasonsSample,
   insights: insightsSample,
   revivalWorks: (db) => revivalSample(db, "1 = 1"),

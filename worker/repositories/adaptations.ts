@@ -110,10 +110,10 @@ export async function readTitleSourceWorks(db: D1Database, titleId: string) {
     .prepare(
       `SELECT w.work_id AS workId, w.label, w.work_type AS workType,
               w.published_year AS publishedYear,
-              (SELECT count(*) FROM title_source_works AS peer
-                WHERE peer.work_entity_id = w.entity_id) AS adaptations
+              (SELECT count(DISTINCT peer.title_id) FROM title_source_works AS peer
+                WHERE peer.work_id = w.work_id) AS adaptations
        FROM title_source_works AS link
-       JOIN source_works AS w ON w.entity_id = link.work_entity_id
+       JOIN source_works AS w ON w.work_id = link.work_id
        WHERE link.title_id = ?
        ORDER BY adaptations DESC, w.label`,
     )
@@ -128,7 +128,7 @@ export async function readTitleSourceWorks(db: D1Database, titleId: string) {
     .prepare(
       `SELECT work_id AS workId, name
        FROM source_work_authors
-       WHERE work_entity_id IN (SELECT value FROM json_each(?))
+       WHERE work_id IN (SELECT value FROM json_each(?))
        ORDER BY name`,
     )
     .bind(JSON.stringify(rows.results.map((row) => row.workId)))
@@ -153,10 +153,10 @@ export async function readTitleSourceWorks(db: D1Database, titleId: string) {
 export async function readAdaptationTitleIds(db: D1Database, workId: string, limit: number) {
   const rows = await db
     .prepare(
-      `SELECT link.title_id AS titleId
+      `SELECT DISTINCT link.title_id AS titleId
        FROM title_source_works AS link
        JOIN catalog_titles AS t ON t.id = link.title_id
-       WHERE link.work_entity_id = ?1
+       WHERE link.work_id = ?1
        ORDER BY COALESCE(t.release_date, '9999-12-31'), t.popularity DESC
        LIMIT ?2`,
     )

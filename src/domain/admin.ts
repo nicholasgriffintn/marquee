@@ -1,0 +1,45 @@
+export const ADMIN_ACTIONS = [
+  "sweep-light",
+  "sweep-deep",
+  "digest",
+  "catalog-head",
+  "availability",
+  "enrichment",
+  "enrichment-omdb",
+  "enrichment-poster",
+  "enrichment-mal",
+  "enrichment-anilist",
+  "embeddings",
+  "discover",
+  "schedule",
+  "buzz",
+  "identifiers",
+  "awards",
+  "visual-format",
+  "adaptations",
+  "filming-locations",
+  "world-board",
+  "providers",
+  "sections",
+  "working-set",
+  "cinemas",
+  "showtimes",
+  "alerts-preview",
+  "alerts-send",
+  "angle-scores",
+  "people",
+  "revival-sweep",
+  "revival-match",
+  "revival-describe",
+  "revival-rights",
+  "revival-recheck",
+  "revival-mirror",
+  "anime-ids",
+  "revival-group",
+] as const;
+
+export type AdminAction = (typeof ADMIN_ACTIONS)[number];
+
+export function isAdminAction(value: unknown): value is AdminAction {
+  return typeof value === "string" && ADMIN_ACTIONS.includes(value as AdminAction);
+}

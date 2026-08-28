@@ -1,40 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 
+import type { AdminAction } from "../domain/admin";
+
+export type { AdminAction };
+
 import { jsonRequest, requestJson } from "../lib/api";
 import type { UserRole } from "../types";
-
-export type AdminAction =
-  | "sweep-light"
-  | "sweep-deep"
-  | "digest"
-  | "catalog-head"
-  | "availability"
-  | "enrichment"
-  | "enrichment-omdb"
-  | "enrichment-poster"
-  | "enrichment-mal"
-  | "enrichment-anilist"
-  | "embeddings"
-  | "discover"
-  | "schedule"
-  | "buzz"
-  | "identifiers"
-  | "providers"
-  | "sections"
-  | "working-set"
-  | "alerts-preview"
-  | "alerts-send"
-  | "angle-scores"
-  | "people"
-  | "cinemas"
-  | "showtimes"
-  | "revival-sweep"
-  | "revival-match"
-  | "revival-describe"
-  | "revival-rights"
-  | "revival-recheck"
-  | "revival-mirror"
-  | "anime-ids";
 
 export type AdminOverview = {
   catalogue: Record<string, number>;

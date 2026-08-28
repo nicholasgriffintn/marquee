@@ -270,10 +270,7 @@ export async function syncBuzz(env: Bindings) {
     );
   }
 
-  const expanded = await syncWorldBoard(
-    env,
-    measured.map((row) => row.titleId),
-  ).catch((error: unknown) => {
+  const expanded = await syncWorldBoard(env).catch((error: unknown) => {
     logError("world_board_failed", error);
 
     return 0;

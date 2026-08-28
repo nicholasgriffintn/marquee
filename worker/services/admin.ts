@@ -1,3 +1,4 @@
+import type { AdminAction } from "../../src/domain/admin.ts";
 import type { UserRole } from "../auth/model.ts";
 import { queueEmbeddings, queueEnrichment, queueStaleAvailability } from "../jobs/ingestion.ts";
 import { readBudgets, resumeSource } from "../repositories/budgets.ts";
@@ -6,55 +7,19 @@ import { readBackfillProgress } from "../repositories/discover.ts";
 import { rebuildPeopleIndex } from "../repositories/usher.ts";
 import { readWorkingSetStats, rebuildWorkingSet } from "../repositories/working-set.ts";
 import type { Bindings, EnrichmentSource, IngestionJob } from "../types.ts";
+import { syncAdaptations } from "./adaptations.ts";
 import { dispatchAlerts, previewAlerts } from "./alerts/dispatch.ts";
 import { computeAngleScores } from "./angle-scores.ts";
+import { syncAwards } from "./awards.ts";
 import { queueCinemaDirectories, queueCinemaScreenings } from "./cinema-sync.ts";
 import { advanceDiscoverFrontier } from "./discover.ts";
 import { queueRevivalMirrors } from "./revival-mirror.ts";
 import { queueRevivalSources } from "./revival.ts";
+import { syncTitlePlaces } from "./title-places.ts";
+import { syncVisualFormat } from "./visual-format.ts";
+import { syncWorldBoard } from "./world-board.ts";
 
-export const ADMIN_ACTIONS = [
-  "sweep-light",
-  "sweep-deep",
-  "digest",
-  "catalog-head",
-  "availability",
-  "enrichment",
-  "enrichment-omdb",
-  "enrichment-poster",
-  "enrichment-mal",
-  "enrichment-anilist",
-  "embeddings",
-  "discover",
-  "schedule",
-  "buzz",
-  "identifiers",
-  "providers",
-  "sections",
-  "working-set",
-  "cinemas",
-  "showtimes",
-  "alerts-preview",
-  "alerts-send",
-  "angle-scores",
-  "people",
-  "revival-sweep",
-  "revival-match",
-  "revival-describe",
-  "revival-rights",
-  "revival-recheck",
-  "revival-mirror",
-  "anime-ids",
-  "revival-group",
-] as const;
-
-const RUN_WINDOW_HOURS = 24;
-
-export type AdminAction = (typeof ADMIN_ACTIONS)[number];
-
-export function isAdminAction(value: unknown): value is AdminAction {
-  return typeof value === "string" && ADMIN_ACTIONS.includes(value as AdminAction);
-}
+export const RUN_WINDOW_HOURS = 24;
 
 const QUEUED_JOBS: Partial<Record<AdminAction, IngestionJob>> = {
   "catalog-head": { type: "sync-catalog" },
@@ -92,6 +57,14 @@ async function catalogueStats(env: Bindings) {
          (SELECT count(*) FROM catalog_people) AS people,
          (SELECT count(*) FROM catalog_seasons) AS seasons,
          (SELECT count(*) FROM title_insights) AS insights,
+         (SELECT count(DISTINCT title_id) FROM title_awards) AS titleAwards,
+         (SELECT count(DISTINCT person_id) FROM person_awards) AS personAwards,
+         (SELECT count(DISTINCT title_id) FROM title_visual_format) AS visualFormat,
+         (SELECT count(DISTINCT title_id) FROM catalog_title_places) AS placedTitles,
+         (SELECT count(DISTINCT title_id) FROM title_source_works) AS adaptedTitles,
+         (SELECT count(DISTINCT title_id) FROM title_language_buzz) AS worldBoards,
+         (SELECT count(*) FROM catalog_title_external_ids WHERE letterboxd_id IS NOT NULL)
+           AS letterboxdIds,
          rv.revivalWorks, rv.revivalApproved, rv.revivalMirrored, rv.revivalPending,
          (SELECT count(*) FROM ai_rails) AS railSets,
          (SELECT count(*) FROM pinned_shelves) AS pinnedShelves
@@ -466,6 +439,36 @@ export async function runAdminAction(env: Bindings, action: AdminAction) {
       queued: frontier.pages,
       detail: `Queued ${frontier.pages} discover pages and ${frontier.measuring} window measurements`,
     };
+  }
+
+  if (action === "awards") {
+    const decorated = await syncAwards(env);
+
+    return { queued: decorated, detail: `Read awards for ${decorated} titles and people` };
+  }
+
+  if (action === "visual-format") {
+    const described = await syncVisualFormat(env);
+
+    return { queued: described, detail: `Recorded colour or ratio for ${described} titles` };
+  }
+
+  if (action === "adaptations") {
+    const linked = await syncAdaptations(env);
+
+    return { queued: linked, detail: `Linked ${linked} titles to a source work` };
+  }
+
+  if (action === "world-board") {
+    const measured = await syncWorldBoard(env);
+
+    return { queued: measured, detail: `Measured ${measured} titles in other languages` };
+  }
+
+  if (action === "filming-locations") {
+    const placed = await syncTitlePlaces(env);
+
+    return { queued: placed, detail: `Placed ${placed} filming locations` };
   }
 
   if (action === "revival-group") {

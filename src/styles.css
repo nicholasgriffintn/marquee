@@ -2547,7 +2547,7 @@ h2 em {
   text-underline-offset: 2px;
 }
 .detail-credit {
-  color: var(--muted);
+  color: var(--muted-on-paper);
   display: block;
   font: 9px var(--mono);
   letter-spacing: 0.06em;
@@ -3919,13 +3919,13 @@ h2 em {
   text-transform: uppercase;
 }
 .detail-awards p {
-  color: var(--muted);
+  color: var(--ink);
   font-size: 12px;
   line-height: 1.5;
   margin: 0;
 }
 .detail-awards small {
-  color: var(--muted);
+  color: var(--muted-on-paper);
   font: 10px/1.6 var(--mono);
 }
 .detail-buzz {
@@ -9000,9 +9000,21 @@ a.showtime:hover small {
   margin: 0;
 }
 .detail-ground small {
-  color: var(--muted);
+  color: var(--muted-on-paper);
   font: 10px var(--mono);
   line-height: 1.6;
+}
+.detail-ground a {
+  color: var(--blue);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.detail-ground a:hover,
+.detail-ground a:focus-visible {
+  background: var(--acid);
+  color: var(--ink);
+  outline: none;
+  text-decoration: none;
 }
 
 @media (max-width: 860px) {

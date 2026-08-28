@@ -94,12 +94,58 @@ function dailyRange(days: number) {
   return `daily/${stamp(start)}/${stamp(end)}`;
 }
 
+const VIEWS_RETRY_STATUSES = new Set([429, 502, 503, 504]);
+const VIEWS_MAX_ATTEMPTS = 3;
+const VIEWS_BASE_BACKOFF_MS = 500;
+const VIEWS_MAX_BACKOFF_MS = 4_000;
+const VIEWS_COOLDOWN_MS = 60_000;
+
+let viewsCoolingUntil = 0;
+
+function viewsBackoff(attempt: number, retryAfter: string | null) {
+  const seconds = Number(retryAfter);
+
+  if (Number.isFinite(seconds) && seconds > 0) {
+    return Math.min(seconds * 1_000, VIEWS_MAX_BACKOFF_MS);
+  }
+
+  return Math.min(VIEWS_BASE_BACKOFF_MS * 2 ** attempt, VIEWS_MAX_BACKOFF_MS);
+}
+
 async function dailyViews(path: string) {
-  const response = await upstreamFetch(`${METRICS_BASE}/${path}`, {
-    headers: { "user-agent": UPSTREAM_AGENT },
-    timeoutMs: TIMEOUT_MS,
-    cacheTtl: VIEWS_CACHE_TTL,
-  });
+  if (Date.now() < viewsCoolingUntil) {
+    throw new WikimediaError("Pageviews is rate limiting; cooling off", 429);
+  }
+
+  let response: Response | null = null;
+
+  for (let attempt = 0; attempt < VIEWS_MAX_ATTEMPTS; attempt += 1) {
+    // oxlint-disable-next-line no-await-in-loop
+    response = await upstreamFetch(`${METRICS_BASE}/${path}`, {
+      headers: { "user-agent": UPSTREAM_AGENT },
+      timeoutMs: TIMEOUT_MS,
+      cacheTtl: VIEWS_CACHE_TTL,
+    });
+
+    if (response.ok || response.status === 404 || !VIEWS_RETRY_STATUSES.has(response.status)) {
+      break;
+    }
+
+    if (response.status === 429) {
+      viewsCoolingUntil = Date.now() + VIEWS_COOLDOWN_MS;
+    }
+
+    const retryAfter = response.headers.get("retry-after");
+
+    if (attempt < VIEWS_MAX_ATTEMPTS - 1) {
+      // oxlint-disable-next-line no-await-in-loop
+      await new Promise((resolve) => setTimeout(resolve, viewsBackoff(attempt, retryAfter)));
+    }
+  }
+
+  if (!response) {
+    throw new WikimediaError("Pageviews request failed", 502);
+  }
 
   if (response.status === 404) {
     return [];

@@ -262,6 +262,15 @@ export function DetailPanel({
             </p>
           )}
           <MarqueeRead insight={insight} isLoading={isInsightLoading} />
+          <AirLine item={item} nextEpisode={nextEpisode} />
+          {continueAt && (
+            <button type="button" className="detail-continue" onClick={resumeWatching}>
+              <span>
+                Continue S{continueAt.season} E{continueAt.episode}
+              </span>
+              <ArrowIcon />
+            </button>
+          )}
           {canSave && (
             <ErrorBoundary label="The shelf card">
               {entryState.status === "idle" || entryState.status === "loading" ? (
@@ -296,8 +305,6 @@ export function DetailPanel({
               )}
             </ErrorBoundary>
           )}
-          <AirLine item={item} nextEpisode={nextEpisode} />
-          {item.visualFormat && <VisualFormatLine format={item.visualFormat} />}
           <WatchOrder label="Before this" entries={watchOrder.before} onOpen={onOpen} />
           <ErrorBoundary label="Where to watch">
             <WatchBlock
@@ -311,14 +318,12 @@ export function DetailPanel({
           </ErrorBoundary>
           <WatchOrder label="After this" entries={watchOrder.after} onOpen={onOpen} />
           <WatchOrder label="Related" entries={watchOrder.related} onOpen={onOpen} />
-          {continueAt && (
-            <button type="button" className="detail-continue" onClick={resumeWatching}>
-              <span>
-                Continue S{continueAt.season} E{continueAt.episode}
-              </span>
-              <ArrowIcon />
-            </button>
-          )}
+          <SourceWorkTrack
+            source={adaptations.source}
+            items={adaptations.items}
+            currentId={item.id}
+            onOpen={onOpen}
+          />
           <ErrorBoundary label="The revival house">
             <RevivalBlock works={reels} />
           </ErrorBoundary>
@@ -334,30 +339,6 @@ export function DetailPanel({
           <ErrorBoundary label="The trailer">
             <TrailerBlock item={item} />
           </ErrorBoundary>
-          <ThemeSongs item={item} />
-          {usherSlot}
-          <FilmingLine titleId={item.id} />
-          <ScoreRow item={item} />
-          <TitleAwards titleId={item.id} />
-          {item.buzz && <BuzzNote buzz={item.buzz} />}
-          <ErrorBoundary label="The credits">
-            <CreditsBlock key={item.id} titleId={item.id} />
-          </ErrorBoundary>
-          <CastAndStaff item={item} />
-          {item.keywords?.length ? (
-            <div className="detail-chips">
-              {item.keywords.slice(0, KEYWORDS_SHOWN).map((keyword) => (
-                <Link
-                  key={keyword}
-                  to={`/listings?type=${item.mediaType}&keywords=${encodeURIComponent(keyword)}`}
-                  className="detail-chip"
-                >
-                  {keyword}
-                </Link>
-              ))}
-            </div>
-          ) : null}
-          <WatchNext pairs={pairs} onOpen={onOpen} />
           {item.collection && collection.items.length > 1 && (
             <TitleTrack
               label={item.collection.name}
@@ -374,12 +355,31 @@ export function DetailPanel({
               }
             />
           )}
-          <SourceWorkTrack
-            source={adaptations.source}
-            items={adaptations.items}
-            currentId={item.id}
-            onOpen={onOpen}
-          />
+          {usherSlot}
+          <ScoreRow item={item} />
+          <TitleAwards titleId={item.id} />
+          {item.buzz && <BuzzNote buzz={item.buzz} />}
+          <CastAndStaff item={item} />
+          {item.visualFormat && <VisualFormatLine format={item.visualFormat} />}
+          <FilmingLine titleId={item.id} />
+          {item.keywords?.length ? (
+            <div className="detail-chips">
+              {item.keywords.slice(0, KEYWORDS_SHOWN).map((keyword) => (
+                <Link
+                  key={keyword}
+                  to={`/listings?type=${item.mediaType}&keywords=${encodeURIComponent(keyword)}`}
+                  className="detail-chip"
+                >
+                  {keyword}
+                </Link>
+              ))}
+            </div>
+          ) : null}
+          <ThemeSongs item={item} />
+          <ErrorBoundary label="The credits">
+            <CreditsBlock key={item.id} titleId={item.id} />
+          </ErrorBoundary>
+          <WatchNext pairs={pairs} onOpen={onOpen} />
           <TitleTrack
             label="More like this"
             items={similar}
