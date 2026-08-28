@@ -31,6 +31,7 @@ import { AirLine } from "./AirLine";
 import { BuzzNote } from "./BuzzNote";
 import { CastAndStaff } from "./CastAndStaff";
 import { CreditsBlock } from "./CreditsBlock";
+import { FilmingLine } from "./FilmingLine";
 import { MarqueeRead } from "./MarqueeRead";
 import { ScoreRow } from "./ScoreRow";
 import { SourceLinks } from "./SourceLinks";
@@ -335,6 +336,7 @@ export function DetailPanel({
           </ErrorBoundary>
           <ThemeSongs item={item} />
           {usherSlot}
+          <FilmingLine titleId={item.id} />
           <ScoreRow item={item} />
           <TitleAwards titleId={item.id} />
           {item.buzz && <BuzzNote buzz={item.buzz} />}

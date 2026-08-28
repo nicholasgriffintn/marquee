@@ -20,6 +20,7 @@ import {
   readTitleCredits,
 } from "../repositories/people.ts";
 import { getTitleAdaptations } from "../services/adaptations.ts";
+import { readPlacesForTitle } from "../repositories/title-places.ts";
 import {
   browseCatalogue,
   getCatalogue,
@@ -417,6 +418,23 @@ catalogRoutes.get("/titles/:titleId/awards", edgeCache(3_600), async (context) =
   }
 
   return context.json(await readTitleAwards(context.env.DB, titleId));
+});
+
+catalogRoutes.get("/titles/:titleId/places", edgeCache(3_600), async (context) => {
+  const titleId = context.req.param("titleId");
+  const empty = { filming: [], narrative: [] };
+
+  if (!isKnownTitle(titleId)) {
+    return context.json(empty);
+  }
+
+  try {
+    return context.json(await readPlacesForTitle(context.env.DB, titleId));
+  } catch (error) {
+    logError("title_places_read_failed", error, { area: "catalogue", titleId });
+
+    return context.json(empty);
+  }
 });
 
 catalogRoutes.get("/titles/:titleId/watch-order", edgeCache(3_600), async (context) => {

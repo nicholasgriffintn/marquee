@@ -38,6 +38,7 @@ import {
 import { hashState } from "../repositories/links.ts";
 import { readViewerContext } from "../repositories/viewer-context.ts";
 import { ALERT_KINDS, isAlertKind } from "../services/alerts/types.ts";
+import { buildShelfAtlas } from "../services/atlas.ts";
 import { refreshBeliefs } from "../services/beliefs.ts";
 import { buildTasteMap } from "../services/taste-map.ts";
 import type { Bindings } from "../types.ts";
@@ -237,6 +238,34 @@ notebookRoutes.get("/map", async (context) => {
     logError("taste_map_route_failed", error);
 
     return jsonResponse({ error: "I cannot lay the map out just now. Try again shortly." }, 503);
+  }
+});
+
+notebookRoutes.get("/awards", async (context) => {
+  const user = context.get("authenticatedUser");
+
+  return jsonResponse({ runs: await readAwardRuns(context.env.DB, user.id, AWARD_RUNS) });
+});
+
+notebookRoutes.get("/atlas", async (context) => {
+  const user = context.get("authenticatedUser");
+
+  try {
+    const schedule = (task: Promise<unknown>) => {
+      const logged = logRejection(task, "shelf_atlas_task_failed");
+
+      try {
+        context.executionCtx.waitUntil(logged);
+      } catch {
+        void logged;
+      }
+    };
+
+    return jsonResponse(await buildShelfAtlas(context.env, user.id, { schedule }));
+  } catch (error) {
+    logError("shelf_atlas_route_failed", error);
+
+    return jsonResponse({ error: "I cannot lay the atlas out just now. Try again shortly." }, 503);
   }
 });
 

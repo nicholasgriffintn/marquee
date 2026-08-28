@@ -8972,3 +8972,232 @@ a.showtime:hover small {
   cursor: default;
   opacity: 0.4;
 }
+
+/* The ground it was shot on */
+
+.detail-ground {
+  border-left: 3px solid var(--blue);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 20px 0 0;
+  padding: 2px 0 2px 15px;
+}
+.detail-ground > span {
+  color: #6f7268;
+  font: 800 9px var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.detail-ground p {
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+}
+.detail-ground small {
+  color: var(--muted);
+  font: 10px var(--mono);
+  line-height: 1.6;
+}
+
+.shelf-atlas {
+  display: grid;
+  gap: 14px;
+}
+.atlas-frame {
+  align-items: start;
+  display: grid;
+  gap: 26px;
+  grid-template-columns: minmax(0, 720px) minmax(240px, 360px);
+}
+.atlas-frame > svg {
+  aspect-ratio: 2;
+  border: 1px solid var(--panel-line);
+  display: block;
+  height: auto;
+  stroke: none;
+  width: 100%;
+}
+.atlas-ground {
+  fill: var(--panel-tile);
+}
+.atlas-line {
+  stroke: var(--panel-line);
+  stroke-width: 1;
+}
+.atlas-line.equator,
+.atlas-line.prime {
+  stroke: var(--panel-line);
+  stroke-dasharray: 4 4;
+  stroke-width: 1.4;
+}
+.atlas-degree {
+  fill: #5c6055;
+  font: 700 9px/1 var(--mono);
+  letter-spacing: 1px;
+}
+.atlas-pin {
+  cursor: pointer;
+  outline: none;
+}
+.atlas-pin circle {
+  stroke: var(--panel-tile);
+  stroke-width: 2;
+  transition:
+    r 0.14s ease,
+    fill 0.14s ease;
+}
+.shelf-atlas .atlas-pin circle.atlas-pin-hit {
+  fill: transparent;
+  stroke: none;
+}
+.atlas-pin.placed circle {
+  fill: var(--acid);
+}
+.atlas-pin.vague circle {
+  fill: none;
+  stroke: var(--coral);
+}
+.atlas-pin.active circle {
+  stroke: var(--white);
+}
+.atlas-pin:focus-visible circle {
+  stroke: var(--white);
+  stroke-width: 3;
+}
+.atlas-readout {
+  align-content: start;
+  display: grid;
+  margin: 0;
+  min-height: 0;
+  order: 2;
+}
+.atlas-card {
+  align-content: start;
+  display: grid;
+  gap: 14px;
+}
+.atlas-card-blank {
+  gap: 18px;
+}
+.atlas-card-hint {
+  color: var(--muted);
+  font: 400 13px/1.5 var(--sans);
+  margin: 0;
+}
+.atlas-card-name {
+  display: grid;
+  gap: 3px;
+}
+.atlas-card-name strong {
+  color: var(--white);
+  font: 500 18px/1.2 var(--sans);
+}
+.atlas-card-name span {
+  color: var(--muted);
+  font: 400 13px/1.3 var(--sans);
+}
+.atlas-card-name em {
+  color: var(--acid-ink);
+  font: 700 10px/1 var(--mono);
+  font-style: normal;
+  letter-spacing: 1.5px;
+}
+.atlas-card-label {
+  color: var(--muted);
+  font: 700 10px/1 var(--mono);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+.atlas-card-shot {
+  border-top: 1px solid var(--panel-line);
+  display: grid;
+  gap: 7px;
+  padding-top: 12px;
+}
+.atlas-card-shot ul {
+  display: grid;
+  gap: 2px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.atlas-card-shot li {
+  color: var(--white);
+  display: flex;
+  font: 400 13px/1.4 var(--sans);
+  gap: 8px;
+  justify-content: space-between;
+}
+.atlas-card-shot li small {
+  color: var(--muted);
+  font: 400 12px/1.4 var(--mono);
+}
+.atlas-card-facts {
+  border-top: 1px solid var(--panel-line);
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-top: 12px;
+}
+.atlas-card-facts div {
+  display: grid;
+  gap: 3px;
+}
+.atlas-card-facts dt {
+  color: var(--muted);
+  font: 700 10px/1 var(--mono);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+.atlas-card-facts dd {
+  color: var(--white);
+  font: 400 13px/1.4 var(--sans);
+  margin: 0;
+}
+.atlas-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.atlas-key li {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  font: 400 12px/1 var(--sans);
+  gap: 7px;
+}
+.atlas-key svg {
+  height: 16px;
+  stroke: none;
+  width: 16px;
+}
+.atlas-key .placed circle {
+  fill: var(--acid);
+  stroke: none;
+}
+.atlas-key .vague circle {
+  fill: none;
+  stroke: var(--coral);
+  stroke-width: 2;
+}
+.atlas-foot {
+  color: var(--muted);
+  font: 400 12px/1.6 var(--sans);
+  margin: 0;
+  max-width: 72ch;
+}
+.atlas-foot a {
+  color: var(--blue);
+  text-decoration: underline;
+}
+
+@media (max-width: 860px) {
+  .atlas-frame {
+    gap: 18px;
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

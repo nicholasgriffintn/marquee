@@ -11,6 +11,7 @@ import { ImportPanel } from "../components/notebook/ImportPanel";
 import { NotebookIndex, type Divider } from "../components/notebook/NotebookIndex";
 import { NotebookSection } from "../components/notebook/NotebookSection";
 import { ServicesPanel } from "../components/notebook/ServicesPanel";
+import { ShelfAtlas } from "../components/notebook/ShelfAtlas";
 import { TasteMap } from "../components/notebook/TasteMap";
 import { UsherMark } from "../components/usher/UsherMark";
 import type { Provider, ProvidersResponse } from "../domain/catalog";
@@ -24,6 +25,7 @@ type GuestResponse = { guests: Guest[] };
 const DIVIDERS: Divider[] = [
   { id: "notes", label: "What I have written down", aside: "and what you have crossed out" },
   { id: "shape", label: "The shape of it", aside: "your shelf, laid out flat" },
+  { id: "ground", label: "The ground it stands on", aside: "and how much of it you have covered" },
   { id: "services", label: "Where you watch", aside: "and what you are paying for" },
   { id: "room", label: "Who sits with you", aside: "and what they will not sit through" },
   { id: "post", label: "When I should write", aside: "sparingly, and never twice" },
@@ -201,9 +203,20 @@ export function NotebookPage({
           </NotebookSection>
 
           <NotebookSection
-            id="services"
+            id="ground"
             number={3}
             title={DIVIDERS[2].label}
+            lede="The same shelf again, placed by where the cameras actually stood. A film gets a pin for every location filed against it, so the well-documented ones take up more room than they deserve. Hover a pin, or tab to it, and I will tell you what was shot there."
+          >
+            <ErrorBoundary label="This atlas">
+              <ShelfAtlas isSignedIn={isSignedIn} />
+            </ErrorBoundary>
+          </NotebookSection>
+
+          <NotebookSection
+            id="services"
+            number={4}
+            title={DIVIDERS[3].label}
             lede="Tick the ones you actually pay for. I will stop offering you things behind doors you cannot open."
           >
             <ErrorBoundary label="This list of services">
@@ -219,8 +232,8 @@ export function NotebookPage({
 
           <NotebookSection
             id="room"
-            number={4}
-            title={DIVIDERS[3].label}
+            number={5}
+            title={DIVIDERS[4].label}
             lede="Give me a name and what they will not sit through, and I will keep it in mind when the room is not just you."
           >
             <ErrorBoundary label="This guest list">
@@ -234,8 +247,8 @@ export function NotebookPage({
 
           <NotebookSection
             id="post"
-            number={5}
-            title={DIVIDERS[4].label}
+            number={6}
+            title={DIVIDERS[5].label}
             lede="Only about things already on your shelf, never more than a handful a week, and never twice about the same thing."
           >
             <ErrorBoundary label="These settings">
@@ -245,8 +258,8 @@ export function NotebookPage({
 
           <NotebookSection
             id="elsewhere"
-            number={6}
-            title={DIVIDERS[5].label}
+            number={7}
+            title={DIVIDERS[6].label}
             lede="Bring your history in from somewhere else, or hand a key to something that is not a person."
           >
             <h3>What you brought with you</h3>
