@@ -1,6 +1,7 @@
 import type { MediaType } from "../../src/domain/catalog.ts";
 import type { PlaceKind } from "../../src/domain/places.ts";
-import { entityIdFrom, literals, queryWikidata } from "./wikidata-query.ts";
+import { tmdbBranches, tmdbKey } from "../lib/wikidata-refs.ts";
+import { entityIdFrom, queryWikidata } from "./wikidata-query.ts";
 
 const TIMEOUT_MS = 30_000;
 const CACHE_TTL = 2_592_000;
@@ -9,7 +10,6 @@ const COUNTRY_BATCH = 120;
 const LABEL_LIMIT = 90;
 const WIDEST_DEGREES = 1;
 
-const TMDB_PROPERTY: Record<MediaType, string> = { movie: "P4947", tv: "P4983" };
 const PLACE_PROPERTY: Record<string, PlaceKind> = { P915: "filming", P840: "narrative" };
 
 export type PlaceRef = {
@@ -32,33 +32,16 @@ export type TitlePlaceRow = { key: string; kind: PlaceKind; place: PlaceRecord }
 
 export type TitlePlaceResult = { rows: TitlePlaceRow[]; countries: PlaceRecord[] };
 
-function tmdbKey(mediaType: MediaType, tmdbId: number) {
-  return `${mediaType}:${tmdbId}`;
-}
-
 function clauses(refs: PlaceRef[]) {
-  const entities = refs.flatMap((ref) => (ref.wikidataId ? [`wd:${ref.wikidataId}`] : []));
-  const byType = new Map<MediaType, number[]>();
+  const byTmdb = refs.flatMap((ref) =>
+    !ref.wikidataId && ref.tmdbId ? [{ mediaType: ref.mediaType, tmdbId: ref.tmdbId }] : [],
+  );
 
-  for (const ref of refs) {
-    if (!ref.wikidataId && ref.tmdbId) {
-      byType.set(ref.mediaType, [...(byType.get(ref.mediaType) ?? []), ref.tmdbId]);
-    }
-  }
-
-  return [
-    entities.length > 0 ? `{ VALUES ?film { ${entities.join(" ")} } }` : null,
-    ...[...byType].map(
-      ([mediaType, ids]) =>
-        `{
-    VALUES ?tmdb { ${literals(ids)} }
-    ?film wdt:${TMDB_PROPERTY[mediaType]} ?tmdb .
-    BIND(CONCAT("${mediaType}:", ?tmdb) AS ?tmdbKey)
-  }`,
-    ),
-  ]
-    .filter(Boolean)
-    .join("\n  UNION\n  ");
+  return tmdbBranches(byTmdb, {
+    subject: "film",
+    key: "tmdbKey",
+    entities: refs.flatMap((ref) => (ref.wikidataId ? [ref.wikidataId] : [])),
+  });
 }
 
 function coordinate(value: string | undefined, limit: number) {
@@ -118,7 +101,7 @@ async function queryPlaces(refs: PlaceRef[]) {
     if (ref.wikidataId) {
       byEntity.set(ref.wikidataId, ref.key);
     } else if (ref.tmdbId) {
-      byTmdb.set(tmdbKey(ref.mediaType, ref.tmdbId), ref.key);
+      byTmdb.set(tmdbKey({ mediaType: ref.mediaType, tmdbId: ref.tmdbId }), ref.key);
     }
   }
 

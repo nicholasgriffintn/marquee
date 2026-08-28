@@ -9,7 +9,7 @@ export type IdentifierField = (typeof IDENTIFIER_FIELDS)[number];
 
 export type TitleIdentifiers = Record<IdentifierField, string | null>;
 
-export type IdentifierLink = { label: string; url: string };
+type IdentifierLink = { label: string; url: string };
 
 type IdentifierTemplate = {
   label: string;

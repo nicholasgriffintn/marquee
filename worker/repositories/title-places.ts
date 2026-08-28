@@ -34,11 +34,14 @@ function toPlace(row: TitlePlaceReadRow): TitlePlace {
   };
 }
 
+export const PLACE_SOURCE = "wikidata";
+
 export async function writeTitlePlaces(
   db: D1Database,
   titleIds: string[],
   rows: TitlePlaceRow[],
   countries: PlaceRecord[],
+  source: string = PLACE_SOURCE,
 ) {
   const places = new Map<string, PlaceRecord>();
 
@@ -76,26 +79,28 @@ export async function writeTitlePlaces(
         ),
     ),
     ...titleIds.map((titleId) =>
-      db.prepare(`DELETE FROM catalog_title_places WHERE title_id = ?`).bind(titleId),
+      db
+        .prepare(`DELETE FROM catalog_title_places WHERE title_id = ? AND source = ?`)
+        .bind(titleId, source),
     ),
     ...rows.map((row) =>
       db
         .prepare(
-          `INSERT OR REPLACE INTO catalog_title_places (title_id, kind, place_id)
-           VALUES (?, ?, ?)`,
+          `INSERT OR REPLACE INTO catalog_title_places (title_id, kind, place_id, source)
+           VALUES (?, ?, ?, ?)`,
         )
-        .bind(row.key, row.kind, row.place.entityId),
+        .bind(row.key, row.kind, row.place.entityId, source),
     ),
     ...titleIds.map((titleId) =>
       db
         .prepare(
-          `INSERT INTO catalog_title_place_sync (title_id, places, synced_at)
-           VALUES (?, ?, CURRENT_TIMESTAMP)
-           ON CONFLICT(title_id) DO UPDATE SET
+          `INSERT INTO catalog_title_place_sync (title_id, source, places, synced_at)
+           VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+           ON CONFLICT(title_id, source) DO UPDATE SET
              places = excluded.places,
              synced_at = CURRENT_TIMESTAMP`,
         )
-        .bind(titleId, rows.filter((row) => row.key === titleId).length),
+        .bind(titleId, source, rows.filter((row) => row.key === titleId).length),
     ),
   ];
 
@@ -110,7 +115,7 @@ export async function writeTitlePlaces(
 export async function readPlacesForTitle(db: D1Database, titleId: string): Promise<TitlePlaces> {
   const rows = await db
     .prepare(
-      `SELECT tp.title_id AS titleId, tp.kind, ${PLACE_COLUMNS}
+      `SELECT DISTINCT tp.title_id AS titleId, tp.kind, ${PLACE_COLUMNS}
        FROM catalog_title_places AS tp
        JOIN catalog_places AS p ON p.entity_id = tp.place_id
        LEFT JOIN catalog_places AS c ON c.entity_id = p.country_id
@@ -139,14 +144,14 @@ export async function readPlaceCandidates(
               t.wikidata_id AS wikidataId
        FROM title_working_set AS w
        JOIN catalog_titles AS t ON t.id = w.title_id
-       LEFT JOIN catalog_title_place_sync AS s ON s.title_id = t.id
+       LEFT JOIN catalog_title_place_sync AS s ON s.title_id = t.id AND s.source = ?4
        WHERE s.title_id IS NULL
           OR (s.places > 0 AND s.synced_at < datetime('now', ?1))
           OR (s.places = 0 AND s.synced_at < datetime('now', ?2))
        ORDER BY w.demand DESC, t.popularity DESC
        LIMIT ?3`,
     )
-    .bind(`-${refreshDays} days`, `-${retryDays} days`, limit)
+    .bind(`-${refreshDays} days`, `-${retryDays} days`, limit, PLACE_SOURCE)
     .all<{
       titleId: string;
       mediaType: "movie" | "tv";
