@@ -34,10 +34,12 @@ const CERT = "COALESCE(certification, '')";
 const STATUS = "COALESCE(status, '')";
 const LANGUAGE = "COALESCE(original_language, '')";
 const REVENUE = "COALESCE(revenue, 0)";
-const AWARD_WINS = `COALESCE(
-  (SELECT award_wins FROM catalog_title_ratings WHERE title_id = catalog_titles.id), 0
+const AWARD_WINS = `max(
+  COALESCE((SELECT award_wins FROM catalog_title_ratings WHERE title_id = catalog_titles.id), 0),
+  (SELECT count(DISTINCT award_id || '/' || ceremony_year) FROM title_awards
+    WHERE title_id = catalog_titles.id AND outcome = 'won')
 )`;
-const NOMINATIONS = `(SELECT count(*) FROM title_awards
+const NOMINATIONS = `(SELECT count(DISTINCT award_id || '/' || ceremony_year) FROM title_awards
   WHERE title_id = catalog_titles.id AND outcome = 'nominated')`;
 const WON_NOTHING = `NOT EXISTS (SELECT 1 FROM title_awards
   WHERE title_id = catalog_titles.id AND outcome = 'won')`;
@@ -331,9 +333,10 @@ export async function buildSections(env: Bindings) {
     titleIds: await pick(
       env,
       used,
-      `EXISTS (SELECT 1 FROM title_awards
-               WHERE title_id = catalog_titles.id
-                 AND award_id = '${PALME_DOR}' AND outcome = 'won')`,
+      `EXISTS (SELECT 1 FROM title_awards AS ta
+               JOIN awards AS a ON a.award_id = ta.award_id
+               WHERE ta.title_id = catalog_titles.id
+                 AND a.wikidata_id = '${PALME_DOR}' AND ta.outcome = 'won')`,
       "year DESC",
     ),
   });

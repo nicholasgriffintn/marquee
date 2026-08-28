@@ -1,4 +1,5 @@
 import { isAwardOutcome, type AwardOutcome } from "../../src/domain/awards.ts";
+import { slugify } from "../../src/domain/slug.ts";
 import {
   entityIdFrom,
   literals,
@@ -15,6 +16,7 @@ const MAX_LABEL = 160;
 export type AwardStatement = {
   key: string;
   awardId: string;
+  wikidataId: string;
   label: string;
   ceremonyYear: number | null;
   outcome: AwardOutcome;
@@ -31,17 +33,19 @@ function statementsFrom(rows: SparqlRow[], keyOf: (row: SparqlRow) => string | n
 
   for (const row of rows) {
     const key = keyOf(row);
-    const awardId = entityIdFrom(row.award);
-    const label = (row.awardLabel ?? "").trim();
+    const wikidataId = entityIdFrom(row.award);
+    const label = (row.awardLabel ?? "").trim().slice(0, MAX_LABEL);
+    const awardId = slugify(label);
 
-    if (!key || !awardId || !label || label === awardId || !isAwardOutcome(row.outcome)) {
+    if (!key || !wikidataId || !awardId || label === wikidataId || !isAwardOutcome(row.outcome)) {
       continue;
     }
 
     statements.push({
       key,
       awardId,
-      label: label.slice(0, MAX_LABEL),
+      wikidataId,
+      label,
       ceremonyYear: yearFrom(row.ceremony),
       outcome: row.outcome,
     });

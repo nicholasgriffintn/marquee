@@ -3,7 +3,6 @@ import { Hono } from "hono";
 import { isBeliefScope } from "../../src/domain/notebook.ts";
 import { requireAuthentication, type AuthVariables } from "../auth/session.ts";
 import { sendAddressConfirmation } from "../clients/email.ts";
-import { AWARD_RUNS } from "../lib/awards.ts";
 import { jsonResponse, readJsonObject } from "../lib/http.ts";
 import { logError, logRejection } from "../lib/logging.ts";
 import { retryTransient } from "../lib/retry.ts";
@@ -15,7 +14,6 @@ import {
   setAlertSetting,
   stageAlertEmail,
 } from "../repositories/alerts.ts";
-import { readAwardRuns } from "../repositories/awards.ts";
 import {
   editBelief,
   readBeliefs,
@@ -240,12 +238,6 @@ notebookRoutes.get("/map", async (context) => {
 
     return jsonResponse({ error: "I cannot lay the map out just now. Try again shortly." }, 503);
   }
-});
-
-notebookRoutes.get("/awards", async (context) => {
-  const user = context.get("authenticatedUser");
-
-  return jsonResponse({ runs: await readAwardRuns(context.env.DB, user.id, AWARD_RUNS) });
 });
 
 notebookRoutes.get("/guests", async (context) => {

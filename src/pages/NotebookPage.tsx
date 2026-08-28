@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { AlertSettings } from "../components/notebook/AlertSettings";
-import { AwardsStrip } from "../components/notebook/AwardsStrip";
 import { BeliefList } from "../components/notebook/BeliefList";
 import { ConnectionsPanel } from "../components/notebook/ConnectionsPanel";
 import { FeedPanel } from "../components/notebook/FeedPanel";
@@ -198,15 +197,6 @@ export function NotebookPage({
           >
             <ErrorBoundary label="This map">
               <TasteMap isSignedIn={isSignedIn} />
-            </ErrorBoundary>
-
-            <h3>What you have caught up with</h3>
-            <p className="notebook-aside">
-              Whole runs of an award, counted against your shelf. The totals are the winners I hold
-              a record of, not every winner there has ever been.
-            </p>
-            <ErrorBoundary label="This tally">
-              <AwardsStrip isSignedIn={isSignedIn} />
             </ErrorBoundary>
           </NotebookSection>
 
