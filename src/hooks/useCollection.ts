@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 import type { MediaTitle } from "../domain/catalog";
-import { isAbortError, requestJson } from "../lib/api";
+import { queryJson } from "../lib/query-client";
 import { useResource } from "./useResource";
 
 const NO_ITEMS: MediaTitle[] = [];
@@ -31,16 +31,14 @@ export function useCollectionPage(collectionId: number | null) {
       return undefined;
     }
 
-    const controller = new AbortController();
     let alive = true;
 
     async function load() {
       setIsFetching(true);
 
       try {
-        const response = await requestJson<CollectionResponse>(
+        const response = await queryJson<CollectionResponse>(
           `/api/catalog/collections/${collectionId}?page=${page}`,
-          { signal: controller.signal },
         );
 
         if (!alive) {
@@ -50,8 +48,8 @@ export function useCollectionPage(collectionId: number | null) {
         setItems((current) => (page === 0 ? response.items : [...current, ...response.items]));
         setHasMore(response.hasMore);
         setError("");
-      } catch (caught) {
-        if (alive && !isAbortError(caught)) {
+      } catch {
+        if (alive) {
           setError("Could not load this collection.");
         }
       } finally {
@@ -65,7 +63,6 @@ export function useCollectionPage(collectionId: number | null) {
 
     return () => {
       alive = false;
-      controller.abort();
     };
   }, [active, collectionId, page]);
 

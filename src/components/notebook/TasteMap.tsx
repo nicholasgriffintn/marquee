@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 
 import type { MapNeighbour, MapPoint, TasteMapResponse } from "../../domain/notebook";
-import { isAbortError, requestJson } from "../../lib/api";
+import { queryJson } from "../../lib/query-client";
 import { ArrowIcon } from "../ui";
 import { TasteMapCard } from "./TasteMapCard";
 
@@ -127,28 +127,28 @@ export function TasteMap({ isSignedIn }: { isSignedIn: boolean }) {
       return undefined;
     }
 
-    const controller = new AbortController();
+    let active = true;
 
     async function load() {
       try {
-        const response = await requestJson<TasteMapResponse>("/api/notebook/map", {
-          signal: controller.signal,
-        });
+        const response = await queryJson<TasteMapResponse>("/api/notebook/map");
 
-        setMap(response);
-        setError("");
-      } catch (caught) {
-        if (isAbortError(caught)) {
-          return;
+        if (active) {
+          setMap(response);
+          setError("");
         }
-
-        setError("I cannot lay the map out just now. Try again shortly.");
+      } catch {
+        if (active) {
+          setError("I cannot lay the map out just now. Try again shortly.");
+        }
       }
     }
 
     void load();
 
-    return () => controller.abort();
+    return () => {
+      active = false;
+    };
   }, [isSignedIn]);
 
   const active = hovered ?? pinned;

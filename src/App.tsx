@@ -149,7 +149,7 @@ export function App() {
   const pinned = usePinned(isSignedIn);
   const aiRails = useAiRails(isSignedIn && isViewerReady && isHome, profile.shelfKey);
   const personalRails = usePersonalRails(isSignedIn && isViewerReady && isHome, profile.shelfKey);
-  const episodes = useTonight(isViewerReady, TONIGHT_EPISODES);
+  const episodes = useTonight(isViewerReady && isHome, TONIGHT_EPISODES);
   const trending = useTrending(isViewerReady && isHome);
   const movieMatch = useMatch("/movie/:tmdbId/*");
   const seriesMatch = useMatch("/tv/:tmdbId/*");

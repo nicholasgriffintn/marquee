@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
-import { jsonRequest, requestJson } from "../../lib/api";
+import { jsonMutation, mutateJson, queryJson } from "../../lib/query-client";
 
 type AlertKindRow = { kind: string; enabled: boolean };
 
@@ -51,24 +51,28 @@ export function AlertSettings({ isSignedIn }: { isSignedIn: boolean }) {
       return undefined;
     }
 
-    const controller = new AbortController();
+    let active = true;
 
     async function load() {
       try {
-        const response = await requestJson<AlertConfig>("/api/notebook/alerts", {
-          signal: controller.signal,
-        });
+        const response = await queryJson<AlertConfig>("/api/notebook/alerts");
 
-        setConfig(response);
-        setDraft(response.email);
+        if (active) {
+          setConfig(response);
+          setDraft(response.email);
+        }
       } catch {
-        setConfig({ email: "", verified: false, kinds: [] });
+        if (active) {
+          setConfig({ email: "", verified: false, kinds: [] });
+        }
       }
     }
 
     void load();
 
-    return () => controller.abort();
+    return () => {
+      active = false;
+    };
   }, [isSignedIn]);
 
   if (!isSignedIn || !config) {
@@ -85,7 +89,7 @@ export function AlertSettings({ isSignedIn }: { isSignedIn: boolean }) {
     setStatus("Sending word…");
 
     try {
-      await requestJson("/api/notebook/alerts/email", jsonRequest("POST", { email }));
+      await mutateJson("/api/notebook/alerts/email", jsonMutation("POST", { email }));
       setStatus(`I have written to ${email}. Say it is you and I will start.`);
       setConfig((current) => (current ? { ...current, email, verified: false } : current));
     } catch {
@@ -95,9 +99,9 @@ export function AlertSettings({ isSignedIn }: { isSignedIn: boolean }) {
 
   async function toggle(kind: string, enabled: boolean) {
     try {
-      const response = await requestJson<{ kinds: AlertKindRow[] }>(
+      const response = await mutateJson<{ kinds: AlertKindRow[] }>(
         "/api/notebook/alerts/settings",
-        jsonRequest("POST", { kind, enabled }),
+        jsonMutation("POST", { kind, enabled }),
       );
 
       setConfig((current) => (current ? { ...current, kinds: response.kinds } : current));

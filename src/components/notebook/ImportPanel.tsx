@@ -1,7 +1,7 @@
 import { useState } from "react";
 
-import { jsonRequest, requestJson } from "../../lib/api";
 import { dedupeRows, parseLetterboxdCsv } from "../../lib/letterboxd";
+import { jsonMutation, mutateJson } from "../../lib/query-client";
 
 const BATCH = 100;
 
@@ -36,12 +36,12 @@ export function ImportPanel({ onImported }: { onImported: () => void }) {
 
         try {
           // oxlint-disable-next-line no-await-in-loop -- batches must post in order so status/progress stays accurate
-          const outcome = await requestJson<{
+          const outcome = await mutateJson<{
             matched: number;
             queued: number;
           }>(
             "/api/profile/import/letterboxd",
-            jsonRequest("POST", { rows: rows.slice(index, index + BATCH) }),
+            jsonMutation("POST", { rows: rows.slice(index, index + BATCH) }),
           );
 
           matched += outcome.matched;

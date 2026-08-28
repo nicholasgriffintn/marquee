@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 import type { MediaTitle } from "../domain/catalog";
-import { isAbortError, requestJson } from "../lib/api";
+import { queryJson } from "../lib/query-client";
 import { useResource } from "./useResource";
 
 const NO_FACETS: string[] = [];
@@ -40,7 +40,6 @@ export function useBrowse(filters: BrowseFilters) {
   const page = pageState.key === key ? pageState.page : 0;
 
   useEffect(() => {
-    const controller = new AbortController();
     let active = true;
     const timer = window.setTimeout(
       () => {
@@ -75,10 +74,7 @@ export function useBrowse(filters: BrowseFilters) {
           }
 
           try {
-            const response = await requestJson<BrowseResponse>(
-              `/api/catalog/browse?${parameters}`,
-              { signal: controller.signal },
-            );
+            const response = await queryJson<BrowseResponse>(`/api/catalog/browse?${parameters}`);
 
             if (!active) {
               return;
@@ -89,8 +85,8 @@ export function useBrowse(filters: BrowseFilters) {
             );
             setHasMore(response.hasMore);
             setError("");
-          } catch (caught) {
-            if (active && !isAbortError(caught)) {
+          } catch {
+            if (active) {
               setError("Could not load titles");
             }
           } finally {
@@ -108,7 +104,6 @@ export function useBrowse(filters: BrowseFilters) {
     return () => {
       active = false;
       window.clearTimeout(timer);
-      controller.abort();
     };
   }, [key, page]);
 

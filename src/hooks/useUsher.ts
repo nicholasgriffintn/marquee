@@ -3,8 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MediaTitle } from "../domain/catalog";
 import type { Guest } from "../domain/notebook";
 import type { TonightOrder, UsherMoment, UsherSurface } from "../domain/usher";
-import { jsonRequest, requestJson } from "../lib/api";
 import { startJourney } from "../lib/journey";
+import { jsonMutation, mutateJson, queryJson } from "../lib/query-client";
 
 type StateResponse = { status: string; answered: string[]; awayDays?: number };
 
@@ -100,7 +100,7 @@ export function useUsher(isSignedIn: boolean) {
       }
 
       try {
-        const response = await requestJson<MomentResponse>(`/api/usher/moment?${parameters}`);
+        const response = await queryJson<MomentResponse>(`/api/usher/moment?${parameters}`);
 
         if (response.moment) {
           setMoment(response.moment);
@@ -126,17 +126,21 @@ export function useUsher(isSignedIn: boolean) {
     }
 
     async function readState() {
-      const options = { signal: controller.signal };
+      try {
+        return await queryJson<StateResponse>("/api/usher/state");
+      } catch {
+        if (controller.signal.aborted) {
+          return null;
+        }
 
-      return requestJson<StateResponse>("/api/usher/state", options)
-        .catch(() => requestJson<StateResponse>("/api/usher/state", options))
-        .catch(() => null);
+        return queryJson<StateResponse>("/api/usher/state").catch(() => null);
+      }
     }
 
     async function load() {
       const state = await readState();
 
-      if (!state) {
+      if (!state || controller.signal.aborted) {
         return;
       }
 
@@ -162,7 +166,7 @@ export function useUsher(isSignedIn: boolean) {
       return;
     }
 
-    const response = await requestJson<MomentResponse>("/api/usher/moment?surface=first-run").catch(
+    const response = await queryJson<MomentResponse>("/api/usher/moment?surface=first-run").catch(
       (): MomentResponse => ({ moment: null }),
     );
 
@@ -178,9 +182,9 @@ export function useUsher(isSignedIn: boolean) {
       let saved: unknown = null;
 
       try {
-        const response = await requestJson<{ answer: unknown }>(
+        const response = await mutateJson<{ answer: unknown }>(
           "/api/usher/answer",
-          jsonRequest("POST", { questionId, answer: value }),
+          jsonMutation("POST", { questionId, answer: value }),
         );
 
         saved = response.answer;
@@ -197,7 +201,7 @@ export function useUsher(isSignedIn: boolean) {
 
   const skip = useCallback(
     async (questionId: string) => {
-      await requestJson("/api/usher/skip", jsonRequest("POST", { questionId })).catch(
+      await mutateJson("/api/usher/skip", jsonMutation("POST", { questionId })).catch(
         () => undefined,
       );
       await advance();
@@ -215,7 +219,7 @@ export function useUsher(isSignedIn: boolean) {
         setIsOnboarding(false);
       }
 
-      await requestJson("/api/usher/dismiss", jsonRequest("POST", { kind, scope })).catch(
+      await mutateJson("/api/usher/dismiss", jsonMutation("POST", { kind, scope })).catch(
         () => undefined,
       );
     },
@@ -224,7 +228,7 @@ export function useUsher(isSignedIn: boolean) {
 
   const railVerdict = useCallback(async (railId: string, verdict: "good" | "bad") => {
     setMoment(null);
-    await requestJson("/api/usher/feedback", jsonRequest("POST", { railId, verdict })).catch(
+    await mutateJson("/api/usher/feedback", jsonMutation("POST", { railId, verdict })).catch(
       () => undefined,
     );
   }, []);
@@ -242,9 +246,9 @@ export function useUsher(isSignedIn: boolean) {
       setPick((current) => ({ ...current, isPicking: true, error: "" }));
 
       try {
-        const response = await requestJson<PickResponse>(
+        const response = await mutateJson<PickResponse>(
           "/api/usher/pick",
-          jsonRequest("POST", {
+          jsonMutation("POST", {
             providerIds,
             rejected: rejected.current,
             ...viewingMoment(),
@@ -285,9 +289,9 @@ export function useUsher(isSignedIn: boolean) {
 
   const remember = useCallback(
     async (titleId: string, source: string, context: Record<string, unknown>) => {
-      await requestJson(
+      await mutateJson(
         "/api/usher/reject",
-        jsonRequest("POST", { titleId, source, ...context }),
+        jsonMutation("POST", { titleId, source, ...context }),
       ).catch(() => undefined);
     },
     [],
@@ -322,9 +326,9 @@ export function useUsher(isSignedIn: boolean) {
       });
 
       try {
-        const response = await requestJson<OrderResponse>(
+        const response = await mutateJson<OrderResponse>(
           "/api/usher/order",
-          jsonRequest("POST", {
+          jsonMutation("POST", {
             order: brief,
             guestIds,
             providerIds,
@@ -370,7 +374,7 @@ export function useUsher(isSignedIn: boolean) {
     setPick(NO_PICK);
     setAside("");
     setOrder({ ...NO_ORDER, isOpen: true });
-    void requestJson<{ guests: Guest[] }>("/api/notebook/guests")
+    void queryJson<{ guests: Guest[] }>("/api/notebook/guests")
       .then((response) => setGuests(response.guests))
       .catch(() => undefined);
   }, []);

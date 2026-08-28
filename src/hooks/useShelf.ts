@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 
 import type { ShelfItem, ShelfResponse } from "../domain/shelf";
-import { requestJson } from "../lib/api";
+import { queryJson } from "../lib/query-client";
 import { useDebouncedValue } from "./useDebouncedValue";
 import { useResource } from "./useResource";
 
@@ -92,7 +92,7 @@ export function useShelf(isSignedIn: boolean, filters: ShelfFilters) {
     setIsLoadingMore(true);
 
     try {
-      const response = await requestJson<ShelfResponse>(
+      const response = await queryJson<ShelfResponse>(
         `/api/profile/shelf?${toSearch(effectiveFilters, last.page + 1)}`,
       );
 

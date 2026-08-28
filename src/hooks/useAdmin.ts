@@ -4,7 +4,7 @@ import type { AdminAction } from "../domain/admin";
 
 export type { AdminAction };
 
-import { jsonRequest, requestJson } from "../lib/api";
+import { jsonMutation, mutateJson, queryJson } from "../lib/query-client";
 import type { UserRole } from "../types";
 
 export type AdminOverview = {
@@ -95,7 +95,7 @@ export function useAdmin(enabled: boolean) {
     setLoading(true);
 
     try {
-      setOverview(await requestJson<AdminOverview>("/api/admin/overview"));
+      setOverview(await queryJson<AdminOverview>("/api/admin/overview"));
       setError("");
     } catch {
       setError("Could not read the admin panel.");
@@ -116,7 +116,7 @@ export function useAdmin(enabled: boolean) {
     }
 
     try {
-      const next = await requestJson<{ users: AdminUser[] }>("/api/admin/users");
+      const next = await queryJson<{ users: AdminUser[] }>("/api/admin/users");
 
       setUsers(next.users);
       setUsersLoaded(true);
@@ -132,9 +132,9 @@ export function useAdmin(enabled: boolean) {
       setMessage("");
 
       try {
-        const result = await requestJson<{ detail: string }>(
+        const result = await mutateJson<{ detail: string }>(
           `/api/admin/actions/${action}`,
-          jsonRequest("POST"),
+          jsonMutation("POST"),
         );
 
         setMessage(result.detail);
@@ -152,9 +152,9 @@ export function useAdmin(enabled: boolean) {
   const resume = useCallback(
     async (source: string) => {
       try {
-        const result = await requestJson<{ detail: string }>(
+        const result = await mutateJson<{ detail: string }>(
           `/api/admin/sources/${source}/resume`,
-          jsonRequest("POST"),
+          jsonMutation("POST"),
         );
 
         setMessage(result.detail);
@@ -168,9 +168,9 @@ export function useAdmin(enabled: boolean) {
 
   const changeRole = useCallback(async (userId: string, role: UserRole) => {
     try {
-      const result = await requestJson<{ users: AdminUser[] }>(
+      const result = await mutateJson<{ users: AdminUser[] }>(
         `/api/admin/users/${userId}/role`,
-        jsonRequest("POST", { role }),
+        jsonMutation("POST", { role }),
       );
 
       setUsers(result.users);

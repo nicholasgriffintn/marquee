@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { jsonRequest, requestJson } from "../lib/api";
+import { jsonMutation, mutateJson } from "../lib/query-client";
 import { useResource } from "./useResource";
 
 const STORAGE_KEY = "marquee.selectedProviderIds";
@@ -40,9 +40,9 @@ export function useProviderPreferences(isSignedIn: boolean) {
       return;
     }
 
-    void requestJson(
+    void mutateJson(
       "/api/profile/providers",
-      jsonRequest("POST", { selectedProviderIds: guestIds }),
+      jsonMutation("POST", { selectedProviderIds: guestIds }),
     )
       .then(reload)
       .catch(() => undefined);
@@ -58,9 +58,9 @@ export function useProviderPreferences(isSignedIn: boolean) {
       }
 
       setOverride(nextIds);
-      requestJson(
+      mutateJson(
         "/api/profile/providers",
-        jsonRequest("POST", { selectedProviderIds: nextIds }),
+        jsonMutation("POST", { selectedProviderIds: nextIds }),
       ).catch(() => setOverride(null));
     },
     [isSignedIn],

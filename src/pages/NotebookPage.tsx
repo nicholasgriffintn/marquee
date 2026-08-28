@@ -15,7 +15,7 @@ import { TasteMap } from "../components/notebook/TasteMap";
 import { UsherMark } from "../components/usher/UsherMark";
 import type { Provider, ProvidersResponse } from "../domain/catalog";
 import type { Belief, Guest } from "../domain/notebook";
-import { isAbortError, jsonRequest, requestJson } from "../lib/api";
+import { jsonMutation, mutateJson, queryJson } from "../lib/query-client";
 
 type NotebookResponse = { beliefs: Belief[] };
 
@@ -76,34 +76,38 @@ export function NotebookPage({
       return undefined;
     }
 
-    const controller = new AbortController();
+    let active = true;
 
     async function load() {
       try {
-        const response = await requestJson<NotebookResponse>("/api/notebook", {
-          signal: controller.signal,
-        });
+        const response = await queryJson<NotebookResponse>("/api/notebook");
 
-        setBeliefs(response.beliefs);
-        setError("");
-      } catch (caught) {
-        if (isAbortError(caught)) {
-          return;
+        if (active) {
+          setBeliefs(response.beliefs);
+          setError("");
         }
-
-        setBeliefs([]);
-        setError("The notebook is out of reach for a moment. Try again shortly.");
+      } catch {
+        if (active) {
+          setBeliefs([]);
+          setError("The notebook is out of reach for a moment. Try again shortly.");
+        }
       }
     }
 
     void load();
-    void requestJson<GuestResponse>("/api/notebook/guests", {
-      signal: controller.signal,
-    })
-      .then((response) => setGuests(response.guests))
+    void queryJson<GuestResponse>("/api/notebook/guests")
+      .then((response) => {
+        if (active) {
+          setGuests(response.guests);
+        }
+
+        return response;
+      })
       .catch(() => undefined);
 
-    return () => controller.abort();
+    return () => {
+      active = false;
+    };
     // oxlint-disable-next-line react/exhaustive-effect-dependencies -- reloads is a deliberate refetch trigger, not read in the body
   }, [isSignedIn, reloads]);
 
@@ -111,7 +115,7 @@ export function NotebookPage({
     setBusy(belief.id);
 
     try {
-      await requestJson(`/api/notebook/${belief.id}`, jsonRequest("PATCH", body));
+      await mutateJson(`/api/notebook/${belief.id}`, jsonMutation("PATCH", body));
       setReloads((count) => count + 1);
     } catch {
       setError("That did not take. Try again.");
@@ -126,9 +130,9 @@ export function NotebookPage({
     }
 
     try {
-      const response = await requestJson<GuestResponse>(
+      const response = await mutateJson<GuestResponse>(
         "/api/notebook/guests",
-        jsonRequest("POST", { name, vetoes }),
+        jsonMutation("POST", { name, vetoes }),
       );
 
       setGuests(response.guests);
@@ -139,9 +143,9 @@ export function NotebookPage({
 
   async function dropGuest(guest: Guest) {
     try {
-      const response = await requestJson<GuestResponse>(
+      const response = await mutateJson<GuestResponse>(
         `/api/notebook/guests/${guest.id}`,
-        jsonRequest("DELETE"),
+        jsonMutation("DELETE"),
       );
 
       setGuests(response.guests);

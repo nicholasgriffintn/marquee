@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { jsonRequest, requestJson } from "../lib/api";
+import { jsonMutation, mutateJson, queryJson } from "../lib/query-client";
 
 export type FeedKeys = {
   subscribed: boolean;
@@ -28,7 +28,7 @@ export function useFeeds(isSignedIn: boolean) {
     }
 
     try {
-      setKeys(await requestJson<FeedKeys>("/api/notebook/feeds"));
+      setKeys(await queryJson<FeedKeys>("/api/notebook/feeds"));
     } catch {
       setError("Could not read your subscriptions.");
     }
@@ -44,7 +44,7 @@ export function useFeeds(isSignedIn: boolean) {
     setError("");
 
     try {
-      setKeys(await requestJson<FeedKeys>("/api/notebook/feeds", jsonRequest("POST")));
+      setKeys(await mutateJson<FeedKeys>("/api/notebook/feeds", jsonMutation("POST")));
     } catch {
       setError("Could not cut you a key.");
     }
@@ -54,7 +54,7 @@ export function useFeeds(isSignedIn: boolean) {
     setError("");
 
     try {
-      setKeys(await requestJson<FeedKeys>("/api/notebook/feeds", jsonRequest("DELETE")));
+      setKeys(await mutateJson<FeedKeys>("/api/notebook/feeds", jsonMutation("DELETE")));
     } catch {
       setError("Could not take that key back.");
     }

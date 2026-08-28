@@ -1,15 +1,13 @@
-import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useCallback } from "react";
 
-import { ApiError, isAbortError, requestJson } from "../lib/api";
+import { jsonQueryOptions, QueryError } from "../lib/query-client";
 
 type ResourceOptions = {
   enabled?: boolean;
-  debounceMs?: number;
   errorMessage?: string;
   refreshKey?: string;
 };
-
-type Loaded<T> = { path: string; data: T | null; error: string };
 
 type Resource<T> = {
   data: T | null;
@@ -18,72 +16,26 @@ type Resource<T> = {
   reload: () => void;
 };
 
-const NOTHING: Loaded<never> = { path: "", data: null, error: "" };
-
 export function useResource<T>(path: string | null, options: ResourceOptions = {}): Resource<T> {
-  const { enabled = true, debounceMs = 0, errorMessage = "", refreshKey = "" } = options;
+  const { enabled = true, errorMessage = "", refreshKey = "" } = options;
   const active = enabled && Boolean(path);
-  const identity = `${refreshKey}\u0000${path ?? ""}`;
-  const [loaded, setLoaded] = useState<Loaded<T>>(NOTHING);
-  const [isFetching, setIsFetching] = useState(false);
-  const [version, setVersion] = useState(0);
-
-  useEffect(() => {
-    if (!active || !path) {
-      return undefined;
+  const loadPath = path ?? "";
+  const { data, error, isFetching, isPending, refetch } = useQuery({
+    ...jsonQueryOptions<T>(loadPath, refreshKey),
+    enabled: active,
+  });
+  const reload = useCallback(() => {
+    if (active) {
+      void refetch();
     }
-
-    const controller = new AbortController();
-    let live = true;
-
-    const load = () => {
-      setIsFetching(true);
-      requestJson<T>(path, { signal: controller.signal })
-        .then((data) => {
-          if (live) {
-            setLoaded({ path: identity, data, error: "" });
-          }
-
-          return data;
-        })
-        .catch((caught: unknown) => {
-          if (!live || isAbortError(caught)) {
-            return;
-          }
-
-          setLoaded({
-            path: identity,
-            data: null,
-            error: errorMessage || (caught instanceof ApiError ? caught.message : "Request failed"),
-          });
-        })
-        .finally(() => {
-          if (live) {
-            setIsFetching(false);
-          }
-        });
-    };
-
-    const timer = debounceMs > 0 ? window.setTimeout(load, debounceMs) : 0;
-
-    if (!timer) {
-      load();
-    }
-
-    return () => {
-      live = false;
-      window.clearTimeout(timer);
-      controller.abort();
-    };
-    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- version is a deliberate reload() trigger, not read in the body
-  }, [active, debounceMs, errorMessage, identity, path, version]);
-
-  const settled = loaded.path === identity;
+  }, [active, refetch]);
 
   return {
-    data: settled ? loaded.data : null,
-    error: settled ? loaded.error : "",
-    isLoading: active && (isFetching || !settled),
-    reload: useCallback(() => setVersion((current) => current + 1), []),
+    data: data ?? null,
+    error: error
+      ? errorMessage || (error instanceof QueryError ? error.message : "Request failed")
+      : "",
+    isLoading: active && (isPending || isFetching),
+    reload,
   };
 }

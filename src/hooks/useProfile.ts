@@ -10,9 +10,10 @@ import {
   runProfileMutation,
   type ProfileEntryState,
 } from "../domain/profile-entry";
-import { ApiError, isAbortError, jsonRequest, requestJson } from "../lib/api";
-import { requestProfileEntry } from "../lib/profile-entry-request";
+import { profileEntryQueryKey, requestProfileEntry } from "../lib/profile-entry-request";
+import { jsonMutation, mutateJson, queryClient, QueryError } from "../lib/query-client";
 import type { EntryStatus, ViewingEntry } from "../types";
+import { useResource } from "./useResource";
 
 type ProfileSummary = {
   shelved: number;
@@ -35,12 +36,9 @@ const emptyEntry = (titleId: string): ViewingEntry => ({
 });
 
 export function useProfile(isSignedIn: boolean) {
-  const [summary, setSummary] = useState<ProfileSummary>(EMPTY_SUMMARY);
   const [entries, setEntries] = useState<Record<string, ViewingEntry>>({});
   const [entryStates, setEntryStates] = useState<Record<string, ProfileEntryState>>({});
   const [message, setMessage] = useState("");
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [version, setVersion] = useState(0);
   const [operations] = useState(createProfileEntryCoordinator);
   const messageTimer = useRef(0);
   const announce = useCallback((text: string, holdMs = SUCCESS_HOLD_MS) => {
@@ -54,37 +52,16 @@ export function useProfile(isSignedIn: boolean) {
 
   useEffect(() => () => window.clearTimeout(messageTimer.current), []);
 
-  useEffect(() => {
-    const controller = new AbortController();
-
-    if (!isSignedIn) {
-      return () => controller.abort();
-    }
-
-    async function loadProfile() {
-      try {
-        const profile = await requestJson<ProfileSummary>("/api/profile", {
-          signal: controller.signal,
-        });
-
-        setSummary(profile);
-        announce("");
-      } catch (error) {
-        if (!isAbortError(error)) {
-          announce("Could not load your saved profile. New changes may not sync.", ERROR_HOLD_MS);
-        }
-      } finally {
-        setIsLoaded(true);
-      }
-    }
-
-    void loadProfile();
-
-    return () => controller.abort();
-    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- version is a deliberate refresh() trigger, not read in the body
-  }, [announce, isSignedIn, version]);
-
-  const refresh = useCallback(() => setVersion((current) => current + 1), []);
+  const {
+    data: loadedSummary,
+    error: profileError,
+    isLoading: isProfileLoading,
+    reload: refresh,
+  } = useResource<ProfileSummary>("/api/profile", {
+    enabled: isSignedIn,
+    errorMessage: "Could not load your saved profile. New changes may not sync.",
+  });
+  const summary = loadedSummary ?? EMPTY_SUMMARY;
 
   const loadEntry = useCallback(
     async (titleId: string, signal?: AbortSignal) => {
@@ -100,11 +77,9 @@ export function useProfile(isSignedIn: boolean) {
       }));
 
       try {
-        const response = await operations.enqueue(titleId, () =>
-          requestProfileEntry(titleId, signal),
-        );
+        const response = await operations.enqueue(titleId, () => requestProfileEntry(titleId));
 
-        if (!operations.isCurrent(titleId, generation)) {
+        if (signal?.aborted || !operations.isCurrent(titleId, generation)) {
           return;
         }
 
@@ -124,11 +99,11 @@ export function useProfile(isSignedIn: boolean) {
           [titleId]: entryLoadSucceeded(response.entry),
         }));
       } catch (error) {
-        if (isAbortError(error) || !operations.isCurrent(titleId, generation)) {
+        if (signal?.aborted || !operations.isCurrent(titleId, generation)) {
           return;
         }
 
-        const status = error instanceof ApiError ? error.status : undefined;
+        const status = error instanceof QueryError ? error.status : undefined;
 
         setEntryStates((current) => ({
           ...current,
@@ -152,7 +127,7 @@ export function useProfile(isSignedIn: boolean) {
       const payload = await runProfileMutation(
         () =>
           operations.enqueue(entry.titleId, () =>
-            requestJson<{ entry: ViewingEntry }>("/api/profile", jsonRequest("POST", entry)),
+            mutateJson<{ entry: ViewingEntry }>("/api/profile", jsonMutation("POST", entry)),
           ),
         refresh,
       );
@@ -168,6 +143,7 @@ export function useProfile(isSignedIn: boolean) {
         return true;
       }
 
+      queryClient.setQueryData(profileEntryQueryKey(entry.titleId), { entry: payload.entry });
       setEntries((current) => ({ ...current, [entry.titleId]: payload.entry }));
       setEntryStates((current) => ({
         ...current,
@@ -187,6 +163,7 @@ export function useProfile(isSignedIn: boolean) {
         return false;
       }
 
+      queryClient.removeQueries({ queryKey: profileEntryQueryKey(entry.titleId), exact: true });
       await loadEntry(entry.titleId);
 
       return false;
@@ -212,7 +189,7 @@ export function useProfile(isSignedIn: boolean) {
       await runProfileMutation(
         () =>
           operations.enqueue(titleId, () =>
-            requestJson(`/api/profile/${encodeURIComponent(titleId)}`, jsonRequest("DELETE")),
+            mutateJson(`/api/profile/${encodeURIComponent(titleId)}`, jsonMutation("DELETE")),
           ),
         refresh,
       );
@@ -222,6 +199,7 @@ export function useProfile(isSignedIn: boolean) {
       }
 
       announce("Removed from shelf");
+      queryClient.setQueryData(profileEntryQueryKey(titleId), { entry: null });
 
       return true;
     } catch {
@@ -230,6 +208,7 @@ export function useProfile(isSignedIn: boolean) {
       }
 
       announce("Could not remove that title. Try again.", ERROR_HOLD_MS);
+      queryClient.removeQueries({ queryKey: profileEntryQueryKey(titleId), exact: true });
       await loadEntry(titleId);
 
       return false;
@@ -262,8 +241,8 @@ export function useProfile(isSignedIn: boolean) {
     shelved: isSignedIn ? summary.shelved : 0,
     unrated: isSignedIn ? summary.unrated : 0,
     shelfKey: isSignedIn ? `${summary.shelved}:${summary.updatedAt}` : "",
-    message: isSignedIn ? message : "",
-    isLoaded: isSignedIn ? isLoaded : true,
+    message: isSignedIn ? message || profileError : "",
+    isLoaded: isSignedIn ? loadedSummary !== null || !isProfileLoading : true,
     loadEntry,
     refresh,
     removeEntry,

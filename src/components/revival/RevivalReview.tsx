@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 
 import {
   rightsSummary,
@@ -7,7 +7,8 @@ import {
   type RevivalStatus,
   type RevivalWork,
 } from "../../domain/revival";
-import { jsonRequest, requestJson } from "../../lib/api";
+import { useResource } from "../../hooks/useResource";
+import { jsonMutation, mutateJson } from "../../lib/query-client";
 import { ExternalLinkIcon } from "../ui";
 
 type ReviewWork = RevivalWork & {
@@ -65,43 +66,29 @@ export function RevivalReview({ revision: outerRevision = 0 }: { revision?: numb
   const [source, setSource] = useState("");
   const [query, setQuery] = useState("");
   const [revision, setRevision] = useState(0);
-  const [data, setData] = useState<ReviewResponse | null>(null);
-  const [error, setError] = useState("");
+  const [actionError, setActionError] = useState("");
   const [pending, setPending] = useState("");
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    requestJson<ReviewResponse>(`/api/admin/revival?status=${status}`, {
-      signal: controller.signal,
-    })
-      .then((response) => {
-        setData(response);
-        setError("");
-
-        return response;
-      })
-      .catch((caught: unknown) => {
-        if (!controller.signal.aborted) {
-          setError(caught instanceof Error ? caught.message : "Could not read the review queue.");
-        }
-      });
-
-    return () => controller.abort();
-    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- outerRevision/revision are deliberate refetch triggers, not read in the body
-  }, [outerRevision, revision, status]);
+  const { data, error: resourceError } = useResource<ReviewResponse>(
+    `/api/admin/revival?status=${status}`,
+    {
+      errorMessage: "Could not read the review queue.",
+      refreshKey: `${outerRevision}:${revision}`,
+    },
+  );
+  const error = actionError || resourceError;
 
   const decide = useCallback(async (workId: string, decision: "approve" | "reject" | "mirror") => {
     setPending(workId);
 
     try {
-      await requestJson(
+      await mutateJson(
         `/api/admin/revival/${encodeURIComponent(workId)}/${decision}`,
-        jsonRequest("POST"),
+        jsonMutation("POST"),
       );
+      setActionError("");
       setRevision((current) => current + 1);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "That decision did not stick.");
+      setActionError(caught instanceof Error ? caught.message : "That decision did not stick.");
     } finally {
       setPending("");
     }

@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 
-import { jsonRequest, requestJson } from "../lib/api";
+import { jsonMutation, mutateJson, queryClient } from "../lib/query-client";
 import type { User } from "../types";
 import { useResource } from "./useResource";
 
@@ -10,13 +10,15 @@ export function useSession() {
   const [signedOut, setSignedOut] = useState(false);
   const [issue, setIssue] = useState(authCallbackError);
   const { data, error, isLoading } = useResource<SessionResponse>("/api/auth/session", {
+    enabled: !signedOut,
     errorMessage: "Could not check your sign-in status. Try again in a moment.",
   });
 
   const logout = useCallback(async () => {
     try {
-      await requestJson("/api/auth/logout", jsonRequest("POST"));
+      await mutateJson("/api/auth/logout", jsonMutation("POST"));
       setSignedOut(true);
+      queryClient.clear();
       setIssue("");
     } catch {
       setIssue("Could not sign you out. Try again.");

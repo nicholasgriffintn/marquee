@@ -1,9 +1,8 @@
 import { AuthFlow, AuthProvider, type ExternalAuthProvider } from "@ngriffin_uk/auth-react";
-import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { UsherMark } from "../components/usher/UsherMark";
-import { requestJson } from "../lib/api";
+import { useResource } from "../hooks/useResource";
 
 const CLASS_NAMES = {
   signIn: "box-office-flow",
@@ -34,32 +33,12 @@ export function SignInPage({
   isSessionLoading: boolean;
 }) {
   const [params] = useSearchParams();
-  const [methods, setMethods] = useState<{
+  const { data, error } = useResource<{
     providers: ExternalAuthProvider[];
     magicLink: boolean;
-  } | null>(null);
+  }>("/api/auth/methods");
+  const methods = data ?? (error ? { providers: [], magicLink: false } : null);
   const returnTo = params.get("returnTo") ?? "/";
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    async function load() {
-      try {
-        const response = await requestJson<{
-          providers: ExternalAuthProvider[];
-          magicLink: boolean;
-        }>("/api/auth/methods", { signal: controller.signal });
-
-        setMethods(response);
-      } catch {
-        setMethods({ providers: [], magicLink: false });
-      }
-    }
-
-    void load();
-
-    return () => controller.abort();
-  }, []);
 
   return (
     <section className="page-section box-office">

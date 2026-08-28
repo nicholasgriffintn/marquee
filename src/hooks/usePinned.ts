@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 
 import type { CatalogSection } from "../domain/catalog";
-import { jsonRequest, requestJson } from "../lib/api";
+import { jsonMutation, mutateJson } from "../lib/query-client";
 import { useResource } from "./useResource";
 
 const NO_SECTIONS: CatalogSection[] = [];
@@ -18,7 +18,7 @@ export function usePinned(isSignedIn: boolean) {
       setPinnedPrompt(shelf.prompt);
 
       try {
-        await requestJson("/api/curator/pinned", jsonRequest("POST", shelf));
+        await mutateJson("/api/curator/pinned", jsonMutation("POST", shelf));
         reload();
 
         return true;
@@ -35,9 +35,9 @@ export function usePinned(isSignedIn: boolean) {
     async (sectionId: string) => {
       const id = sectionId.replace(/^pinned-/u, "");
 
-      await requestJson(
+      await mutateJson(
         `/api/curator/pinned/${encodeURIComponent(id)}`,
-        jsonRequest("DELETE"),
+        jsonMutation("DELETE"),
       ).catch(() => undefined);
       reload();
     },

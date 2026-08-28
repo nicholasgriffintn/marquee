@@ -121,6 +121,7 @@ export function DetailPanel({
   const madeIn = item.countries?.slice(0, COUNTRIES_SHOWN).join(", ") ?? "";
   const { exit, leaveVia, report, dismiss } = useExitWarning(item.id);
   const exitOpenRef = useRef(Boolean(exit));
+  const viewedTitleId = useRef("");
 
   useEffect(() => {
     exitOpenRef.current = Boolean(exit);
@@ -155,6 +156,11 @@ export function DetailPanel({
   }, [exit, panelRef]);
 
   useEffect(() => {
+    if (viewedTitleId.current === item.id) {
+      return;
+    }
+
+    viewedTitleId.current = item.id;
     track("title_view", { titleId: item.id });
   }, [item.id]);
 

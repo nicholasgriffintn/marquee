@@ -1,9 +1,12 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 
 import { App } from "./App";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { queryClient } from "./lib/query-client";
 
 // oxlint-disable-next-line import/no-unassigned-import -- Vite loads the global stylesheet for its side effect.
 import "./styles.css";
@@ -16,10 +19,13 @@ if (!root) {
 
 createRoot(root).render(
   <StrictMode>
-    <BrowserRouter>
-      <ErrorBoundary variant="page" label="the building">
-        <App />
-      </ErrorBoundary>
-    </BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <ErrorBoundary variant="page" label="the building">
+          <App />
+        </ErrorBoundary>
+        <ReactQueryDevtools initialIsOpen={false} />
+      </BrowserRouter>
+    </QueryClientProvider>
   </StrictMode>,
 );

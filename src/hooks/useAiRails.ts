@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { CatalogSection } from "../domain/catalog";
-import { requestJson } from "../lib/api";
+import { queryJson } from "../lib/query-client";
 
 type RailsResponse = {
   sections: CatalogSection[];
@@ -28,7 +28,6 @@ export function useAiRails(isSignedIn: boolean, savedKey: string) {
       return undefined;
     }
 
-    const controller = new AbortController();
     let active = true;
     let timer = 0;
     const kickoffDelay = hasLoadedOnce.current ? SHELF_CHANGE_DEBOUNCE_MS : 0;
@@ -37,11 +36,8 @@ export function useAiRails(isSignedIn: boolean, savedKey: string) {
 
     async function load(attempt: number) {
       try {
-        const response = await requestJson<RailsResponse>(
+        const response = await queryJson<RailsResponse>(
           `/api/curator/rails${attempt === 0 ? "?generate=1" : ""}`,
-          {
-            signal: controller.signal,
-          },
         );
 
         if (!active) {
@@ -78,7 +74,6 @@ export function useAiRails(isSignedIn: boolean, savedKey: string) {
       active = false;
       window.clearTimeout(kickoff);
       window.clearTimeout(timer);
-      controller.abort();
     };
     // oxlint-disable-next-line react/exhaustive-effect-dependencies -- savedKey is a deliberate regenerate-on-shelf-change trigger, not read in the body
   }, [isSignedIn, savedKey]);

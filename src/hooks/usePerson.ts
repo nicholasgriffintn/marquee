@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { NO_AWARDS, type AwardSummary } from "../domain/awards";
 import type { MediaTitle } from "../domain/catalog";
-import { ApiError, isAbortError, jsonRequest, requestJson } from "../lib/api";
+import { jsonMutation, mutateJson, queryJson, QueryError } from "../lib/query-client";
 import { useResource } from "./useResource";
 
 export type PersonResponse = {
@@ -34,16 +34,14 @@ export function usePerson(name: string, isSignedIn: boolean) {
       return undefined;
     }
 
-    const controller = new AbortController();
     let alive = true;
 
     async function load() {
       setIsLoading(true);
 
       try {
-        const response = await requestJson<PersonResponse>(
+        const response = await queryJson<PersonResponse>(
           `/api/catalog/people/${encodeURIComponent(name)}?page=${page}`,
-          { signal: controller.signal },
         );
 
         if (!alive) {
@@ -57,9 +55,9 @@ export function usePerson(name: string, isSignedIn: boolean) {
         setHasMore(response.hasMore);
         setLoadError("");
       } catch (caught) {
-        if (alive && !isAbortError(caught)) {
+        if (alive) {
           if (page === 0) {
-            const notFound = caught instanceof ApiError && caught.status === 404;
+            const notFound = caught instanceof QueryError && caught.status === 404;
 
             setLoadError(
               notFound
@@ -83,7 +81,6 @@ export function usePerson(name: string, isSignedIn: boolean) {
 
     return () => {
       alive = false;
-      controller.abort();
     };
   }, [active, name, page]);
 
@@ -99,9 +96,9 @@ export function usePerson(name: string, isSignedIn: boolean) {
     const follow = !following;
 
     try {
-      const response = await requestJson<{ following: string[] }>(
+      const response = await mutateJson<{ following: string[] }>(
         "/api/notebook/people",
-        jsonRequest("POST", { name, follow }),
+        jsonMutation("POST", { name, follow }),
       );
 
       setFollowed(response.following);

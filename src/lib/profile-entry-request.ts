@@ -1,9 +1,15 @@
 import type { ViewingEntry } from "../types";
-import { requestJson } from "./api.ts";
+import { jsonQueryOptions, queryClient } from "./query-client.ts";
 
-export function requestProfileEntry(titleId: string, signal?: AbortSignal) {
-  return requestJson<{ entry: ViewingEntry | null }>(
-    `/api/profile/entry/${encodeURIComponent(titleId)}`,
-    { signal },
-  );
+export function profileEntryQueryKey(titleId: string) {
+  return ["profile-entry", titleId];
+}
+
+export function requestProfileEntry(titleId: string) {
+  return queryClient.fetchQuery({
+    ...jsonQueryOptions<{ entry: ViewingEntry | null }>(
+      `/api/profile/entry/${encodeURIComponent(titleId)}`,
+    ),
+    queryKey: profileEntryQueryKey(titleId),
+  });
 }

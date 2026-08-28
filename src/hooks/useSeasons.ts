@@ -11,7 +11,7 @@ import {
   type SeasonSummary,
   type ShowProgress,
 } from "../domain/seasons";
-import { isAbortError, jsonRequest, requestJson } from "../lib/api";
+import { jsonMutation, mutateJson, queryJson } from "../lib/query-client";
 
 type SeasonIndexResponse = { seasons: SeasonSummary[]; source: string; fetchedAt: string };
 
@@ -64,15 +64,12 @@ export function useSeasons(item: MediaTitle, enabled: boolean, progress: ShowPro
       setIsLoadingIndex(true);
 
       try {
-        const response = await requestJson<SeasonIndexResponse>(
-          `/api/catalog/tv/${tmdbId}/seasons`,
-          { signal: controller.signal },
-        );
+        const response = await queryJson<SeasonIndexResponse>(`/api/catalog/tv/${tmdbId}/seasons`);
 
         setIndex({ titleId: `tv:${tmdbId}`, seasons: response.seasons });
         setError("");
-      } catch (loadError) {
-        if (!isAbortError(loadError)) {
+      } catch {
+        if (!controller.signal.aborted) {
           setError("The series listing is not answering.");
         }
       } finally {
@@ -101,14 +98,13 @@ export function useSeasons(item: MediaTitle, enabled: boolean, progress: ShowPro
       setIsLoadingSeason(true);
 
       try {
-        const response = await requestJson<SeasonDetail>(
+        const response = await queryJson<SeasonDetail>(
           `/api/catalog/tv/${tmdbId}/seasons/${selected}`,
-          { signal: controller.signal },
         );
 
         setDetails((current) => ({ ...current, [`tv:${tmdbId}:${selected}`]: response }));
-      } catch (loadError) {
-        if (!isAbortError(loadError)) {
+      } catch {
+        if (!controller.signal.aborted) {
           setError("That season would not come off the shelf.");
         }
       } finally {
@@ -170,15 +166,14 @@ export function useEpisodeEntries(titleId: string, enabled: boolean) {
 
     async function load() {
       try {
-        const response = await requestJson<EpisodesResponse>(
+        const response = await queryJson<EpisodesResponse>(
           `/api/episodes?titleId=${encodeURIComponent(titleId)}`,
-          { signal: controller.signal },
         );
 
         setTracked({ titleId, entries: response.entries, progress: response.progress });
         setMessage("");
-      } catch (error) {
-        if (!isAbortError(error)) {
+      } catch {
+        if (!controller.signal.aborted) {
           setMessage("I could not read your episode notes.");
         }
       }
@@ -216,9 +211,9 @@ export function useEpisodeEntries(titleId: string, enabled: boolean) {
       setTracked({ titleId, entries: [...without, next], progress });
 
       try {
-        const response = await requestJson<SaveResponse>(
+        const response = await mutateJson<SaveResponse>(
           "/api/episodes",
-          jsonRequest("POST", {
+          jsonMutation("POST", {
             titleId,
             scope,
             season: next.season,
@@ -252,9 +247,9 @@ export function useEpisodeEntries(titleId: string, enabled: boolean) {
       setMessage(watched ? "Marking those off…" : "Putting those back…");
 
       try {
-        const response = await requestJson<EpisodesResponse & { marked: number }>(
+        const response = await mutateJson<EpisodesResponse & { marked: number }>(
           "/api/episodes/mark",
-          jsonRequest("POST", { titleId, season, watched, through }),
+          jsonMutation("POST", { titleId, season, watched, through }),
         );
 
         setTracked({ titleId, entries: response.entries, progress: response.progress });

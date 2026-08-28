@@ -12,6 +12,14 @@ type TrackPayload = {
   monetization?: string;
 };
 
+function queueBeacon(body: string) {
+  try {
+    globalThis.navigator?.sendBeacon("/api/events", new Blob([body], { type: "application/json" }));
+  } catch {
+    return;
+  }
+}
+
 export function track(name: ClientEvent, payload: TrackPayload = {}) {
   const journey = payload.titleId ? journeyFor(payload.titleId) : null;
   const body = {
@@ -22,10 +30,5 @@ export function track(name: ClientEvent, payload: TrackPayload = {}) {
     position: payload.position ?? journey?.position,
   };
 
-  void fetch("/api/events", {
-    method: "POST",
-    keepalive: true,
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-  }).catch(() => undefined);
+  queueBeacon(JSON.stringify(body));
 }

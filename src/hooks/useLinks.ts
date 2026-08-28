@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { jsonRequest, requestJson } from "../lib/api";
+import { jsonMutation, mutateJson, queryJson } from "../lib/query-client";
 
 export type AccountLink = {
   provider: "trakt";
@@ -62,15 +62,15 @@ export function useLinks(isSignedIn: boolean) {
 
     try {
       const [linkResponse, tokenResponse] = await Promise.all([
-        requestJson<{ links: AccountLink[] }>("/api/links"),
-        requestJson<{ tokens: ApiToken[] }>("/api/auth/tokens"),
+        queryJson<{ links: AccountLink[] }>("/api/links"),
+        queryJson<{ tokens: ApiToken[] }>("/api/auth/tokens"),
       ]);
 
       setLinks(linkResponse.links);
       setTokens(tokenResponse.tokens);
 
       if (linkResponse.links.some((link) => link.provider === "trakt" && link.connected)) {
-        setPending(await requestJson<TraktPending>("/api/links/trakt/push"));
+        setPending(await queryJson<TraktPending>("/api/links/trakt/push"));
       }
     } catch {
       setError("Could not read your connected accounts.");
@@ -88,11 +88,11 @@ export function useLinks(isSignedIn: boolean) {
     setSyncStatus("running");
 
     try {
-      await requestJson("/api/links/trakt/sync", jsonRequest("POST"));
+      await mutateJson("/api/links/trakt/sync", jsonMutation("POST"));
 
       const before = links.find((link) => link.provider === "trakt")?.syncedAt ?? null;
       const finished = await pollUntil(async () => {
-        const response = await requestJson<{ links: AccountLink[] }>("/api/links");
+        const response = await queryJson<{ links: AccountLink[] }>("/api/links");
         const trakt = response.links.find((link) => link.provider === "trakt");
 
         if (!trakt?.syncedAt || trakt.syncedAt === before) {
@@ -116,9 +116,9 @@ export function useLinks(isSignedIn: boolean) {
     setPushStatus("running");
 
     try {
-      const response = await requestJson<TraktPending & { queued: boolean }>(
+      const response = await mutateJson<TraktPending & { queued: boolean }>(
         "/api/links/trakt/push",
-        jsonRequest("POST"),
+        jsonMutation("POST"),
       );
 
       if (!response.queued) {
@@ -130,7 +130,7 @@ export function useLinks(isSignedIn: boolean) {
 
       const before = response.pushedAt;
       const finished = await pollUntil(async () => {
-        const preview = await requestJson<TraktPending>("/api/links/trakt/push");
+        const preview = await queryJson<TraktPending>("/api/links/trakt/push");
 
         if (!preview.pushedAt || preview.pushedAt === before) {
           return false;
@@ -152,7 +152,7 @@ export function useLinks(isSignedIn: boolean) {
     setError("");
 
     try {
-      await requestJson("/api/links/trakt", jsonRequest("DELETE"));
+      await mutateJson("/api/links/trakt", jsonMutation("DELETE"));
       await reload();
     } catch {
       setError("Could not unlink Trakt.");
@@ -164,9 +164,9 @@ export function useLinks(isSignedIn: boolean) {
       setError("");
 
       try {
-        const created = await requestJson<{ token: string }>(
+        const created = await mutateJson<{ token: string }>(
           "/api/auth/tokens",
-          jsonRequest("POST", { label }),
+          jsonMutation("POST", { label }),
         );
 
         setFreshToken(created.token);
@@ -183,7 +183,7 @@ export function useLinks(isSignedIn: boolean) {
       setError("");
 
       try {
-        await requestJson(`/api/auth/tokens/${id}`, jsonRequest("DELETE"));
+        await mutateJson(`/api/auth/tokens/${id}`, jsonMutation("DELETE"));
         await reload();
       } catch {
         setError("Could not revoke the token.");

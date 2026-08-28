@@ -173,7 +173,13 @@ function upsertPeopleStatement(db: D1Database, who: TitleCredit["person"][]) {
          known_for = excluded.known_for,
          gender = excluded.gender,
          profile_path = excluded.profile_path,
-         popularity = excluded.popularity`,
+         popularity = excluded.popularity
+       WHERE catalog_people.name IS NOT excluded.name
+          OR catalog_people.original_name IS NOT excluded.original_name
+          OR catalog_people.known_for IS NOT excluded.known_for
+          OR catalog_people.gender IS NOT excluded.gender
+          OR catalog_people.profile_path IS NOT excluded.profile_path
+          OR catalog_people.popularity IS NOT excluded.popularity`,
     )
     .bind(...params);
 }
@@ -208,15 +214,30 @@ function upsertCreditsStatement(db: D1Database, rows: { titleId: string; entry: 
          billing = excluded.billing,
          season_number = excluded.season_number,
          episode_number = excluded.episode_number,
-         episode_count = excluded.episode_count`,
+         episode_count = excluded.episode_count
+       WHERE catalog_credits.title_id IS NOT excluded.title_id
+          OR catalog_credits.person_id IS NOT excluded.person_id
+          OR catalog_credits.department IS NOT excluded.department
+          OR catalog_credits.job IS NOT excluded.job
+          OR catalog_credits.character IS NOT excluded.character
+          OR catalog_credits.billing IS NOT excluded.billing
+          OR catalog_credits.season_number IS NOT excluded.season_number
+          OR catalog_credits.episode_number IS NOT excluded.episode_number
+          OR catalog_credits.episode_count IS NOT excluded.episode_count`,
     )
     .bind(...params);
 }
 
 export async function storeCredits(db: D1Database, credits: TitleCredits[]) {
-  const entries = credits.flatMap((title) =>
-    title.entries.map((entry) => ({ titleId: title.titleId, entry })),
-  );
+  const entriesByCreditId = new Map<string, { titleId: string; entry: TitleCredit }>();
+
+  for (const title of credits) {
+    for (const entry of title.entries) {
+      entriesByCreditId.set(entry.creditId, { titleId: title.titleId, entry });
+    }
+  }
+
+  const entries = [...entriesByCreditId.values()];
 
   if (entries.length === 0) {
     return 0;

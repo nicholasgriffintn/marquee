@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import type { MediaTitle, Provider } from "../../domain/catalog";
 import type { UsherQuestion } from "../../domain/usher";
 import { useActiveOption } from "../../hooks/useActiveOption";
-import { requestJson } from "../../lib/api";
+import { queryJson } from "../../lib/query-client";
 import { TitleArt } from "../TitleArt";
 import { CheckIcon, CloseIcon, ProviderBadge } from "../ui";
 
@@ -148,15 +148,21 @@ function PeopleAnswer({
   const { active, setActive, move, reset, optionRefs } = useActiveOption(matches.length);
 
   useEffect(() => {
-    const controller = new AbortController();
+    let live = true;
 
-    void requestJson<{ people: string[] }>("/api/usher/people", {
-      signal: controller.signal,
-    })
-      .then((response) => setSuggestions(response.people))
+    void queryJson<{ people: string[] }>("/api/usher/people")
+      .then((response) => {
+        if (live) {
+          setSuggestions(response.people);
+        }
+
+        return response;
+      })
       .catch(() => undefined);
 
-    return () => controller.abort();
+    return () => {
+      live = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -164,19 +170,22 @@ function PeopleAnswer({
       return undefined;
     }
 
-    const controller = new AbortController();
+    let live = true;
     const timer = window.setTimeout(() => {
-      void requestJson<{ people: string[] }>(
-        `/api/usher/people?query=${encodeURIComponent(term)}`,
-        { signal: controller.signal },
-      )
-        .then((response) => setResults({ term, people: response.people }))
+      void queryJson<{ people: string[] }>(`/api/usher/people?query=${encodeURIComponent(term)}`)
+        .then((response) => {
+          if (live) {
+            setResults({ term, people: response.people });
+          }
+
+          return response;
+        })
         .catch(() => undefined);
     }, 180);
 
     return () => {
+      live = false;
       window.clearTimeout(timer);
-      controller.abort();
     };
   }, [term]);
 
@@ -339,24 +348,28 @@ function TitleAnswer({
   const [query, setQuery] = useState("");
 
   useEffect(() => {
-    const controller = new AbortController();
+    let active = true;
     const term = query.trim();
     const timer = window.setTimeout(
       () => {
         const search = term ? `&query=${encodeURIComponent(term)}` : "";
 
-        void requestJson<{ items: MediaTitle[] }>(`/api/catalog/browse?sort=popularity${search}`, {
-          signal: controller.signal,
-        })
-          .then((response) => setItems(response.items.slice(0, SEEN_GRID)))
+        void queryJson<{ items: MediaTitle[] }>(`/api/catalog/browse?sort=popularity${search}`)
+          .then((response) => {
+            if (active) {
+              setItems(response.items.slice(0, SEEN_GRID));
+            }
+
+            return response;
+          })
           .catch(() => undefined);
       },
       term ? 220 : 0,
     );
 
     return () => {
+      active = false;
       window.clearTimeout(timer);
-      controller.abort();
     };
   }, [query]);
 

@@ -1,7 +1,8 @@
 import { useCallback, useRef, useState } from "react";
 
 import type { MediaTitle } from "../domain/catalog";
-import { isAbortError } from "../lib/api";
+import { isAbortError } from "../lib/errors";
+import { jsonMutation, mutateJson, mutateResponse } from "../lib/query-client";
 
 type CuratorEvent =
   | { type: "status"; label: string }
@@ -40,7 +41,7 @@ export function useCurator() {
     setState(EMPTY);
     setError("");
     setIsAsking(false);
-    void fetch("/api/curator", { method: "DELETE" }).catch(() => undefined);
+    void mutateJson("/api/curator", jsonMutation("DELETE")).catch(() => undefined);
   }, []);
 
   const ask = useCallback(
@@ -67,7 +68,7 @@ export function useCurator() {
       }));
 
       try {
-        const response = await fetch("/api/curator", {
+        const response = await mutateResponse("/api/curator", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({

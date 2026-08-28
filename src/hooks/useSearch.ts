@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 import type { MediaTitle } from "../domain/catalog";
-import { ApiError, isAbortError, requestJson } from "../lib/api";
+import { queryJson, QueryError } from "../lib/query-client";
 
 type SearchResponse = {
   items: MediaTitle[];
@@ -47,15 +47,12 @@ export function useSearch(query: string, providerIds: string[]) {
       return undefined;
     }
 
-    const controller = new AbortController();
     let active = true;
     let hybridTimer: number | undefined;
 
     async function refine() {
       try {
-        const response = await requestJson<SearchResponse>(searchUrl(trimmed, providerKey, true), {
-          signal: controller.signal,
-        });
+        const response = await queryJson<SearchResponse>(searchUrl(trimmed, providerKey, true));
 
         if (active) {
           setItems((current) => mergeRefined(current, response.items));
@@ -74,10 +71,7 @@ export function useSearch(query: string, providerIds: string[]) {
         setIsRefining(false);
 
         try {
-          const response = await requestJson<SearchResponse>(
-            searchUrl(trimmed, providerKey, false),
-            { signal: controller.signal },
-          );
+          const response = await queryJson<SearchResponse>(searchUrl(trimmed, providerKey, false));
 
           if (active) {
             setItems(response.items);
@@ -89,9 +83,9 @@ export function useSearch(query: string, providerIds: string[]) {
             }
           }
         } catch (caught) {
-          if (active && !isAbortError(caught)) {
+          if (active) {
             setItems([]);
-            setError(caught instanceof ApiError ? caught.message : "Search is unavailable");
+            setError(caught instanceof QueryError ? caught.message : "Search is unavailable");
           }
         } finally {
           if (active) {
@@ -110,8 +104,6 @@ export function useSearch(query: string, providerIds: string[]) {
       if (hybridTimer !== undefined) {
         window.clearTimeout(hybridTimer);
       }
-
-      controller.abort();
     };
   }, [isShort, providerKey, trimmed]);
 

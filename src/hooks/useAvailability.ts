@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { MediaTitle, ProviderAvailability } from "../domain/catalog";
-import { jsonRequest, requestJson } from "../lib/api";
+import { jsonMutation, mutateJson } from "../lib/query-client";
 import { useResource } from "./useResource";
 
 export type NextEpisode = {
@@ -46,9 +46,9 @@ export function useAvailability(item: MediaTitle, enabled: boolean) {
 
     const refresh = async () => {
       try {
-        const response = await requestJson<AvailabilityResponse>(
+        const response = await mutateJson<AvailabilityResponse>(
           `/api/catalog/${mediaType}/${tmdbId}/availability/refresh`,
-          jsonRequest("POST"),
+          jsonMutation("POST"),
         );
 
         if (live) {

@@ -9,12 +9,13 @@ import type {
   RevivalShelvesResponse,
   RevivalWork,
 } from "../domain/revival";
-import { jsonRequest, requestJson } from "../lib/api";
+import { jsonMutation, mutateJson, queryJson } from "../lib/query-client";
 import { useResource } from "./useResource";
 
 const NO_BILL: RevivalBillSlot[] = [];
 const NO_SHELVES: RevivalShelf[] = [];
 const NO_CARDS: RevivalCard[] = [];
+const NO_WORKS: RevivalWork[] = [];
 
 export function useVaultTotal(isReady: boolean) {
   const { data } = useResource<{ total: number }>("/api/revival/vault", { enabled: isReady });
@@ -48,64 +49,25 @@ export function useResumeShelf(isReady: boolean) {
   return data?.works ?? NO_CARDS;
 }
 
-type ScreeningState = { workId: string; screening: RevivalScreening | null; error: string };
-
 export function useScreening(workId: string | undefined) {
-  const [state, setState] = useState<ScreeningState>({ workId: "", screening: null, error: "" });
-
-  useEffect(() => {
-    if (!workId) {
-      return undefined;
-    }
-
-    const controller = new AbortController();
-
-    requestJson<RevivalScreening>(`/api/revival/${encodeURIComponent(workId)}`, {
-      signal: controller.signal,
-    })
-      .then((screening) => setState({ workId, screening, error: "" }))
-      .catch((cause: unknown) => {
-        if (!controller.signal.aborted) {
-          setState({
-            workId,
-            screening: null,
-            error: cause instanceof Error ? cause.message : "Nothing showing under that name",
-          });
-        }
-      });
-
-    return () => controller.abort();
-  }, [workId]);
-
-  const settled = state.workId === workId;
+  const { data, error, isLoading } = useResource<RevivalScreening>(
+    workId ? `/api/revival/${encodeURIComponent(workId)}` : null,
+    { errorMessage: "Nothing showing under that name" },
+  );
 
   return {
-    screening: settled ? state.screening : null,
-    isLoading: Boolean(workId) && !settled,
-    error: settled ? state.error : "",
+    screening: data,
+    isLoading,
+    error,
   };
 }
 
 export function useTitleReels(titleId: string, mediaType: string, tmdbId: number) {
-  const [works, setWorks] = useState<RevivalWork[]>([]);
+  const { data } = useResource<{ works: RevivalWork[] }>(
+    titleId ? `/api/revival/titles/${mediaType}/${tmdbId}` : null,
+  );
 
-  useEffect(() => {
-    if (!titleId) {
-      return undefined;
-    }
-
-    const controller = new AbortController();
-
-    requestJson<{ works: RevivalWork[] }>(`/api/revival/titles/${mediaType}/${tmdbId}`, {
-      signal: controller.signal,
-    })
-      .then((response) => setWorks(response.works))
-      .catch(() => setWorks([]));
-
-    return () => controller.abort();
-  }, [mediaType, titleId, tmdbId]);
-
-  return works;
+  return data?.works ?? NO_WORKS;
 }
 
 const SEARCH_DEBOUNCE_MS = 250;
@@ -123,20 +85,21 @@ export function useVaultSearch(query: string) {
       return undefined;
     }
 
-    const controller = new AbortController();
+    let active = true;
     const timer = window.setTimeout(() => {
-      requestJson<{ works: RevivalCard[] }>(
-        `/api/revival/search?q=${encodeURIComponent(trimmed)}`,
-        {
-          signal: controller.signal,
-        },
-      )
-        .then((response) => setState({ query: trimmed, works: response.works }))
+      queryJson<{ works: RevivalCard[] }>(`/api/revival/search?q=${encodeURIComponent(trimmed)}`)
+        .then((response) => {
+          if (active) {
+            setState({ query: trimmed, works: response.works });
+          }
+
+          return response;
+        })
         .catch(() => undefined);
     }, SEARCH_DEBOUNCE_MS);
 
     return () => {
-      controller.abort();
+      active = false;
       window.clearTimeout(timer);
     };
   }, [isActive, trimmed]);
@@ -167,9 +130,9 @@ export function useProgressReporter(workId: string, canSave: boolean) {
 
       lastSent.current = positionSeconds;
 
-      void fetch(
+      void mutateJson(
         `/api/revival/${encodeURIComponent(workId)}/progress`,
-        jsonRequest("POST", { positionSeconds: Math.floor(positionSeconds), finished }),
+        jsonMutation("POST", { positionSeconds: Math.floor(positionSeconds), finished }),
       ).catch(() => undefined);
     },
     [canSave, workId],
