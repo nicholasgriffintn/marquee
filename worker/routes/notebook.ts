@@ -241,12 +241,6 @@ notebookRoutes.get("/map", async (context) => {
   }
 });
 
-notebookRoutes.get("/awards", async (context) => {
-  const user = context.get("authenticatedUser");
-
-  return jsonResponse({ runs: await readAwardRuns(context.env.DB, user.id, AWARD_RUNS) });
-});
-
 notebookRoutes.get("/atlas", async (context) => {
   const user = context.get("authenticatedUser");
 
