@@ -8577,6 +8577,17 @@ a.showtime:hover small {
 .revival-screen .detail-synopsis {
   max-width: 68ch;
 }
+.revival-synopsis-credit {
+  color: var(--muted);
+  font: 400 11px var(--mono);
+  line-height: 1.6;
+  margin: 8px 0 0;
+  max-width: 68ch;
+}
+.revival-synopsis-credit a {
+  color: inherit;
+  text-decoration: underline;
+}
 .revival-tags {
   display: flex;
   flex-wrap: wrap;

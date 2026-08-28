@@ -118,6 +118,12 @@ export class CatalogSweep extends WorkflowEntrypoint<Bindings, CatalogSweepParam
       return true;
     });
 
+    await step.do("describe public domain works", { retries: RETRIES }, async () => {
+      await this.env.REVIVAL_QUEUE.send({ type: "describe-revival-works", chain: true });
+
+      return true;
+    });
+
     await step.do("group public domain prints", { retries: RETRIES }, async () => {
       await this.env.REVIVAL_QUEUE.send({ type: "group-revival-prints" });
 

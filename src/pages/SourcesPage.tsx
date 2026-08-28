@@ -43,6 +43,21 @@ const CREDITS: { name: string; href: string; note: string; logo?: string }[] = [
     note: "Pageview trends behind Trending",
   },
   {
+    name: "Wikipedia",
+    href: "https://en.wikipedia.org",
+    note: "Written descriptions in the revival house",
+  },
+  {
+    name: "Wikidata",
+    href: "https://www.wikidata.org",
+    note: "Authors' death dates, which close the UK term",
+  },
+  {
+    name: "Wikimedia Commons",
+    href: "https://commons.wikimedia.org",
+    note: "Revival prints held by the Commons community",
+  },
+  {
     name: "Trakt",
     href: "https://trakt.tv",
     note: "Your imported watch history",
@@ -163,6 +178,31 @@ export function SourcesPage({
               ODbL
             </a>
             .
+          </p>
+          <p>
+            Two licences sit on the same print page in the revival house, and they cover different
+            things. Where a description was taken from Wikipedia, the prose is the work of that
+            article&rsquo;s editors and stays under{" "}
+            <a
+              href="https://creativecommons.org/licenses/by-sa/4.0/"
+              target="_blank"
+              rel="noreferrer"
+            >
+              CC BY-SA 4.0
+            </a>
+            . Every extract names its article, links back to it, and is passed on to you under the
+            same licence. The death dates used to work out whether a film is out of UK copyright are
+            Wikidata statements, which carry no such obligation — Wikidata publishes them under{" "}
+            <a
+              href="https://creativecommons.org/publicdomain/zero/1.0/"
+              target="_blank"
+              rel="noreferrer"
+            >
+              CC0
+            </a>
+            . Prints that reached us through Wikimedia Commons carry whatever licence the Commons
+            community recorded against the file, and only the ones marked public domain or CC0 are
+            taken. That licence is quoted on the print&rsquo;s own page.
           </p>
           <p>
             This product uses the TMDB API but is not endorsed or certified by TMDB. Availability
