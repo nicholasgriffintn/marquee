@@ -347,3 +347,8 @@ matching and mirroring each have a button on `/admin`.
 **The artwork** is in `public/`, all of it cut from `usher.svg`, in ink, paper, acid and coral and
 nothing else. He is drawn to survive on his own dark background, so anything you add to him wants a
 paper core and an ink keyline or it will disappear into the page.
+
+## Licence
+
+Marquee is free software licensed under the [GNU General Public License version 3](LICENSE) only.
+Third-party media, data and trademarks remain subject to their own terms.

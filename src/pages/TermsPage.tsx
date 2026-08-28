@@ -4,7 +4,7 @@ import { Heading, Page } from "../ui";
 
 import styles from "./LegalPage.module.css";
 
-const UPDATED = "28 August 2026";
+const UPDATED = "29 August 2026";
 
 export function TermsPage() {
   return (
@@ -214,6 +214,19 @@ export function TermsPage() {
               protected by intellectual property law unless stated otherwise. These terms let you
               use the service; they do not transfer those rights or allow you to reuse Marquee
               branding in a way that suggests endorsement.
+            </p>
+            <p>
+              Marquee&rsquo;s source code is free software licensed under the GNU General Public
+              License version 3 only. The licence and source are available in the{" "}
+              <a
+                href="https://github.com/nicholasgriffintn/marquee"
+                target="_blank"
+                rel="noreferrer"
+              >
+                public repository
+              </a>
+              . The licence does not grant rights to third-party material or permission to suggest
+              endorsement by Marquee.
             </p>
             <p>
               Film and television titles, posters, trailers, metadata, logos and archive prints may
