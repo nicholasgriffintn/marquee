@@ -22,12 +22,32 @@ type NotebookResponse = { beliefs: Belief[] };
 type GuestResponse = { guests: Guest[] };
 
 const DIVIDERS: Divider[] = [
-  { id: "notes", label: "What I have written down", aside: "and what you have crossed out" },
+  {
+    id: "notes",
+    label: "What I have written down",
+    aside: "and what you have crossed out",
+  },
   { id: "shape", label: "The shape of it", aside: "your shelf, laid out flat" },
-  { id: "services", label: "Where you watch", aside: "and what you are paying for" },
-  { id: "room", label: "Who sits with you", aside: "and what they will not sit through" },
-  { id: "post", label: "When I should write", aside: "sparingly, and never twice" },
-  { id: "elsewhere", label: "Elsewhere you have an account", aside: "keys to other houses" },
+  {
+    id: "services",
+    label: "Where you watch",
+    aside: "and what you are paying for",
+  },
+  {
+    id: "room",
+    label: "Who sits with you",
+    aside: "and what they will not sit through",
+  },
+  {
+    id: "post",
+    label: "When I should write",
+    aside: "sparingly, and never twice",
+  },
+  {
+    id: "elsewhere",
+    label: "Elsewhere you have an account",
+    aside: "keys to other houses",
+  },
 ];
 
 export function NotebookPage({
@@ -77,11 +97,14 @@ export function NotebookPage({
     }
 
     void load();
-    void requestJson<GuestResponse>("/api/notebook/guests", { signal: controller.signal })
+    void requestJson<GuestResponse>("/api/notebook/guests", {
+      signal: controller.signal,
+    })
       .then((response) => setGuests(response.guests))
       .catch(() => undefined);
 
     return () => controller.abort();
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- reloads is a deliberate refetch trigger, not read in the body
   }, [isSignedIn, reloads]);
 
   async function actOnBelief(belief: Belief, body: Record<string, unknown>) {

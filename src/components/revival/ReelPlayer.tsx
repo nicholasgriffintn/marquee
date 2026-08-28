@@ -117,6 +117,7 @@ export function ReelPlayer({
   return (
     <div className="revival-player">
       <div className={`revival-player-frame${started ? " is-running" : ""}`}>
+        {/* oxlint-disable-next-line jsx-a11y/media-has-caption -- public-domain archive footage, no caption track exists */}
         <video
           ref={videoRef}
           controls={started}

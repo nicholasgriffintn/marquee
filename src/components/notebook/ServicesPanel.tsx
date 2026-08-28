@@ -58,6 +58,7 @@ export function ServicesPanel({
     return !term || provider.name.toLowerCase().includes(term);
   }
 
+  // oxlint-disable-next-line no-map-spread -- CATEGORIES is a fixed 8-item list, spread is the clearest form here
   const groups = CATEGORIES.map((category) => ({
     ...category,
     all: providers.filter((provider) => provider.category === category.name),
@@ -148,7 +149,10 @@ export function ServicesPanel({
                 const isNowOpen = event.currentTarget.open;
 
                 if (!forced) {
-                  setOpened((current) => ({ ...current, [group.id]: isNowOpen }));
+                  setOpened((current) => ({
+                    ...current,
+                    [group.id]: isNowOpen,
+                  }));
                 }
               }}
             >

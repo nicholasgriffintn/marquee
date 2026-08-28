@@ -36,9 +36,14 @@ export function UsherOnboarding({
       <div className="usher-bulbs" aria-hidden="true">
         {SIGN.map((glyph, index) =>
           glyph === "." ? (
+            // oxlint-disable-next-line react/no-array-index-key -- SIGN is a fixed static glyph array, never reordered
             <i key={`bulb-${index}-${glyph}`} />
           ) : (
-            <span key={`bulb-${index}-${glyph}`} className={`letter${index === 9 ? " dim" : ""}`}>
+            <span
+              // oxlint-disable-next-line react/no-array-index-key -- SIGN is a fixed static glyph array, never reordered
+              key={`bulb-${index}-${glyph}`}
+              className={`letter${index === 9 ? " dim" : ""}`}
+            >
               {glyph}
             </span>
           ),

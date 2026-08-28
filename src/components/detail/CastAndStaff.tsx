@@ -15,6 +15,7 @@ function CharacterList({ characters }: { characters: AnimeCharacter[] }) {
       <span>Cast</span>
       <ol>
         {visible.map((character, index) => (
+          // oxlint-disable-next-line react/no-array-index-key -- AnimeCharacter has no stable id, list order is API-fixed
           <li key={`${character.name}-${index}`}>
             <b>{character.name}</b>
             {character.voiceActor ? <i>{character.voiceActor}</i> : null}
@@ -42,6 +43,7 @@ function StaffList({ staff }: { staff: AnimeStaffMember[] }) {
       <span>Staff</span>
       <ol>
         {visible.map((member, index) => (
+          // oxlint-disable-next-line react/no-array-index-key -- AnimeStaffMember has no stable id, list order is API-fixed
           <li key={`${member.name}-${index}`}>
             <b>{member.name}</b>
             <small>{member.role}</small>

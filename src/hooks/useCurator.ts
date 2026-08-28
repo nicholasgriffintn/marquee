@@ -87,6 +87,7 @@ export function useCurator() {
         let buffer = "";
 
         for (;;) {
+          // oxlint-disable-next-line no-await-in-loop -- reads one stream reader sequentially, chunks arrive in order
           const { done, value } = await reader.read();
 
           if (done) {
@@ -118,7 +119,11 @@ export function useCurator() {
       } catch (caught) {
         if (!isAbortError(caught)) {
           setError(caught instanceof Error ? caught.message : "The AI curator is unavailable");
-          setState((current) => ({ ...current, isStreaming: false, status: "" }));
+          setState((current) => ({
+            ...current,
+            isStreaming: false,
+            status: "",
+          }));
         }
       } finally {
         setIsAsking(false);

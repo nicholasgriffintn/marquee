@@ -205,11 +205,12 @@ export async function readShelfEpisodes(db: D1Database, viewerId: string, limit 
     }>();
 
   return rows.results.flatMap((row): UpcomingEpisode[] =>
-    parseEpisodes(row.payload, row.seasonNumber).map((episode) => ({
-      ...episode,
-      titleId: row.titleId,
-      progressSeason: row.progressSeason,
-      progressEpisode: row.progressEpisode,
-    })),
+    parseEpisodes(row.payload, row.seasonNumber).map((episode) =>
+      Object.assign(episode, {
+        titleId: row.titleId,
+        progressSeason: row.progressSeason,
+        progressEpisode: row.progressEpisode,
+      }),
+    ),
   );
 }

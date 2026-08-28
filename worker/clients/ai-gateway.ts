@@ -114,7 +114,9 @@ async function completeOnce(
         "cf-aig-skip-cache": "false",
         ...(options.cacheSeconds ? { "cf-aig-cache-ttl": String(options.cacheSeconds) } : {}),
         ...(options.metadata
-          ? { "cf-aig-metadata": JSON.stringify(options.metadata).slice(0, 1_000) }
+          ? {
+              "cf-aig-metadata": JSON.stringify(options.metadata).slice(0, 1_000),
+            }
           : {}),
         "content-type": "application/json",
       },
@@ -207,6 +209,7 @@ export async function* streamAiCompletion(env: Bindings, messages: ChatMessage[]
   let buffer = "";
 
   while (true) {
+    // oxlint-disable-next-line no-await-in-loop -- reads one stream reader sequentially, chunks arrive in order
     const { done, value } = await reader.read();
 
     if (done) {

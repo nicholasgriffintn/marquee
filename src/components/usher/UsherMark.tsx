@@ -70,6 +70,7 @@ export function UsherMark({
     <svg
       className={`usher-mark${className ? ` ${className}` : ""}`}
       viewBox={crop === "head" ? "108 98 296 200" : "0 0 600 512"}
+      // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- the svg paths are the image, role=img is the standard pattern
       role="img"
       aria-label="The Usher"
       fill="none"

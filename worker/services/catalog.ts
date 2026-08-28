@@ -60,10 +60,11 @@ export async function getCatalogue(env: Bindings, providerIds: string[]) {
 
   return {
     ...catalogue,
-    sections: catalogue.sections.map((section) => ({
-      ...section,
-      items: applyBuzz(section.items, buzz),
-    })),
+    sections: catalogue.sections.map((section) => {
+      section.items = applyBuzz(section.items, buzz);
+
+      return section;
+    }),
   };
 }
 
@@ -322,10 +323,11 @@ export async function getTonight(
   const byId = new Map(hydrated.map((item) => [item.id, item]));
 
   return {
-    episodes: merged.map((episode) => ({
-      ...episode,
-      item: episode.item ?? (episode.titleId ? (byId.get(episode.titleId) ?? null) : null),
-    })),
+    episodes: merged.map((episode) => {
+      episode.item = episode.item ?? (episode.titleId ? (byId.get(episode.titleId) ?? null) : null);
+
+      return episode;
+    }),
     fetchedAt: new Date().toISOString(),
   };
 }
@@ -339,7 +341,11 @@ export async function getTrending(env: Bindings) {
   const byId = new Map(ranked.map((entry) => [entry.titleId, entry.buzz]));
 
   return {
-    items: items.map((item) => ({ ...item, buzz: byId.get(item.id) })),
+    items: items.map((item) => {
+      item.buzz = byId.get(item.id);
+
+      return item;
+    }),
     source: "Wikipedia pageview trend",
     fetchedAt: new Date().toISOString(),
   };
