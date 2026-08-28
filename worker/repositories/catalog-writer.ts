@@ -13,7 +13,7 @@ import { readRawItems } from "./catalog-reader.ts";
 const READ_CHUNK = 80;
 const KEYWORD_LIMIT = 40;
 
-const EXTERNAL_PROVIDER_SOURCES = new Set<ProviderAvailability["source"]>(["JustWatch"]);
+export const EXTERNAL_PROVIDER_SOURCES = new Set<ProviderAvailability["source"]>(["JustWatch"]);
 
 function canonical(value: unknown): string {
   if (Array.isArray(value)) {
