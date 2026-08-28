@@ -18,6 +18,7 @@ export type AdminAction =
   | "discover"
   | "schedule"
   | "buzz"
+  | "identifiers"
   | "providers"
   | "sections"
   | "working-set"

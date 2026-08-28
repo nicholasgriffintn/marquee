@@ -6,6 +6,7 @@ import type {
   TitleCredit,
   TitleCredits,
 } from "../../src/domain/catalog.ts";
+import { EXTERNAL_ID_FIELDS, EXTERNAL_ID_OWNERS } from "../../src/domain/catalog.ts";
 import { computeBlendedRating, computeWeightedRating } from "../lib/ratings.ts";
 import { persistTitleExtensions } from "./catalog-arrays.ts";
 import { readRawItems } from "./catalog-reader.ts";
@@ -59,40 +60,21 @@ function mergeProviders(fresh: MediaTitle, stored: MediaTitle) {
   return [...providers.values()];
 }
 
-// malId/anilistId only ever arrive via MAL/AniList enrichment, so a plain TMDB refresh must not clobber them.
-const STORED_FIRST_EXTERNAL_ID_FIELDS = new Set<keyof ExternalIds>(["malId", "anilistId"]);
-
 function mergeExternalIds(fresh: MediaTitle, stored: MediaTitle) {
   if (!fresh.externalIds && !stored.externalIds) {
     return undefined;
   }
 
-  const fields: (keyof ExternalIds)[] = [
-    "imdbId",
-    "tvdbId",
-    "wikidataId",
-    "malId",
-    "anilistId",
-    "anidbId",
-    "kitsuId",
-    "aniSearchId",
-    "animePlanetId",
-    "livechartId",
-    "animeNewsNetworkId",
-    "animeCountdownId",
-    "facebookId",
-    "instagramId",
-    "twitterId",
-  ];
   const merged: ExternalIds = {};
 
-  for (const field of fields) {
+  for (const field of EXTERNAL_ID_FIELDS) {
     const freshValue = fresh.externalIds?.[field];
     const storedValue = stored.externalIds?.[field];
 
-    (merged as Record<string, unknown>)[field] = STORED_FIRST_EXTERNAL_ID_FIELDS.has(field)
-      ? (storedValue ?? freshValue ?? null)
-      : (freshValue ?? storedValue ?? null);
+    (merged as Record<string, unknown>)[field] =
+      EXTERNAL_ID_OWNERS[field] === "enrichment"
+        ? (storedValue ?? freshValue ?? null)
+        : (freshValue ?? storedValue ?? null);
   }
 
   return merged;
