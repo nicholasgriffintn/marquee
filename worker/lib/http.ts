@@ -50,3 +50,17 @@ export function hasTrustedOrigin(request: Request, configuredOrigin?: string) {
 
   return origin === canonicalOrigin(request, configuredOrigin);
 }
+
+export function errorStatus(error: unknown) {
+  if (error instanceof Error && "status" in error) {
+    const status = (error as { status?: unknown }).status;
+
+    return typeof status === "number" ? status : null;
+  }
+
+  return null;
+}
+
+export function isPermanentHttpStatus(status: number | null) {
+  return status !== null && status >= 400 && status < 500 && status !== 429;
+}
