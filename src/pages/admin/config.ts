@@ -84,10 +84,11 @@ export const ACTION_GROUPS: {
   },
   {
     title: "The revival house",
-    note: "Public domain prints from European archives, the Internet Archive and the Library of Congress. The UK term runs 70 years from the death of the last author, so a work is matched to the catalogue, checked against Wikidata for its authors' death dates, and only then cleared. Everything unresolved waits in the queue below. Mirroring copies an approved print into our own bucket, one chunk per run.",
+    note: "Public domain prints from European archives, the Internet Archive, the Library of Congress and Wikimedia Commons. The UK term runs 70 years from the death of the last author, so a work is matched to the catalogue, checked against Wikidata for its authors' death dates, and only then cleared. Commons prints arrive having already cleared that test. Descriptions come from Wikipedia and are shown with attribution. Everything unresolved waits in the queue below. Mirroring copies an approved print into our own bucket, one chunk per run.",
     actions: [
       { id: "revival-sweep", label: "Sweep the sources" },
       { id: "revival-match", label: "Match to catalogue" },
+      { id: "revival-describe", label: "Describe from Wikipedia" },
       { id: "revival-rights", label: "Check UK rights" },
       { id: "revival-mirror", label: "Mirror approved prints" },
     ],

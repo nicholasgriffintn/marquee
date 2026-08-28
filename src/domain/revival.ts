@@ -1,8 +1,14 @@
 import { slugify } from "./slug";
 
-export type RevivalSource = "archive" | "loc" | "europeana";
+export type RevivalSource = "archive" | "loc" | "europeana" | "wikidata";
 
 export type RevivalKind = "feature" | "short" | "episode" | "ephemeral";
+
+const SHORT_MAX_SECONDS = 45 * 60;
+
+export function runtimeKind(seconds: number | null): RevivalKind {
+  return seconds !== null && seconds <= SHORT_MAX_SECONDS ? "short" : "feature";
+}
 
 export type RevivalRightsBasis =
   | "uk-expired"
@@ -26,6 +32,13 @@ export type RevivalTagKind = "subject" | "genre" | "person" | "language" | "hold
 
 export type RevivalTag = { kind: RevivalTagKind; slug: string; label: string };
 
+export const WIKIPEDIA_TEXT_LICENCE = {
+  name: "CC BY-SA 4.0",
+  url: "https://creativecommons.org/licenses/by-sa/4.0/",
+};
+
+export type RevivalSynopsisCredit = { article: string; url: string };
+
 export type RevivalWork = {
   id: string;
   source: RevivalSource;
@@ -34,6 +47,7 @@ export type RevivalWork = {
   year: number | null;
   director: string | null;
   synopsis: string;
+  synopsisCredit: RevivalSynopsisCredit | null;
   kind: RevivalKind;
   runtimeSeconds: number | null;
   stillUrl: string | null;
@@ -178,6 +192,7 @@ export const SOURCE_LABELS: Record<RevivalSource, string> = {
   archive: "Internet Archive",
   loc: "Library of Congress",
   europeana: "Europeana",
+  wikidata: "Wikimedia Commons",
 };
 
 export type PrintCondition = "pristine" | "watchable" | "rough" | "unknown";

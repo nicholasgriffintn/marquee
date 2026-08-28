@@ -1,4 +1,9 @@
-import type { RevivalKind, RevivalRightsBasis, RevivalTag } from "../../src/domain/revival.ts";
+import {
+  runtimeKind,
+  type RevivalKind,
+  type RevivalRightsBasis,
+  type RevivalTag,
+} from "../../src/domain/revival.ts";
 import { isUnsuitable } from "../lib/revival-safety.ts";
 import { personName, splitSubjects, tagList } from "../lib/revival-tags.ts";
 import {
@@ -190,14 +195,8 @@ function durationSeconds(value: string) {
   return total > 0 ? Math.round(total) : null;
 }
 
-const SHORT_MAX_SECONDS = 45 * 60;
-
 function kindFor(collections: string[], seconds: number | null): RevivalKind {
-  if (collections.includes("prelinger")) {
-    return "ephemeral";
-  }
-
-  return seconds !== null && seconds <= SHORT_MAX_SECONDS ? "short" : "feature";
+  return collections.includes("prelinger") ? "ephemeral" : runtimeKind(seconds);
 }
 
 export async function readArchiveItem(

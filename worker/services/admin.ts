@@ -39,6 +39,7 @@ export const ADMIN_ACTIONS = [
   "people",
   "revival-sweep",
   "revival-match",
+  "revival-describe",
   "revival-rights",
   "revival-recheck",
   "revival-mirror",
@@ -61,6 +62,7 @@ const QUEUED_JOBS: Partial<Record<AdminAction, IngestionJob>> = {
   providers: { type: "sync-providers" },
   sections: { type: "build-sections" },
   "revival-match": { type: "match-revival-works", chain: true },
+  "revival-describe": { type: "describe-revival-works", chain: true },
   "revival-rights": { type: "check-revival-rights" },
   "revival-recheck": { type: "recheck-revival-works", chain: true },
 };

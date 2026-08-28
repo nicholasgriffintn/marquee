@@ -29,6 +29,7 @@ export type AdminAction =
   | "showtimes"
   | "revival-sweep"
   | "revival-match"
+  | "revival-describe"
   | "revival-rights"
   | "revival-recheck"
   | "revival-mirror"

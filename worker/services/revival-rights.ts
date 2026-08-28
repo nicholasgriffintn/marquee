@@ -31,6 +31,10 @@ export function ukExpiryFromDeath(deathYear: number) {
   return deathYear + UK_FILM_TERM_YEARS + 1;
 }
 
+export function ukClearedDeathCutoff(now = new Date()) {
+  return currentUkYear(now) - UK_FILM_TERM_YEARS;
+}
+
 export function ukExpiryFromRelease(releaseYear: number) {
   return releaseYear + UK_ANONYMOUS_TERM_YEARS + 1;
 }
