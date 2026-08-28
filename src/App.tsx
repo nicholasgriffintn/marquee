@@ -59,7 +59,9 @@ const RevivalPage = lazy(() =>
   import("./pages/RevivalPage").then((m) => ({ default: m.RevivalPage })),
 );
 const RevivalScreenPage = lazy(() =>
-  import("./pages/RevivalScreenPage").then((m) => ({ default: m.RevivalScreenPage })),
+  import("./pages/RevivalScreenPage").then((m) => ({
+    default: m.RevivalScreenPage,
+  })),
 );
 const NotebookPage = lazy(() =>
   import("./pages/NotebookPage").then((m) => ({ default: m.NotebookPage })),
@@ -246,7 +248,9 @@ export function App() {
     (item: MediaTitle) => {
       openTriggerRef.current =
         document.activeElement instanceof HTMLElement ? document.activeElement : null;
-      void navigate(titlePath(item), { state: { background: openBackgroundRef.current } });
+      void navigate(titlePath(item), {
+        state: { background: openBackgroundRef.current },
+      });
     },
     [navigate],
   );
@@ -391,7 +395,10 @@ export function App() {
 
   const onRailSeen = useCallback(
     (section: CatalogSection) => {
-      void requestMoment("rail", { railId: section.id, railName: section.title });
+      void requestMoment("rail", {
+        railId: section.id,
+        railName: section.title,
+      });
     },
     [requestMoment],
   );
@@ -589,8 +596,8 @@ export function App() {
                     <LibraryPage
                       isSignedIn={isSignedIn}
                       usherMoment={usher.moment?.surface === "shelf" ? usher.moment : null}
-                      onClaim={(entry) => void profile.saveEntry(entry)}
-                      onDiscard={(titleId) => void profile.removeEntry(titleId)}
+                      onClaim={(entry) => profile.saveEntry(entry)}
+                      onDiscard={(titleId) => profile.removeEntry(titleId)}
                       onUsherRequest={onShelfMoment}
                       onUsherAction={onUsherAction}
                       onUsherDismiss={(scope) => void usher.dismiss(scope)}

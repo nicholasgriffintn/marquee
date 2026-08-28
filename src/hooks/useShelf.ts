@@ -1,13 +1,15 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import type { ShelfItem, ShelfResponse } from "../domain/shelf";
 import { requestJson } from "../lib/api";
+import { useDebouncedValue } from "./useDebouncedValue";
 import { useResource } from "./useResource";
 
 const NO_ITEMS: ShelfItem[] = [];
 const NO_GENRES: string[] = [];
 const NO_PAGES: ShelfResponse[] = [];
 const EMPTY_SET: ReadonlySet<string> = new Set();
+const QUERY_DEBOUNCE_MS = 250;
 
 export type ShelfFilters = {
   sort: string;
@@ -16,10 +18,17 @@ export type ShelfFilters = {
   query: string;
 };
 
-type Marked = { key: string; claimed: ReadonlySet<string>; discarded: ReadonlySet<string> };
+type Marked = {
+  key: string;
+  claimed: ReadonlySet<string>;
+  discarded: ReadonlySet<string>;
+};
 
 function toSearch(filters: ShelfFilters, page: number) {
-  const params = new URLSearchParams({ sort: filters.sort, page: String(page) });
+  const params = new URLSearchParams({
+    sort: filters.sort,
+    page: String(page),
+  });
 
   if (filters.status) {
     params.set("status", filters.status);
@@ -37,8 +46,16 @@ function toSearch(filters: ShelfFilters, page: number) {
 }
 
 export function useShelf(isSignedIn: boolean, filters: ShelfFilters) {
-  const key = toSearch(filters, 0);
-  const [extra, setExtra] = useState<{ key: string; pages: ShelfResponse[] } | null>(null);
+  const debouncedQuery = useDebouncedValue(filters.query, QUERY_DEBOUNCE_MS);
+  const effectiveFilters = useMemo(
+    () => ({ ...filters, query: debouncedQuery }),
+    [filters, debouncedQuery],
+  );
+  const key = toSearch(effectiveFilters, 0);
+  const [extra, setExtra] = useState<{
+    key: string;
+    pages: ShelfResponse[];
+  } | null>(null);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [pageError, setPageError] = useState("");
   const [marked, setMarked] = useState<Marked | null>(null);
@@ -76,7 +93,7 @@ export function useShelf(isSignedIn: boolean, filters: ShelfFilters) {
 
     try {
       const response = await requestJson<ShelfResponse>(
-        `/api/profile/shelf?${toSearch(filters, last.page + 1)}`,
+        `/api/profile/shelf?${toSearch(effectiveFilters, last.page + 1)}`,
       );
 
       setExtra((current) => ({
@@ -88,7 +105,7 @@ export function useShelf(isSignedIn: boolean, filters: ShelfFilters) {
     } finally {
       setIsLoadingMore(false);
     }
-  }, [filters, isLoadingMore, key, last]);
+  }, [effectiveFilters, isLoadingMore, key, last]);
 
   const items = head
     ? [head, ...pages]
