@@ -258,18 +258,24 @@ struct TitleCard: View {
             .padding(7)
           }
           .overlay(alignment: .bottomTrailing) {
-            HStack(spacing: 4) {
-              ForEach(item.providers.prefix(providerLimit)) { provider in
-                ProviderBadge(providerID: provider.id, name: provider.name, size: 24)
+            if !item.providers.isEmpty {
+              HStack(spacing: 4) {
+                ForEach(item.providers.prefix(providerLimit)) { provider in
+                  ProviderBadge(providerID: provider.id, name: provider.name, size: 24)
+                }
+                if item.providers.count > providerLimit {
+                  Text("+\(item.providers.count - providerLimit)")
+                    .font(MarqueeTheme.mono(9, weight: .bold))
+                    .foregroundStyle(MarqueeTheme.white.opacity(0.8))
+                    .padding(.horizontal, 2)
+                }
               }
-              if item.providers.count > providerLimit {
-                Text("+\(item.providers.count - providerLimit)")
-                  .font(MarqueeTheme.mono(9, weight: .bold))
-                  .foregroundStyle(MarqueeTheme.white.opacity(0.78))
-              }
+              .padding(.horizontal, 5)
+              .padding(.vertical, 4)
+              .background(MarqueeTheme.ink.opacity(0.72))
+              .padding(.bottom, 7)
+              .padding(.trailing, 7)
             }
-            .padding(.bottom, 7)
-            .padding(.trailing, 7)
           }
         Text(item.title)
           .font(MarqueeTheme.sans(13, weight: .bold))

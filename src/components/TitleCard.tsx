@@ -57,21 +57,23 @@ export const TitleCard = memo(function TitleCard({
               {item.pending ? "FETCHING" : item.mediaType === "movie" ? "FILM" : "TV"}
             </span>
           </div>
-          <div className={styles.providers}>
-            {item.providers.slice(0, RAIL_PROVIDER_LIMIT).map((provider) => (
-              <ProviderBadge
-                provider={provider}
-                compact
-                key={provider.id}
-                className={styles.providerBadge}
-              />
-            ))}
-            {item.providers.length > RAIL_PROVIDER_LIMIT && (
-              <span className={styles.providerMore}>
-                +{item.providers.length - RAIL_PROVIDER_LIMIT}
-              </span>
-            )}
-          </div>
+          {item.providers.length > 0 && (
+            <div className={styles.providers}>
+              {item.providers.slice(0, RAIL_PROVIDER_LIMIT).map((provider) => (
+                <ProviderBadge
+                  provider={provider}
+                  compact
+                  key={provider.id}
+                  className={styles.providerBadge}
+                />
+              ))}
+              {item.providers.length > RAIL_PROVIDER_LIMIT && (
+                <span className={styles.providerMore}>
+                  +{item.providers.length - RAIL_PROVIDER_LIMIT}
+                </span>
+              )}
+            </div>
+          )}
         </div>
         <strong className={styles.title}>{item.title}</strong>
       </Link>
