@@ -165,6 +165,30 @@ export type ExternalIds = {
   animeCountdownId?: number | null;
 } & Partial<TitleIdentifiers>;
 
+export const EXTERNAL_ID_OWNERS = {
+  imdbId: "tmdb",
+  tvdbId: "tmdb",
+  wikidataId: "tmdb",
+  facebookId: "tmdb",
+  instagramId: "tmdb",
+  twitterId: "tmdb",
+  anidbId: "tmdb",
+  kitsuId: "tmdb",
+  aniSearchId: "tmdb",
+  animePlanetId: "tmdb",
+  livechartId: "tmdb",
+  animeNewsNetworkId: "tmdb",
+  animeCountdownId: "tmdb",
+  malId: "enrichment",
+  anilistId: "enrichment",
+  letterboxdId: "enrichment",
+  rottenTomatoesId: "enrichment",
+  metacriticId: "enrichment",
+  traktId: "enrichment",
+} as const satisfies Record<keyof Required<ExternalIds>, "tmdb" | "enrichment">;
+
+export const EXTERNAL_ID_FIELDS = Object.keys(EXTERNAL_ID_OWNERS) as (keyof ExternalIds)[];
+
 export type MediaTitle = {
   id: string;
   tmdbId: number;
