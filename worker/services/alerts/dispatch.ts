@@ -137,8 +137,7 @@ async function dispatchToViewer(
   );
   const perKind = new Map<string, number>();
   const fresh = ordered
-    .slice()
-    .sort((left, right) => left.priority - right.priority)
+    .toSorted((left, right) => left.priority - right.priority)
     .filter((entry) => {
       const used = perKind.get(entry.candidate.kind) ?? 0;
 

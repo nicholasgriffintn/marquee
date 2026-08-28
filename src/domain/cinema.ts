@@ -79,7 +79,7 @@ export function attributeRank(attribute: string) {
 export function displayAttributes(attributes: string[]) {
   return attributes
     .filter((attribute) => attributeRank(attribute) !== -1)
-    .sort((left, right) => attributeRank(left) - attributeRank(right));
+    .toSorted((left, right) => attributeRank(left) - attributeRank(right));
 }
 
 export function distanceLabel(distanceKm: number | null) {

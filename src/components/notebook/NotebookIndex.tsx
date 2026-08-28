@@ -18,7 +18,7 @@ export function NotebookIndex({ dividers }: { dividers: Divider[] }) {
       (entries) => {
         const visible = entries
           .filter((entry) => entry.isIntersecting)
-          .sort((left, right) => left.boundingClientRect.top - right.boundingClientRect.top)[0];
+          .toSorted((left, right) => left.boundingClientRect.top - right.boundingClientRect.top)[0];
 
         if (visible) {
           setActive(visible.target.id);

@@ -66,7 +66,7 @@ export async function getTitleShowings(
 
   const listings = [...byCinema.values()]
     .filter((listing) => listing.screenings.length > 0)
-    .sort((left, right) => (left.cinema.distanceKm ?? 0) - (right.cinema.distanceKm ?? 0));
+    .toSorted((left, right) => (left.cinema.distanceKm ?? 0) - (right.cinema.distanceKm ?? 0));
 
   return { listings, origin, radiusKm, fetchedAt };
 }
@@ -95,7 +95,7 @@ export async function getLocalShowings(
   const order = new Map(showings.map((showing, index) => [showing.titleId, index]));
 
   return {
-    items: items.sort((left, right) => (order.get(left.id) ?? 0) - (order.get(right.id) ?? 0)),
+    items: items.toSorted((left, right) => (order.get(left.id) ?? 0) - (order.get(right.id) ?? 0)),
     cinemas: cinemas.slice(0, 8),
     origin,
     radiusKm,

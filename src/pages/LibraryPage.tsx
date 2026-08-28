@@ -57,15 +57,15 @@ function groupFor(sort: ShelfSort, item: MediaTitle, entry: ViewingEntry) {
 
 function sortGroups(sort: ShelfSort, names: string[]) {
   if (sort === "year") {
-    return names.sort((left, right) => right.localeCompare(left, undefined, { numeric: true }));
+    return names.toSorted((left, right) => right.localeCompare(left, undefined, { numeric: true }));
   }
 
   if (sort === "rating") {
-    return names.sort((left, right) => right.localeCompare(left));
+    return names.toSorted((left, right) => right.localeCompare(left));
   }
 
   if (sort === "status") {
-    return names.sort(
+    return names.toSorted(
       (left, right) =>
         STATUS_ORDER.indexOf(
           (Object.keys(STATUS_LABELS) as EntryStatus[]).find(
@@ -80,7 +80,7 @@ function sortGroups(sort: ShelfSort, names: string[]) {
     );
   }
 
-  return names.sort((left, right) => left.localeCompare(right));
+  return names.toSorted((left, right) => left.localeCompare(right));
 }
 
 export function LibraryPage({
