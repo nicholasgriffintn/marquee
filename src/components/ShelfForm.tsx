@@ -86,6 +86,7 @@ export function ShelfForm({
             type="button"
             key={rating}
             className={(entry.rating ?? 0) >= rating ? "active" : ""}
+            aria-pressed={entry.rating === rating}
             onClick={() =>
               onSave({
                 ...entry,

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { ErrorBoundary } from "../components/ErrorBoundary";
@@ -57,15 +57,15 @@ function groupFor(sort: ShelfSort, item: MediaTitle, entry: ViewingEntry) {
 
 function sortGroups(sort: ShelfSort, names: string[]) {
   if (sort === "year") {
-    return names.sort((left, right) => right.localeCompare(left, undefined, { numeric: true }));
+    return names.toSorted((left, right) => right.localeCompare(left, undefined, { numeric: true }));
   }
 
   if (sort === "rating") {
-    return names.sort((left, right) => right.localeCompare(left));
+    return names.toSorted((left, right) => right.localeCompare(left));
   }
 
   if (sort === "status") {
-    return names.sort(
+    return names.toSorted(
       (left, right) =>
         STATUS_ORDER.indexOf(
           (Object.keys(STATUS_LABELS) as EntryStatus[]).find(
@@ -80,7 +80,7 @@ function sortGroups(sort: ShelfSort, names: string[]) {
     );
   }
 
-  return names.sort((left, right) => left.localeCompare(right));
+  return names.toSorted((left, right) => left.localeCompare(right));
 }
 
 export function LibraryPage({
@@ -96,8 +96,8 @@ export function LibraryPage({
 }: {
   isSignedIn: boolean;
   usherMoment: UsherMoment | null;
-  onClaim: (entry: ViewingEntry) => void;
-  onDiscard: (titleId: string) => void;
+  onClaim: (entry: ViewingEntry) => Promise<boolean>;
+  onDiscard: (titleId: string) => Promise<boolean>;
   onOpen: (item: MediaTitle) => void;
   onShowTonight: () => void;
   onUsherRequest: () => void;
@@ -118,6 +118,29 @@ export function LibraryPage({
   });
   const savedCount = shelf.shelved;
   const lost = shelf.lost.map(({ entry, title }) => ({ entry, item: title }));
+  const [pendingLost, setPendingLost] = useState<ReadonlySet<string>>(() => new Set());
+
+  async function resolveLostItem(
+    titleId: string,
+    binned: boolean,
+    resolve: () => Promise<boolean>,
+  ) {
+    setPendingLost((current) => new Set([...current, titleId]));
+
+    const succeeded = await resolve();
+
+    setPendingLost((current) => {
+      const next = new Set(current);
+
+      next.delete(titleId);
+
+      return next;
+    });
+
+    if (succeeded) {
+      shelf.note(titleId, binned);
+    }
+  }
 
   useEffect(() => {
     if (savedCount >= 5) {
@@ -140,7 +163,10 @@ export function LibraryPage({
   }
 
   const genres = shelf.genres;
-  const visible = shelf.items.map(({ entry, title }) => ({ entry, item: title }));
+  const visible = shelf.items.map(({ entry, title }) => ({
+    entry,
+    item: title,
+  }));
 
   const grouped = new Map<string, typeof visible>();
 
@@ -191,19 +217,15 @@ export function LibraryPage({
                   <div className="lost-buttons">
                     <button
                       type="button"
-                      onClick={() => {
-                        shelf.note(item.id, false);
-                        onClaim(entry);
-                      }}
+                      disabled={pendingLost.has(item.id)}
+                      onClick={() => void resolveLostItem(item.id, false, () => onClaim(entry))}
                     >
                       Claim it
                     </button>
                     <button
                       type="button"
-                      onClick={() => {
-                        shelf.note(item.id, true);
-                        onDiscard(item.id);
-                      }}
+                      disabled={pendingLost.has(item.id)}
+                      onClick={() => void resolveLostItem(item.id, true, () => onDiscard(item.id))}
                     >
                       Bin it
                     </button>
@@ -244,7 +266,11 @@ export function LibraryPage({
                   key={option.value}
                   className={sort === option.value ? "selected" : ""}
                   aria-pressed={sort === option.value}
-                  onClick={() => update({ sort: option.value === "added" ? "" : option.value })}
+                  onClick={() =>
+                    update({
+                      sort: option.value === "added" ? "" : option.value,
+                    })
+                  }
                 >
                   {option.label}
                 </button>

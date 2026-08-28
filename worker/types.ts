@@ -15,6 +15,7 @@ export type Bindings = {
   WRITE_RATE_LIMITER: RateLimit;
   TELEMETRY_RATE_LIMITER: RateLimit;
   MEDIA_RATE_LIMITER: RateLimit;
+  REEL_RATE_LIMITER: RateLimit;
   BOT_PROTECTION?: string;
   LOCAL_DEV?: string;
   LOCAL_SYNC?: string;
@@ -50,6 +51,7 @@ export type Bindings = {
   TRAKT_CLIENT_ID?: string;
   TRAKT_CLIENT_SECRET?: string;
   MAL_CLIENT_ID?: string;
+  TOKEN_ENCRYPTION_KEY?: string;
 };
 
 export type CatalogSweepParameters = { deep?: boolean };

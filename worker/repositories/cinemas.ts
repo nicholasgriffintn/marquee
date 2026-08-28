@@ -165,7 +165,7 @@ export async function readNearbyCinemas(
 
       return distanceKm <= radiusKm ? [{ row, distanceKm }] : [];
     })
-    .sort((left, right) => left.distanceKm - right.distanceKm)
+    .toSorted((left, right) => left.distanceKm - right.distanceKm)
     .slice(0, limit)
     .map((entry) => toCinema(entry.row, entry.distanceKm));
 }
@@ -429,7 +429,7 @@ export async function readShowingTitles(
     titleId: row.titleId,
     cinemaCount: row.cinemaCount,
     nextStartsAt: row.nextStartsAt,
-    businessDays: (row.days ?? "").split(",").filter(Boolean).sort(),
+    businessDays: (row.days ?? "").split(",").filter(Boolean).toSorted(),
   }));
 }
 

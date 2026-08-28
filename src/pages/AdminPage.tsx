@@ -25,11 +25,13 @@ export function AdminPage({ user }: { user: User }) {
   const tab = TABS.find((entry) => entry.id === params.get("tab"))?.id ?? "overview";
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
+  const { usersLoaded, loadUsers } = admin;
+
   useEffect(() => {
-    if (tab === "people" && !admin.usersLoaded) {
-      void admin.loadUsers();
+    if (tab === "people" && !usersLoaded) {
+      void loadUsers();
     }
-  }, [tab, admin.usersLoaded, admin.loadUsers]);
+  }, [tab, usersLoaded, loadUsers]);
 
   function selectTab(next: AdminTab) {
     const merged = new URLSearchParams(params);

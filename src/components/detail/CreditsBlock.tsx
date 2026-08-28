@@ -33,7 +33,7 @@ function byJob(crew: TitleCredit[]) {
     grouped.set(credit.job, [...(grouped.get(credit.job) ?? []), credit.name]);
   }
 
-  return [...grouped.entries()].sort((left, right) => {
+  return [...grouped.entries()].toSorted((left, right) => {
     const leftRank = CREW_ORDER.indexOf(left[0]);
     const rightRank = CREW_ORDER.indexOf(right[0]);
 

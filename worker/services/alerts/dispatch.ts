@@ -30,7 +30,7 @@ async function runAlerts(env: Bindings, origin: string, options: { send: boolean
   const found = await Promise.all(
     DETECTORS.map((detector) =>
       detector
-        .find(env)
+        .find(env, options)
         .then((candidates) => candidates.map((candidate) => ({ candidate, detector })))
         .catch((error: unknown) => {
           logError("detector_failed", error, { kind: detector.kind });
@@ -137,8 +137,7 @@ async function dispatchToViewer(
   );
   const perKind = new Map<string, number>();
   const fresh = ordered
-    .slice()
-    .sort((left, right) => left.priority - right.priority)
+    .toSorted((left, right) => left.priority - right.priority)
     .filter((entry) => {
       const used = perKind.get(entry.candidate.kind) ?? 0;
 

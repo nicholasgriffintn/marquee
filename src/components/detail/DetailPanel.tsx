@@ -390,6 +390,7 @@ export function DetailPanel({
           >
             <ErrorBoundary label="The episode guide">
               <SeasonsBlock
+                key={item.id}
                 item={item}
                 canTrack={canSave}
                 shelved={Boolean(entry)}

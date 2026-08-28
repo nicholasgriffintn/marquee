@@ -36,7 +36,7 @@ export function useAvailability(item: MediaTitle, enabled: boolean) {
 
   useEffect(() => {
     if (!enabled || !data || data.checked || attempted.current === id) {
-      return;
+      return undefined;
     }
 
     attempted.current = id;
@@ -44,21 +44,26 @@ export function useAvailability(item: MediaTitle, enabled: boolean) {
 
     let live = true;
 
-    requestJson<AvailabilityResponse>(
-      `/api/catalog/${mediaType}/${tmdbId}/availability/refresh`,
-      jsonRequest("POST"),
-    )
-      .then((response) => {
+    const refresh = async () => {
+      try {
+        const response = await requestJson<AvailabilityResponse>(
+          `/api/catalog/${mediaType}/${tmdbId}/availability/refresh`,
+          jsonRequest("POST"),
+        );
+
         if (live) {
           setRefreshed(response);
         }
-      })
-      .catch(() => {})
-      .finally(() => {
+      } catch {
+        // a failed refresh keeps the listed providers
+      } finally {
         if (live) {
           setIsRefreshing(false);
         }
-      });
+      }
+    };
+
+    void refresh();
 
     return () => {
       live = false;

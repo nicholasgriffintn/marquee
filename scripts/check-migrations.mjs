@@ -12,14 +12,14 @@ for (const file of readdirSync("migrations").filter((name) => name.endsWith(".sq
 
 const problems = [];
 
-const ordered = [...byPrefix].sort(([left], [right]) => left.localeCompare(right));
+const ordered = [...byPrefix].toSorted(([left], [right]) => left.localeCompare(right));
 
 for (const [prefix, files] of ordered) {
   const allowed = GRANDFATHERED.get(prefix) ?? 1;
 
   if (files.length > allowed) {
     problems.push(
-      `${prefix}: ${files.length} files share this prefix (at most ${allowed} allowed) — ${[...files].sort((left, right) => left.localeCompare(right)).join(", ")}`,
+      `${prefix}: ${files.length} files share this prefix (at most ${allowed} allowed) — ${[...files].toSorted((left, right) => left.localeCompare(right)).join(", ")}`,
     );
   }
 }

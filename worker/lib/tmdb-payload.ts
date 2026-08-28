@@ -473,9 +473,9 @@ function parsePeople(mediaType: MediaType, details: Record<string, unknown>) {
   const cast = credits ? billed(credits.cast, CAST_LIMIT) : [];
   const seen = new Map<number, { id: number; name: string }>();
 
-  for (const person of [...directors, ...creators, ...cast]) {
-    if (!seen.has(person.id)) {
-      seen.set(person.id, person);
+  for (const candidate of [...directors, ...creators, ...cast]) {
+    if (!seen.has(candidate.id)) {
+      seen.set(candidate.id, candidate);
     }
   }
 
@@ -574,7 +574,7 @@ export function parseTmdbTitle(mediaType: MediaType, value: unknown): MediaTitle
       )
       .slice(0, 8) as string[],
     keywords: parseKeywords(value),
-    people: billing.map((person) => person.name),
+    people: billing.map((credited) => credited.name),
     credits: parseTmdbCredits(mediaType, value)?.entries ?? [],
     trailerKey: parseTrailer(value),
     videos: parseVideos(value),
@@ -660,7 +660,7 @@ export function parseTmdbSeason(
 
   const episodes = records(value.episodes)
     .flatMap((episode) => parseTmdbEpisode(seasonNumber, episode))
-    .sort((left, right) => left.episodeNumber - right.episodeNumber);
+    .toSorted((left, right) => left.episodeNumber - right.episodeNumber);
 
   return {
     seasonNumber: numberAt(value, "season_number") ?? seasonNumber,

@@ -59,7 +59,9 @@ const RevivalPage = lazy(() =>
   import("./pages/RevivalPage").then((m) => ({ default: m.RevivalPage })),
 );
 const RevivalScreenPage = lazy(() =>
-  import("./pages/RevivalScreenPage").then((m) => ({ default: m.RevivalScreenPage })),
+  import("./pages/RevivalScreenPage").then((m) => ({
+    default: m.RevivalScreenPage,
+  })),
 );
 const NotebookPage = lazy(() =>
   import("./pages/NotebookPage").then((m) => ({ default: m.NotebookPage })),
@@ -165,6 +167,7 @@ export function App() {
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    // oxlint-disable-next-line exhaustive-effect-dependencies -- rerun on navigation
   }, [pagePath]);
 
   const openTitleId = routedTitleId || (legacyMatch?.params.titleId ?? "");
@@ -245,7 +248,9 @@ export function App() {
     (item: MediaTitle) => {
       openTriggerRef.current =
         document.activeElement instanceof HTMLElement ? document.activeElement : null;
-      void navigate(titlePath(item), { state: { background: openBackgroundRef.current } });
+      void navigate(titlePath(item), {
+        state: { background: openBackgroundRef.current },
+      });
     },
     [navigate],
   );
@@ -390,7 +395,10 @@ export function App() {
 
   const onRailSeen = useCallback(
     (section: CatalogSection) => {
-      void requestMoment("rail", { railId: section.id, railName: section.title });
+      void requestMoment("rail", {
+        railId: section.id,
+        railName: section.title,
+      });
     },
     [requestMoment],
   );
@@ -512,7 +520,7 @@ export function App() {
                 path="/revival"
                 element={
                   <Suspense fallback={<RouteFallback />}>
-                    <RevivalPage isReady={isViewerReady} />
+                    <RevivalPage isReady={isViewerReady} isSignedIn={isSignedIn} />
                   </Suspense>
                 }
               />
@@ -588,8 +596,8 @@ export function App() {
                     <LibraryPage
                       isSignedIn={isSignedIn}
                       usherMoment={usher.moment?.surface === "shelf" ? usher.moment : null}
-                      onClaim={(entry) => void profile.saveEntry(entry)}
-                      onDiscard={(titleId) => void profile.removeEntry(titleId)}
+                      onClaim={(entry) => profile.saveEntry(entry)}
+                      onDiscard={(titleId) => profile.removeEntry(titleId)}
                       onUsherRequest={onShelfMoment}
                       onUsherAction={onUsherAction}
                       onUsherDismiss={(scope) => void usher.dismiss(scope)}

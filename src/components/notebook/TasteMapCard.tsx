@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 
 import { titlePath } from "../../domain/catalog";
@@ -44,17 +44,26 @@ export const TasteMapCard = memo(function TasteMapCard({
   axes,
   artReady,
   onPick,
+  focusSignal,
 }: {
   point: MapPoint;
   axes: TasteMapResponse["axes"];
   artReady: boolean;
   onPick: (neighbour: MapNeighbour) => void;
+  focusSignal?: number;
 }) {
   const sits = leaning(point, axes);
   const meta = pointMeta(point);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (focusSignal) {
+      cardRef.current?.focus();
+    }
+  }, [focusSignal]);
 
   return (
-    <div className="taste-card">
+    <div className="taste-card" ref={cardRef} tabIndex={-1}>
       <div className="taste-card-head">
         <div className="taste-card-art">
           {artReady && (

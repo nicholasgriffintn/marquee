@@ -5,6 +5,7 @@ import {
   articleUrl,
   findArticle,
   getPageviews,
+  WikimediaError,
 } from "../clients/wikimedia.ts";
 import { buzzScore, MIN_TRENDING_VIEWS } from "../lib/buzz.ts";
 import { logError, logEvent } from "../lib/logging.ts";
@@ -16,8 +17,16 @@ const CONCURRENCY = 6;
 const MAX_BOOST = 1.5;
 const REFRESH_DAYS = 2;
 const RETRY_DAYS = 21;
+const SEARCH_BUDGET = 60;
 
 type BuzzMatch = TitleBuzz["match"];
+
+type SearchBudget = { remaining: number; blocked: boolean };
+
+type Resolution =
+  | { kind: "found"; article: string; match: BuzzMatch }
+  | { kind: "absent" }
+  | { kind: "skipped" };
 
 type BuzzCandidate = {
   titleId: string;
@@ -98,47 +107,73 @@ async function candidates(env: Bindings) {
   }));
 }
 
-async function resolveArticle(candidate: BuzzCandidate, entities: Map<string, TitleEntity>) {
+async function resolveArticle(
+  candidate: BuzzCandidate,
+  entities: Map<string, TitleEntity>,
+  budget: SearchBudget,
+): Promise<Resolution> {
   const names = [candidate.title, candidate.originalTitle];
   const entity = entities.get(candidate.titleId);
 
   if (entity?.article) {
-    return { article: entity.article, match: "wikidata" as const };
+    return { kind: "found", article: entity.article, match: "wikidata" };
   }
 
   if (candidate.article && candidate.match === "wikidata") {
-    return { article: candidate.article, match: "wikidata" as const };
+    return { kind: "found", article: candidate.article, match: "wikidata" };
   }
 
   if (candidate.article && articleMatchesTitle(candidate.article, names)) {
-    return { article: candidate.article, match: "search" as const };
+    return { kind: "found", article: candidate.article, match: "search" };
   }
 
-  const found = await findArticle(names, candidate.year, candidate.mediaType === "movie");
+  if (budget.blocked || budget.remaining <= 0) {
+    return { kind: "skipped" };
+  }
 
-  return found ? { article: found, match: "search" as const } : null;
+  budget.remaining -= 1;
+
+  try {
+    const found = await findArticle(names, candidate.year, candidate.mediaType === "movie");
+
+    return found ? { kind: "found", article: found, match: "search" } : { kind: "absent" };
+  } catch (error) {
+    if (error instanceof WikimediaError && error.status === 429) {
+      budget.blocked = true;
+
+      return { kind: "skipped" };
+    }
+
+    throw error;
+  }
 }
 
 async function measure(
   candidate: BuzzCandidate,
   entities: Map<string, TitleEntity>,
-): Promise<BuzzRow> {
-  const resolved = await resolveArticle(candidate, entities);
+  budget: SearchBudget,
+): Promise<BuzzRow | null> {
+  const resolved = await resolveArticle(candidate, entities, budget);
 
-  if (!resolved) {
+  if (resolved.kind === "skipped") {
+    return null;
+  }
+
+  if (resolved.kind === "absent") {
     return { titleId: candidate.titleId, article: "", match: "search", views: 0, previousViews: 0 };
   }
 
-  const views = await getPageviews(resolved.article, 14);
+  const { article, match } = resolved;
+  const views = await getPageviews(article, 14);
 
   if (views.length < 8) {
-    return { titleId: candidate.titleId, ...resolved, views: 0, previousViews: 0 };
+    return { titleId: candidate.titleId, article, match, views: 0, previousViews: 0 };
   }
 
   const recent = views.slice(-7).reduce((total, value) => total + value, 0);
   const previous = views.slice(-14, -7).reduce((total, value) => total + value, 0);
 
-  return { titleId: candidate.titleId, ...resolved, views: recent, previousViews: previous };
+  return { titleId: candidate.titleId, article, match, views: recent, previousViews: previous };
 }
 
 async function storeEntityIds(env: Bindings, entities: Map<string, TitleEntity>) {
@@ -170,6 +205,7 @@ export async function syncBuzz(env: Bindings) {
     },
   );
   const stored = await storeEntityIds(env, entities);
+  const budget: SearchBudget = { remaining: SEARCH_BUDGET, blocked: false };
   const measured: BuzzRow[] = [];
 
   logEvent("buzz_entities_resolved", {
@@ -182,7 +218,7 @@ export async function syncBuzz(env: Bindings) {
   for (let index = 0; index < pending.length; index += CONCURRENCY) {
     const wave = pending.slice(index, index + CONCURRENCY);
     // oxlint-disable-next-line no-await-in-loop
-    const settled = await Promise.allSettled(wave.map((entry) => measure(entry, entities)));
+    const settled = await Promise.allSettled(wave.map((entry) => measure(entry, entities, budget)));
 
     for (const result of settled) {
       if (result.status === "rejected") {
@@ -232,6 +268,9 @@ export async function syncBuzz(env: Bindings) {
     titles: measured.length,
     resolved,
     unresolved: measured.length - resolved,
+    skipped: pending.length - measured.length,
+    searchesLeft: budget.remaining,
+    searchBlocked: budget.blocked,
   });
 
   return resolved;

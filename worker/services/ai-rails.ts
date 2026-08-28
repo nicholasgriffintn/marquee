@@ -98,9 +98,7 @@ export function rankAngles(angles: Angle[], scores: Map<string, number>) {
     return angles;
   }
 
-  return [...angles].sort(
-    (left, right) => (scores.get(right.id) ?? 0) - (scores.get(left.id) ?? 0),
-  );
+  return angles.toSorted((left, right) => (scores.get(right.id) ?? 0) - (scores.get(left.id) ?? 0));
 }
 
 export function anglesFor(preferences: ViewerPreferences): Angle[] {
@@ -670,7 +668,7 @@ export async function prepareRails(
   const claimed = new Set<string>();
   const seeds: Record<string, MediaTitle[]> = {};
 
-  for (const angle of [...angles].sort((a, b) => a.claimOrder - b.claimOrder)) {
+  for (const angle of angles.toSorted((a, b) => a.claimOrder - b.claimOrder)) {
     // oxlint-disable-next-line no-await-in-loop
     seeds[angle.id] = await seedCandidates(
       env,

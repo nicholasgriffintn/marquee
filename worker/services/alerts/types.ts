@@ -14,10 +14,12 @@ export type AlertCandidate = {
   path: string;
 };
 
+export type DetectorOptions = { send: boolean };
+
 export type Detector = {
   kind: AlertKind;
   priority: number;
-  find(env: Bindings): Promise<AlertCandidate[]>;
+  find(env: Bindings, options: DetectorOptions): Promise<AlertCandidate[]>;
 };
 
 export function isAlertKind(value: unknown): value is AlertKind {

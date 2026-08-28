@@ -273,7 +273,7 @@ async function enrichmentStats(env: Bindings) {
       ]
     : [];
 
-  return [...enriched.results.map(withAttempts), ...justwatchRow].sort((left, right) =>
+  return [...enriched.results.map(withAttempts), ...justwatchRow].toSorted((left, right) =>
     left.source.localeCompare(right.source),
   );
 }

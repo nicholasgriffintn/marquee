@@ -1,45 +1,51 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type {
+  RevivalBillResponse,
+  RevivalBillSlot,
   RevivalCard,
-  RevivalProgramme,
   RevivalScreening,
+  RevivalShelf,
+  RevivalShelvesResponse,
   RevivalWork,
 } from "../domain/revival";
 import { jsonRequest, requestJson } from "../lib/api";
+import { useResource } from "./useResource";
 
-const EMPTY: RevivalProgramme = { bill: [], billDate: "", shelves: [], total: 0, fetchedAt: "" };
+const NO_BILL: RevivalBillSlot[] = [];
+const NO_SHELVES: RevivalShelf[] = [];
+const NO_CARDS: RevivalCard[] = [];
 
-type ProgrammeState = { programme: RevivalProgramme; isLoading: boolean; error: string };
+export function useVaultTotal(isReady: boolean) {
+  const { data } = useResource<{ total: number }>("/api/revival/vault", { enabled: isReady });
 
-const IDLE: ProgrammeState = { programme: EMPTY, isLoading: true, error: "" };
+  return data?.total ?? 0;
+}
 
-export function useProgramme(isReady: boolean) {
-  const [state, setState] = useState<ProgrammeState>(IDLE);
+export function useBill(isReady: boolean) {
+  const { data, error, isLoading } = useResource<RevivalBillResponse>("/api/revival/bill", {
+    enabled: isReady,
+    errorMessage: "Tonight's bill is unavailable",
+  });
 
-  useEffect(() => {
-    if (!isReady) {
-      return undefined;
-    }
+  return { bill: data?.bill ?? NO_BILL, error, isLoading: isLoading || !isReady };
+}
 
-    const controller = new AbortController();
+export function useShelves(isReady: boolean) {
+  const { data, error, isLoading } = useResource<RevivalShelvesResponse>("/api/revival/shelves", {
+    enabled: isReady,
+    errorMessage: "The programme is unavailable",
+  });
 
-    requestJson<RevivalProgramme>("/api/revival", { signal: controller.signal })
-      .then((programme) => setState({ programme, isLoading: false, error: "" }))
-      .catch((cause: unknown) => {
-        if (!controller.signal.aborted) {
-          setState({
-            programme: EMPTY,
-            isLoading: false,
-            error: cause instanceof Error ? cause.message : "The programme is unavailable",
-          });
-        }
-      });
+  return { shelves: data?.shelves ?? NO_SHELVES, error, isLoading: isLoading || !isReady };
+}
 
-    return () => controller.abort();
-  }, [isReady]);
+export function useResumeShelf(isReady: boolean) {
+  const { data } = useResource<{ works: RevivalCard[] }>("/api/revival/resume", {
+    enabled: isReady,
+  });
 
-  return state;
+  return data?.works ?? NO_CARDS;
 }
 
 type ScreeningState = { workId: string; screening: RevivalScreening | null; error: string };

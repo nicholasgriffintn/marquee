@@ -39,7 +39,7 @@ function groupByDay(screenings: Screening[]) {
     }
   }
 
-  return [...days.entries()].sort(([left], [right]) => left.localeCompare(right)).slice(0, 4);
+  return [...days.entries()].toSorted(([left], [right]) => left.localeCompare(right)).slice(0, 4);
 }
 
 function ExactDay({
@@ -106,7 +106,7 @@ function Listing({
         .map((screening) => screening.businessDay),
     ),
   ]
-    .sort()
+    .toSorted()
     .slice(0, 5);
   const link = coarse.find((screening) => screening.bookingUrl)?.bookingUrl ?? cinema.bookingUrl;
 

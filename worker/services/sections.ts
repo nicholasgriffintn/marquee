@@ -461,7 +461,7 @@ export async function buildSections(env: Bindings) {
     });
   }
 
-  const moods = (
+  const moods: string[] = (
     await cachedFacet(env, "keywords", seed, () =>
       topValues(env, "catalog_title_keywords", "keyword", 60, 40),
     )

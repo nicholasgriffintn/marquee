@@ -268,7 +268,7 @@ export async function readBudgets(env: Bindings) {
       consecutivePauses: 0,
     }));
 
-  return [...rows.results, ...missing].sort((left, right) =>
+  return [...rows.results, ...missing].toSorted((left, right) =>
     left.source.localeCompare(right.source),
   );
 }

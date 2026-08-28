@@ -16,7 +16,6 @@ import { billDay, lateNight, seedFrom, shuffler, standingOffset } from "../lib/r
 import { isRecord } from "../lib/values.ts";
 import {
   deleteWork,
-  countApproved,
   countShelf,
   readAlsoShowing,
   readCountryGroups,
@@ -703,38 +702,24 @@ export async function drawBill(db: D1Database, day: string) {
   return drawn.map((entry) => ({ ...entry, work: toCard(entry.work) }));
 }
 
-export async function getProgramme(env: Bindings, viewerId: string | null) {
+export async function getBill(db: D1Database) {
   const day = billDay();
-  const [total, shelves, bill] = await Promise.all([
-    countApproved(env.DB),
-    readShelves(env.DB),
-    drawBill(env.DB, day),
-  ]);
 
-  if (viewerId) {
-    const progress = await readViewerProgress(env.DB, viewerId);
-    const resuming = await readWorksByIds(
-      env.DB,
-      progress.map((entry) => entry.id),
-    );
+  return { bill: await drawBill(db, day), billDate: day, fetchedAt: new Date().toISOString() };
+}
 
-    if (resuming.length) {
-      shelves.unshift({
-        id: "resume",
-        title: "Where you left off",
-        description: "The lights are still down on these.",
-        works: resuming.map(toCard),
-      });
-    }
-  }
+export async function getShelves(db: D1Database) {
+  return { shelves: await readShelves(db), fetchedAt: new Date().toISOString() };
+}
 
-  return {
-    bill,
-    billDate: day,
-    shelves,
-    total,
-    fetchedAt: new Date().toISOString(),
-  };
+export async function getResumeShelf(db: D1Database, viewerId: string) {
+  const progress = await readViewerProgress(db, viewerId);
+  const works = await readWorksByIds(
+    db,
+    progress.map((entry) => entry.id),
+  );
+
+  return { works: works.map(toCard) };
 }
 
 export async function getScreening(env: Bindings, id: string, viewerId: string | null) {

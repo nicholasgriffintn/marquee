@@ -119,11 +119,14 @@ export type RevivalBillSlot = RevivalBillSlotOf<RevivalCard>;
 
 export type RevivalShelf = RevivalShelfOf<RevivalCard>;
 
-export type RevivalProgramme = {
+export type RevivalBillResponse = {
   bill: RevivalBillSlot[];
   billDate: string;
+  fetchedAt: string;
+};
+
+export type RevivalShelvesResponse = {
   shelves: RevivalShelf[];
-  total: number;
   fetchedAt: string;
 };
 

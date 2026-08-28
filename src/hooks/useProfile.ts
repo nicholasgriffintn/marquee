@@ -93,7 +93,10 @@ export function useProfile(isSignedIn: boolean) {
 
       const generation = operations.begin(titleId);
 
-      setEntryStates((current) => ({ ...current, [titleId]: beginEntryLoad() }));
+      setEntryStates((current) => ({
+        ...current,
+        [titleId]: beginEntryLoad(),
+      }));
 
       try {
         const response = await operations.enqueue(titleId, () =>
@@ -199,7 +202,10 @@ export function useProfile(isSignedIn: boolean) {
 
       return next;
     });
-    setEntryStates((current) => ({ ...current, [titleId]: entryLoadSucceeded(null) }));
+    setEntryStates((current) => ({
+      ...current,
+      [titleId]: entryLoadSucceeded(null),
+    }));
     announce("Removing from shelf…", 0);
     try {
       await runProfileMutation(
@@ -211,17 +217,21 @@ export function useProfile(isSignedIn: boolean) {
       );
 
       if (!operations.isCurrent(titleId, generation)) {
-        return;
+        return true;
       }
 
       announce("Removed from shelf");
+
+      return true;
     } catch {
       if (!operations.isCurrent(titleId, generation)) {
-        return;
+        return false;
       }
 
       announce("Could not remove that title. Try again.", ERROR_HOLD_MS);
       await loadEntry(titleId);
+
+      return false;
     }
   }
 
@@ -233,7 +243,10 @@ export function useProfile(isSignedIn: boolean) {
 
     operations.begin(titleId);
     setEntries((current) => ({ ...current, [titleId]: entry }));
-    setEntryStates((current) => ({ ...current, [titleId]: entryLoadSucceeded(entry) }));
+    setEntryStates((current) => ({
+      ...current,
+      [titleId]: entryLoadSucceeded(entry),
+    }));
   }
 
   function setStatus(titleId: string, status: EntryStatus) {
