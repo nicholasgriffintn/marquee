@@ -1,3 +1,4 @@
+import type { TitleIdentifiers } from "./identifiers";
 import type { ProviderCategory, ProviderIntegration, ProviderStatus } from "./providers";
 import { slugify } from "./slug";
 
@@ -162,7 +163,7 @@ export type ExternalIds = {
   livechartId?: number | null;
   animeNewsNetworkId?: number | null;
   animeCountdownId?: number | null;
-};
+} & Partial<TitleIdentifiers>;
 
 export type MediaTitle = {
   id: string;

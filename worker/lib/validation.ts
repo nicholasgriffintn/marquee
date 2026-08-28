@@ -58,6 +58,7 @@ export function isIngestionJob(value: unknown): value is IngestionJob {
   if (
     value.type === "sync-schedule" ||
     value.type === "sync-buzz" ||
+    value.type === "sync-title-identifiers" ||
     value.type === "check-revival-rights" ||
     value.type === "build-sections"
   ) {

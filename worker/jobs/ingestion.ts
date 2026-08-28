@@ -10,6 +10,7 @@ import { syncCinemaDirectory, syncCinemaScreenings } from "../services/cinema-sy
 import { advanceDiscoverFrontier, measureDiscoverPartition } from "../services/discover.ts";
 import { embedTitles } from "../services/embeddings.ts";
 import { describeRevivalWorks } from "../services/revival-descriptions.ts";
+import { syncTitleIdentifiers } from "../services/identifiers.ts";
 import { groupRevivalPrints } from "../services/revival-groups.ts";
 import { mirrorWork } from "../services/revival-mirror.ts";
 import { checkRevivalRights } from "../services/revival-rights.ts";
@@ -228,6 +229,12 @@ export async function executeIngestionJob(env: Bindings, job: IngestionJob) {
 
     case "sync-buzz": {
       await syncBuzz(env);
+
+      return;
+    }
+
+    case "sync-title-identifiers": {
+      await syncTitleIdentifiers(env);
 
       return;
     }

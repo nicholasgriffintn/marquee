@@ -101,6 +101,7 @@ export type IngestionJob =
   | { type: "push-trakt-shelf"; viewerId: string; origin: string }
   | { type: "sync-schedule" }
   | { type: "sync-buzz" }
+  | { type: "sync-title-identifiers" }
   | { type: "sync-cinemas"; source: string }
   | { type: "sync-cinema-screenings"; source: string; siteId: string }
   | {

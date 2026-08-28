@@ -6,6 +6,7 @@ import type {
   TitleCredit,
   TitleCredits,
 } from "../../src/domain/catalog.ts";
+import { IDENTIFIER_FIELDS } from "../../src/domain/identifiers.ts";
 import { computeBlendedRating, computeWeightedRating } from "../lib/ratings.ts";
 import { persistTitleExtensions } from "./catalog-arrays.ts";
 import { readRawItems } from "./catalog-reader.ts";
@@ -59,8 +60,13 @@ function mergeProviders(fresh: MediaTitle, stored: MediaTitle) {
   return [...providers.values()];
 }
 
-// malId/anilistId only ever arrive via MAL/AniList enrichment, so a plain TMDB refresh must not clobber them.
-const STORED_FIRST_EXTERNAL_ID_FIELDS = new Set<keyof ExternalIds>(["malId", "anilistId"]);
+// These only ever arrive via MAL/AniList/Wikidata enrichment, so a plain TMDB refresh must not
+// clobber them.
+const STORED_FIRST_EXTERNAL_ID_FIELDS = new Set<keyof ExternalIds>([
+  "malId",
+  "anilistId",
+  ...IDENTIFIER_FIELDS,
+]);
 
 function mergeExternalIds(fresh: MediaTitle, stored: MediaTitle) {
   if (!fresh.externalIds && !stored.externalIds) {
@@ -83,6 +89,7 @@ function mergeExternalIds(fresh: MediaTitle, stored: MediaTitle) {
     "facebookId",
     "instagramId",
     "twitterId",
+    ...IDENTIFIER_FIELDS,
   ];
   const merged: ExternalIds = {};
 
