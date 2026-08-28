@@ -24,6 +24,7 @@ import {
   Page,
   PageHeader,
   StarIcon,
+  StatusNote,
 } from "../ui";
 
 import styles from "./LibraryPage.module.css";
@@ -374,9 +375,14 @@ export function LibraryPage({
         />
       )}
 
-      {!savedCount && (
+      {shelf.isLoading && (
+        <StatusNote busy live="polite">
+          Fetching your shelf…
+        </StatusNote>
+      )}
+
+      {!savedCount && !shelf.isLoading && (
         <EmptyState
-          className={styles.empty}
           heading="Nothing on your shelf yet."
           size="heading"
           description="Save something from Tonight to rate it and keep notes here."

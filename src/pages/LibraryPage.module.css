@@ -174,11 +174,6 @@
   margin: var(--space-6) 0 var(--space-2);
 }
 
-.empty {
-  padding: 60px;
-  text-align: center;
-}
-
 @media (max-width: 700px) {
   .lostItems {
     grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));

@@ -600,7 +600,7 @@ export function App() {
                       onShowTonight={() => void navigate("/")}
                     />
                   ) : (
-                    <SignedOutShelf />
+                    <SignedOutShelf isLoading={session.isLoading} />
                   )
                 }
               />
