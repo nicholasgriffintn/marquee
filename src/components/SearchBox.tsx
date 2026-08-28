@@ -120,6 +120,7 @@ export function SearchBox({
               type="button"
               key={item.id}
               id={`search-option-${item.id}`}
+              tabIndex={-1}
               ref={(node) => {
                 optionRefs.current[index] = node;
               }}
@@ -149,7 +150,7 @@ export function SearchBox({
           ))}
 
           {suggestions.length === 0 && (
-            <p className="search-suggestion-empty">
+            <p className="search-suggestion-empty" aria-live="polite">
               {isSearching
                 ? "Searching…"
                 : isRefining
@@ -158,7 +159,7 @@ export function SearchBox({
             </p>
           )}
 
-          <button type="button" className="search-suggestion-all" onClick={submit}>
+          <button type="button" tabIndex={-1} className="search-suggestion-all" onClick={submit}>
             See all results for “{query.trim()}” <ArrowIcon />
           </button>
         </div>

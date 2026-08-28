@@ -24,6 +24,7 @@ function AccountAvatar({ user }: { user: User }) {
 
 function AccountTools({ user, onSignOut }: { user: User; onSignOut: () => void }) {
   const menuRef = useRef<HTMLDetailsElement>(null);
+  const summaryRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     function closeMenu(event: PointerEvent) {
@@ -34,9 +35,22 @@ function AccountTools({ user, onSignOut }: { user: User; onSignOut: () => void }
       }
     }
 
-    document.addEventListener("pointerdown", closeMenu);
+    function onKeyDown(event: KeyboardEvent) {
+      const menu = menuRef.current;
 
-    return () => document.removeEventListener("pointerdown", closeMenu);
+      if (event.key === "Escape" && menu?.open) {
+        menu.open = false;
+        summaryRef.current?.focus();
+      }
+    }
+
+    document.addEventListener("pointerdown", closeMenu);
+    document.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", closeMenu);
+      document.removeEventListener("keydown", onKeyDown);
+    };
   }, []);
 
   return (
@@ -47,7 +61,7 @@ function AccountTools({ user, onSignOut }: { user: User; onSignOut: () => void }
         Sign out
       </button>
       <details className="account-menu" ref={menuRef}>
-        <summary aria-label={`Open account menu for ${user.name}`}>
+        <summary ref={summaryRef} aria-label={`Open account menu for ${user.name}`}>
           <AccountAvatar user={user} />
         </summary>
         <div className="account-menu-popover">

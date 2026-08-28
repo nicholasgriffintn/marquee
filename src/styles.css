@@ -826,7 +826,8 @@ svg .icon-fill {
   .skeleton,
   .availability-spinner,
   .detail-panel,
-  .modal-shell {
+  .modal-shell,
+  .curator-caret {
     animation: none;
   }
   .hero-actions .hero-play,
