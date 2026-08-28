@@ -424,8 +424,8 @@ export async function buildSections(env: Bindings) {
        AND EXISTS (
          SELECT 1 FROM title_source_works AS link
           WHERE link.title_id = catalog_titles.id
-            AND (SELECT count(*) FROM title_source_works AS peer
-                  WHERE peer.work_entity_id = link.work_entity_id) >= 2
+            AND (SELECT count(DISTINCT peer.title_id) FROM title_source_works AS peer
+                  WHERE peer.work_id = link.work_id) >= 2
        )`,
       "popularity DESC",
     ),

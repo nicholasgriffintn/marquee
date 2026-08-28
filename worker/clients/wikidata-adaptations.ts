@@ -1,4 +1,5 @@
 import type { MediaType } from "../../src/domain/catalog.ts";
+import { slugify } from "../../src/domain/slug.ts";
 import { preferredWorkType } from "../lib/source-works.ts";
 import { entityIdFrom, literals, queryWikidata, yearFrom } from "./wikidata-query.ts";
 import type { EntityRef } from "./wikidata.ts";
@@ -36,10 +37,11 @@ function sourceBranches(refs: EntityRef[]) {
     .join("\n  UNION\n  ");
 }
 
-export type SourceWorkAuthor = { entityId: string; name: string };
+export type SourceWorkAuthor = { wikidataId: string; name: string };
 
 export type SourceWorkRecord = {
-  entityId: string;
+  workId: string;
+  wikidataId: string;
   label: string;
   workType: string | null;
   publishedYear: number | null;
@@ -161,11 +163,12 @@ export async function fetchSourceWorks(entityIds: string[]) {
     [...drafts].map(([entityId, draft]): [string, SourceWorkRecord] => [
       entityId,
       {
-        entityId,
+        workId: slugify(`${draft.label} ${draft.publishedYear ?? ""}`.trim()),
+        wikidataId: entityId,
         label: draft.label,
         workType: preferredWorkType([...draft.types]),
         publishedYear: draft.publishedYear,
-        authors: [...draft.authors].map(([id, name]) => ({ entityId: id, name })),
+        authors: [...draft.authors].map(([id, name]) => ({ wikidataId: id, name })),
       },
     ]),
   );

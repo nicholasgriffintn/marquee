@@ -9,7 +9,7 @@ export type AdaptationCandidate = { titleId: string; mediaType: MediaType; tmdbI
 export type ScannedTitle = { titleId: string; works: SourceWorkRecord[] };
 
 export type StoredSourceWork = {
-  entityId: string;
+  workId: string;
   label: string;
   workType: string | null;
   publishedYear: number | null;
@@ -40,56 +40,60 @@ export async function selectAdaptationCandidates(
   return rows.results;
 }
 
-export async function storeAdaptations(db: D1Database, scanned: ScannedTitle[]) {
+export async function storeAdaptations(db: D1Database, source: string, scanned: ScannedTitle[]) {
   const statements: D1PreparedStatement[] = [];
 
   for (const entry of scanned) {
     statements.push(
-      db.prepare(`DELETE FROM title_source_works WHERE title_id = ?`).bind(entry.titleId),
+      db
+        .prepare(`DELETE FROM title_source_works WHERE title_id = ? AND source = ?`)
+        .bind(entry.titleId, source),
     );
 
     for (const work of entry.works) {
       statements.push(
         db
           .prepare(
-            `INSERT INTO source_works (entity_id, label, work_type, published_year, updated_at)
-             VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-             ON CONFLICT(entity_id) DO UPDATE SET
+            `INSERT INTO source_works
+               (work_id, label, work_type, published_year, wikidata_id, updated_at)
+             VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+             ON CONFLICT(work_id) DO UPDATE SET
                label = excluded.label,
                work_type = excluded.work_type,
                published_year = excluded.published_year,
+               wikidata_id = COALESCE(excluded.wikidata_id, source_works.wikidata_id),
                updated_at = CURRENT_TIMESTAMP`,
           )
-          .bind(work.entityId, work.label, work.workType, work.publishedYear),
-        db.prepare(`DELETE FROM source_work_authors WHERE work_entity_id = ?`).bind(work.entityId),
+          .bind(work.workId, work.label, work.workType, work.publishedYear, work.wikidataId),
+        db.prepare(`DELETE FROM source_work_authors WHERE work_id = ?`).bind(work.workId),
         ...work.authors.map((author) =>
           db
             .prepare(
-              `INSERT INTO source_work_authors (work_entity_id, author_entity_id, name)
+              `INSERT INTO source_work_authors (work_id, name, wikidata_id)
                VALUES (?, ?, ?)
-               ON CONFLICT(work_entity_id, author_entity_id) DO UPDATE SET name = excluded.name`,
+               ON CONFLICT(work_id, name) DO UPDATE SET wikidata_id = excluded.wikidata_id`,
             )
-            .bind(work.entityId, author.entityId, author.name),
+            .bind(work.workId, author.name, author.wikidataId),
         ),
         db
           .prepare(
-            `INSERT INTO title_source_works (title_id, work_entity_id) VALUES (?, ?)
-             ON CONFLICT(title_id, work_entity_id) DO NOTHING`,
+            `INSERT INTO title_source_works (title_id, work_id, source) VALUES (?, ?, ?)
+             ON CONFLICT(title_id, work_id, source) DO NOTHING`,
           )
-          .bind(entry.titleId, work.entityId),
+          .bind(entry.titleId, work.workId, source),
       );
     }
 
     statements.push(
       db
         .prepare(
-          `INSERT INTO title_adaptation_scans (title_id, works, scanned_at)
-           VALUES (?, ?, CURRENT_TIMESTAMP)
-           ON CONFLICT(title_id) DO UPDATE SET
+          `INSERT INTO title_adaptation_scans (title_id, source, works, scanned_at)
+           VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+           ON CONFLICT(title_id, source) DO UPDATE SET
              works = excluded.works,
              scanned_at = CURRENT_TIMESTAMP`,
         )
-        .bind(entry.titleId, entry.works.length),
+        .bind(entry.titleId, source, entry.works.length),
     );
   }
 
@@ -104,7 +108,7 @@ export async function storeAdaptations(db: D1Database, scanned: ScannedTitle[]) 
 export async function readTitleSourceWorks(db: D1Database, titleId: string) {
   const rows = await db
     .prepare(
-      `SELECT w.entity_id AS entityId, w.label, w.work_type AS workType,
+      `SELECT w.work_id AS workId, w.label, w.work_type AS workType,
               w.published_year AS publishedYear,
               (SELECT count(*) FROM title_source_works AS peer
                 WHERE peer.work_entity_id = w.entity_id) AS adaptations
@@ -122,31 +126,31 @@ export async function readTitleSourceWorks(db: D1Database, titleId: string) {
 
   const authors = await db
     .prepare(
-      `SELECT work_entity_id AS entityId, name
+      `SELECT work_id AS workId, name
        FROM source_work_authors
        WHERE work_entity_id IN (SELECT value FROM json_each(?))
        ORDER BY name`,
     )
-    .bind(JSON.stringify(rows.results.map((row) => row.entityId)))
-    .all<{ entityId: string; name: string }>();
+    .bind(JSON.stringify(rows.results.map((row) => row.workId)))
+    .all<{ workId: string; name: string }>();
 
   const byWork = new Map<string, string[]>();
 
   for (const author of authors.results) {
-    byWork.set(author.entityId, [...(byWork.get(author.entityId) ?? []), author.name]);
+    byWork.set(author.workId, [...(byWork.get(author.workId) ?? []), author.name]);
   }
 
   return rows.results.map((row): StoredSourceWork => ({
-    entityId: row.entityId,
+    workId: row.workId,
     label: row.label,
     workType: row.workType,
     publishedYear: row.publishedYear,
     adaptations: row.adaptations,
-    authors: byWork.get(row.entityId) ?? [],
+    authors: byWork.get(row.workId) ?? [],
   }));
 }
 
-export async function readAdaptationTitleIds(db: D1Database, entityId: string, limit: number) {
+export async function readAdaptationTitleIds(db: D1Database, workId: string, limit: number) {
   const rows = await db
     .prepare(
       `SELECT link.title_id AS titleId
@@ -156,7 +160,7 @@ export async function readAdaptationTitleIds(db: D1Database, entityId: string, l
        ORDER BY COALESCE(t.release_date, '9999-12-31'), t.popularity DESC
        LIMIT ?2`,
     )
-    .bind(entityId, clamp(limit, 1, 48))
+    .bind(workId, clamp(limit, 1, 48))
     .all<{ titleId: string }>();
 
   return rows.results.map((row) => row.titleId);

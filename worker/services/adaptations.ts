@@ -24,11 +24,13 @@ const STRIP_LIMIT = 24;
 
 type TitleAdaptations = { source: SourceWork | null; items: MediaTitle[] };
 
+const SOURCE = "wikidata";
+
 const NOTHING: TitleAdaptations = { source: null, items: [] };
 
 function toSourceWork(work: StoredSourceWork): SourceWork {
   return {
-    entityId: work.entityId,
+    workId: work.workId,
     label: work.label,
     workType: work.workType,
     publishedYear: work.publishedYear,
@@ -88,7 +90,7 @@ export async function syncAdaptations(env: Bindings) {
   }));
   const linked = scanned.filter((entry) => entry.works.length > 0);
 
-  await storeAdaptations(env.DB, scanned);
+  await storeAdaptations(env.DB, SOURCE, scanned);
 
   logEvent("adaptations_synced", {
     candidates: candidates.length,
@@ -117,7 +119,7 @@ export async function getTitleAdaptations(
     return { source: toSourceWork(work), items: [] };
   }
 
-  const titleIds = await readAdaptationTitleIds(db, work.entityId, STRIP_LIMIT);
+  const titleIds = await readAdaptationTitleIds(db, work.workId, STRIP_LIMIT);
 
   return {
     source: toSourceWork(work),

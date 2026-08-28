@@ -42,7 +42,7 @@ export type TitleVisualFormat = {
 };
 
 export type SourceWork = {
-  entityId: string;
+  workId: string;
   label: string;
   workType: string | null;
   publishedYear: number | null;
