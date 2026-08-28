@@ -7,3 +7,7 @@ worker-configuration.d.ts
 .claude
 *.xcuserstate
 xcuserdata/
+*.sqlite-shm
+*.sqlite-wal
+
+backups/
