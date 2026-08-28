@@ -122,22 +122,6 @@ where there is neither.
 Odeon and Curzon publish nothing readable — both sit behind a bot challenge a Worker does not get
 through. They are absent rather than approximated.
 
-## Trending, in more than English
-
-The trending rail counted English Wikipedia readers and nothing else, so a Korean series half of
-Seoul is reading about registered as nothing at all. Trending now measures a title in its own
-languages, found from the same Wikidata entity its article was matched by.
-
-Raw counts only ever crown English. `en.wikipedia` serves about 1.5 billion article views a week
-against Korean's 15 million, so the largest edition wins by a hundred to one and tells you about
-Wikipedia's readership rather than about the film. Each edition is weighed against its own weekly
-readership instead. One week of _Oppenheimer_ turns 62% English by raw count into 10% by share; for
-_Jana Nayagan_, 1,064 Tamil readers against 139,631 English ones is 89% of the interest.
-
-Languages, not countries — reading the French article does not put you in France. Ten editions are
-measured, the ten largest by readership, plus the title's own original language, and an edition
-needs fifty readers in the week before it counts.
-
 ## The revival house
 
 There is a small screen at the back where the ticket is nothing, because the prints are out of
