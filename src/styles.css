@@ -8326,12 +8326,21 @@ a.showtime:hover small {
   border-bottom: 1px solid var(--line);
   position: relative;
 }
-.revival-bill-list a {
+.revival-bill-list a,
+.revival-bill-row {
   align-items: baseline;
   display: grid;
   gap: 4px 20px;
   grid-template-columns: minmax(170px, 200px) 1fr;
   padding: 16px 0;
+}
+.skeleton-bill-slot {
+  height: 9px;
+  width: 130px;
+}
+.skeleton-bill-title {
+  height: 20px;
+  width: min(340px, 60%);
 }
 .revival-bill-slot {
   color: var(--acid);
@@ -8353,7 +8362,8 @@ a.showtime:hover small {
   color: var(--acid);
 }
 @media (max-width: 700px) {
-  .revival-bill-list a {
+  .revival-bill-list a,
+  .revival-bill-row {
     grid-template-columns: 1fr;
   }
   .revival-bill-list small {

@@ -9,7 +9,17 @@ import { SearchField } from "../components/ui";
 import { UsherMark } from "../components/usher/UsherMark";
 import { revivalPath, workMeta, type RevivalBillSlot, type RevivalShelf } from "../domain/revival";
 import { useNearViewport } from "../hooks/useNearViewport";
-import { useProgramme, useVaultSearch } from "../hooks/useRevival";
+import {
+  useBill,
+  useResumeShelf,
+  useShelves,
+  useVaultSearch,
+  useVaultTotal,
+} from "../hooks/useRevival";
+
+const BILL_SKELETON_SLOTS = [0, 1, 2, 3];
+const SHELF_SKELETON_RAILS = [0, 1];
+const SHELF_SKELETON_REELS = [0, 1, 2, 3, 4];
 
 function Shelf({ shelf }: { shelf: RevivalShelf }) {
   const ref = useRef<HTMLElement>(null);
@@ -67,10 +77,59 @@ function Bill({ bill }: { bill: RevivalBillSlot[] }) {
   );
 }
 
-export function RevivalPage({ isReady }: { isReady: boolean }) {
-  const { programme, isLoading, error } = useProgramme(isReady);
+function BillSkeleton() {
+  return (
+    <section className="revival-bill" aria-hidden="true">
+      <div className="rail-heading">
+        <div>
+          <span className="skeleton skeleton-eyebrow" />
+          <span className="skeleton skeleton-heading" />
+        </div>
+      </div>
+      <ol className="revival-bill-list">
+        {BILL_SKELETON_SLOTS.map((slot) => (
+          <li key={slot}>
+            <span className="revival-bill-row">
+              <span className="skeleton skeleton-bill-slot" />
+              <span className="skeleton skeleton-bill-title" />
+            </span>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+function ShelvesSkeleton() {
+  return (
+    <div aria-hidden="true">
+      {SHELF_SKELETON_RAILS.map((rail) => (
+        <div className="content-rail" key={rail}>
+          <div className="rail-heading">
+            <div>
+              <span className="skeleton skeleton-eyebrow" />
+              <span className="skeleton skeleton-heading" />
+            </div>
+          </div>
+          <div className="rail-track">
+            {SHELF_SKELETON_REELS.map((reel) => (
+              <span className="skeleton skeleton-reel" key={reel} />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function RevivalPage({ isReady, isSignedIn }: { isReady: boolean; isSignedIn: boolean }) {
+  const total = useVaultTotal(isReady);
+  const bill = useBill(isReady);
+  const shelves = useShelves(isReady);
+  const resuming = useResumeShelf(isReady && isSignedIn);
   const [query, setQuery] = useState("");
   const search = useVaultSearch(query);
+  const error = bill.error || shelves.error;
 
   return (
     <section className="page-section revival-shelves">
@@ -78,8 +137,7 @@ export function RevivalPage({ isReady }: { isReady: boolean }) {
         <p>
           The small screen at the back. When the building came down, the sign went in a skip and
           this did not. The prints are out of copyright, the projectionist is somewhere behind that
-          door, and the ticket is nothing.{" "}
-          {programme.total ? `${programme.total.toLocaleString()} in the vault.` : ""}
+          door, and the ticket is nothing. {total ? `${total.toLocaleString()} in the vault.` : ""}
         </p>
       </PageTitle>
 
@@ -100,12 +158,12 @@ export function RevivalPage({ isReady }: { isReady: boolean }) {
           <span>
             {search.isSearching
               ? "Looking…"
-              : `${search.works.length.toLocaleString()} of ${programme.total.toLocaleString()} in the vault`}
+              : `${search.works.length.toLocaleString()} of ${total.toLocaleString()} in the vault`}
           </span>
         )}
       </div>
 
-      {search.isActive && (
+      {search.isActive ? (
         <section className="content-rail" aria-busy={search.isSearching}>
           <div className="rail-heading">
             <div>
@@ -132,64 +190,72 @@ export function RevivalPage({ isReady }: { isReady: boolean }) {
             <p className="rail-empty">Nothing under that name.</p>
           )}
         </section>
-      )}
+      ) : (
+        <>
+          {bill.isLoading ? <BillSkeleton /> : <Bill bill={bill.bill} />}
 
-      {isLoading && !programme.shelves.length && (
-        <div className="content-rail">
-          <div className="rail-track">
-            <span className="skeleton skeleton-reel" />
-            <span className="skeleton skeleton-reel" />
-            <span className="skeleton skeleton-reel" />
-          </div>
-        </div>
-      )}
+          {resuming.length > 0 && (
+            <ErrorBoundary label="This shelf">
+              <Shelf
+                shelf={{
+                  id: "resume",
+                  title: "Where you left off",
+                  description: "The lights are still down on these.",
+                  works: resuming,
+                }}
+              />
+            </ErrorBoundary>
+          )}
 
-      {!isLoading && !programme.shelves.length && (
-        <div className="search-empty">
-          <UsherMark face="dormant" crop="head" />
-          <h2>Nothing threaded yet.</h2>
-          <p>
-            The projectionist is still going through the vault. Come back when he has found
-            something worth showing.
-          </p>
-          <Link className="button-link" to="/">
-            Back to tonight
-          </Link>
-        </div>
-      )}
+          {shelves.isLoading && <ShelvesSkeleton />}
 
-      {!search.isActive && <Bill bill={programme.bill} />}
+          {shelves.shelves.map((shelf) => (
+            <ErrorBoundary key={shelf.id} label="This shelf">
+              <Shelf shelf={shelf} />
+            </ErrorBoundary>
+          ))}
 
-      {!search.isActive &&
-        programme.shelves.map((shelf) => (
-          <ErrorBoundary key={shelf.id} label="This shelf">
-            <Shelf shelf={shelf} />
-          </ErrorBoundary>
-        ))}
+          {!shelves.isLoading && !shelves.shelves.length && (
+            <div className="search-empty">
+              <UsherMark face="dormant" crop="head" />
+              <h2>Nothing threaded yet.</h2>
+              <p>
+                The projectionist is still going through the vault. Come back when he has found
+                something worth showing.
+              </p>
+              <Link className="button-link" to="/">
+                Back to tonight
+              </Link>
+            </div>
+          )}
 
-      {programme.shelves.length > 0 && <ProjectionNote seed={programme.total} />}
+          {shelves.shelves.length > 0 && (
+            <>
+              <ProjectionNote seed={total} />
 
-      {programme.shelves.length > 0 && (
-        <div className="revival-note">
-          <p className="revival-note-head">On what we are allowed to show you</p>
-          <p>
-            Every print here was published as public domain by the archive holding it. That is their
-            claim, and we pass it on. Whether we thread it up ourselves depends on one thing: UK
-            copyright runs for seventy years after the last of the principal director, the
-            screenwriters and the composer has died. Past that, the print is ours to keep and we
-            serve it from our own vault.
-          </p>
-          <p>
-            Not past it, and we do not touch the reel. The play button sends you to the archive that
-            holds it and they show it to you, exactly as they would if you had walked in there
-            yourself. Every print says which of the two it is, and why, on its own page. I would
-            rather tell you where a thing came from than have you wonder.
-          </p>
-          <p>
-            If you think something here is on the wrong shelf, say so. It comes down the same day,
-            and we argue about it afterwards.
-          </p>
-        </div>
+              <div className="revival-note">
+                <p className="revival-note-head">On what we are allowed to show you</p>
+                <p>
+                  Every print here was published as public domain by the archive holding it. That is
+                  their claim, and we pass it on. Whether we thread it up ourselves depends on one
+                  thing: UK copyright runs for seventy years after the last of the principal
+                  director, the screenwriters and the composer has died. Past that, the print is
+                  ours to keep and we serve it from our own vault.
+                </p>
+                <p>
+                  Not past it, and we do not touch the reel. The play button sends you to the
+                  archive that holds it and they show it to you, exactly as they would if you had
+                  walked in there yourself. Every print says which of the two it is, and why, on its
+                  own page. I would rather tell you where a thing came from than have you wonder.
+                </p>
+                <p>
+                  If you think something here is on the wrong shelf, say so. It comes down the same
+                  day, and we argue about it afterwards.
+                </p>
+              </div>
+            </>
+          )}
+        </>
       )}
     </section>
   );

@@ -520,7 +520,7 @@ export function App() {
                 path="/revival"
                 element={
                   <Suspense fallback={<RouteFallback />}>
-                    <RevivalPage isReady={isViewerReady} />
+                    <RevivalPage isReady={isViewerReady} isSignedIn={isSignedIn} />
                   </Suspense>
                 }
               />

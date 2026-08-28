@@ -17,22 +17,62 @@ import {
   saveProgress,
   searchApproved,
 } from "../repositories/revival.ts";
-import { getProgramme, getScreening, shelfSelector } from "../services/revival.ts";
+import {
+  getBill,
+  getResumeShelf,
+  getScreening,
+  getShelves,
+  shelfSelector,
+} from "../services/revival.ts";
 import type { Bindings } from "../types.ts";
 
 export const revivalRoutes = new Hono<{ Bindings: Bindings }>();
 
-revivalRoutes.get("/", async (context) => {
+revivalRoutes.get("/vault", edgeCache(600), async (context) => {
+  try {
+    return context.json({ total: await countApproved(context.env.DB) });
+  } catch (error) {
+    logError("revival_vault_failed", error, { area: "revival" });
+
+    return context.json({ total: 0 });
+  }
+});
+
+revivalRoutes.get("/bill", edgeCache(300), async (context) => {
+  try {
+    return context.json(await getBill(context.env.DB));
+  } catch (error) {
+    logError("revival_bill_failed", error, { area: "revival" });
+
+    return context.json({ bill: [], billDate: "", fetchedAt: "" });
+  }
+});
+
+revivalRoutes.get("/shelves", edgeCache(300), async (context) => {
+  try {
+    return context.json(await getShelves(context.env.DB));
+  } catch (error) {
+    logError("revival_shelves_failed", error, { area: "revival" });
+
+    return context.json({ shelves: [], fetchedAt: "" });
+  }
+});
+
+revivalRoutes.get("/resume", async (context) => {
   const principal = await sessionPrincipal(context.env, context.req.raw);
 
+  context.header("cache-control", "no-store");
+
+  if (!principal) {
+    return context.json({ works: [] });
+  }
+
   try {
-    context.header("cache-control", principal ? "no-store" : "public, max-age=300");
-
-    return context.json(await getProgramme(context.env, principal?.user.id ?? null));
+    return context.json(await getResumeShelf(context.env.DB, principal.user.id));
   } catch (error) {
-    logError("revival_programme_failed", error, { area: "revival" });
+    logError("revival_resume_failed", error, { area: "revival" });
 
-    return context.json({ shelves: [], total: 0, fetchedAt: "" });
+    return context.json({ works: [] });
   }
 });
 
