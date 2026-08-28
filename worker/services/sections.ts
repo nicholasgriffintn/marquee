@@ -1,9 +1,11 @@
 import type { SectionAudience } from "../../src/domain/catalog.ts";
 import { providerRegistry } from "../../src/domain/providers.ts";
+import { anniversaryCaption, anniversaryQuery } from "../lib/anniversary.ts";
 import { PALME_DOR } from "../lib/awards.ts";
 import { logError, logEvent } from "../lib/logging.ts";
 import { titleCase } from "../lib/text.ts";
 import { isKnownTitle } from "../lib/validation.ts";
+import { ACADEMY_RATIO, BLACK_AND_WHITE } from "../lib/visual-format.ts";
 import type { Bindings } from "../types.ts";
 
 const POOL_SIZE = 40;
@@ -92,6 +94,27 @@ async function scheduled(env: Bindings, used: Set<string>) {
     .map((row) => row.id)
     .filter((id) => isKnownTitle(id) && !used.has(id))
     .slice(0, POOL_SIZE);
+}
+
+async function anniversaries(env: Bindings, used: Set<string>) {
+  const query = anniversaryQuery(new Date());
+  const rows = await env.DB.prepare(
+    `SELECT id, year FROM catalog_titles
+     WHERE ${query.where} AND ${SCORE} >= 6.2 AND ${VOTES} >= 60
+     ORDER BY ${query.order}, ${SCORE} DESC
+     LIMIT ${OVERFETCH}`,
+  )
+    .bind(...query.binds)
+    .all<{ id: string; year: number }>();
+
+  const picked = rows.results
+    .filter((row) => isKnownTitle(row.id) && !used.has(row.id))
+    .slice(0, POOL_SIZE);
+
+  return {
+    titleIds: picked.map((row) => row.id),
+    years: [...new Set(picked.map((row) => row.year))],
+  };
 }
 
 async function topValues(
@@ -230,6 +253,15 @@ export async function buildSections(env: Bindings) {
     titleIds: await pick(env, used, `year >= ? AND ${VOTES} >= 40`, "popularity DESC", [year]),
   });
 
+  const anniversary = await anniversaries(env, used);
+
+  add({
+    id: "anniversary",
+    title: "Years ago this week",
+    description: anniversaryCaption(anniversary.years),
+    titleIds: anniversary.titleIds,
+  });
+
   add({
     id: "gems",
     title: "Quietly brilliant",
@@ -275,6 +307,34 @@ export async function buildSections(env: Bindings) {
       used,
       `year BETWEEN 1970 AND 1999 AND ${SCORE} >= 7.3 AND ${VOTES} >= 200`,
       `${SCORE} DESC`,
+    ),
+  });
+
+  add({
+    id: "black-and-white",
+    title: "In black and white",
+    description: "Shot without colour, whatever year they were made",
+    titleIds: await pick(
+      env,
+      used,
+      `id IN (SELECT title_id FROM title_visual_format WHERE kind = 'colour' AND value = ?)
+       AND ${SCORE} >= 6.5 AND ${VOTES} >= 60`,
+      `${SCORE} DESC`,
+      [BLACK_AND_WHITE],
+    ),
+  });
+
+  add({
+    id: "academy-ratio",
+    title: "Shot in Academy ratio",
+    description: `The near-square ${ACADEMY_RATIO} frame, from before the screen got wider`,
+    titleIds: await pick(
+      env,
+      used,
+      `id IN (SELECT title_id FROM title_visual_format WHERE kind = 'aspect_ratio' AND value = ?)
+       AND ${VOTES} >= 40`,
+      `${SCORE} DESC`,
+      [ACADEMY_RATIO],
     ),
   });
 
@@ -350,6 +410,24 @@ export async function buildSections(env: Bindings) {
       used,
       `${NOMINATIONS} >= 3 AND ${WON_NOTHING} AND ${VOTES} >= 100`,
       `${NOMINATIONS} DESC`,
+    ),
+  });
+
+  add({
+    id: "adaptations",
+    title: "The same story, again",
+    description: "Books, plays and films the screen keeps coming back to",
+    titleIds: await pick(
+      env,
+      used,
+      `${VOTES} >= 60
+       AND EXISTS (
+         SELECT 1 FROM title_source_works AS link
+          WHERE link.title_id = catalog_titles.id
+            AND (SELECT count(DISTINCT peer.title_id) FROM title_source_works AS peer
+                  WHERE peer.work_id = link.work_id) >= 2
+       )`,
+      "popularity DESC",
     ),
   });
 

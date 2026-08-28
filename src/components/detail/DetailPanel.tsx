@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { mergeAnimeProviders } from "../../domain/anime";
 import { collectionPath, type MediaTitle } from "../../domain/catalog";
 import { removalDisclosure, type ProfileEntryState } from "../../domain/profile-entry";
+import { useAdaptations } from "../../hooks/useAdaptations";
 import { useAnimeRecommendations } from "../../hooks/useAnimeRecommendations";
 import { useAvailability } from "../../hooks/useAvailability";
 import { useCollection } from "../../hooks/useCollection";
@@ -33,10 +34,12 @@ import { CreditsBlock } from "./CreditsBlock";
 import { MarqueeRead } from "./MarqueeRead";
 import { ScoreRow } from "./ScoreRow";
 import { SourceLinks } from "./SourceLinks";
+import { SourceWorkLine, SourceWorkTrack } from "./SourceWorkBlock";
 import { ThemeSongs } from "./ThemeSongs";
 import { TitleAwards } from "./TitleAwards";
 import { collectionCaption, similarCaption, TitleTrack } from "./TitleTrack";
 import { useExitWarning } from "./useExitWarning";
+import { VisualFormatLine } from "./VisualFormatLine";
 import { WatchNext } from "./WatchNext";
 import { WatchOrder } from "./WatchOrder";
 
@@ -112,6 +115,7 @@ export function DetailPanel({
   const showings = useShowings(item, canSave);
   const reels = useTitleReels(item.id, item.mediaType, item.tmdbId);
   const collection = useCollection(item.collection?.id);
+  const adaptations = useAdaptations(item.id);
   const spokenIn = languageLabel(item.originalLanguage);
   const madeIn = item.countries?.slice(0, COUNTRIES_SHOWN).join(", ") ?? "";
   const { exit, leaveVia, report, dismiss } = useExitWarning(item.id);
@@ -221,6 +225,7 @@ export function DetailPanel({
               .join(" · ")}
           </p>
         )}
+        <SourceWorkLine source={adaptations.source} />
         {item.tagline && <p className="detail-tagline">{item.tagline}</p>}
         {isSeries && (
           <div className="detail-tabs" role="tablist" aria-label="Overview or episodes">
@@ -291,6 +296,7 @@ export function DetailPanel({
             </ErrorBoundary>
           )}
           <AirLine item={item} nextEpisode={nextEpisode} />
+          {item.visualFormat && <VisualFormatLine format={item.visualFormat} />}
           <WatchOrder label="Before this" entries={watchOrder.before} onOpen={onOpen} />
           <ErrorBoundary label="Where to watch">
             <WatchBlock
@@ -366,6 +372,12 @@ export function DetailPanel({
               }
             />
           )}
+          <SourceWorkTrack
+            source={adaptations.source}
+            items={adaptations.items}
+            currentId={item.id}
+            onOpen={onOpen}
+          />
           <TitleTrack
             label="More like this"
             items={similar}

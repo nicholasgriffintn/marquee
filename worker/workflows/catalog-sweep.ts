@@ -15,14 +15,17 @@ import { storeProviders } from "../repositories/providers.ts";
 import { rebuildPeopleIndex } from "../repositories/usher.ts";
 import { rebuildWorkingSet } from "../repositories/working-set.ts";
 import { syncAwards } from "../services/awards.ts";
+import { syncAdaptations } from "../services/adaptations.ts";
 import { syncBuzz } from "../services/buzz.ts";
 import { queueCinemaDirectories, queueCinemaScreenings } from "../services/cinema-sync.ts";
 import { advanceDiscoverFrontier } from "../services/discover.ts";
+import { syncTitleIdentifiers } from "../services/identifiers.ts";
 import { queueRevivalMirrors } from "../services/revival-mirror.ts";
 import { checkRevivalRights } from "../services/revival-rights.ts";
 import { queueRevivalSources } from "../services/revival.ts";
 import { syncSchedule } from "../services/schedule.ts";
 import { buildSections } from "../services/sections.ts";
+import { syncVisualFormat } from "../services/visual-format.ts";
 import type { Bindings, CatalogSweepParameters } from "../types.ts";
 
 const RETRIES = { limit: 4, delay: "30 seconds", backoff: "exponential" } as const;
@@ -88,6 +91,16 @@ export class CatalogSweep extends WorkflowEntrypoint<Bindings, CatalogSweepParam
     await step.do("sync buzz", { retries: RETRIES }, async () => syncBuzz(this.env));
 
     await step.do("sync awards", { retries: RETRIES }, async () => syncAwards(this.env));
+
+    await step.do("sync visual format", { retries: RETRIES }, async () =>
+      syncVisualFormat(this.env),
+    );
+
+    await step.do("sync adaptations", { retries: RETRIES }, async () => syncAdaptations(this.env));
+    
+    await step.do("sync title identifiers", { retries: RETRIES }, async () =>
+      syncTitleIdentifiers(this.env),
+    );
 
     await step.do("queue embeddings", { retries: RETRIES }, async () => {
       await queueEmbeddings(this.env);

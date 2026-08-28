@@ -49,6 +49,7 @@ export const ACTION_GROUPS: {
       { id: "embeddings", label: "Queue embeddings" },
       { id: "discover", label: "Advance backfill" },
       { id: "anime-ids", label: "Import anime ids" },
+      { id: "identifiers", label: "Sync identifier hub" },
     ],
   },
   {

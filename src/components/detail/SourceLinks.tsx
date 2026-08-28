@@ -1,6 +1,7 @@
 import type { MouseEvent } from "react";
 
 import type { MediaTitle } from "../../domain/catalog";
+import { identifierLinks } from "../../domain/identifiers";
 import { ArrowIcon } from "../ui";
 import type { Exit } from "../usher/ExitDoor";
 
@@ -62,6 +63,11 @@ export function SourceLinks({ item, onLeave }: { item: MediaTitle; onLeave: Leav
         ]
       : []),
     ...(item.imdbUrl ? [{ href: item.imdbUrl, label: "IMDb", kind: "imdb" as const }] : []),
+    ...identifierLinks(item.externalIds).map((link) => ({
+      href: link.url,
+      label: link.label,
+      kind: "other" as const,
+    })),
     ...(item.anime?.links ?? []).map((link) => ({
       href: link.url,
       label: link.name,
