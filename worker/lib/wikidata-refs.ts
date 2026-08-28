@@ -15,22 +15,35 @@ export function isUsableTmdbRef(ref: TmdbRef) {
   return Number.isInteger(ref.tmdbId) && ref.tmdbId > 0;
 }
 
-export function tmdbBranches(refs: TmdbRef[]) {
+type BranchShape = { subject?: string; key?: string; also?: string; entities?: string[] };
+
+export function tmdbBranches(refs: TmdbRef[], shape: BranchShape = {}) {
+  const subject = shape.subject ?? "item";
+  const key = shape.key ?? "key";
+  const also = shape.also ? ` ; ${shape.also}` : "";
   const byType = new Map<MediaType, TmdbRef[]>();
 
   for (const ref of refs) {
     byType.set(ref.mediaType, [...(byType.get(ref.mediaType) ?? []), ref]);
   }
 
-  return [...byType]
-    .map(([mediaType, group]) => {
+  const entities = (shape.entities ?? []).filter((id) => /^Q\d+$/u.test(id));
+  const entityBranch = entities.length
+    ? `{ VALUES ?${subject} { ${entities.map((id) => `wd:${id}`).join(" ")} } }`
+    : null;
+
+  return [
+    entityBranch,
+    ...[...byType].map(([mediaType, group]) => {
       const variable = VARIABLE[mediaType];
 
       return `{
     VALUES ?${variable} { ${literals(group.map((ref) => ref.tmdbId))} }
-    ?item wdt:${TMDB_PROPERTY[mediaType]} ?${variable} .
-    BIND(CONCAT("${mediaType}:", ?${variable}) AS ?key)
+    ?${subject} wdt:${TMDB_PROPERTY[mediaType]} ?${variable}${also} .
+    BIND(CONCAT("${mediaType}:", ?${variable}) AS ?${key})
   }`;
-    })
+    }),
+  ]
+    .filter(Boolean)
     .join("\n  UNION\n  ");
 }

@@ -5,13 +5,12 @@ import {
   type IdentifierField,
   type TitleIdentifiers,
 } from "../../src/domain/identifiers.ts";
-import { entityIdFrom, literals, queryWikidata, type SparqlRow } from "./wikidata-query.ts";
+import { isUsableTmdbRef, tmdbBranches, tmdbKey } from "../lib/wikidata-refs.ts";
+import { entityIdFrom, queryWikidata, type SparqlRow } from "./wikidata-query.ts";
 
 const TIMEOUT_MS = 30_000;
 const CACHE_TTL = 604_800;
 const BATCH = 60;
-
-const TMDB_PROPERTY: Record<MediaType, string> = { movie: "P4947", tv: "P4983" };
 
 const PROPERTIES: Record<IdentifierField, { property: string; variable: string }> = {
   letterboxdId: { property: "P6127", variable: "letterboxd" },
@@ -27,31 +26,6 @@ export type IdentifierRef = {
   wikidataId: string | null;
 };
 
-function tmdbBranch(mediaType: MediaType, refs: IdentifierRef[]) {
-  const variable = mediaType === "movie" ? "movie" : "show";
-
-  return `{
-    VALUES ?${variable} { ${literals(refs.map((ref) => ref.tmdbId))} }
-    ?item wdt:${TMDB_PROPERTY[mediaType]} ?${variable} .
-    BIND(CONCAT("${mediaType}:", ?${variable}) AS ?key)
-  }`;
-}
-
-function branches(refs: IdentifierRef[]) {
-  const byType = new Map<MediaType, IdentifierRef[]>();
-
-  for (const ref of refs) {
-    byType.set(ref.mediaType, [...(byType.get(ref.mediaType) ?? []), ref]);
-  }
-
-  const entities = refs.flatMap((ref) => (ref.wikidataId ? [`wd:${ref.wikidataId}`] : []));
-
-  return [
-    ...[...byType].map(([mediaType, group]) => tmdbBranch(mediaType, group)),
-    ...(entities.length > 0 ? [`{ VALUES ?item { ${entities.join(" ")} } }`] : []),
-  ].join("\n  UNION\n  ");
-}
-
 function buildQuery(refs: IdentifierRef[]) {
   const projection = IDENTIFIER_FIELDS.map(
     (field) => `(SAMPLE(?${PROPERTIES[field].variable}) AS ?${field})`,
@@ -62,7 +36,7 @@ function buildQuery(refs: IdentifierRef[]) {
   ).join("\n  ");
 
   return `SELECT ?item ?key ${projection} WHERE {
-  ${branches(refs)}
+  ${tmdbBranches(refs, { entities: refs.flatMap((ref) => (ref.wikidataId ? [ref.wikidataId] : [])) })}
   ${optionals}
 } GROUP BY ?item ?key`;
 }
@@ -85,7 +59,7 @@ async function queryBatch(refs: IdentifierRef[]) {
     timeoutMs: TIMEOUT_MS,
     cacheTtl: CACHE_TTL,
   });
-  const byKey = new Map(refs.map((ref) => [`${ref.mediaType}:${ref.tmdbId}`, ref.titleId]));
+  const byKey = new Map(refs.map((ref) => [tmdbKey(ref), ref.titleId]));
   const byEntity = new Map(
     refs.flatMap((ref) => (ref.wikidataId ? [[ref.wikidataId, ref.titleId]] : [])),
   );
@@ -115,7 +89,7 @@ export async function readTitleIdentifiers(refs: IdentifierRef[]) {
   const usable = [
     ...new Map(
       refs
-        .filter((ref) => Number.isInteger(ref.tmdbId) && ref.tmdbId > 0)
+        .filter((ref) => isUsableTmdbRef(ref))
         .map((ref): [string, IdentifierRef] => [
           ref.titleId,
           {

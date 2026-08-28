@@ -1,6 +1,6 @@
 export type PlaceKind = "filming" | "narrative";
 
-export type PlacePin = "exact" | "near" | "loose" | "centroid";
+type PlacePin = "exact" | "near" | "loose" | "centroid";
 
 export type TitlePlace = {
   entityId: string;
@@ -33,8 +33,4 @@ export function placePin(degrees: number): PlacePin {
 
 export function isVague(place: { pin: PlacePin; isCountry: boolean }) {
   return place.isCountry || place.pin === "centroid";
-}
-
-export function placeSubtitle(place: { country: string | null; isCountry: boolean }) {
-  return place.isCountry ? null : place.country;
 }

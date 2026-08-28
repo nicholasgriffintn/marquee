@@ -1,41 +1,13 @@
-import type { MediaType } from "../../src/domain/catalog.ts";
 import { slugify } from "../../src/domain/slug.ts";
 import { preferredWorkType } from "../lib/source-works.ts";
-import { entityIdFrom, literals, queryWikidata, yearFrom } from "./wikidata-query.ts";
+import { tmdbBranches, tmdbKey } from "../lib/wikidata-refs.ts";
+import { entityIdFrom, queryWikidata, yearFrom } from "./wikidata-query.ts";
 import type { EntityRef } from "./wikidata.ts";
 
 const TIMEOUT_MS = 20_000;
 const CACHE_TTL = 604_800;
 const LINK_BATCH = 60;
 const WORK_BATCH = 60;
-
-const TMDB_PROPERTY: Record<MediaType, string> = { movie: "P4947", tv: "P4983" };
-
-function refKey(mediaType: MediaType, tmdbId: number) {
-  return `${mediaType}:${tmdbId}`;
-}
-
-function sourceBranch(mediaType: MediaType, tmdbIds: number[]) {
-  const variable = mediaType === "movie" ? "movie" : "show";
-
-  return `{
-    VALUES ?${variable} { ${literals(tmdbIds)} }
-    ?item wdt:${TMDB_PROPERTY[mediaType]} ?${variable} ; wdt:P144 ?work .
-    BIND(CONCAT("${mediaType}:", ?${variable}) AS ?key)
-  }`;
-}
-
-function sourceBranches(refs: EntityRef[]) {
-  const byType = new Map<MediaType, number[]>();
-
-  for (const ref of refs) {
-    byType.set(ref.mediaType, [...(byType.get(ref.mediaType) ?? []), ref.tmdbId]);
-  }
-
-  return [...byType]
-    .map(([mediaType, tmdbIds]) => sourceBranch(mediaType, tmdbIds))
-    .join("\n  UNION\n  ");
-}
 
 export type SourceWorkAuthor = { wikidataId: string; name: string };
 
@@ -58,11 +30,11 @@ type WorkDraft = {
 async function linkBatch(refs: EntityRef[]) {
   const rows = await queryWikidata(
     `SELECT ?key ?work WHERE {
-  ${sourceBranches(refs)}
+  ${tmdbBranches(refs, { also: "wdt:P144 ?work" })}
 }`,
     { timeoutMs: TIMEOUT_MS, cacheTtl: CACHE_TTL },
   );
-  const titleIds = new Map(refs.map((ref) => [refKey(ref.mediaType, ref.tmdbId), ref.titleId]));
+  const titleIds = new Map(refs.map((ref) => [tmdbKey(ref), ref.titleId]));
   const links = new Map<string, string[]>();
 
   for (const row of rows) {

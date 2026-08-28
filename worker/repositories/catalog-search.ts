@@ -438,7 +438,7 @@ export async function readKeywords(db: D1Database, limit = 120) {
 export async function readFilmingPlaces(db: D1Database, limit = 80) {
   const rows = await db
     .prepare(
-      `SELECT cp.label, count(*) AS titles
+      `SELECT cp.label, count(DISTINCT tp.title_id) AS titles
        FROM catalog_title_places AS tp
        JOIN catalog_places AS cp ON cp.entity_id = tp.place_id
        WHERE tp.kind = 'filming'
