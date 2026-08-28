@@ -30,6 +30,7 @@ import { AirLine } from "./AirLine";
 import { BuzzNote } from "./BuzzNote";
 import { CastAndStaff } from "./CastAndStaff";
 import { CreditsBlock } from "./CreditsBlock";
+import { FormLine } from "./FormLine";
 import { MarqueeRead } from "./MarqueeRead";
 import { ScoreRow } from "./ScoreRow";
 import { SourceLinks } from "./SourceLinks";
@@ -291,6 +292,7 @@ export function DetailPanel({
             </ErrorBoundary>
           )}
           <AirLine item={item} nextEpisode={nextEpisode} />
+          {item.form && <FormLine form={item.form} />}
           <WatchOrder label="Before this" entries={watchOrder.before} onOpen={onOpen} />
           <ErrorBoundary label="Where to watch">
             <WatchBlock

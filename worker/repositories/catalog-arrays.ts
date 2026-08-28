@@ -41,6 +41,7 @@ import { readRatingsMap, writeRatingsRows } from "./catalog-ratings.ts";
 import { readRecommendationMap, writeRecommendationRows } from "./catalog-recommendations.ts";
 import { readStudioMap, writeStudioRows } from "./catalog-studios.ts";
 import { readVideoMap, writeVideoRows } from "./catalog-videos.ts";
+import { readTitleFormMap } from "./title-form.ts";
 
 async function attachAnime(db: D1Database, ids: string[]) {
   const core = await readAnimeCoreMap(db, ids);
@@ -126,6 +127,7 @@ export async function attachTitleExtensions<T extends MediaTitle>(
     ratings,
     externalIds,
     details,
+    form,
     anime,
   ] = await Promise.all([
     readGenreMap(db, ids),
@@ -140,6 +142,7 @@ export async function attachTitleExtensions<T extends MediaTitle>(
     readRatingsMap(db, ids),
     readExternalIdsMap(db, ids),
     readDetailsMap(db, ids),
+    readTitleFormMap(db, ids),
     attachAnime(db, ids),
   ]);
 
@@ -170,6 +173,7 @@ export async function attachTitleExtensions<T extends MediaTitle>(
       lastAirDate: detail?.lastAirDate,
       nextAirDate: detail?.nextAirDate,
       pending: detail?.pending,
+      form: form.get(title.id),
       externalIds: externalId ? { ...title.externalIds, ...externalId } : title.externalIds,
       anime: anime.get(title.id),
     } satisfies MediaTitle;
