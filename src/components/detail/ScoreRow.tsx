@@ -55,17 +55,6 @@ export function ScoreRow({ item }: { item: MediaTitle }) {
           <Score value={moneyLabel(item.revenue)} label="Worldwide gross" />
         )}
       </div>
-      {ratings?.awards && (
-        <div className="detail-awards">
-          <span>Awards</span>
-          <p>
-            {ratings.awards}
-            {ratings.awardWins
-              ? ` · ${ratings.awardWins} win${ratings.awardWins === 1 ? "" : "s"}`
-              : ""}
-          </p>
-        </div>
-      )}
       {anime?.statusBreakdown && (
         <div className="detail-awards">
           <span>MyAnimeList lists</span>
