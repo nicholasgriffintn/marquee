@@ -19,6 +19,7 @@ import { syncAdaptations } from "../services/adaptations.ts";
 import { syncBuzz } from "../services/buzz.ts";
 import { queueCinemaDirectories, queueCinemaScreenings } from "../services/cinema-sync.ts";
 import { advanceDiscoverFrontier } from "../services/discover.ts";
+import { syncTitleIdentifiers } from "../services/identifiers.ts";
 import { queueRevivalMirrors } from "../services/revival-mirror.ts";
 import { checkRevivalRights } from "../services/revival-rights.ts";
 import { queueRevivalSources } from "../services/revival.ts";
@@ -96,6 +97,10 @@ export class CatalogSweep extends WorkflowEntrypoint<Bindings, CatalogSweepParam
     );
 
     await step.do("sync adaptations", { retries: RETRIES }, async () => syncAdaptations(this.env));
+    
+    await step.do("sync title identifiers", { retries: RETRIES }, async () =>
+      syncTitleIdentifiers(this.env),
+    );
 
     await step.do("queue embeddings", { retries: RETRIES }, async () => {
       await queueEmbeddings(this.env);
