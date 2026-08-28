@@ -36,6 +36,11 @@ export type TitleBuzz = {
   measuredAt: string;
 };
 
+export type TitleVisualFormat = {
+  colours: string[];
+  aspectRatios: string[];
+};
+
 export type AnimeLink = {
   name: string;
   url: string;
@@ -206,6 +211,7 @@ export type MediaTitle = {
   nextAirDate?: string | null;
   recommendationIds?: string[];
   buzz?: TitleBuzz;
+  visualFormat?: TitleVisualFormat;
   ratings?: {
     imdbScore: number | null;
     imdbVotes: number | null;
