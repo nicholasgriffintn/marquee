@@ -99,6 +99,7 @@ const VIEWS_MAX_ATTEMPTS = 3;
 const VIEWS_BASE_BACKOFF_MS = 500;
 const VIEWS_MAX_BACKOFF_MS = 4_000;
 const VIEWS_COOLDOWN_MS = 60_000;
+const VIEWS_MAX_COOLDOWN_WAIT_MS = 3_000;
 
 let viewsCoolingUntil = 0;
 
@@ -113,8 +114,12 @@ function viewsBackoff(attempt: number, retryAfter: string | null) {
 }
 
 async function dailyViews(path: string) {
-  if (Date.now() < viewsCoolingUntil) {
-    throw new WikimediaError("Pageviews is rate limiting; cooling off", 429);
+  const cooling = viewsCoolingUntil - Date.now();
+
+  if (cooling > 0) {
+    await new Promise((resolve) =>
+      setTimeout(resolve, Math.min(cooling, VIEWS_MAX_COOLDOWN_WAIT_MS)),
+    );
   }
 
   let response: Response | null = null;

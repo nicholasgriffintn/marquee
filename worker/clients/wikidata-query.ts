@@ -8,6 +8,7 @@ const MAX_ATTEMPTS = 3;
 const BASE_BACKOFF_MS = 1_000;
 const MAX_BACKOFF_MS = 8_000;
 const COOLDOWN_MS = 60_000;
+const MAX_COOLDOWN_WAIT_MS = 5_000;
 
 let coolingUntil = 0;
 
@@ -88,8 +89,10 @@ async function fetchQuery(url: URL, options: QueryOptions) {
 }
 
 export async function queryWikidata(query: string, options: QueryOptions) {
-  if (Date.now() < coolingUntil) {
-    throw new WikidataError("Wikidata is rate limiting; cooling off", 429);
+  const cooling = coolingUntil - Date.now();
+
+  if (cooling > 0) {
+    await new Promise((resolve) => setTimeout(resolve, Math.min(cooling, MAX_COOLDOWN_WAIT_MS)));
   }
 
   const url = new URL(SPARQL_ENDPOINT);
