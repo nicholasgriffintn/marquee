@@ -9,8 +9,9 @@ import {
 } from "../clients/wikimedia.ts";
 import { buzzScore, MIN_TRENDING_VIEWS } from "../lib/buzz.ts";
 import { logError, logEvent } from "../lib/logging.ts";
-import { clamp } from "../lib/numbers.ts";
+import { clamp, sum } from "../lib/numbers.ts";
 import type { Bindings } from "../types.ts";
+import { syncWorldBoard } from "./world-board.ts";
 
 const SAMPLE_SIZE = 250;
 const CONCURRENCY = 6;
@@ -170,8 +171,8 @@ async function measure(
     return { titleId: candidate.titleId, article, match, views: 0, previousViews: 0 };
   }
 
-  const recent = views.slice(-7).reduce((total, value) => total + value, 0);
-  const previous = views.slice(-14, -7).reduce((total, value) => total + value, 0);
+  const recent = sum(views.slice(-7));
+  const previous = sum(views.slice(-14, -7));
 
   return { titleId: candidate.titleId, article, match, views: recent, previousViews: previous };
 }
@@ -239,8 +240,9 @@ export async function syncBuzz(env: Bindings) {
       measured.slice(index, index + 50).map((row) =>
         env.DB.prepare(
           `INSERT INTO title_buzz
-             (title_id, article, source, views, previous_views, delta, score, measured_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+             (title_id, article, source, views, previous_views, delta, score, measured_at,
+              world_views, world_previous_views, world_score)
+           VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?)
            ON CONFLICT(title_id) DO UPDATE SET
              article = excluded.article,
              source = excluded.source,
@@ -248,7 +250,10 @@ export async function syncBuzz(env: Bindings) {
              previous_views = excluded.previous_views,
              delta = excluded.delta,
              score = excluded.score,
-             measured_at = CURRENT_TIMESTAMP`,
+             measured_at = CURRENT_TIMESTAMP,
+             world_views = excluded.world_views,
+             world_previous_views = excluded.world_previous_views,
+             world_score = excluded.world_score`,
         ).bind(
           row.titleId,
           row.article,
@@ -257,11 +262,22 @@ export async function syncBuzz(env: Bindings) {
           row.previousViews,
           (row.views - row.previousViews) / Math.max(1, row.previousViews),
           buzzScore(row.views, row.previousViews),
+          row.views,
+          row.previousViews,
+          buzzScore(row.views, row.previousViews),
         ),
       ),
     );
   }
 
+  const expanded = await syncWorldBoard(
+    env,
+    measured.map((row) => row.titleId),
+  ).catch((error: unknown) => {
+    logError("world_board_failed", error);
+
+    return 0;
+  });
   const resolved = measured.filter((row) => row.article !== "").length;
 
   logEvent("buzz_synced", {
@@ -271,6 +287,7 @@ export async function syncBuzz(env: Bindings) {
     skipped: pending.length - measured.length,
     searchesLeft: budget.remaining,
     searchBlocked: budget.blocked,
+    languageRows: expanded,
   });
 
   return resolved;
@@ -328,8 +345,8 @@ export async function readTrendingBuzz(env: Bindings, limit = 20) {
             b.previous_views AS previousViews, b.delta, b.score, b.measured_at AS measuredAt
      FROM title_buzz AS b
      JOIN catalog_titles AS t ON t.id = b.title_id
-     WHERE b.article <> '' AND b.views >= ${MIN_TRENDING_VIEWS} AND b.score > 0
-     ORDER BY b.score DESC
+     WHERE b.article <> '' AND b.views >= ${MIN_TRENDING_VIEWS} AND b.world_score > 0
+     ORDER BY b.world_score DESC
      LIMIT ?`,
   )
     .bind(clamp(limit, 1, 60))

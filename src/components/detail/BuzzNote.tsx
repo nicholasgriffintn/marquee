@@ -1,13 +1,6 @@
 import type { TitleBuzz } from "../../domain/catalog";
-import { parseDatabaseDate } from "../../lib/dates";
+import { measuredOn } from "../../lib/dates";
 import { changeLabel } from "../../lib/media";
-
-function measuredOn(value: string) {
-  return (
-    parseDatabaseDate(value)?.toLocaleDateString(undefined, { day: "numeric", month: "short" }) ??
-    value
-  );
-}
 
 export function BuzzNote({ buzz }: { buzz: TitleBuzz }) {
   return (

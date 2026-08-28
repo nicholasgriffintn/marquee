@@ -1,3 +1,4 @@
+import { sum } from "../lib/numbers.ts";
 import { isRecord, numberAt, records, stringAt } from "../lib/values.ts";
 import { upstreamFetch, UPSTREAM_AGENT } from "./fetch.ts";
 import { upstreamError } from "./upstream.ts";
@@ -7,8 +8,7 @@ const SEARCH_CACHE_TTL = 604_800;
 const VIEWS_CACHE_TTL = 43_200;
 
 const SEARCH_BASE = "https://en.wikipedia.org/w/api.php";
-const METRICS_BASE =
-  "https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/user";
+const METRICS_BASE = "https://wikimedia.org/api/rest_v1/metrics/pageviews";
 
 export const WikimediaError = upstreamError("WikimediaError");
 
@@ -40,8 +40,12 @@ export function articleMatchesTitle(article: string, names: (string | null)[]) {
   });
 }
 
-export function articleUrl(article: string) {
-  return `https://en.wikipedia.org/wiki/${encodeURIComponent(article.replaceAll(" ", "_"))}`;
+function pagePath(article: string) {
+  return encodeURIComponent(article.replaceAll(" ", "_"));
+}
+
+export function articleUrl(article: string, language = "en") {
+  return `https://${language}.wikipedia.org/wiki/${pagePath(article)}`;
 }
 
 export async function findArticle(names: (string | null)[], year: number | null, isFilm: boolean) {
@@ -83,11 +87,15 @@ export async function findArticle(names: (string | null)[], year: number | null,
   return found.find((name) => articleMatchesTitle(name, names)) ?? null;
 }
 
-export async function getPageviews(article: string, days = 14) {
+function dailyRange(days: number) {
   const end = new Date(Date.now() - 86_400_000);
   const start = new Date(end.getTime() - days * 86_400_000);
-  const url = `${METRICS_BASE}/${encodeURIComponent(article.replaceAll(" ", "_"))}/daily/${stamp(start)}/${stamp(end)}`;
-  const response = await upstreamFetch(url, {
+
+  return `daily/${stamp(start)}/${stamp(end)}`;
+}
+
+async function dailyViews(path: string) {
+  const response = await upstreamFetch(`${METRICS_BASE}/${path}`, {
     headers: { "user-agent": UPSTREAM_AGENT },
     timeoutMs: TIMEOUT_MS,
     cacheTtl: VIEWS_CACHE_TTL,
@@ -108,4 +116,18 @@ export async function getPageviews(article: string, days = 14) {
 
     return views === null ? [] : [views];
   });
+}
+
+export async function getPageviews(article: string, days = 14, language = "en") {
+  return dailyViews(
+    `per-article/${language}.wikipedia/all-access/user/${pagePath(article)}/${dailyRange(days)}`,
+  );
+}
+
+export async function getProjectVolume(language: string, days: number) {
+  const daily = await dailyViews(
+    `aggregate/${language}.wikipedia/all-access/user/${dailyRange(days)}`,
+  );
+
+  return sum(daily);
 }

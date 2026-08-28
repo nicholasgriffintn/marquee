@@ -37,6 +37,7 @@ import {
 import { getFeaturedTitle } from "../services/featured.ts";
 import { getPersonalRails } from "../services/personal-rails.ts";
 import { getSeason, getSeasonIndex } from "../services/seasons.ts";
+import { getWorldBoard } from "../services/world-board.ts";
 import type { Bindings } from "../types.ts";
 
 const TONIGHT_DEFAULT_LIMIT = 12;
@@ -416,6 +417,23 @@ catalogRoutes.get("/titles/:titleId/awards", edgeCache(3_600), async (context) =
   }
 
   return context.json(await readTitleAwards(context.env.DB, titleId));
+});
+
+catalogRoutes.get("/titles/:titleId/world-board", edgeCache(3_600), async (context) => {
+  const titleId = context.req.param("titleId");
+  const empty = { languages: [], measuredAt: null };
+
+  if (!isKnownTitle(titleId)) {
+    return context.json(empty);
+  }
+
+  try {
+    return context.json(await getWorldBoard(context.env.DB, titleId));
+  } catch (error) {
+    logError("world_board_read_failed", error, { area: "buzz", titleId });
+
+    return context.json(empty);
+  }
 });
 
 catalogRoutes.get("/titles/:titleId/watch-order", edgeCache(3_600), async (context) => {

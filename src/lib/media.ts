@@ -104,18 +104,16 @@ export function detailMeta(item: MediaTitle) {
   return values.filter(Boolean).join(" · ");
 }
 
-export function languageLabel(code: string | null | undefined) {
-  if (!code || code === "en") {
-    return null;
-  }
-
+export function languageName(code: string) {
   try {
-    const names = new Intl.DisplayNames(["en-GB"], { type: "language" });
-
-    return names.of(code) ?? null;
+    return new Intl.DisplayNames(["en-GB"], { type: "language" }).of(code) ?? code;
   } catch {
-    return null;
+    return code;
   }
+}
+
+export function languageLabel(code: string | null | undefined) {
+  return !code || code === "en" ? null : languageName(code);
 }
 
 export function moneyLabel(value: number) {

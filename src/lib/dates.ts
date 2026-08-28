@@ -12,6 +12,13 @@ export function parseDatabaseDate(value: string | null | undefined) {
   return parseDate(value && !value.includes("T") ? `${value.replace(" ", "T")}Z` : value);
 }
 
+export function measuredOn(value: string) {
+  return (
+    parseDatabaseDate(value)?.toLocaleDateString(undefined, { day: "numeric", month: "short" }) ??
+    value
+  );
+}
+
 export function formatDate(
   value: string | null | undefined,
   options: Intl.DateTimeFormatOptions,
