@@ -45,18 +45,12 @@ export async function encryptOAuthToken(env: Bindings, plaintext: string): Promi
     return plaintext;
   }
 
-  try {
-    const { iv, ciphertext } = await keyringFor(env.TOKEN_ENCRYPTION_KEY).encrypt(
-      textEncoder.encode(plaintext),
-      additionalData,
-    );
+  const { iv, ciphertext } = await keyringFor(env.TOKEN_ENCRYPTION_KEY).encrypt(
+    textEncoder.encode(plaintext),
+    additionalData,
+  );
 
-    return `${ENVELOPE_PREFIX}:${iv}:${ciphertext}`;
-  } catch (error) {
-    logError("token_encrypt_failed", error);
-
-    return plaintext;
-  }
+  return `${ENVELOPE_PREFIX}:${iv}:${ciphertext}`;
 }
 
 // Rows written before this feature shipped (or while TOKEN_ENCRYPTION_KEY was
