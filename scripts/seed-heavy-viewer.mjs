@@ -425,15 +425,17 @@ const viewerId = viewer.id;
 
 const titles = database
   .prepare(
-    `SELECT id,
-            media_type AS mediaType,
-            title,
-            year,
-            popularity,
-            json_extract(payload, '$.genres') AS genres,
-            json_extract(payload, '$.people') AS people,
-            json_extract(payload, '$.runtimeMinutes') AS runtime
-       FROM catalog_titles`,
+    `SELECT t.id,
+            t.media_type AS mediaType,
+            t.title,
+            t.year,
+            t.popularity,
+            (SELECT json_group_array(g.genre)
+               FROM catalog_title_genres AS g WHERE g.title_id = t.id) AS genres,
+            (SELECT json_group_array(p.person)
+               FROM catalog_title_people AS p WHERE p.title_id = t.id) AS people,
+            t.runtime_minutes AS runtime
+       FROM catalog_titles AS t`,
   )
   .all()
   .map((row) => ({
@@ -1030,8 +1032,8 @@ for (const table of [
 }
 
 const insertEntry = database.prepare(
-  `INSERT INTO viewing_entries (id, viewer_id, title_id, status, rating, thoughts, created_at, updated_at, season, episode)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  `INSERT INTO viewing_entries (id, viewer_id, title_id, status, rating, thoughts, created_at, updated_at)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 );
 
 for (const entry of entries) {
@@ -1044,8 +1046,6 @@ for (const entry of entries) {
     entry.thoughts,
     entry.createdAt,
     entry.updatedAt,
-    entry.season,
-    entry.episode,
   );
 }
 
@@ -1183,10 +1183,9 @@ run(
 );
 
 run(
-  `INSERT INTO viewer_preferences (viewer_id, selected_provider_ids, created_at, updated_at) VALUES (?, ?, ?, ?)`,
+  `INSERT INTO viewer_preferences (viewer_id, selected_provider_ids, updated_at) VALUES (?, ?, ?)`,
   viewerId,
   JSON.stringify(PROVIDERS),
-  stamp(560),
   stamp(4),
 );
 
