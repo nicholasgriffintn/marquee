@@ -16,8 +16,6 @@ export async function syncTitleIdentifiers(env: Bindings) {
     return 0;
   }
 
-  // A failed sweep must not mark the sample as synced, or these titles sit out the retry window
-  // for something that was never actually asked.
   const matched = await readTitleIdentifiers(pending).catch((error: unknown) => {
     logError("wikidata_identifiers_failed", error);
 

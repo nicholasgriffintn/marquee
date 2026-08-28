@@ -60,8 +60,6 @@ function mergeProviders(fresh: MediaTitle, stored: MediaTitle) {
   return [...providers.values()];
 }
 
-// These only ever arrive via MAL/AniList/Wikidata enrichment, so a plain TMDB refresh must not
-// clobber them.
 const STORED_FIRST_EXTERNAL_ID_FIELDS = new Set<keyof ExternalIds>([
   "malId",
   "anilistId",

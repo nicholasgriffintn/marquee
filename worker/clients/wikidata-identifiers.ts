@@ -52,8 +52,6 @@ function branches(refs: IdentifierRef[]) {
   ].join("\n  UNION\n  ");
 }
 
-// SAMPLE keeps this to one row per item: a handful of titles carry several Rotten Tomatoes or
-// Metacritic statements, and four plain OPTIONAL joins multiply those out.
 function buildQuery(refs: IdentifierRef[]) {
   const projection = IDENTIFIER_FIELDS.map(
     (field) => `(SAMPLE(?${PROPERTIES[field].variable}) AS ?${field})`,
@@ -105,8 +103,6 @@ async function queryBatch(refs: IdentifierRef[]) {
     const seen = matched.get(titleId);
     const score = scoreRow(identifiers);
 
-    // A TMDB id occasionally hangs off two items (an original and its recut). Keep whichever
-    // item carries the most identifiers rather than blending fields from both works.
     if (score > 0 && (!seen || score > scoreRow(seen))) {
       matched.set(titleId, identifiers);
     }

@@ -40,8 +40,6 @@ const TEMPLATES: Record<IdentifierField, IdentifierTemplate> = {
   },
 };
 
-// Wikidata also hangs season and person ids off these properties, and those slugs would build
-// links that resolve to the wrong page rather than 404.
 export function cleanIdentifier(field: IdentifierField, value: string | null | undefined) {
   const trimmed = value?.trim() ?? "";
 
