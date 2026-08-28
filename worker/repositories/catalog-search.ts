@@ -29,6 +29,7 @@ export type CatalogueSearch = {
   minVotes?: number;
   genres?: string[];
   keywords?: string[];
+  places?: string[];
   mediaType?: "movie" | "tv";
   providerIds?: string[];
   minScore?: number;
@@ -119,6 +120,23 @@ export async function searchCatalogue(db: D1Database, search: CatalogueSearch) {
        )`,
     );
     bindings.push(...genres);
+  }
+
+  const places = (search.places ?? [])
+    .map((place) => place.trim().toLowerCase())
+    .filter(Boolean)
+    .slice(0, 6);
+
+  if (places.length) {
+    conditions.push(
+      `EXISTS (
+         SELECT 1 FROM catalog_title_places AS tp
+         JOIN catalog_places AS cp ON cp.entity_id = tp.place_id
+         WHERE tp.title_id = t.id AND tp.kind = 'filming'
+           AND lower(cp.label) IN (${places.map(() => "?").join(", ")})
+       )`,
+    );
+    bindings.push(...places);
   }
 
   const keywords = (search.keywords ?? [])
@@ -237,6 +255,7 @@ export type BrowseTrendingFilter = {
   mediaType?: "movie" | "tv";
   genres: string[];
   keywords: string[];
+  places: string[];
   providerIds: string[];
   minVotes: number;
 };
@@ -263,6 +282,23 @@ async function trendingCandidates(db: D1Database, filter: BrowseTrendingFilter) 
        )`,
     );
     bindings.push(...genres);
+  }
+
+  const places = filter.places
+    .map((place) => place.trim().toLowerCase())
+    .filter(Boolean)
+    .slice(0, 6);
+
+  if (places.length) {
+    conditions.push(
+      `EXISTS (
+         SELECT 1 FROM catalog_title_places AS tp
+         JOIN catalog_places AS cp ON cp.entity_id = tp.place_id
+         WHERE tp.title_id = t.id AND tp.kind = 'filming'
+           AND lower(cp.label) IN (${places.map(() => "?").join(", ")})
+       )`,
+    );
+    bindings.push(...places);
   }
 
   const keywords = filter.keywords
@@ -397,4 +433,22 @@ export async function readKeywords(db: D1Database, limit = 120) {
   return rows.results
     .filter((row) => typeof row.keyword === "string" && row.keyword.length > 0)
     .map((row) => row.keyword);
+}
+
+export async function readFilmingPlaces(db: D1Database, limit = 80) {
+  const rows = await db
+    .prepare(
+      `SELECT cp.label, count(*) AS titles
+       FROM catalog_title_places AS tp
+       JOIN catalog_places AS cp ON cp.entity_id = tp.place_id
+       WHERE tp.kind = 'filming'
+       GROUP BY cp.label
+       HAVING titles >= 4
+       ORDER BY titles DESC
+       LIMIT ?`,
+    )
+    .bind(clamp(limit, 1, 300))
+    .all<{ label: string; titles: number }>();
+
+  return rows.results.map((row) => row.label);
 }

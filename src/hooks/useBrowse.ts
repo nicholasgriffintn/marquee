@@ -11,6 +11,7 @@ export type BrowseFilters = {
   sort: "trending" | "popularity" | "score" | "recent";
   genres: string[];
   keywords: string[];
+  places: string[];
   providerIds: string[];
   query: string;
 };
@@ -32,6 +33,7 @@ export function useBrowse(filters: BrowseFilters) {
     filters.sort,
     filters.genres.join(","),
     filters.keywords.join(","),
+    filters.places.join(","),
     filters.providerIds.join(","),
     filters.query.trim(),
   ].join("\u0000");
@@ -45,7 +47,7 @@ export function useBrowse(filters: BrowseFilters) {
         async function load() {
           setIsLoading(true);
 
-          const [mediaType, sort, genres, keywords, providers, query] = key.split("\u0000");
+          const [mediaType, sort, genres, keywords, places, providers, query] = key.split("\u0000");
           const parameters = new URLSearchParams({ sort, page: String(page) });
 
           if (mediaType) {
@@ -58,6 +60,10 @@ export function useBrowse(filters: BrowseFilters) {
 
           if (keywords) {
             parameters.set("keywords", keywords);
+          }
+
+          if (places) {
+            parameters.set("places", places);
           }
 
           if (providers) {
@@ -119,6 +125,12 @@ export function useKeywords(limit: number) {
   const { data } = useResource<{ keywords: string[] }>(`/api/catalog/keywords?limit=${limit}`);
 
   return data?.keywords ?? NO_FACETS;
+}
+
+export function useFilmingPlaces(limit: number) {
+  const { data } = useResource<{ places: string[] }>(`/api/catalog/places?limit=${limit}`);
+
+  return data?.places ?? NO_FACETS;
 }
 
 export function useGenres(limit: number) {

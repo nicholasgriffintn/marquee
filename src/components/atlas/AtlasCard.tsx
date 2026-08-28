@@ -1,4 +1,5 @@
 import { memo } from "react";
+import { Link } from "react-router-dom";
 
 import {
   furthest,
@@ -26,7 +27,10 @@ export const AtlasCard = memo(function AtlasCard({ place }: { place: AtlasPlace 
 
       <div className="atlas-card-shot">
         <span className="atlas-card-label">
-          Shot here {place.titles.length === 1 ? "once" : `${place.titles.length} times`}
+          Shot here {place.titles.length === 1 ? "once" : `${place.titles.length} times`} ·{" "}
+          <Link to={`/listings?places=${encodeURIComponent(place.label)}`}>
+            everything shot here
+          </Link>
         </span>
         <ul>
           {place.titles.map((title) => (

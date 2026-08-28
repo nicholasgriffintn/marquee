@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 import { isVague, type TitlePlace } from "../../domain/places";
 import { useTitlePlaces } from "../../hooks/useTitlePlaces";
 import { sentenceList } from "../../lib/string";
@@ -8,15 +10,12 @@ function labels(places: TitlePlace[]) {
   return places.slice(0, NAMES_SHOWN).map((place) => place.label);
 }
 
-function shotSentence(places: TitlePlace[]) {
-  const pinned = labels(places.filter((place) => !isVague(place)));
-  const broad = labels(places.filter(isVague));
-  const clauses = [
-    pinned.length > 0 ? `at ${sentenceList(pinned)}` : null,
-    broad.length > 0 ? `in ${sentenceList(broad)}` : null,
-  ].filter(Boolean);
-
-  return `Shot ${clauses.join(", and ")}.`;
+function placeLinks(places: TitlePlace[]) {
+  return places.map((place) => (
+    <Link key={place.label} to={`/listings?places=${encodeURIComponent(place.label)}`}>
+      {place.label}
+    </Link>
+  ));
 }
 
 export function FilmingLine({ titleId }: { titleId: string }) {
@@ -44,7 +43,16 @@ export function FilmingLine({ titleId }: { titleId: string }) {
   return (
     <div className="detail-ground">
       <span>Ground</span>
-      <p>{shotSentence(shown)}</p>
+      <p>
+        Shot at{" "}
+        {placeLinks(shown).map((link, index) => (
+          <span key={shown[index]?.label}>
+            {index > 0 ? ", " : ""}
+            {link}
+          </span>
+        ))}
+        .
+      </p>
       <small>
         {places.filming.length} {places.filming.length === 1 ? "place" : "places"} on Wikidata
         {unnamed > 0 ? `, ${unnamed} of them not listed here` : ""}

@@ -6,7 +6,7 @@ import { PageTitle } from "../components/PageTitle";
 import { TitleCard } from "../components/TitleCard";
 import { ProviderBadge, SearchField, VerticalChevronIcon } from "../components/ui";
 import type { MediaTitle, Provider } from "../domain/catalog";
-import { useBrowse, useGenres, useKeywords } from "../hooks/useBrowse";
+import { useBrowse, useFilmingPlaces, useGenres, useKeywords } from "../hooks/useBrowse";
 
 export type BrowsePreset = {
   title: string;
@@ -17,6 +17,7 @@ export type BrowsePreset = {
 
 const BROWSE_GENRES = 18;
 const BROWSE_KEYWORDS = 28;
+const BROWSE_PLACES = 24;
 
 const KINDS: { value: "" | "movie" | "tv"; label: string }[] = [
   { value: "", label: "Everything" },
@@ -50,11 +51,16 @@ export function BrowsePage({
   const mediaType: "" | "movie" | "tv" =
     typeParam === "movie" || typeParam === "tv" ? typeParam : (preset.mediaType ?? "");
   const keywords = useKeywords(BROWSE_KEYWORDS);
+  const places = useFilmingPlaces(BROWSE_PLACES);
   const selectedGenres = (params.get("genres") ?? "").split(",").filter(Boolean);
   const selectedKeywords = (params.get("keywords") ?? "").split(",").filter(Boolean);
   const selectedProviders = (params.get("providers") ?? "").split(",").filter(Boolean);
+  const selectedPlaces = (params.get("places") ?? "").split(",").filter(Boolean);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(
-    selectedGenres.length > 0 || selectedKeywords.length > 0 || selectedProviders.length > 0,
+    selectedGenres.length > 0 ||
+      selectedKeywords.length > 0 ||
+      selectedProviders.length > 0 ||
+      selectedPlaces.length > 0,
   );
   const query = params.get("q") ?? "";
   const sortParam = params.get("sort");
@@ -72,11 +78,16 @@ export function BrowsePage({
     ...selectedKeywords,
     ...keywords.filter((keyword) => !selectedKeywords.includes(keyword)),
   ];
+  const shownPlaces = [
+    ...selectedPlaces,
+    ...places.filter((place) => !selectedPlaces.includes(place)),
+  ];
   const browse = useBrowse({
     mediaType: mediaType || undefined,
     sort,
     genres: selectedGenres,
     keywords: selectedKeywords,
+    places: selectedPlaces,
     providerIds: selectedProviders,
     query,
   });
@@ -96,6 +107,7 @@ export function BrowsePage({
   }
 
   const hasFilters =
+    selectedPlaces.length > 0 ||
     selectedKeywords.length > 0 ||
     mediaType !== (preset.mediaType ?? "") ||
     selectedGenres.length > 0 ||
@@ -199,6 +211,25 @@ export function BrowsePage({
             </div>
           )}
 
+          {shownPlaces.length > 0 && (
+            <div className="browse-facet">
+              <span>Shot in</span>
+              <div className="browse-chips">
+                {shownPlaces.map((place) => (
+                  <button
+                    type="button"
+                    key={place}
+                    className={selectedPlaces.includes(place) ? "selected" : ""}
+                    aria-pressed={selectedPlaces.includes(place)}
+                    onClick={() => update({ places: toggle(selectedPlaces, place).join(",") })}
+                  >
+                    {place}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {filterable.length > 0 && (
             <div className="browse-facet">
               <span>Source</span>
@@ -236,7 +267,9 @@ export function BrowsePage({
           <button
             type="button"
             className="browse-clear"
-            onClick={() => update({ genres: "", keywords: "", providers: "", q: "", sort: "" })}
+            onClick={() =>
+              update({ genres: "", keywords: "", places: "", providers: "", q: "", sort: "" })
+            }
           >
             Clear filters
           </button>

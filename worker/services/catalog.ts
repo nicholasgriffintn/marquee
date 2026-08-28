@@ -11,6 +11,7 @@ import {
 import {
   browseTrending,
   readGenres,
+  readFilmingPlaces,
   readKeywords,
   readRanked,
   searchCatalogue as queryCatalogue,
@@ -198,6 +199,7 @@ export type BrowseQuery = {
   mediaType?: "movie" | "tv";
   genres: string[];
   keywords: string[];
+  places: string[];
   providerIds: string[];
   query: string;
   sort: "trending" | "popularity" | "score" | "recent";
@@ -212,6 +214,7 @@ async function browseByPopularityOrScore(env: Bindings, browse: BrowseQuery, min
     mediaType: browse.mediaType,
     genres: browse.genres,
     keywords: browse.keywords,
+    places: browse.places,
     providerIds: browse.providerIds,
     query: browse.query,
     sort: browse.query && browse.sort === "popularity" ? undefined : browse.sort,
@@ -233,6 +236,7 @@ export async function browseCatalogue(env: Bindings, browse: BrowseQuery) {
             mediaType: browse.mediaType,
             genres: browse.genres,
             keywords: browse.keywords,
+            places: browse.places,
             providerIds: browse.providerIds,
             minVotes,
           },
@@ -343,4 +347,19 @@ export async function getTrending(env: Bindings) {
     source: "Wikipedia pageview trend",
     fetchedAt: new Date().toISOString(),
   };
+}
+
+export async function getFilmingPlaces(env: Bindings, limit: number) {
+  const cacheKey = `catalog-places:${limit}`;
+  const cached = await readCachedValue<string[]>(cacheKey);
+
+  if (cached) {
+    return cached;
+  }
+
+  const places = await readFilmingPlaces(env.DB, limit);
+
+  await writeCachedValue(cacheKey, places, FACET_CACHE_SECONDS);
+
+  return places;
 }
