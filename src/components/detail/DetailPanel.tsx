@@ -30,7 +30,6 @@ import { AirLine } from "./AirLine";
 import { BuzzNote } from "./BuzzNote";
 import { CastAndStaff } from "./CastAndStaff";
 import { CreditsBlock } from "./CreditsBlock";
-import { FormLine } from "./FormLine";
 import { MarqueeRead } from "./MarqueeRead";
 import { ScoreRow } from "./ScoreRow";
 import { SourceLinks } from "./SourceLinks";
@@ -38,6 +37,7 @@ import { ThemeSongs } from "./ThemeSongs";
 import { TitleAwards } from "./TitleAwards";
 import { collectionCaption, similarCaption, TitleTrack } from "./TitleTrack";
 import { useExitWarning } from "./useExitWarning";
+import { VisualFormatLine } from "./VisualFormatLine";
 import { WatchNext } from "./WatchNext";
 import { WatchOrder } from "./WatchOrder";
 
@@ -292,7 +292,7 @@ export function DetailPanel({
             </ErrorBoundary>
           )}
           <AirLine item={item} nextEpisode={nextEpisode} />
-          {item.form && <FormLine form={item.form} />}
+          {item.visualFormat && <VisualFormatLine format={item.visualFormat} />}
           <WatchOrder label="Before this" entries={watchOrder.before} onOpen={onOpen} />
           <ErrorBoundary label="Where to watch">
             <WatchBlock

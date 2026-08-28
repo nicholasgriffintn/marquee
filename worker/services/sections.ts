@@ -1,11 +1,11 @@
 import type { SectionAudience } from "../../src/domain/catalog.ts";
 import { providerRegistry } from "../../src/domain/providers.ts";
-import { PALME_DOR } from "../lib/awards.ts";
 import { anniversaryCaption, anniversaryQuery } from "../lib/anniversary.ts";
+import { PALME_DOR } from "../lib/awards.ts";
 import { logError, logEvent } from "../lib/logging.ts";
 import { titleCase } from "../lib/text.ts";
-import { ACADEMY_RATIO, BLACK_AND_WHITE } from "../lib/title-form.ts";
 import { isKnownTitle } from "../lib/validation.ts";
+import { ACADEMY_RATIO, BLACK_AND_WHITE } from "../lib/visual-format.ts";
 import type { Bindings } from "../types.ts";
 
 const POOL_SIZE = 40;
@@ -317,7 +317,7 @@ export async function buildSections(env: Bindings) {
     titleIds: await pick(
       env,
       used,
-      `id IN (SELECT title_id FROM title_form WHERE colour = ?)
+      `id IN (SELECT title_id FROM title_visual_format WHERE kind = 'colour' AND value = ?)
        AND ${SCORE} >= 6.5 AND ${VOTES} >= 60`,
       `${SCORE} DESC`,
       [BLACK_AND_WHITE],
@@ -331,7 +331,8 @@ export async function buildSections(env: Bindings) {
     titleIds: await pick(
       env,
       used,
-      `id IN (SELECT title_id FROM title_form WHERE aspect_ratio = ?) AND ${VOTES} >= 40`,
+      `id IN (SELECT title_id FROM title_visual_format WHERE kind = 'aspect_ratio' AND value = ?)
+       AND ${VOTES} >= 40`,
       `${SCORE} DESC`,
       [ACADEMY_RATIO],
     ),

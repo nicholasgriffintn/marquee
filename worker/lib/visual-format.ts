@@ -16,10 +16,8 @@ const RATIO_PATTERN = /^(\d{1,2}(?:\.\d{1,3})?)\s*:\s*(\d{1,2}(?:\.\d{1,3})?)$/u
 const NARROWEST = 1;
 const WIDEST = 3;
 
-function only(values: (string | null)[]) {
-  const distinct = new Set(values.filter((value): value is string => value !== null));
-
-  return distinct.size === 1 ? [...distinct][0] : null;
+function distinct(values: (string | null)[]) {
+  return [...new Set(values.filter((value): value is string => value !== null))];
 }
 
 function colourFrom(label: string) {
@@ -46,10 +44,10 @@ function ratioFrom(label: string) {
   return ratio >= NARROWEST && ratio <= WIDEST ? `${ratio.toFixed(2)}:1` : null;
 }
 
-export function normaliseColour(labels: string[]) {
-  return only(labels.map(colourFrom));
+export function normaliseColours(labels: string[]) {
+  return distinct(labels.map(colourFrom));
 }
 
-export function normaliseAspectRatio(labels: string[]) {
-  return only(labels.map(ratioFrom));
+export function normaliseAspectRatios(labels: string[]) {
+  return distinct(labels.map(ratioFrom));
 }
