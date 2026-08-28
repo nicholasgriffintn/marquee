@@ -333,7 +333,7 @@ export function DetailPanel({
           {usherSlot}
           <ScoreRow item={item} />
           <TitleAwards titleId={item.id} />
-          {item.buzz && <BuzzNote buzz={item.buzz} titleId={item.id} />}
+          {item.buzz && <BuzzNote buzz={item.buzz} />}
           <ErrorBoundary label="The credits">
             <CreditsBlock key={item.id} titleId={item.id} />
           </ErrorBoundary>

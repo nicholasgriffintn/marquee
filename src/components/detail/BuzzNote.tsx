@@ -1,10 +1,15 @@
-import { Link } from "react-router-dom";
-
 import type { TitleBuzz } from "../../domain/catalog";
-import { measuredOn } from "../../lib/dates";
+import { parseDatabaseDate } from "../../lib/dates";
 import { changeLabel } from "../../lib/media";
 
-export function BuzzNote({ buzz, titleId }: { buzz: TitleBuzz; titleId: string }) {
+function measuredOn(value: string) {
+  return (
+    parseDatabaseDate(value)?.toLocaleDateString(undefined, { day: "numeric", month: "short" }) ??
+    value
+  );
+}
+
+export function BuzzNote({ buzz }: { buzz: TitleBuzz }) {
   return (
     <div className="detail-buzz">
       <span>Trending signal</span>
@@ -19,11 +24,6 @@ export function BuzzNote({ buzz, titleId }: { buzz: TitleBuzz; titleId: string }
         </a>{" "}
         · matched by {buzz.match === "wikidata" ? "Wikidata entity" : "title search"} · measured{" "}
         {measuredOn(buzz.measuredAt)}
-      </small>
-      <small>
-        <Link to={`/world?title=${encodeURIComponent(titleId)}`}>
-          See which languages it is being read in
-        </Link>
       </small>
     </div>
   );

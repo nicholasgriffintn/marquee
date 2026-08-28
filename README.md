@@ -122,24 +122,21 @@ where there is neither.
 Odeon and Curzon publish nothing readable — both sit behind a bot challenge a Worker does not get
 through. They are absent rather than approximated.
 
-## The world board
+## Trending, in more than English
 
 The trending rail counted English Wikipedia readers and nothing else, so a Korean series half of
-Seoul is reading about registered as nothing at all. A title's panel now carries a world board:
-which languages it is being read in, from the same Wikidata entity its article was matched by.
+Seoul is reading about registered as nothing at all. Trending now measures a title in its own
+languages, found from the same Wikidata entity its article was matched by.
 
 Raw counts only ever crown English. `en.wikipedia` serves about 1.5 billion article views a week
-against Korean's 15 million, so the largest edition wins every chart by a hundred to one and tells
-you about Wikipedia's readership rather than about the film. Each edition is measured against its
-own weekly readership instead. One week of _Oppenheimer_ turns 62% English by raw count into 10% by
-share, and puts Chinese, Italian and Russian above it; for _Jana Nayagan_, 1,064 Tamil readers
-against 139,631 English ones is 89% of the interest.
+against Korean's 15 million, so the largest edition wins by a hundred to one and tells you about
+Wikipedia's readership rather than about the film. Each edition is weighed against its own weekly
+readership instead. One week of _Oppenheimer_ turns 62% English by raw count into 10% by share; for
+_Jana Nayagan_, 1,064 Tamil readers against 139,631 English ones is 89% of the interest.
 
-It is a board of languages, not of countries. Reading the French article does not put you in
-France, so there is no map here and there will not be one. Ten editions are measured, the ten
-largest by readership, plus the title's own original language, and an edition needs fifty readers
-in the week before it appears, because a handful of views on a small one would otherwise take the
-whole board.
+Languages, not countries — reading the French article does not put you in France. Ten editions are
+measured, the ten largest by readership, plus the title's own original language, and an edition
+needs fifty readers in the week before it counts.
 
 ## The revival house
 
