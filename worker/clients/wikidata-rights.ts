@@ -1,9 +1,6 @@
-import { isRecord, records, stringAt } from "../lib/values.ts";
-import { upstreamFetch, UPSTREAM_AGENT } from "./fetch.ts";
+import { entityIdFrom, literals, queryWikidata, yearFrom } from "./wikidata-query.ts";
 
 const CACHE_TTL = 604_800;
-
-const SPARQL_ENDPOINT = "https://query.wikidata.org/sparql";
 const BATCH = 40;
 const TIMEOUT_MS = 30_000;
 
@@ -16,52 +13,27 @@ export type FilmAuthors = {
   latestDeathYear: number | null;
 };
 
-function yearOf(value: string) {
-  const match = /^-?(\d{4})/u.exec(value);
-
-  return match ? Number(match[1]) : null;
-}
-
-function entityId(value: string) {
-  const match = /\/(Q\d+)$/u.exec(value);
-
-  return match ? match[1] : null;
-}
-
 function clauses(refs: FilmRef[]) {
   const entities = refs.flatMap((ref) => (ref.wikidataId ? [`wd:${ref.wikidataId}`] : []));
-  const imdbIds = refs.flatMap((ref) => (ref.imdbId ? [`"${ref.imdbId}"`] : []));
+  const imdbIds = refs.flatMap((ref) => (ref.imdbId ? [ref.imdbId] : []));
   const parts = [
     entities.length ? `{ VALUES ?film { ${entities.join(" ")} } }` : null,
-    imdbIds.length ? `{ VALUES ?imdb { ${imdbIds.join(" ")} } ?film wdt:P345 ?imdb . }` : null,
+    imdbIds.length ? `{ VALUES ?imdb { ${literals(imdbIds)} } ?film wdt:P345 ?imdb . }` : null,
   ].filter(Boolean);
 
   return parts.join("\n  UNION\n  ");
 }
 
 async function queryAuthors(refs: FilmRef[]) {
-  const query = `SELECT ?film ?imdb ?person ?death WHERE {
+  const rows = await queryWikidata(
+    `SELECT ?film ?imdb ?person ?death WHERE {
   ${clauses(refs)}
   VALUES ?prop { wdt:P57 wdt:P58 wdt:P86 }
   ?film ?prop ?person .
   OPTIONAL { ?person wdt:P570 ?death . }
-}`;
-  const url = new URL(SPARQL_ENDPOINT);
-
-  url.search = new URLSearchParams({ query, format: "json" }).toString();
-
-  const response = await upstreamFetch(url, {
-    headers: { accept: "application/sparql-results+json", "user-agent": UPSTREAM_AGENT },
-    timeoutMs: TIMEOUT_MS,
-    cacheTtl: CACHE_TTL,
-  });
-
-  if (!response.ok) {
-    throw new Error(`Wikidata rights query failed (${response.status})`);
-  }
-
-  const payload = await response.json();
-  const bindings = isRecord(payload) && isRecord(payload.results) ? payload.results.bindings : [];
+}`,
+    { timeoutMs: TIMEOUT_MS, cacheTtl: CACHE_TTL },
+  );
   const byEntity = new Map<string, string>();
   const byImdb = new Map<string, string>();
 
@@ -77,19 +49,16 @@ async function queryAuthors(refs: FilmRef[]) {
 
   const people = new Map<string, Map<string, number | null>>();
 
-  for (const binding of records(bindings)) {
-    const film = isRecord(binding.film) ? stringAt(binding.film, "value") : null;
-    const imdb = isRecord(binding.imdb) ? stringAt(binding.imdb, "value") : null;
-    const person = isRecord(binding.person) ? stringAt(binding.person, "value") : null;
-    const entity = film ? entityId(film) : null;
-    const key = (entity ? byEntity.get(entity) : null) ?? (imdb ? byImdb.get(imdb) : null);
+  for (const row of rows) {
+    const person = row.person ?? null;
+    const entity = entityIdFrom(row.film);
+    const key = (entity ? byEntity.get(entity) : null) ?? (row.imdb ? byImdb.get(row.imdb) : null);
 
     if (!key || !person) {
       continue;
     }
 
-    const death = isRecord(binding.death) ? stringAt(binding.death, "value") : null;
-    const year = death ? yearOf(death) : null;
+    const year = yearFrom(row.death);
     const seen = people.get(key) ?? new Map<string, number | null>();
     const known = seen.get(person) ?? null;
 

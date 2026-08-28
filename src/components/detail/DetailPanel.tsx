@@ -34,6 +34,7 @@ import { MarqueeRead } from "./MarqueeRead";
 import { ScoreRow } from "./ScoreRow";
 import { SourceLinks } from "./SourceLinks";
 import { ThemeSongs } from "./ThemeSongs";
+import { TitleAwards } from "./TitleAwards";
 import { collectionCaption, similarCaption, TitleTrack } from "./TitleTrack";
 import { useExitWarning } from "./useExitWarning";
 import { WatchNext } from "./WatchNext";
@@ -329,6 +330,7 @@ export function DetailPanel({
           <ThemeSongs item={item} />
           {usherSlot}
           <ScoreRow item={item} />
+          <TitleAwards titleId={item.id} />
           {item.buzz && <BuzzNote buzz={item.buzz} />}
           <ErrorBoundary label="The credits">
             <CreditsBlock key={item.id} titleId={item.id} />

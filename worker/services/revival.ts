@@ -10,6 +10,7 @@ import {
 } from "../clients/archive.ts";
 import { EUROPEANA_COUNTRIES, searchEuropeana } from "../clients/europeana.ts";
 import { searchScreeningRoom } from "../clients/loc.ts";
+import { searchCommonsFilms } from "../clients/wikidata-films.ts";
 import { logError } from "../lib/logging.ts";
 import { billDay, lateNight, seedFrom, shuffler, standingOffset } from "../lib/revival-bill.ts";
 import { isRecord } from "../lib/values.ts";
@@ -40,6 +41,7 @@ import {
 } from "../repositories/revival.ts";
 import type { Bindings } from "../types.ts";
 import { findTitleForFilm } from "./cinema-matching.ts";
+import { ukClearedDeathCutoff } from "./revival-rights.ts";
 
 const US_TERM_YEARS = 96;
 const MIN_RUNTIME_SECONDS = 60;
@@ -230,7 +232,10 @@ export async function syncEuropeanaCountry(env: Bindings, country: string) {
   const counts = { seen: candidates.length, accepted: 0, rejected: 0 };
 
   for (const candidate of candidates) {
-    const status = decideStatus({ ...candidate, runtimeSeconds: MIN_RUNTIME_SECONDS });
+    const status = decideStatus({
+      ...candidate,
+      runtimeSeconds: MIN_RUNTIME_SECONDS,
+    });
 
     // oxlint-disable-next-line no-await-in-loop
     await upsertWork(env.DB, "europeana", { ...candidate, popularity: CURATED_POPULARITY }, status);
@@ -254,9 +259,44 @@ export async function syncEuropeanaCountry(env: Bindings, country: string) {
   return { country, page, exhausted, ...counts };
 }
 
+export async function syncCommonsFilms(env: Bindings) {
+  const cursor = parseCursor(await readSourceCursor(env.DB, "wikidata"));
+  const page = cursor.films ?? 1;
+  const { candidates, seen, exhausted } = await searchCommonsFilms(page, ukClearedDeathCutoff());
+  const counts = { seen, accepted: 0, rejected: seen - candidates.length };
+
+  for (const candidate of candidates) {
+    const status = decideStatus(candidate);
+
+    // oxlint-disable-next-line no-await-in-loop
+    await upsertWork(env.DB, "wikidata", { ...candidate, popularity: CURATED_POPULARITY }, status);
+
+    if (status === "approved") {
+      counts.accepted += 1;
+    } else {
+      counts.rejected += 1;
+    }
+  }
+
+  await recordSourceRun(
+    env.DB,
+    "wikidata",
+    JSON.stringify({ films: exhausted ? 1 : page + 1 }),
+    counts,
+  );
+
+  return { page, exhausted, ...counts };
+}
+
 export async function queueRevivalSources(env: Bindings) {
   const jobs = [
-    { body: { type: "sync-revival-source" as const, source: "loc" as const, chain: true } },
+    {
+      body: {
+        type: "sync-revival-source" as const,
+        source: "loc" as const,
+        chain: true,
+      },
+    },
     ...(env.EUROPEANA_API_KEY
       ? EUROPEANA_COUNTRIES.map((country) => ({
           body: {
@@ -267,6 +307,13 @@ export async function queueRevivalSources(env: Bindings) {
           },
         }))
       : []),
+    {
+      body: {
+        type: "sync-revival-source" as const,
+        source: "wikidata" as const,
+        chain: true,
+      },
+    },
     ...ARCHIVE_COLLECTIONS.map((collection) => ({
       body: {
         type: "sync-revival-source" as const,
@@ -299,7 +346,11 @@ export async function recheckArchiveWorks(env: Bindings, limit = 80) {
     const verdicts = await Promise.all(
       lane.map(async (row) => {
         try {
-          return { row, item: await readArchiveItem(row.sourceId), failed: false };
+          return {
+            row,
+            item: await readArchiveItem(row.sourceId),
+            failed: false,
+          };
         } catch {
           return { row, item: null, failed: true };
         }
@@ -326,7 +377,12 @@ export async function recheckArchiveWorks(env: Bindings, limit = 80) {
       }
 
       counts.removed += 1;
-      console.log(JSON.stringify({ event: "revival_work_withdrawn", workId: verdict.row.id }));
+      console.log(
+        JSON.stringify({
+          event: "revival_work_withdrawn",
+          workId: verdict.row.id,
+        }),
+      );
       // oxlint-disable-next-line no-await-in-loop
       await deleteWork(env.DB, verdict.row.id);
     }
@@ -468,13 +524,21 @@ async function planShelves(db: D1Database): Promise<ShelfPlan[]> {
       id: `genre:${group.slug}`,
       title: group.label,
       description: `${group.size} of them, filed under ${group.label.toLowerCase()}.`,
-      selector: { of: "tag" as const, kind: "genre" as const, slug: group.slug },
+      selector: {
+        of: "tag" as const,
+        kind: "genre" as const,
+        slug: group.slug,
+      },
     })),
     ...subjects.map((group) => ({
       id: `subject:${group.slug}`,
       title: group.label,
       description: "Everything we hold on the subject.",
-      selector: { of: "tag" as const, kind: "subject" as const, slug: group.slug },
+      selector: {
+        of: "tag" as const,
+        kind: "subject" as const,
+        slug: group.slug,
+      },
     })),
     ...countries.map((group) => ({
       id: `country:${group.slug}`,
@@ -486,7 +550,11 @@ async function planShelves(db: D1Database): Promise<ShelfPlan[]> {
       id: `person:${group.slug}`,
       title: group.label,
       description: "Their work, as far as we hold it.",
-      selector: { of: "tag" as const, kind: "person" as const, slug: group.slug },
+      selector: {
+        of: "tag" as const,
+        kind: "person" as const,
+        slug: group.slug,
+      },
     })),
     ...RUNTIME_BANDS.slice(0, RUNTIME_SHELVES).map((band, index) => ({
       id: `runtime:${band.id}`,

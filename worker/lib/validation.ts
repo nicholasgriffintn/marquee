@@ -77,9 +77,11 @@ export function isIngestionJob(value: unknown): value is IngestionJob {
       return true;
     }
 
-    return value.source === "europeana"
-      ? isEuropeanaCountry(value.collection)
-      : isArchiveCollection(value.collection);
+    if (value.source === "archive") {
+      return isArchiveCollection(value.collection);
+    }
+
+    return value.source === "europeana" && isEuropeanaCountry(value.collection);
   }
 
   if (value.type === "mirror-revival-work") {
@@ -138,7 +140,7 @@ export function isIngestionJob(value: unknown): value is IngestionJob {
     return true;
   }
 
-  if (value.type === "match-revival-works") {
+  if (value.type === "match-revival-works" || value.type === "describe-revival-works") {
     return value.chain === undefined || typeof value.chain === "boolean";
   }
 

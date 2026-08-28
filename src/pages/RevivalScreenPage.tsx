@@ -15,6 +15,7 @@ import {
   rightsSummary,
   SOURCE_LABELS,
   ukStanding,
+  WIKIPEDIA_TEXT_LICENCE,
   workMeta,
 } from "../domain/revival";
 import { useScreening } from "../hooks/useRevival";
@@ -75,7 +76,24 @@ export function RevivalScreenPage({ isSignedIn }: { isSignedIn: boolean }) {
         <em>{CONDITION_NOTES[work.condition]}</em>
       </p>
 
-      {work.synopsis && <p className="detail-synopsis">{work.synopsis}</p>}
+      {work.synopsis && (
+        <div className="revival-synopsis">
+          <p className="detail-synopsis">{work.synopsis}</p>
+          {work.synopsisCredit && (
+            <p className="revival-synopsis-credit">
+              Extract from the Wikipedia article{" "}
+              <a href={work.synopsisCredit.url} target="_blank" rel="noreferrer">
+                {work.synopsisCredit.article}
+              </a>
+              , used under{" "}
+              <a href={WIKIPEDIA_TEXT_LICENCE.url} target="_blank" rel="noreferrer">
+                {WIKIPEDIA_TEXT_LICENCE.name}
+              </a>{" "}
+              and passed on to you under the same licence.
+            </p>
+          )}
+        </div>
+      )}
 
       {work.tags.length > 0 && (
         <div className="revival-tags">

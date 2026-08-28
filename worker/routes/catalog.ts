@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 
+import { NO_AWARDS } from "../../src/domain/awards.ts";
 import { requireAuthentication, sessionPrincipal, type AuthVariables } from "../auth/session.ts";
 import { refreshTitleAvailability } from "../jobs/availability.ts";
 import { edgeCache } from "../lib/cache.ts";
@@ -9,6 +10,7 @@ import { logError } from "../lib/logging.ts";
 import { pathInteger, queryInteger, queryList, queryText } from "../lib/params.ts";
 import { canonicalOrigin } from "../lib/security.ts";
 import { isKnownTitle, validProviderIds } from "../lib/validation.ts";
+import { readPersonAwards, readTitleAwards } from "../repositories/awards.ts";
 import { readCollectionTitleIds, readItems } from "../repositories/catalog-reader.ts";
 import {
   readCreditSeasons,
@@ -274,16 +276,17 @@ catalogRoutes.get("/people/:name", async (context) => {
     }
 
     const principal = await sessionPrincipal(context.env, context.req.raw);
-    const [ids, shelf] = await Promise.all([
+    const [ids, shelf, awards] = await Promise.all([
       readPersonTitleIds(context.env.DB, person.personId, PERSON_LIMIT + 1, page * PERSON_LIMIT),
       principal?.user
         ? readPersonShelf(context.env.DB, principal.user.id, person.personId)
         : Promise.resolve({ shelved: 0, watched: 0 }),
+      readPersonAwards(context.env.DB, person.personId),
     ]);
     const hasMore = ids.length > PERSON_LIMIT;
     const items = await readItems(context.env.DB, ids.slice(0, PERSON_LIMIT), PERSON_LIMIT);
 
-    return context.json({ person, items, shelf, page, hasMore });
+    return context.json({ person, items, shelf, awards, page, hasMore });
   } catch (error) {
     logError("catalogue_read_failed", error, { area: "person" });
 
@@ -403,6 +406,16 @@ catalogRoutes.get("/titles/:titleId/credits", edgeCache(3_600), async (context) 
 
     return context.json(empty);
   }
+});
+
+catalogRoutes.get("/titles/:titleId/awards", edgeCache(3_600), async (context) => {
+  const titleId = context.req.param("titleId");
+
+  if (!isKnownTitle(titleId)) {
+    return context.json(NO_AWARDS);
+  }
+
+  return context.json(await readTitleAwards(context.env.DB, titleId));
 });
 
 catalogRoutes.get("/titles/:titleId/watch-order", edgeCache(3_600), async (context) => {

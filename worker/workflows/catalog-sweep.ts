@@ -14,6 +14,7 @@ import { pruneScreenings } from "../repositories/cinemas.ts";
 import { storeProviders } from "../repositories/providers.ts";
 import { rebuildPeopleIndex } from "../repositories/usher.ts";
 import { rebuildWorkingSet } from "../repositories/working-set.ts";
+import { syncAwards } from "../services/awards.ts";
 import { syncBuzz } from "../services/buzz.ts";
 import { queueCinemaDirectories, queueCinemaScreenings } from "../services/cinema-sync.ts";
 import { advanceDiscoverFrontier } from "../services/discover.ts";
@@ -86,6 +87,8 @@ export class CatalogSweep extends WorkflowEntrypoint<Bindings, CatalogSweepParam
 
     await step.do("sync buzz", { retries: RETRIES }, async () => syncBuzz(this.env));
 
+    await step.do("sync awards", { retries: RETRIES }, async () => syncAwards(this.env));
+
     await step.do("queue embeddings", { retries: RETRIES }, async () => {
       await queueEmbeddings(this.env);
 
@@ -114,6 +117,12 @@ export class CatalogSweep extends WorkflowEntrypoint<Bindings, CatalogSweepParam
 
     await step.do("match public domain works", { retries: RETRIES }, async () => {
       await this.env.REVIVAL_QUEUE.send({ type: "match-revival-works", chain: true });
+
+      return true;
+    });
+
+    await step.do("describe public domain works", { retries: RETRIES }, async () => {
+      await this.env.REVIVAL_QUEUE.send({ type: "describe-revival-works", chain: true });
 
       return true;
     });

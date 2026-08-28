@@ -9,6 +9,7 @@ import { syncBuzz } from "../services/buzz.ts";
 import { syncCinemaDirectory, syncCinemaScreenings } from "../services/cinema-sync.ts";
 import { advanceDiscoverFrontier, measureDiscoverPartition } from "../services/discover.ts";
 import { embedTitles } from "../services/embeddings.ts";
+import { describeRevivalWorks } from "../services/revival-descriptions.ts";
 import { groupRevivalPrints } from "../services/revival-groups.ts";
 import { mirrorWork } from "../services/revival-mirror.ts";
 import { checkRevivalRights } from "../services/revival-rights.ts";
@@ -16,6 +17,7 @@ import {
   matchRevivalWorks,
   recheckArchiveWorks,
   syncArchiveCollection,
+  syncCommonsFilms,
   syncEuropeanaCountry,
   syncScreeningRoom,
 } from "../services/revival.ts";
@@ -110,6 +112,7 @@ async function syncRevivalSource(
   env: Bindings,
   job: IngestionJob & { type: "sync-revival-source" },
 ) {
+  const paged = job.source === "archive" || job.source === "europeana";
   const collection =
     job.source === "europeana"
       ? (job.collection ?? "United Kingdom")
@@ -117,9 +120,11 @@ async function syncRevivalSource(
   const run =
     job.source === "loc"
       ? await syncScreeningRoom(env)
-      : job.source === "europeana"
-        ? await syncEuropeanaCountry(env, collection)
-        : await syncArchiveCollection(env, collection);
+      : job.source === "wikidata"
+        ? await syncCommonsFilms(env)
+        : job.source === "europeana"
+          ? await syncEuropeanaCountry(env, collection)
+          : await syncArchiveCollection(env, collection);
 
   if (!job.chain || run.exhausted) {
     return;
@@ -128,7 +133,7 @@ async function syncRevivalSource(
   await env.REVIVAL_QUEUE.send({
     type: "sync-revival-source",
     source: job.source,
-    ...(job.source === "loc" ? {} : { collection }),
+    ...(paged ? { collection } : {}),
     chain: true,
   });
 }
@@ -241,6 +246,19 @@ export async function executeIngestionJob(env: Bindings, job: IngestionJob) {
 
     case "sync-revival-source": {
       await syncRevivalSource(env, job);
+
+      return;
+    }
+
+    case "describe-revival-works": {
+      const run = await describeRevivalWorks(env);
+
+      if (job.chain && !run.exhausted) {
+        await env.REVIVAL_QUEUE.send({
+          type: "describe-revival-works",
+          chain: true,
+        });
+      }
 
       return;
     }

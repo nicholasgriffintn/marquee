@@ -44,6 +44,9 @@ type WorkRow = {
   year: number | null;
   director: string | null;
   synopsis: string;
+  synopsisSource: string | null;
+  synopsisArticle: string | null;
+  synopsisUrl: string | null;
   kind: string;
   runtimeSeconds: number | null;
   stillUrl: string | null;
@@ -70,7 +73,8 @@ type WorkRow = {
 };
 
 const WORK_COLUMNS = `w.id, w.source, w.source_url AS sourceUrl, w.title, w.year, w.director,
-   w.synopsis,
+   w.synopsis, w.synopsis_source AS synopsisSource,
+   w.synopsis_article AS synopsisArticle, w.synopsis_url AS synopsisUrl,
    w.kind, w.runtime_seconds AS runtimeSeconds, w.still_url AS stillUrl,
    w.rights_basis AS rightsBasis, w.rights_note AS rightsNote, w.rights_url AS rightsUrl,
    w.title_id AS titleId, w.country, w.uk_clear AS ukClear,
@@ -88,14 +92,14 @@ const UNSCORED_POPULARITY = 550;
 
 const BY_STANDING = `w.plays DESC, COALESCE(w.popularity, ${UNSCORED_POPULARITY}) DESC, w.sort_title`;
 
-const ID_PATTERN = /^(archive|loc|europeana)\.[\w.-]{1,120}$/u;
+const ID_PATTERN = /^(archive|loc|europeana|wikidata)\.[\w.-]{1,120}$/u;
 
 export function isRevivalId(value: unknown): value is string {
   return typeof value === "string" && ID_PATTERN.test(value);
 }
 
 export function isRevivalSource(value: unknown): value is RevivalSource {
-  return value === "archive" || value === "loc" || value === "europeana";
+  return value === "archive" || value === "loc" || value === "europeana" || value === "wikidata";
 }
 
 export function revivalId(source: RevivalSource, sourceId: string) {
@@ -134,6 +138,10 @@ function toWork(row: WorkRow): RevivalWork {
     year: row.year,
     director: row.director,
     synopsis: row.synopsis,
+    synopsisCredit:
+      row.synopsisSource === "wikipedia" && row.synopsisArticle && row.synopsisUrl
+        ? { article: row.synopsisArticle, url: row.synopsisUrl }
+        : null,
     kind: row.kind as RevivalKind,
     runtimeSeconds: row.runtimeSeconds,
     stillUrl: artFor(row),
@@ -236,10 +244,13 @@ export async function upsertWork(
          sort_title = excluded.sort_title,
          year = excluded.year,
          director = excluded.director,
-         synopsis = excluded.synopsis,
+         synopsis = CASE
+           WHEN revival_works.synopsis_source IS NULL THEN excluded.synopsis
+           ELSE revival_works.synopsis
+         END,
          kind = excluded.kind,
          runtime_seconds = excluded.runtime_seconds,
-         still_url = excluded.still_url,
+         still_url = COALESCE(excluded.still_url, revival_works.still_url),
          stream_url = excluded.stream_url,
          stream_bytes = excluded.stream_bytes,
          stream_type = excluded.stream_type,
@@ -307,7 +318,10 @@ export async function readUncheckedRights(db: D1Database, limit = 60) {
     .prepare(
       `SELECT w.id, w.source, w.year, w.director, w.rights_basis AS rightsBasis,
               t.imdb_id AS imdbId,
-              t.wikidata_id AS wikidataId
+              COALESCE(
+                t.wikidata_id,
+                CASE WHEN w.source = 'wikidata' THEN w.source_id END
+              ) AS wikidataId
        FROM revival_works AS w
        LEFT JOIN catalog_titles AS t ON t.id = w.title_id
        WHERE w.status <> 'rejected'
@@ -324,7 +338,12 @@ export async function readUncheckedRights(db: D1Database, limit = 60) {
 export async function storeUkRights(
   db: D1Database,
   id: string,
-  verdict: { clear: boolean; expiresYear: number | null; basis: RevivalRightsBasis; note: string },
+  verdict: {
+    clear: boolean;
+    expiresYear: number | null;
+    basis: RevivalRightsBasis;
+    note: string;
+  },
 ) {
   await db
     .prepare(
@@ -338,6 +357,57 @@ export async function storeUkRights(
        WHERE id = ?`,
     )
     .bind(verdict.clear ? 1 : 0, verdict.expiresYear, verdict.basis, verdict.note.slice(0, 400), id)
+    .run();
+}
+
+export type DescriptionRow = {
+  id: string;
+  title: string;
+  year: number | null;
+  kind: RevivalKind;
+  synopsis: string;
+  catalogueArticle: string | null;
+};
+
+export const THIN_SYNOPSIS = 80;
+
+export async function selectForDescription(db: D1Database, limit = 40) {
+  const rows = await db
+    .prepare(
+      `SELECT w.id, w.title, w.year, w.kind, w.synopsis, b.article AS catalogueArticle
+       FROM revival_works AS w
+       LEFT JOIN title_buzz AS b ON b.title_id = w.title_id AND b.article <> ''
+       WHERE w.status = 'approved'
+         AND length(trim(w.synopsis)) < ?
+         AND (w.described_at IS NULL OR w.described_at < datetime('now', '-180 days'))
+       ORDER BY w.described_at IS NOT NULL, COALESCE(w.popularity, 0) DESC
+       LIMIT ?`,
+    )
+    .bind(THIN_SYNOPSIS, Math.min(Math.max(1, limit), 200))
+    .all<DescriptionRow>();
+
+  return rows.results;
+}
+
+export type ArticleDescription = { synopsis: string; article: string; articleUrl: string };
+
+export async function storeDescription(
+  db: D1Database,
+  id: string,
+  found: ArticleDescription | null,
+) {
+  await db
+    .prepare(
+      `UPDATE revival_works
+       SET synopsis = COALESCE(?2, synopsis),
+           synopsis_source = CASE WHEN ?2 IS NULL THEN synopsis_source ELSE 'wikipedia' END,
+           synopsis_article = COALESCE(?3, synopsis_article),
+           synopsis_url = COALESCE(?4, synopsis_url),
+           described_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?1`,
+    )
+    .bind(id, found?.synopsis ?? null, found?.article ?? null, found?.articleUrl ?? null)
     .run();
 }
 
@@ -816,7 +886,12 @@ export async function selectUnmatched(db: D1Database, limit = 400) {
        LIMIT ?`,
     )
     .bind(Math.min(limit, 600))
-    .all<{ id: string; title: string; year: number | null; runtimeSeconds: number | null }>();
+    .all<{
+      id: string;
+      title: string;
+      year: number | null;
+      runtimeSeconds: number | null;
+    }>();
 
   return rows.results;
 }
@@ -866,7 +941,11 @@ export async function selectKnownSourceIds(
 export async function refreshPopularity(
   db: D1Database,
   source: RevivalSource,
-  entries: { sourceId: string; popularity: number | null; downloads: number | null }[],
+  entries: {
+    sourceId: string;
+    popularity: number | null;
+    downloads: number | null;
+  }[],
 ) {
   const scored = entries.filter((entry) => entry.popularity !== null);
 
@@ -997,7 +1076,10 @@ export async function readProgress(db: D1Database, viewerId: string, workId: str
     .bind(viewerId, workId)
     .first<{ positionSeconds: number; finished: number }>();
 
-  return { positionSeconds: row?.positionSeconds ?? 0, finished: Boolean(row?.finished) };
+  return {
+    positionSeconds: row?.positionSeconds ?? 0,
+    finished: Boolean(row?.finished),
+  };
 }
 
 export async function saveProgress(

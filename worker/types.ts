@@ -105,10 +105,11 @@ export type IngestionJob =
   | { type: "sync-cinema-screenings"; source: string; siteId: string }
   | {
       type: "sync-revival-source";
-      source: "archive" | "loc" | "europeana";
+      source: "archive" | "loc" | "europeana" | "wikidata";
       collection?: string;
       chain?: boolean;
     }
+  | { type: "describe-revival-works"; chain?: boolean }
   | { type: "match-revival-works"; chain?: boolean }
   | { type: "group-revival-prints" }
   | { type: "check-revival-rights" }
