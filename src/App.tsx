@@ -29,6 +29,7 @@ import { NotFoundPage } from "./pages/NotFoundPage";
 import { SignedOutShelf } from "./pages/SignedOutShelf";
 import { TonightPage } from "./pages/TonightPage";
 
+const WorldPage = lazy(() => import("./pages/WorldPage").then((m) => ({ default: m.WorldPage })));
 const BrowsePage = lazy(() =>
   import("./pages/BrowsePage").then((m) => ({ default: m.BrowsePage })),
 );
@@ -652,6 +653,7 @@ export function App() {
                 <Route key={path} path={path} element={<LegacyBrowse preset={preset} />} />
               ))}
 
+              <Route path="/world" element={<WorldPage />} />
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
           </Suspense>

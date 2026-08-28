@@ -3979,6 +3979,7 @@ h2 em {
   line-height: 1.5;
   margin: 0;
 }
+.world-rows,
 .detail-world ul {
   display: flex;
   flex-direction: column;
@@ -3987,12 +3988,14 @@ h2 em {
   margin: 0;
   padding: 0;
 }
+.world-rows li,
 .detail-world li {
   align-items: center;
   display: grid;
   gap: 8px;
   grid-template-columns: 5.5rem 1fr 2.6rem 4.5rem;
 }
+.world-rows li a,
 .detail-world li a {
   color: var(--ink);
   font-size: 12px;
@@ -4001,6 +4004,7 @@ h2 em {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.world-rows li a:hover,
 .detail-world li a:hover {
   color: var(--blue);
   text-decoration: underline;
@@ -9042,4 +9046,20 @@ a.showtime:hover small {
 .detail-credit-pager button:disabled {
   cursor: default;
   opacity: 0.4;
+}
+
+.world-entry {
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 18px;
+}
+.world-entry h2 {
+  font-size: 1.05rem;
+  margin: 0;
+}
+.world-entry h2 span {
+  color: var(--muted);
+  font-weight: 400;
 }

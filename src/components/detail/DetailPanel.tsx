@@ -40,7 +40,6 @@ import { useExitWarning } from "./useExitWarning";
 import { VisualFormatLine } from "./VisualFormatLine";
 import { WatchNext } from "./WatchNext";
 import { WatchOrder } from "./WatchOrder";
-import { WorldBoard } from "./WorldBoard";
 
 const SIMILAR_LIMIT = 12;
 const DETAIL_TABS = ["overview", "episodes"] as const;
@@ -334,12 +333,7 @@ export function DetailPanel({
           {usherSlot}
           <ScoreRow item={item} />
           <TitleAwards titleId={item.id} />
-          {item.buzz && <BuzzNote buzz={item.buzz} />}
-          {item.buzz && (
-            <ErrorBoundary label="The world board">
-              <WorldBoard titleId={item.id} />
-            </ErrorBoundary>
-          )}
+          {item.buzz && <BuzzNote buzz={item.buzz} titleId={item.id} />}
           <ErrorBoundary label="The credits">
             <CreditsBlock key={item.id} titleId={item.id} />
           </ErrorBoundary>

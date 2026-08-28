@@ -37,7 +37,7 @@ import {
 import { getFeaturedTitle } from "../services/featured.ts";
 import { getPersonalRails } from "../services/personal-rails.ts";
 import { getSeason, getSeasonIndex } from "../services/seasons.ts";
-import { getWorldBoard } from "../services/world-board.ts";
+import { getWorldBoard, getWorldLeaders } from "../services/world-board.ts";
 import type { Bindings } from "../types.ts";
 
 const TONIGHT_DEFAULT_LIMIT = 12;
@@ -417,6 +417,16 @@ catalogRoutes.get("/titles/:titleId/awards", edgeCache(3_600), async (context) =
   }
 
   return context.json(await readTitleAwards(context.env.DB, titleId));
+});
+
+catalogRoutes.get("/world-board", edgeCache(3_600), async (context) => {
+  try {
+    return context.json({ boards: await getWorldLeaders(context.env.DB) });
+  } catch (error) {
+    logError("world_leaders_read_failed", error, { area: "buzz" });
+
+    return context.json({ boards: [] });
+  }
 });
 
 catalogRoutes.get("/titles/:titleId/world-board", edgeCache(3_600), async (context) => {

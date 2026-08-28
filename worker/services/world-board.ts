@@ -13,6 +13,7 @@ import { sum } from "../lib/numbers.ts";
 import {
   readLanguageBuzz,
   readProjectVolumes,
+  readWorldLeaders,
   writeLanguageBuzz,
   writeProjectVolumes,
   type LanguageBuzzRow,
@@ -220,6 +221,22 @@ export async function syncWorldBoard(env: Bindings, titleIds: string[]) {
   return rows.length;
 }
 
+export type WorldBoardEntry = {
+  titleId: string;
+  title: string;
+  year: number | null;
+  languages: WorldBoardLanguage[];
+};
+
+export type WorldBoardLanguage = {
+  language: string;
+  article: string;
+  articleUrl: string;
+  views: number;
+  previousViews: number;
+  share: number;
+};
+
 export async function getWorldBoard(db: D1Database, titleId: string) {
   const rows = await readLanguageBuzz(db, titleId);
 
@@ -235,4 +252,33 @@ export async function getWorldBoard(db: D1Database, titleId: string) {
     measuredAt: rows[0]?.measuredAt ?? null,
     source: "Wikipedia pageviews, normalised per language edition",
   };
+}
+
+const LEADER_TITLES = 24;
+const LEADER_LANGUAGES = 6;
+
+export async function getWorldLeaders(db: D1Database) {
+  const rows = await readWorldLeaders(db, LEADER_TITLES, LEADER_LANGUAGES);
+  const boards = new Map<string, WorldBoardEntry>();
+
+  for (const row of rows) {
+    const board = boards.get(row.titleId) ?? {
+      titleId: row.titleId,
+      title: row.title,
+      year: row.year,
+      languages: [],
+    };
+
+    board.languages.push({
+      language: row.language,
+      article: row.article,
+      articleUrl: articleUrl(row.article, row.language),
+      views: row.views,
+      previousViews: row.previousViews,
+      share: row.share,
+    });
+    boards.set(row.titleId, board);
+  }
+
+  return [...boards.values()];
 }

@@ -25,3 +25,18 @@ export function useWorldBoard(titleId: string) {
     isLoading,
   };
 }
+
+export type WorldBoardEntry = {
+  titleId: string;
+  title: string;
+  year: number | null;
+  languages: WorldBoardLanguage[];
+};
+
+export function useWorldLeaders() {
+  const { data, error, isLoading } = useResource<{ boards: WorldBoardEntry[] }>(
+    "/api/catalog/world-board",
+  );
+
+  return { boards: data?.boards ?? [], error, isLoading };
+}
