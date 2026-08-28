@@ -8977,3 +8977,37 @@ a.showtime:hover small {
   cursor: default;
   opacity: 0.4;
 }
+
+/* The ground it was shot on */
+
+.detail-ground {
+  border-left: 3px solid var(--blue);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 20px 0 0;
+  padding: 2px 0 2px 15px;
+}
+.detail-ground > span {
+  color: #6f7268;
+  font: 800 9px var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.detail-ground p {
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+}
+.detail-ground small {
+  color: var(--muted);
+  font: 10px var(--mono);
+  line-height: 1.6;
+}
+
+@media (max-width: 860px) {
+  .atlas-frame {
+    gap: 18px;
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

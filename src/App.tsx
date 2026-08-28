@@ -588,7 +588,6 @@ export function App() {
                   />
                 }
               />
-
               <Route
                 path="/shelf"
                 element={

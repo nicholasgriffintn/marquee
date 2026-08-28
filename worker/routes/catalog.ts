@@ -20,10 +20,12 @@ import {
   readTitleCredits,
 } from "../repositories/people.ts";
 import { getTitleAdaptations } from "../services/adaptations.ts";
+import { readPlacesForTitle } from "../repositories/title-places.ts";
 import {
   browseCatalogue,
   getCatalogue,
   getGenres,
+  getFilmingPlaces,
   getKeywords,
   getTonight,
   getTrending,
@@ -47,6 +49,7 @@ const FACET_LIMIT = 6;
 const ITEMS_LIMIT = 30;
 const MAX_BROWSE_PAGE = 80;
 const KEYWORDS_DEFAULT_LIMIT = 120;
+const PLACES_DEFAULT_LIMIT = 80;
 const GENRES_DEFAULT_LIMIT = 40;
 const SEASON_LIMIT = 100;
 const MAX_TMDB_ID = 9_999_999_999;
@@ -204,6 +207,19 @@ catalogRoutes.get("/trending", edgeCache(1_800), async (context) => {
   }
 });
 
+catalogRoutes.get("/places", edgeCache(3_600), async (context) => {
+  const limit = queryInteger(context, "limit", PLACES_DEFAULT_LIMIT, 1, 300);
+
+  try {
+    return context.json({ places: await getFilmingPlaces(context.env, limit) });
+  } catch (error) {
+    logError("places_read_failed", error, { area: "browse" });
+    context.header("cache-control", "no-store");
+
+    return context.json({ places: [] });
+  }
+});
+
 catalogRoutes.get("/keywords", edgeCache(3_600), async (context) => {
   const limit = queryInteger(context, "limit", KEYWORDS_DEFAULT_LIMIT, 1, 400);
 
@@ -230,6 +246,7 @@ catalogRoutes.get("/browse", edgeCache(120), async (context) => {
           mediaTypeParam === "movie" || mediaTypeParam === "tv" ? mediaTypeParam : undefined,
         genres: queryList(context, "genres", FACET_LIMIT),
         keywords: queryList(context, "keywords", FACET_LIMIT),
+        places: queryList(context, "places", FACET_LIMIT),
         providerIds: validProviderIds(queryList(context, "providers", PROVIDER_LIMIT)),
         query: queryText(context, "query", QUERY_LIMIT),
         sort:
@@ -417,6 +434,23 @@ catalogRoutes.get("/titles/:titleId/awards", edgeCache(3_600), async (context) =
   }
 
   return context.json(await readTitleAwards(context.env.DB, titleId));
+});
+
+catalogRoutes.get("/titles/:titleId/places", edgeCache(3_600), async (context) => {
+  const titleId = context.req.param("titleId");
+  const empty = { filming: [], narrative: [] };
+
+  if (!isKnownTitle(titleId)) {
+    return context.json(empty);
+  }
+
+  try {
+    return context.json(await readPlacesForTitle(context.env.DB, titleId));
+  } catch (error) {
+    logError("title_places_read_failed", error, { area: "catalogue", titleId });
+
+    return context.json(empty);
+  }
 });
 
 catalogRoutes.get("/titles/:titleId/watch-order", edgeCache(3_600), async (context) => {

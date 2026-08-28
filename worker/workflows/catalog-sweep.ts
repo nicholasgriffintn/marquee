@@ -26,6 +26,7 @@ import { queueRevivalSources } from "../services/revival.ts";
 import { syncSchedule } from "../services/schedule.ts";
 import { buildSections } from "../services/sections.ts";
 import { syncVisualFormat } from "../services/visual-format.ts";
+import { syncTitlePlaces } from "../services/title-places.ts";
 import type { Bindings, CatalogSweepParameters } from "../types.ts";
 
 const RETRIES = { limit: 4, delay: "30 seconds", backoff: "exponential" } as const;
@@ -100,6 +101,10 @@ export class CatalogSweep extends WorkflowEntrypoint<Bindings, CatalogSweepParam
     
     await step.do("sync title identifiers", { retries: RETRIES }, async () =>
       syncTitleIdentifiers(this.env),
+    );
+
+    await step.do("sync filming locations", { retries: RETRIES }, async () =>
+      syncTitlePlaces(this.env),
     );
 
     await step.do("queue embeddings", { retries: RETRIES }, async () => {
