@@ -1,5 +1,7 @@
 import type { MediaType, TitleVisualFormat } from "../../src/domain/catalog.ts";
-import { insertRows, queryChunked } from "./catalog-array-utils.ts";
+import { queryChunked } from "./catalog-array-utils.ts";
+
+const WRITE_CHUNK = 60;
 
 type FormatRow = { titleId: string; kind: string; value: string };
 
@@ -56,46 +58,39 @@ export async function selectFormatCandidates(db: D1Database, limit: number, retr
 }
 
 export async function writeVisualFormats(db: D1Database, source: string, writes: FormatWrite[]) {
-  const values = writes.flatMap((write) => [
-    ...write.colours.map((value) => ({ titleId: write.titleId, kind: "colour", value })),
-    ...write.aspectRatios.map((value) => ({ titleId: write.titleId, kind: "aspect_ratio", value })),
-  ]);
+  const statements = writes.flatMap((write) => {
+    const values = [
+      ...write.colours.map((value) => ["colour", value]),
+      ...write.aspectRatios.map((value) => ["aspect_ratio", value]),
+    ];
 
-  await db.batch(
-    writes.map((write) =>
+    return [
       db
         .prepare(`DELETE FROM title_visual_format WHERE title_id = ? AND source = ?`)
         .bind(write.titleId, source),
-    ),
-  );
+      ...values.map(([kind, value]) =>
+        db
+          .prepare(
+            `INSERT INTO title_visual_format (title_id, kind, value, source)
+             VALUES (?, ?, ?, ?)
+             ON CONFLICT (title_id, kind, value, source) DO NOTHING`,
+          )
+          .bind(write.titleId, kind, value, source),
+      ),
+      db
+        .prepare(
+          `INSERT INTO title_visual_format_sync (title_id, source, values_found, checked_at)
+           VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+           ON CONFLICT (title_id, source) DO UPDATE SET
+             values_found = excluded.values_found,
+             checked_at = excluded.checked_at`,
+        )
+        .bind(write.titleId, source, values.length),
+    ];
+  });
 
-  if (values.length > 0) {
-    await insertRows(
-      db,
-      4,
-      25,
-      values.map((row): unknown[] => [row.titleId, row.kind, row.value, source]),
-      (chunk) =>
-        `INSERT INTO title_visual_format (title_id, kind, value, source)
-         VALUES ${chunk.map(() => "(?, ?, ?, ?)").join(", ")}
-         ON CONFLICT (title_id, kind, value, source) DO NOTHING`,
-    );
+  for (let index = 0; index < statements.length; index += WRITE_CHUNK) {
+    // oxlint-disable-next-line no-await-in-loop
+    await db.batch(statements.slice(index, index + WRITE_CHUNK));
   }
-
-  await insertRows(
-    db,
-    3,
-    25,
-    writes.map((write): unknown[] => [
-      write.titleId,
-      source,
-      write.colours.length + write.aspectRatios.length,
-    ]),
-    (chunk) =>
-      `INSERT INTO title_visual_format_sync (title_id, source, values_found, checked_at)
-       VALUES ${chunk.map(() => "(?, ?, ?, CURRENT_TIMESTAMP)").join(", ")}
-       ON CONFLICT (title_id, source) DO UPDATE SET
-         values_found = excluded.values_found,
-         checked_at = excluded.checked_at`,
-  );
 }
