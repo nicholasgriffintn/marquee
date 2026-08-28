@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { personPath } from "../../domain/catalog";
 import { useTitleCredits, type CreditSeason, type TitleCredit } from "../../hooks/useTitleCredits";
 import { Dropdown, Heading, StatusNote, type DropdownOption } from "../../ui";
+import { DetailCredit } from "./DetailNote";
 
 import styles from "./CreditsBlock.module.css";
 
@@ -47,29 +48,48 @@ function byJob(crew: TitleCredit[]) {
   });
 }
 
-export function CreditsBlock({ titleId }: { titleId: string }) {
+export function CreditsBlock({ titleId, people }: { titleId: string; people: string[] }) {
   const [season, setSeason] = useState<number | null>(null);
   const [page, setPage] = useState(1);
   const { credits, isLoading } = useTitleCredits(titleId, season, page);
   const { cast, crew, hasMore, total } = credits;
   const [seasons, setSeasons] = useState<CreditSeason[]>([]);
+  const [seriesCredits, setSeriesCredits] = useState<number | null>(null);
 
   if (credits.seasons.length > 0 && credits.seasons !== seasons) {
     setSeasons(credits.seasons);
   }
 
-  if (cast.length === 0 && crew.length === 0 && seasons.length === 0) {
-    return null;
+  if (season === null && !isLoading && seriesCredits !== total) {
+    setSeriesCredits(total);
+  }
+
+  const opener =
+    seasons.find((entry) => entry.credits > 0) ??
+    seasons.find((entry) => entry.season > 0) ??
+    seasons[0];
+
+  if (season === null && seriesCredits === 0 && opener) {
+    setSeason(opener.season);
   }
 
   const jobs = byJob(crew);
+  const billed = !isLoading && cast.length === 0 && jobs.length === 0 ? people : [];
+  const bare = cast.length === 0 && jobs.length === 0 && billed.length === 0;
+
+  if (bare && !isLoading && seasons.length === 0 && people.length === 0) {
+    return null;
+  }
+
   const choose = (next: number | null) => {
     setSeason(next);
     setPage(1);
   };
 
   const seasonOptions: DropdownOption[] = [
-    { key: "series", selected: season === null, content: "The series" },
+    ...(seriesCredits === 0 && seasons.length > 0
+      ? []
+      : [{ key: "series", selected: season === null, content: "The series" }]),
     ...seasons.map((entry) => ({
       key: String(entry.season),
       selected: season === entry.season,
@@ -91,10 +111,26 @@ export function CreditsBlock({ titleId }: { titleId: string }) {
           onSelect={(key) => choose(key === "series" ? null : Number(key))}
         />
       )}
-      {jobs.length === 0 && cast.length === 0 && (
+      {bare && (
         <StatusNote busy={isLoading} surface="paper">
           {isLoading ? "Reading…" : "Not read yet."}
         </StatusNote>
+      )}
+      {billed.length > 0 && (
+        <>
+          <ul className={styles.cast}>
+            {billed.map((name) => (
+              <li key={name}>
+                <Link to={personPath(name)}>
+                  <strong>{name}</strong>
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <DetailCredit>
+            Top billing for the title from TMDB. The full credits are not read yet.
+          </DetailCredit>
+        </>
       )}
       {jobs.length > 0 && (
         <dl className={styles.crew}>

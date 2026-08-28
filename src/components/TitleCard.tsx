@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { Link, useViewTransitionState } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 import { titlePath, type MediaTitle } from "../domain/catalog";
 import { classNames } from "../lib/class-names";
@@ -24,7 +24,6 @@ export const TitleCard = memo(function TitleCard({
   rank?: number;
 }) {
   const path = titlePath(item);
-  const isTransitioning = useViewTransitionState(path);
 
   return (
     <article className={classNames(styles.card, item.pending && styles.pending)}>
@@ -42,10 +41,7 @@ export const TitleCard = memo(function TitleCard({
           onOpen(item);
         }}
       >
-        <div
-          className={styles.art}
-          style={{ viewTransitionName: isTransitioning ? "title-art" : "none" }}
-        >
+        <div className={styles.art}>
           <TitleArt
             url={item.backdropUrl ?? item.posterUrl}
             seed={item.id}

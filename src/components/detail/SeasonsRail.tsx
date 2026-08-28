@@ -29,47 +29,56 @@ export function SeasonsRail({
   }
 
   const newest = listed[0]?.seasonNumber ?? null;
+  const manySeasons = listed.length > 1;
   const detail = state.season;
   const aired = detail?.episodes.filter((episode) => hasAired(episode.airDate)) ?? [];
   const episodes = (aired.length > 0 ? aired : (detail?.episodes ?? []))
     .toSorted((left, right) => right.episodeNumber - left.episodeNumber)
     .slice(0, EPISODES_SHOWN);
 
+  if (!manySeasons && episodes.length === 0) {
+    return null;
+  }
+
   return (
     <section className={styles.block}>
-      <Eyebrow size="sm" weight="heavy" tone="inkMuted">
-        {listed.length} season{listed.length === 1 ? "" : "s"}
-      </Eyebrow>
-      <ul className={styles.rail}>
-        {listed.map((season) => (
-          <li key={season.seasonNumber}>
-            <button
-              type="button"
-              className={styles.season}
-              onClick={() => onOpenSeason(season.seasonNumber)}
-            >
-              {season.posterUrl ? (
-                <img
-                  className={styles.poster}
-                  src={artwork(season.posterUrl, 92) ?? season.posterUrl}
-                  srcSet={artworkSrcSet(season.posterUrl, 92)}
-                  alt=""
-                  loading="lazy"
-                  decoding="async"
-                />
-              ) : (
-                <span className={styles.poster} aria-hidden="true" />
-              )}
-              <span className={styles.seasonText}>
-                <strong>Season {season.seasonNumber}</strong>
-                <small>
-                  {season.episodeCount} episode{season.episodeCount === 1 ? "" : "s"}
-                </small>
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
+      {manySeasons && (
+        <>
+          <Eyebrow size="sm" weight="heavy" tone="inkMuted">
+            {listed.length} seasons
+          </Eyebrow>
+          <ul className={styles.rail}>
+            {listed.map((season) => (
+              <li key={season.seasonNumber}>
+                <button
+                  type="button"
+                  className={styles.season}
+                  onClick={() => onOpenSeason(season.seasonNumber)}
+                >
+                  {season.posterUrl ? (
+                    <img
+                      className={styles.poster}
+                      src={artwork(season.posterUrl, 92) ?? season.posterUrl}
+                      srcSet={artworkSrcSet(season.posterUrl, 92)}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  ) : (
+                    <span className={styles.poster} aria-hidden="true" />
+                  )}
+                  <span className={styles.seasonText}>
+                    <strong>Season {season.seasonNumber}</strong>
+                    <small>
+                      {season.episodeCount} episode{season.episodeCount === 1 ? "" : "s"}
+                    </small>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
 
       {episodes.length > 0 && detail && (
         <>
@@ -95,7 +104,7 @@ export function SeasonsRail({
 
       <button type="button" className={styles.all} onClick={onOpenAll}>
         <Text size="sm" as="span">
-          All episodes and seasons
+          All episodes{manySeasons ? " and seasons" : ""}
         </Text>
         <ArrowIcon />
       </button>

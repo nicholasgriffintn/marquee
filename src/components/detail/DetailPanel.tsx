@@ -445,7 +445,7 @@ export function DetailPanel({
           ) : null}
           <ThemeSongs item={item} />
           <ErrorBoundary label="The credits">
-            <CreditsBlock key={item.id} titleId={item.id} />
+            <CreditsBlock key={item.id} titleId={item.id} people={item.people ?? []} />
           </ErrorBoundary>
           <WatchNext pairs={pairs} onOpen={onOpen} />
           <TitleTrack
