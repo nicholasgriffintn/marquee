@@ -29,7 +29,6 @@ import { NotFoundPage } from "./pages/NotFoundPage";
 import { SignedOutShelf } from "./pages/SignedOutShelf";
 import { TonightPage } from "./pages/TonightPage";
 
-const AtlasPage = lazy(() => import("./pages/AtlasPage").then((m) => ({ default: m.AtlasPage })));
 const BrowsePage = lazy(() =>
   import("./pages/BrowsePage").then((m) => ({ default: m.BrowsePage })),
 );
@@ -588,11 +587,6 @@ export function App() {
                     }}
                   />
                 }
-              />
-
-              <Route
-                path="/atlas"
-                element={isSignedIn ? <AtlasPage isSignedIn={isSignedIn} /> : <SignedOutShelf />}
               />
               <Route
                 path="/shelf"

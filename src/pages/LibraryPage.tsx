@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { PageTitle } from "../components/PageTitle";
@@ -186,9 +186,6 @@ export function LibraryPage({
           {savedCount
             ? `${shelf.matched.toLocaleString()} of ${savedCount.toLocaleString()} title${savedCount === 1 ? "" : "s"}. Click a poster to rate it or add notes.`
             : "Ratings and notes stay in your account and shape your recommendations."}
-        </p>
-        <p>
-          <Link to="/atlas">See it placed by where it was shot</Link>
         </p>
       </PageTitle>
 

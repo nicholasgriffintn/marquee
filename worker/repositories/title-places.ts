@@ -1,11 +1,9 @@
-import type { AtlasPlace, TitlePlace, TitlePlaces } from "../../src/domain/places.ts";
+import type { TitlePlace, TitlePlaces } from "../../src/domain/places.ts";
 import { placePin } from "../../src/domain/places.ts";
 import type { PlaceRecord, TitlePlaceRow } from "../clients/wikidata-places.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 
 const WRITE_CHUNK = 40;
-const ATLAS_PLACES = 400;
-const ATLAS_TITLES_PER_PLACE = 6;
 
 type PlaceRow = {
   entityId: string;
@@ -18,8 +16,6 @@ type PlaceRow = {
 };
 
 type TitlePlaceReadRow = PlaceRow & { titleId: string; kind: string };
-
-type AtlasReadRow = PlaceRow & { titleId: string; title: string; year: number | null };
 
 const PLACE_COLUMNS = `p.entity_id AS entityId, p.label, p.latitude, p.longitude,
        p.precision_degrees AS precisionDegrees, p.country_id AS countryId,
@@ -129,63 +125,6 @@ export async function readPlacesForTitle(db: D1Database, titleId: string): Promi
     filming: places.filter((place) => place.kind === "filming"),
     narrative: places.filter((place) => place.kind === "narrative"),
   };
-}
-
-export async function readShelfPlaces(db: D1Database, viewerId: string): Promise<AtlasPlace[]> {
-  const rows = await db
-    .prepare(
-      `SELECT t.id AS titleId, t.title, t.year, ${PLACE_COLUMNS}
-       FROM viewing_entries AS v
-       JOIN catalog_titles AS t ON t.id = v.title_id
-       JOIN catalog_title_places AS tp ON tp.title_id = v.title_id AND tp.kind = 'filming'
-       JOIN catalog_places AS p ON p.entity_id = tp.place_id
-       LEFT JOIN catalog_places AS c ON c.entity_id = p.country_id
-       WHERE v.viewer_id = ?
-       ORDER BY p.label, t.title
-       LIMIT ?`,
-    )
-    .bind(viewerId, ATLAS_PLACES * ATLAS_TITLES_PER_PLACE)
-    .all<AtlasReadRow>();
-  const byPlace = new Map<string, AtlasPlace>();
-
-  for (const row of rows.results) {
-    const existing = byPlace.get(row.entityId);
-
-    if (existing) {
-      if (existing.titles.length < ATLAS_TITLES_PER_PLACE) {
-        existing.titles.push({ titleId: row.titleId, title: row.title, year: row.year });
-      }
-
-      continue;
-    }
-
-    byPlace.set(row.entityId, {
-      entityId: row.entityId,
-      label: row.label,
-      country: row.country,
-      latitude: row.latitude,
-      longitude: row.longitude,
-      pin: placePin(row.precisionDegrees),
-      isCountry: row.countryId === row.entityId,
-      titles: [{ titleId: row.titleId, title: row.title, year: row.year }],
-    });
-  }
-
-  return [...byPlace.values()].slice(0, ATLAS_PLACES);
-}
-
-export async function countPlacedShelfTitles(db: D1Database, viewerId: string) {
-  const row = await db
-    .prepare(
-      `SELECT count(DISTINCT v.title_id) AS placed
-       FROM viewing_entries AS v
-       JOIN catalog_title_places AS tp ON tp.title_id = v.title_id AND tp.kind = 'filming'
-       WHERE v.viewer_id = ?`,
-    )
-    .bind(viewerId)
-    .first<{ placed: number }>();
-
-  return row?.placed ?? 0;
 }
 
 export async function readPlaceCandidates(

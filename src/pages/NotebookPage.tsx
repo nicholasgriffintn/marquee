@@ -198,11 +198,6 @@ export function NotebookPage({
             <ErrorBoundary label="This map">
               <TasteMap isSignedIn={isSignedIn} />
             </ErrorBoundary>
-
-            <p className="notebook-aside">
-              There is a second map of the same shelf, placed by where the cameras stood rather than
-              by what the films are. <Link to="/atlas">The atlas is through here</Link>.
-            </p>
           </NotebookSection>
 
           <NotebookSection
