@@ -4327,7 +4327,8 @@ h2 em {
   padding: 14px 18px;
 }
 .usher-options button:hover:not(:disabled),
-.usher-matches button:hover {
+.usher-matches button:hover,
+.usher-matches button.active {
   border-color: var(--acid);
   transform: translateY(-1px);
 }
@@ -4451,6 +4452,10 @@ h2 em {
   color: var(--muted);
   font: 400 12px/1 var(--sans);
   margin: 8px 0 0;
+}
+.usher-note:empty,
+.search-suggestion-empty:empty {
+  display: none;
 }
 .usher-suggests {
   margin-bottom: 16px;
