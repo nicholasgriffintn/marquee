@@ -5,6 +5,7 @@ const WORK_TYPE_ORDER = [
   "short story collection",
   "novella",
   "novelization",
+  "novelisation",
   "poem",
   "epic poem",
   "fairy tale",
@@ -39,25 +40,21 @@ const WORK_TYPE_ORDER = [
   "anime television series",
   "limited series",
   "television series",
+  "television programme",
   "television program",
   "web series",
   "radio drama",
   "song",
   "album",
   "musical work/composition",
+  "serialised fiction",
   "serialized fiction",
   "media franchise",
 ];
-
-const BRITISH_LABELS: Record<string, string> = {
-  "television program": "television programme",
-  "serialized fiction": "serialised fiction",
-  novelization: "novelisation",
-};
 
 export function preferredWorkType(labels: string[]) {
   const offered = new Set(labels.map((label) => label.toLowerCase()));
   const matched = WORK_TYPE_ORDER.find((type) => offered.has(type));
 
-  return matched ? (BRITISH_LABELS[matched] ?? matched) : null;
+  return matched ?? null;
 }

@@ -112,7 +112,7 @@ async function workBatch(entityIds: string[], works: Map<string, WorkDraft>) {
   OPTIONAL { ?work wdt:P31 ?type . }
   OPTIONAL { ?work wdt:P50 ?author . }
   OPTIONAL { ?work wdt:P577 ?published . }
-  SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "en-gb,en". }
 }`,
     { timeoutMs: TIMEOUT_MS, cacheTtl: CACHE_TTL },
   );
