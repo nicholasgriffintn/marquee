@@ -65,3 +65,36 @@
     transition: none;
   }
 }
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.22s;
+  animation-timing-function: cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+::view-transition-old(root) {
+  animation-name: transitionOut;
+}
+
+::view-transition-new(root) {
+  animation-name: transitionIn;
+}
+
+@keyframes transitionOut {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes transitionIn {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+  }
+}

@@ -10,10 +10,11 @@ import { useAvailability } from "../../hooks/useAvailability";
 import { useCollection } from "../../hooks/useCollection";
 import { useRecommendations } from "../../hooks/useRecommendations";
 import { useTitleReels } from "../../hooks/useRevival";
-import { useEpisodeEntries } from "../../hooks/useSeasons";
+import { useEpisodeEntries, useSeasons } from "../../hooks/useSeasons";
 import { useShowings } from "../../hooks/useShowings";
 import { useTitleInsight } from "../../hooks/useTitleInsight";
 import { useWatchOrder } from "../../hooks/useWatchOrder";
+import { classNames } from "../../lib/class-names";
 import { focusableElements } from "../../lib/focus";
 import { detailMeta, languageLabel } from "../../lib/media";
 import { track } from "../../lib/telemetry";
@@ -48,6 +49,7 @@ import { DetailCredit } from "./DetailNote";
 import { FilmingLine } from "./FilmingLine";
 import { MarqueeRead } from "./MarqueeRead";
 import { ScoreRow } from "./ScoreRow";
+import { SeasonsRail } from "./SeasonsRail";
 import { SourceLinks } from "./SourceLinks";
 import { SourceWorkLine, SourceWorkTrack } from "./SourceWorkBlock";
 import { ThemeSongs } from "./ThemeSongs";
@@ -80,6 +82,7 @@ type DetailView = {
 
 export function DetailPanel({
   item,
+  layout = "overlay",
   panelRef,
   availabilityEnabled,
   canSave,
@@ -97,6 +100,7 @@ export function DetailPanel({
   onUpdateDraft,
 }: {
   item: MediaTitle;
+  layout?: "overlay" | "page";
   panelRef: RefObject<HTMLDialogElement | null>;
   entryState: ProfileEntryState;
   selectedProviderIds: string[];
@@ -113,6 +117,7 @@ export function DetailPanel({
   onSaveEntry: (entry: ViewingEntry) => void;
   onRetryEntry: () => void;
 }) {
+  const isModal = layout === "overlay";
   const isSeries = item.mediaType === "tv";
   const entry = entryState.status === "loaded" ? entryState.entry : null;
   const [view, setView] = useState<DetailView>({
@@ -126,6 +131,7 @@ export function DetailPanel({
   const setTab = (next: DetailTab) => setView({ titleId: item.id, tab: next, jump });
   const tracker = useEpisodeEntries(item.id, canSave);
   const progress = tracker.progress;
+  const seasons = useSeasons(item, isSeries, progress);
   const continueAt = isSeries && progress && progress.watched > 0 ? progress.upNext : null;
   const { providers, nextEpisode, isRefreshing } = useAvailability(item, availabilityEnabled);
   const watchProviders = mergeAnimeProviders(item, providers);
@@ -147,22 +153,23 @@ export function DetailPanel({
     exitOpenRef.current = Boolean(exit);
   }, [exit]);
 
-  const resumeWatching = () => {
-    if (!continueAt) {
-      return;
-    }
-
+  const openSeason = (season: number) =>
     setView({
       titleId: item.id,
       tab: "episodes",
-      jump: { season: continueAt.season, nonce: (jump?.nonce ?? 0) + 1 },
+      jump: { season, nonce: (jump?.nonce ?? 0) + 1 },
     });
+
+  const resumeWatching = () => {
+    if (continueAt) {
+      openSeason(continueAt.season);
+    }
   };
 
   useEffect(() => {
     const panel = panelRef.current;
 
-    if (!panel) {
+    if (!panel || !isModal) {
       return undefined;
     }
 
@@ -173,7 +180,7 @@ export function DetailPanel({
     return () => {
       panel.style.overflow = previous;
     };
-  }, [exit, panelRef]);
+  }, [exit, isModal, panelRef]);
 
   useEffect(() => {
     if (viewedTitleId.current === item.id) {
@@ -185,6 +192,10 @@ export function DetailPanel({
   }, [item.id]);
 
   useEffect(() => {
+    if (!isModal) {
+      return undefined;
+    }
+
     const previousOverflow = document.body.style.overflow;
 
     function onKeyDown(event: KeyboardEvent) {
@@ -228,13 +239,17 @@ export function DetailPanel({
       document.body.style.overflow = previousOverflow;
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [onClose, panelRef]);
+  }, [isModal, onClose, panelRef]);
 
   return (
     <>
-      <Poster item={item} wide className={styles.art} />
-      <div className={styles.copy}>
-        <Heading level={2} size="title" id="detail-title" tone="ink">
+      <Poster
+        item={item}
+        wide
+        className={classNames(styles.art, isModal ? undefined : styles.pageArt)}
+      />
+      <div className={classNames(styles.copy, isModal ? undefined : styles.pageCopy)}>
+        <Heading level={isModal ? 2 : 1} size="title" id="detail-title" tone="ink">
           {item.title}
         </Heading>
         <Eyebrow weight="regular" tone="inkMuted" className={styles.meta}>
@@ -293,6 +308,13 @@ export function DetailPanel({
           )}
           <MarqueeRead insight={insight} isLoading={isInsightLoading} />
           <AirLine item={item} nextEpisode={nextEpisode} />
+          {isSeries && (
+            <SeasonsRail
+              seasons={seasons}
+              onOpenSeason={openSeason}
+              onOpenAll={() => setTab("episodes")}
+            />
+          )}
           {continueAt && (
             <button type="button" className={styles.continue} onClick={resumeWatching}>
               <span>
@@ -353,6 +375,7 @@ export function DetailPanel({
           <WatchOrder label="Before this" entries={watchOrder.before} onOpen={onOpen} />
           <ErrorBoundary label="Where to watch">
             <WatchBlock
+              title={item.title}
               providers={watchProviders}
               fallbackHref={item.watchLink}
               selectedProviderIds={selectedProviderIds}
@@ -449,10 +472,10 @@ export function DetailPanel({
             <ErrorBoundary label="The episode guide">
               <SeasonsBlock
                 key={item.id}
-                item={item}
                 canTrack={canSave}
                 shelved={Boolean(entry)}
                 tracker={tracker}
+                seasons={seasons}
                 jumpTo={jump}
                 onTracked={entry ? undefined : onTracked}
               />

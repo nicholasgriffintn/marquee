@@ -24,6 +24,7 @@ import { notebookRoutes } from "./routes/notebook.ts";
 import { profileRoutes } from "./routes/profile.ts";
 import { reelRoutes } from "./routes/reel.ts";
 import { revivalRoutes } from "./routes/revival.ts";
+import { sitemapRoutes } from "./routes/sitemap.ts";
 import { usherRoutes } from "./routes/usher.ts";
 import { apiGuard } from "./security/guard.ts";
 import type { Bindings, IngestionJob } from "./types.ts";
@@ -57,6 +58,8 @@ app.use("/api/*", async (context, next) => {
 app.use("*", apiGuard);
 
 app.get("/health", (context) => context.json({ ok: true, service: "marquee" }));
+
+app.route("/", sitemapRoutes);
 
 app.route("/media/reel", reelRoutes);
 

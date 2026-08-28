@@ -142,3 +142,10 @@
     transform: none;
   }
 }
+
+.summary {
+  color: var(--muted-on-paper);
+  font-size: var(--type-sm);
+  line-height: var(--leading-relaxed);
+  margin: var(--space-3) 0 0;
+}

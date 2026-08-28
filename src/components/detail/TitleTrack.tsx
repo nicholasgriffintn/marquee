@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
+import { Link } from "react-router-dom";
 
-import type { MediaTitle } from "../../domain/catalog";
+import { titlePath, type MediaTitle } from "../../domain/catalog";
 import { classNames } from "../../lib/class-names";
 import { mediaMeta } from "../../lib/media";
+import { isModifiedClick } from "../../lib/navigation";
 import { Eyebrow } from "../../ui";
 import { TitleArt } from "../TitleArt";
 
@@ -40,16 +42,23 @@ export function TitleTrack({
       </Eyebrow>
       <div className={styles.strip}>
         {items.map((item) => (
-          <button
-            type="button"
+          <Link
             key={item.id}
+            to={titlePath(item)}
             className={classNames(styles.card, item.id === currentId && styles.current)}
-            onClick={() => onOpen(item)}
+            onClick={(event) => {
+              if (isModifiedClick(event)) {
+                return;
+              }
+
+              event.preventDefault();
+              onOpen(item);
+            }}
           >
             <TitleArt url={item.posterUrl} seed={item.id} label={item.title} width={160} />
             <strong>{item.title}</strong>
             <small>{caption(item)}</small>
-          </button>
+          </Link>
         ))}
       </div>
     </div>

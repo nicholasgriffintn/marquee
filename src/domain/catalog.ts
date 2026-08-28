@@ -314,7 +314,7 @@ export type CuratorCandidate = Pick<
   | "overview"
 >;
 
-function titleSlug(title: string) {
+export function titleSlug(title: string) {
   return slugify(title) || "title";
 }
 

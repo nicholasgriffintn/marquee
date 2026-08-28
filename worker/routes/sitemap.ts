@@ -1,0 +1,228 @@
+import { Hono } from "hono";
+
+import { titleSlug } from "../../src/domain/catalog.ts";
+import { canonicalOrigin } from "../lib/security.ts";
+import type { Bindings } from "../types.ts";
+
+export const sitemapRoutes = new Hono<{ Bindings: Bindings }>();
+
+const PAGE_SIZE = 10_000;
+const CACHE = "public, max-age=3600";
+
+const STATIC_PATHS = [
+  { path: "/", priority: "1.0", changefreq: "hourly" },
+  { path: "/listings", priority: "0.9", changefreq: "hourly" },
+  { path: "/revival", priority: "0.8", changefreq: "daily" },
+  { path: "/sources", priority: "0.3", changefreq: "monthly" },
+  { path: "/usher", priority: "0.3", changefreq: "yearly" },
+];
+
+type TitleRow = {
+  media_type: string;
+  tmdb_id: number;
+  title: string;
+  updated_at: string | null;
+};
+
+function escapeXml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&apos;");
+}
+
+function lastModified(value: string | null) {
+  const parsed = value ? new Date(value.replace(" ", "T")) : null;
+
+  return parsed && !Number.isNaN(parsed.getTime()) ? parsed.toISOString().slice(0, 10) : null;
+}
+
+function missing() {
+  return new Response("No such sitemap.", {
+    status: 404,
+    headers: { "content-type": "text/plain; charset=UTF-8" },
+  });
+}
+
+function served(body: string, contentType = "application/xml; charset=UTF-8") {
+  return new Response(body, {
+    headers: {
+      "cache-control": CACHE,
+      "content-type": contentType,
+      "x-content-type-options": "nosniff",
+    },
+  });
+}
+
+async function countTitles(db: D1Database) {
+  const row = await db
+    .prepare("SELECT COUNT(*) AS total FROM catalog_titles")
+    .first<{ total: number }>();
+
+  return row?.total ?? 0;
+}
+
+sitemapRoutes.get("/robots.txt", (context) => {
+  const origin = canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN);
+  const body = [
+    "User-agent: *",
+    "Allow: /",
+    "Disallow: /admin",
+    "Disallow: /notebook",
+    "Disallow: /shelf",
+    "Disallow: /sign-in",
+    "Disallow: /search",
+    "Disallow: /api/",
+    "Disallow: /feeds/",
+    "",
+    `Sitemap: ${origin}/sitemap.xml`,
+    "",
+  ].join("\n");
+
+  return served(body, "text/plain; charset=UTF-8");
+});
+
+sitemapRoutes.get("/sitemap.xml", async (context) => {
+  const origin = canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN);
+  const total = await countTitles(context.env.DB);
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const entries = [
+    `${origin}/sitemap/pages.xml`,
+    ...Array.from({ length: pages }, (_, index) => `${origin}/sitemap/titles/${index + 1}.xml`),
+  ];
+
+  return served(
+    [
+      '<?xml version="1.0" encoding="UTF-8"?>',
+      '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+      ...entries.map((location) => `<sitemap><loc>${escapeXml(location)}</loc></sitemap>`),
+      "</sitemapindex>",
+    ].join(""),
+  );
+});
+
+sitemapRoutes.get("/sitemap/pages.xml", (context) => {
+  const origin = canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN);
+
+  return served(
+    [
+      '<?xml version="1.0" encoding="UTF-8"?>',
+      '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+      ...STATIC_PATHS.map(
+        (entry) =>
+          `<url><loc>${escapeXml(`${origin}${entry.path}`)}</loc>` +
+          `<changefreq>${entry.changefreq}</changefreq>` +
+          `<priority>${entry.priority}</priority></url>`,
+      ),
+      "</urlset>",
+    ].join(""),
+  );
+});
+
+function urlset(entries: string[]) {
+  return served(
+    [
+      '<?xml version="1.0" encoding="UTF-8"?>',
+      '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+      ...entries,
+      "</urlset>",
+    ].join(""),
+  );
+}
+
+sitemapRoutes.get("/sitemap/people.xml", async (context) => {
+  const origin = canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN);
+  const { results } = await context.env.DB.prepare(
+    `SELECT name FROM catalog_people WHERE titles > 0 ORDER BY titles DESC LIMIT ?1`,
+  )
+    .bind(PAGE_SIZE)
+    .all<{ name: string }>();
+
+  return urlset(
+    results.map(
+      (row) =>
+        `<url><loc>${escapeXml(`${origin}/person/${encodeURIComponent(row.name)}`)}</loc>` +
+        "<changefreq>weekly</changefreq></url>",
+    ),
+  );
+});
+
+sitemapRoutes.get("/sitemap/collections.xml", async (context) => {
+  const origin = canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN);
+  const { results } = await context.env.DB.prepare(
+    `SELECT DISTINCT collection_id AS id
+       FROM catalog_titles
+      WHERE collection_id IS NOT NULL
+      LIMIT ?1`,
+  )
+    .bind(PAGE_SIZE)
+    .all<{ id: number }>();
+
+  return urlset(
+    results.map(
+      (row) =>
+        `<url><loc>${escapeXml(`${origin}/collection/${row.id}`)}</loc>` +
+        "<changefreq>monthly</changefreq></url>",
+    ),
+  );
+});
+
+sitemapRoutes.get("/sitemap/revival.xml", async (context) => {
+  const origin = canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN);
+  const { results } = await context.env.DB.prepare(
+    `SELECT id, title FROM revival_works WHERE status = 'approved' LIMIT ?1`,
+  )
+    .bind(PAGE_SIZE)
+    .all<{ id: string; title: string }>();
+
+  return urlset(
+    results.map(
+      (row) =>
+        `<url><loc>${escapeXml(`${origin}/revival/${encodeURIComponent(row.id)}`)}</loc>` +
+        "<changefreq>monthly</changefreq></url>",
+    ),
+  );
+});
+
+sitemapRoutes.get("/sitemap/titles/:file", async (context) => {
+  const matched = /^([1-9][0-9]*)\.xml$/u.exec(context.req.param("file"));
+  const page = matched ? Number(matched[1]) : 0;
+
+  if (!page) {
+    return missing();
+  }
+
+  const origin = canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN);
+  const { results } = await context.env.DB.prepare(
+    `SELECT media_type, tmdb_id, title, updated_at
+       FROM catalog_titles
+      ORDER BY popularity DESC, id
+      LIMIT ?1 OFFSET ?2`,
+  )
+    .bind(PAGE_SIZE, (page - 1) * PAGE_SIZE)
+    .all<TitleRow>();
+
+  if (results.length === 0) {
+    return missing();
+  }
+
+  return served(
+    [
+      '<?xml version="1.0" encoding="UTF-8"?>',
+      '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+      ...results.map((row) => {
+        const location = `${origin}/${row.media_type}/${row.tmdb_id}/${titleSlug(row.title)}`;
+        const changed = lastModified(row.updated_at);
+
+        return (
+          `<url><loc>${escapeXml(location)}</loc>` +
+          (changed ? `<lastmod>${changed}</lastmod>` : "") +
+          "<changefreq>weekly</changefreq></url>"
+        );
+      }),
+      "</urlset>",
+    ].join(""),
+  );
+});

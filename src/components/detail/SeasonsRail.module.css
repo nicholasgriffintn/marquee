@@ -1,0 +1,111 @@
+.block {
+  border-top: 1px solid var(--paper-line);
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+  padding-top: var(--space-5);
+}
+
+.rail {
+  display: flex;
+  gap: var(--space-3);
+  list-style: none;
+  margin: 0;
+  overflow-x: auto;
+  padding: 0 0 var(--space-2);
+  scrollbar-width: thin;
+}
+
+.season {
+  align-items: center;
+  background: transparent;
+  border: 1px solid var(--paper-line);
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4) var(--space-2) var(--space-2);
+  text-align: left;
+  transition: border-color var(--duration) var(--ease);
+  white-space: nowrap;
+}
+
+.season:hover {
+  border-color: var(--ink);
+}
+
+.poster {
+  aspect-ratio: 2 / 3;
+  background: var(--paper-line);
+  display: block;
+  object-fit: cover;
+  width: 46px;
+}
+
+.seasonText {
+  display: grid;
+  gap: 2px;
+}
+
+.seasonText strong {
+  font-size: var(--type-md);
+  font-weight: var(--weight-heavy);
+}
+
+.seasonText small {
+  color: var(--muted-on-paper);
+  font-size: var(--type-xs);
+}
+
+.episodes {
+  border-top: 1px solid var(--paper-line);
+  display: grid;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.episode {
+  align-items: baseline;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--paper-line);
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  font-size: var(--type-body);
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+  text-align: left;
+  width: 100%;
+}
+
+.episode em {
+  color: var(--muted-on-paper);
+  flex: none;
+  font-family: var(--mono);
+  font-size: var(--type-xs);
+  font-style: normal;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.episode:hover span {
+  text-decoration: underline;
+}
+
+.all {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: var(--muted-on-paper);
+  cursor: pointer;
+  display: flex;
+  gap: var(--space-2);
+  justify-self: start;
+  padding: var(--space-2) 0 0;
+}
+
+.all:hover {
+  color: var(--ink);
+}

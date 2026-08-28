@@ -1,7 +1,7 @@
 import { useState, type MouseEvent } from "react";
 
 import type { ProviderAvailability } from "../domain/catalog";
-import { STREAMING_LIMIT, watchOptions, type WatchOption } from "../domain/watch";
+import { availabilityLine, STREAMING_LIMIT, watchOptions, type WatchOption } from "../domain/watch";
 import { classNames } from "../lib/class-names";
 import { ArrowIcon, ChevronIcon, Eyebrow, StatusNote } from "../ui";
 import { ProviderBadge } from "./ProviderBadge";
@@ -43,6 +43,7 @@ function WatchLink({
 }
 
 export function WatchBlock({
+  title,
   providers,
   fallbackHref,
   selectedProviderIds,
@@ -50,6 +51,7 @@ export function WatchBlock({
   isRefreshing,
   onLeave,
 }: {
+  title: string;
   providers: ProviderAvailability[];
   fallbackHref: string | null;
   selectedProviderIds: string[];
@@ -63,6 +65,10 @@ export function WatchBlock({
   const listed = [primary, ...rest, ...paid].filter(Boolean);
   const fromJustWatch = listed.some((option) => option.provider.source !== "AniList");
   const fromAniList = listed.some((option) => option.provider.source === "AniList");
+  const summary = availabilityLine(
+    title,
+    listed.map((option) => option.provider),
+  );
 
   if (!primary && rest.length === 0 && paid.length === 0) {
     if (isRefreshing) {
@@ -142,6 +148,7 @@ export function WatchBlock({
           )}
         </div>
       )}
+      {summary && <p className={styles.summary}>{summary}</p>}
       <p className={styles.credit}>
         {fromJustWatch && (
           <>

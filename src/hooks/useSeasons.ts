@@ -136,6 +136,8 @@ export function useSeasons(item: MediaTitle, enabled: boolean, progress: ShowPro
   };
 }
 
+export type SeasonsState = ReturnType<typeof useSeasons>;
+
 export type EpisodePatch = {
   scope?: EntryScope;
   season: number;

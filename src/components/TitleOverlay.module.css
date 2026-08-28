@@ -99,3 +99,20 @@
     animation: none;
   }
 }
+
+.page {
+  background: var(--paper);
+  color: var(--ink);
+  display: grid;
+  grid-template-columns: clamp(300px, 30vw, 520px) minmax(0, 1fr);
+  margin-inline: auto;
+  max-width: 1760px;
+  min-height: calc(100vh - 78px);
+  width: 100%;
+}
+
+@media (max-width: 900px) {
+  .page {
+    display: block;
+  }
+}

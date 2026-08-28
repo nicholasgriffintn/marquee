@@ -78,6 +78,10 @@ function DialogShell({
   );
 }
 
+function PageShell({ children }: { children: ReactNode }) {
+  return <article className={styles.page}>{children}</article>;
+}
+
 function MissingContent({ onRetry }: { onRetry?: () => void }) {
   return (
     <EmptyState
@@ -146,6 +150,7 @@ export function TitleOverlay({
   onLoadEntry,
   onRetryTitle,
   selectedProviderIds,
+  layout = "overlay",
 }: {
   titleId: string;
   title: MediaTitle | null;
@@ -170,6 +175,7 @@ export function TitleOverlay({
   onLoadEntry: (titleId: string, signal: AbortSignal) => Promise<void>;
   onRetryTitle: () => void;
   selectedProviderIds: string[];
+  layout?: "overlay" | "page";
 }) {
   const viewToken = useMemo(() => Symbol(titleId), [titleId]);
   const [resolvedViewToken, setResolvedViewToken] = useState<symbol | null>(null);
@@ -229,12 +235,24 @@ export function TitleOverlay({
     }
   }, [isSaved, onUsherRequest, titleId]);
 
+  const isPage = layout === "page";
+
   if (!title) {
     if (!titleError && !isMissing && !isLoading) {
       return null;
     }
 
-    return (
+    const fallback = titleError ? (
+      <MissingContent onRetry={onRetryTitle} />
+    ) : isMissing ? (
+      <MissingContent />
+    ) : (
+      <LoadingContent />
+    );
+
+    return isPage ? (
+      <PageShell>{fallback}</PageShell>
+    ) : (
       <DialogShell
         panelRef={panelRef}
         closeRef={closeRef}
@@ -242,46 +260,47 @@ export function TitleOverlay({
         labelledBy="detail-title"
         onClose={onClose}
       >
-        {titleError ? (
-          <MissingContent onRetry={onRetryTitle} />
-        ) : isMissing ? (
-          <MissingContent />
-        ) : (
-          <LoadingContent />
-        )}
+        {fallback}
       </DialogShell>
     );
   }
 
-  return (
+  const detail = (
+    <DetailPanel
+      item={title}
+      layout={layout}
+      panelRef={panelRef}
+      canSave={canSave}
+      entryState={resolvedEntryState}
+      usherSlot={
+        usherMoment ? (
+          <UsherCard moment={usherMoment} onAction={onUsherAction} onDismiss={onUsherDismiss} />
+        ) : undefined
+      }
+      availabilityEnabled={availabilityEnabled}
+      onClose={onClose}
+      onOpen={onOpen}
+      onSave={onSave}
+      onSaveEntry={onSaveEntry}
+      onRemove={onRemove}
+      onStatus={onStatus}
+      onUpdateDraft={onUpdateDraft}
+      onTracked={onTracked}
+      onRetryEntry={() => void retryEntry()}
+      selectedProviderIds={selectedProviderIds}
+    />
+  );
+
+  return isPage ? (
+    <PageShell>{detail}</PageShell>
+  ) : (
     <DialogShell
       panelRef={panelRef}
       closeRef={closeRef}
       labelledBy="detail-title"
       onClose={onClose}
     >
-      <DetailPanel
-        item={title}
-        panelRef={panelRef}
-        canSave={canSave}
-        entryState={resolvedEntryState}
-        usherSlot={
-          usherMoment ? (
-            <UsherCard moment={usherMoment} onAction={onUsherAction} onDismiss={onUsherDismiss} />
-          ) : undefined
-        }
-        availabilityEnabled={availabilityEnabled}
-        onClose={onClose}
-        onOpen={onOpen}
-        onSave={onSave}
-        onSaveEntry={onSaveEntry}
-        onRemove={onRemove}
-        onStatus={onStatus}
-        onUpdateDraft={onUpdateDraft}
-        onTracked={onTracked}
-        onRetryEntry={() => void retryEntry()}
-        selectedProviderIds={selectedProviderIds}
-      />
+      {detail}
     </DialogShell>
   );
 }

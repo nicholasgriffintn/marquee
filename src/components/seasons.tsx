@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 
-import type { MediaTitle } from "../domain/catalog";
 import {
   airLabel,
   episodeEntryFor,
@@ -14,7 +13,7 @@ import {
   type SeasonDetail,
   type SeasonSummary,
 } from "../domain/seasons";
-import { useSeasons, type EpisodePatch, type EpisodeTracker } from "../hooks/useSeasons";
+import type { EpisodePatch, EpisodeTracker, SeasonsState } from "../hooks/useSeasons";
 import { classNames } from "../lib/class-names";
 import { artwork, artworkSrcSet } from "../lib/media";
 import {
@@ -306,17 +305,17 @@ function SeasonHeader({
 }
 
 export function SeasonsBlock({
-  item,
   canTrack,
   shelved,
   tracker,
+  seasons: state,
   jumpTo,
   onTracked,
 }: {
-  item: MediaTitle;
   canTrack: boolean;
   shelved: boolean;
   tracker: EpisodeTracker;
+  seasons: SeasonsState;
   jumpTo: { season: number; nonce: number } | null;
   onTracked?: () => void;
 }) {
@@ -325,11 +324,7 @@ export function SeasonsBlock({
     void tracker.save(patch).then((saved) => saved && onTracked?.());
   const mark = (season: number, watched: boolean, through: number | null = null) =>
     void tracker.mark(season, watched, through).then((marked) => marked && onTracked?.());
-  const { seasons, season, selected, selectSeason, isLoading, isLoadingSeason, error } = useSeasons(
-    item,
-    true,
-    tracker.progress,
-  );
+  const { seasons, season, selected, selectSeason, isLoading, isLoadingSeason, error } = state;
   const summary = seasons.find((candidate) => candidate.seasonNumber === selected) ?? null;
   const nonce = jumpTo?.nonce ?? null;
   const jumpSeason = jumpTo?.season ?? null;

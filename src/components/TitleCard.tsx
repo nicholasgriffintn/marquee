@@ -1,8 +1,10 @@
 import { memo } from "react";
+import { Link, useViewTransitionState } from "react-router-dom";
 
-import type { MediaTitle } from "../domain/catalog";
+import { titlePath, type MediaTitle } from "../domain/catalog";
 import { classNames } from "../lib/class-names";
 import { changeLabel, compactCount, mediaMeta } from "../lib/media";
+import { isModifiedClick } from "../lib/navigation";
 import { ProviderBadge } from "./ProviderBadge";
 import { RatingLine } from "./RatingLine";
 import { TitleArt } from "./TitleArt";
@@ -21,15 +23,29 @@ export const TitleCard = memo(function TitleCard({
   onOpen: (title: MediaTitle) => void;
   rank?: number;
 }) {
+  const path = titlePath(item);
+  const isTransitioning = useViewTransitionState(path);
+
   return (
     <article className={classNames(styles.card, item.pending && styles.pending)}>
-      <button
-        type="button"
+      <Link
+        to={path}
+        viewTransition
         className={styles.hit}
-        onClick={() => onOpen(item)}
         aria-label={`Open ${item.title}`}
+        onClick={(event) => {
+          if (isModifiedClick(event)) {
+            return;
+          }
+
+          event.preventDefault();
+          onOpen(item);
+        }}
       >
-        <div className={styles.art}>
+        <div
+          className={styles.art}
+          style={{ viewTransitionName: isTransitioning ? "title-art" : "none" }}
+        >
           <TitleArt
             url={item.backdropUrl ?? item.posterUrl}
             seed={item.id}
@@ -62,7 +78,7 @@ export const TitleCard = memo(function TitleCard({
           </div>
         </div>
         <strong className={styles.title}>{item.title}</strong>
-      </button>
+      </Link>
       <div className={styles.meta}>
         {item.buzz && (
           <span className={styles.buzz}>

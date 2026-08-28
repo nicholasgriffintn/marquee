@@ -1,8 +1,8 @@
+import { QueryClientProvider } from "@tanstack/react-query";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter } from "react-router-dom";
-import { QueryClientProvider } from "@tanstack/react-query";
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
+import { createBrowserRouter, RouterProvider } from "react-router-dom";
 
 import { App } from "./App";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -17,15 +17,24 @@ if (!root) {
   throw new Error("Root element not found");
 }
 
-createRoot(root).render(
-  <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+const router = createBrowserRouter([
+  {
+    path: "*",
+    element: (
+      <>
         <ErrorBoundary variant="page" label="the building">
           <App />
         </ErrorBoundary>
         <ReactQueryDevtools initialIsOpen={false} />
-      </BrowserRouter>
+      </>
+    ),
+  },
+]);
+
+createRoot(root).render(
+  <StrictMode>
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
     </QueryClientProvider>
   </StrictMode>,
 );

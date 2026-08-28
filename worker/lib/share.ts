@@ -1,22 +1,59 @@
-import { titlePath, type MediaTitle } from "../../src/domain/catalog.ts";
-import { readItems } from "../repositories/catalog-reader.ts";
+import { collectionPath, titlePath, type MediaTitle } from "../../src/domain/catalog.ts";
+import { revivalPath, runtimeLabel, type RevivalWork } from "../../src/domain/revival.ts";
+import { sentenceList } from "../../src/lib/string.ts";
+import { readCollectionTitleIds, readItems } from "../repositories/catalog-reader.ts";
+import { readPerson } from "../repositories/people.ts";
+import { readWork } from "../repositories/revival.ts";
 import type { Bindings } from "../types.ts";
 import { isKnownTitle } from "./validation.ts";
 
-type ShareCard = {
+type PageCard = {
   title: string;
   description: string;
   image: string | null;
-  url: string;
-  structuredData: string;
+  canonical: string;
+  ogType: string;
+  structuredData: string[];
+  index: boolean;
 };
 
-const CANONICAL_PARAMS: Record<string, string[]> = {
-  "/listings": ["genres", "keywords", "providers", "q", "sort", "type"],
-  "/search": ["q"],
+const NAMED_SERVICES = 3;
+const FACET_PARAMS = new Set(["type", "genres", "providers"]);
+
+const LISTING_KINDS: Record<string, { one: string; many: string }> = {
+  movie: { one: "film", many: "films" },
+  tv: { one: "TV series", many: "TV series" },
+  all: { one: "film or TV series", many: "films and TV" },
 };
 
-const NOINDEX_PATHS = new Set(["/search", "/sign-in", "/shelf", "/admin"]);
+const NOINDEX_PATHS = new Set(["/search", "/sign-in", "/shelf", "/admin", "/notebook"]);
+
+const STATIC_CARDS: Record<string, { title: string; description: string }> = {
+  "/": {
+    title: "Marquee — what to watch tonight, across every service you pay for",
+    description:
+      "Search live UK streaming, ask for a recommendation in plain English, and keep a shelf of what you have watched.",
+  },
+  "/this-week": {
+    title: "This week — new arrivals and returning series · Marquee",
+    description:
+      "What lands on your services this week, what comes back, and what the town is reading about. Printed every Monday.",
+  },
+  "/sources": {
+    title: "Where Marquee's data comes from — every service and source · Marquee",
+    description:
+      "Every streaming service Marquee tracks, how much it can see inside each one, and credit to everyone whose data makes it work.",
+  },
+  "/usher": {
+    title: "The Usher — thirty years on the door · Marquee",
+    description: "Who the Usher is, and why he has opinions about what you should watch tonight.",
+  },
+  "/revival": {
+    title: "The revival house — free public domain films to watch online · Marquee",
+    description:
+      "Out-of-copyright films streaming free in the UK. No account, no advert, no ticket — just press play.",
+  },
+};
 
 function escapeAttribute(value: string) {
   return value
@@ -34,11 +71,54 @@ function absolute(url: string | null, origin: string) {
   return url.startsWith("/") ? `${origin}${url}` : url;
 }
 
-function structuredDataFor(title: MediaTitle, url: string, origin: string) {
+function ldJson(data: Record<string, unknown>) {
+  return JSON.stringify(data).replaceAll("<", "\\u003c");
+}
+
+function capitalise(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function kindLabel(title: MediaTitle) {
+  return title.mediaType === "movie" ? "film" : "TV series";
+}
+
+function yearSuffix(year: number | null) {
+  return year ? ` (${year})` : "";
+}
+
+function breadcrumbs(origin: string, trail: { name: string; item: string }[]) {
+  return ldJson({
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [{ name: "Marquee", item: `${origin}/` }, ...trail].map((entry, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: entry.name,
+      item: entry.item,
+    })),
+  });
+}
+
+function offersFor(title: MediaTitle, url: string) {
+  return title.providers.slice(0, 12).map((provider) => ({
+    "@type": "WatchAction",
+    target: provider.webUrl ?? url,
+    expectsAcceptanceOf: {
+      "@type": "Offer",
+      availableAtOrFrom: { "@type": "Organization", name: provider.name },
+      category: provider.offerTypes[0] ?? "subscription",
+      ...(provider.offerTypes.includes("free") ? { price: 0, priceCurrency: "GBP" } : {}),
+    },
+  }));
+}
+
+function titleStructuredData(title: MediaTitle, url: string, origin: string) {
   const isMovie = title.mediaType === "movie";
   const image = absolute(title.posterUrl, origin);
   const sameAs = [title.tmdbUrl, title.imdbUrl].filter(Boolean);
-  const data: Record<string, unknown> = {
+
+  return ldJson({
     "@context": "https://schema.org",
     "@type": isMovie ? "Movie" : "TVSeries",
     name: title.title,
@@ -55,6 +135,7 @@ function structuredDataFor(title: MediaTitle, url: string, origin: string) {
     ...(!isMovie && title.numberOfSeasons ? { numberOfSeasons: title.numberOfSeasons } : {}),
     ...(!isMovie && title.episodeCount ? { numberOfEpisodes: title.episodeCount } : {}),
     ...(sameAs.length ? { sameAs } : {}),
+    ...(title.providers.length ? { potentialAction: offersFor(title, url) } : {}),
     ...(title.tmdbScore && title.tmdbVoteCount > 0
       ? {
           aggregateRating: {
@@ -66,21 +147,20 @@ function structuredDataFor(title: MediaTitle, url: string, origin: string) {
           },
         }
       : {}),
-  };
-
-  return JSON.stringify(data).replaceAll("<", "\\u003c");
+  });
 }
 
-async function cardFor(env: Bindings, path: string, origin: string): Promise<ShareCard | null> {
-  const routed = /^\/(movie|tv)\/([1-9][0-9]*)(?:\/|$)/u.exec(path);
-  const legacy = /^\/title\/([^/?#]+)/u.exec(path);
+function titleDescription(title: MediaTitle) {
+  const services = title.providers.map((provider) => provider.name).slice(0, NAMED_SERVICES);
 
-  if (!routed && !legacy) {
-    return null;
+  if (services.length) {
+    return `Watch ${title.title} on ${sentenceList(services)}. UK streaming, rent and buy prices, cinema showings and free options, checked daily.`;
   }
 
-  const titleId = routed ? `${routed[1]}:${routed[2]}` : decodeURIComponent(legacy?.[1] ?? "");
+  return `${title.title} is not on a UK service right now. Marquee watches every service and lists rent, buy, cinema and free options for this ${kindLabel(title)} as they land.`;
+}
 
+async function titleCard(env: Bindings, titleId: string, origin: string): Promise<PageCard | null> {
   if (!isKnownTitle(titleId)) {
     return null;
   }
@@ -91,34 +171,262 @@ async function cardFor(env: Bindings, path: string, origin: string): Promise<Sha
     return null;
   }
 
-  const services = title.providers.map((provider) => provider.name).slice(0, 3);
   const url = `${origin}${titlePath(title)}`;
 
   return {
-    title: `${title.title}${title.year ? ` (${title.year})` : ""} · Marquee`,
-    description:
-      title.overview.slice(0, 200) ||
-      `${title.genres.join(", ")}${services.length ? ` · on ${services.join(", ")}` : ""}`,
+    title: `Where to watch ${title.title}${yearSuffix(title.year)} — ${kindLabel(title)} streaming in the UK · Marquee`,
+    description: titleDescription(title),
     image: `${origin}/media/og/${encodeURIComponent(titleId)}.png`,
-    url,
-    structuredData: structuredDataFor(title, url, origin),
+    canonical: url,
+    ogType: "video.other",
+    index: true,
+    structuredData: [
+      titleStructuredData(title, url, origin),
+      breadcrumbs(origin, [
+        {
+          name: title.mediaType === "movie" ? "Films" : "Series",
+          item: `${origin}/listings?type=${title.mediaType}`,
+        },
+        { name: title.title, item: url },
+      ]),
+    ],
   };
 }
 
-function canonicalFor(url: URL, origin: string) {
-  const params = new URLSearchParams();
+async function personCard(env: Bindings, name: string, origin: string): Promise<PageCard | null> {
+  const person = await readPerson(env.DB, name);
 
-  for (const key of CANONICAL_PARAMS[url.pathname] ?? []) {
-    const value = url.searchParams.get(key)?.trim();
-
-    if (value) {
-      params.set(key, value);
-    }
+  if (!person) {
+    return null;
   }
 
-  const query = params.toString();
+  const url = `${origin}/person/${encodeURIComponent(person.name)}`;
+  const count = person.titles > 0 ? `${person.titles.toLocaleString("en-GB")} ` : "";
 
-  return `${origin}${url.pathname}${query ? `?${query}` : ""}`;
+  return {
+    title: `${person.name} — every film and TV series, and where to stream them · Marquee`,
+    description: `All ${count}${person.name} titles in the catalogue, with UK streaming, rent and buy options for each one.`,
+    image: null,
+    canonical: url,
+    ogType: "profile",
+    index: person.titles > 0,
+    structuredData: [
+      ldJson({
+        "@context": "https://schema.org",
+        "@type": "Person",
+        name: person.name,
+        url,
+      }),
+      breadcrumbs(origin, [{ name: person.name, item: url }]),
+    ],
+  };
+}
+
+async function collectionCard(
+  env: Bindings,
+  collectionId: number,
+  origin: string,
+): Promise<PageCard | null> {
+  const ids = await readCollectionTitleIds(env.DB, collectionId, 48);
+
+  if (ids.length === 0) {
+    return null;
+  }
+
+  const items = await readItems(env.DB, ids, 48);
+  const name = items[0]?.collection?.name ?? "Collection";
+  const url = `${origin}${collectionPath(collectionId)}`;
+  const plural = items.length === 1 ? "film" : "films";
+
+  return {
+    title: `${name} — every film in order, and where to watch · Marquee`,
+    description: `All ${items.length} ${plural} in ${name}, in release order, with UK streaming and rent options for each.`,
+    image: absolute(items[0]?.posterUrl ?? null, origin),
+    canonical: url,
+    ogType: "website",
+    index: items.length > 1,
+    structuredData: [
+      ldJson({
+        "@context": "https://schema.org",
+        "@type": "ItemList",
+        name,
+        url,
+        numberOfItems: items.length,
+        itemListElement: items.slice(0, 24).map((item, index) => ({
+          "@type": "ListItem",
+          position: index + 1,
+          name: item.title,
+          url: `${origin}${titlePath(item)}`,
+        })),
+      }),
+      breadcrumbs(origin, [{ name, item: url }]),
+    ],
+  };
+}
+
+function revivalStructuredData(work: RevivalWork, url: string, origin: string) {
+  return ldJson({
+    "@context": "https://schema.org",
+    "@type": "VideoObject",
+    name: work.title,
+    url,
+    ...(work.synopsis ? { description: work.synopsis } : {}),
+    ...(work.stillUrl ? { thumbnailUrl: absolute(work.stillUrl, origin) } : {}),
+    ...(work.year ? { datePublished: String(work.year) } : {}),
+    ...(work.director ? { director: { "@type": "Person", name: work.director } } : {}),
+    ...(work.runtimeSeconds ? { duration: `PT${Math.round(work.runtimeSeconds / 60)}M` } : {}),
+    isAccessibleForFree: true,
+    contentUrl: work.reelUrl,
+  });
+}
+
+async function revivalWorkCard(
+  env: Bindings,
+  workId: string,
+  origin: string,
+): Promise<PageCard | null> {
+  const work = await readWork(env.DB, workId);
+
+  if (!work) {
+    return null;
+  }
+
+  const url = `${origin}${revivalPath(work)}`;
+  const runtime = runtimeLabel(work.runtimeSeconds);
+
+  return {
+    title: `Watch ${work.title}${yearSuffix(work.year)} free — public domain film · Marquee`,
+    description: `${work.title} streams free in the revival house${runtime ? `, ${runtime}` : ""}. Out of UK copyright, no account and no advert.`,
+    image: absolute(work.stillUrl, origin),
+    canonical: url,
+    ogType: "video.movie",
+    index: true,
+    structuredData: [
+      revivalStructuredData(work, url, origin),
+      breadcrumbs(origin, [
+        { name: "Revival house", item: `${origin}/revival` },
+        { name: work.title, item: url },
+      ]),
+    ],
+  };
+}
+
+async function providerName(env: Bindings, providerId: string) {
+  const row = await env.DB.prepare(
+    "SELECT name FROM catalog_title_providers WHERE provider_id = ?1 LIMIT 1",
+  )
+    .bind(providerId)
+    .first<{ name: string }>();
+
+  return row?.name ?? null;
+}
+
+function selected(url: URL, key: string) {
+  return url.searchParams
+    .getAll(key)
+    .flatMap((value) => value.split(","))
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
+async function listingsCard(env: Bindings, url: URL, origin: string): Promise<PageCard> {
+  const type = url.searchParams.get("type");
+  const genres = selected(url, "genres");
+  const providers = selected(url, "providers");
+  const extras = [...url.searchParams.keys()].filter((key) => !FACET_PARAMS.has(key));
+  const kind = LISTING_KINDS[type === "movie" || type === "tv" ? type : "all"];
+  const genre = genres.length === 1 ? genres[0] : null;
+  const service = providers.length === 1 ? await providerName(env, providers[0]) : null;
+  const isFacet =
+    extras.length === 0 && genres.length <= 1 && (providers.length === 0 || Boolean(service));
+  const facets = new URLSearchParams();
+
+  if (type === "movie" || type === "tv") {
+    facets.set("type", type);
+  }
+
+  if (genre) {
+    facets.set("genres", genre);
+  }
+
+  if (service) {
+    facets.set("providers", providers[0]);
+  }
+
+  const query = facets.toString();
+  const canonical = `${origin}/listings${query ? `?${query}` : ""}`;
+  const label = genre ? `${genre.toLowerCase()} ` : "";
+  const heading = capitalise(`${label}${kind.many}`);
+  const named = service ? `${heading} on ${service}` : heading;
+
+  return {
+    title: `${service ? named : `${heading} to stream in the UK`} · Marquee`,
+    description: service
+      ? `Every ${label}${kind.one} on ${service} in the UK right now, ranked, with what it costs elsewhere if you do not subscribe.`
+      : `Every ${label}${kind.one} streaming in the UK right now, across every service, ranked and filterable by tag, service and where it was shot.`,
+    image: null,
+    canonical,
+    ogType: "website",
+    index: isFacet,
+    structuredData: [breadcrumbs(origin, [{ name: named, item: canonical }])],
+  };
+}
+
+function staticCard(path: string, origin: string): PageCard | null {
+  const copy = STATIC_CARDS[path];
+
+  if (!copy) {
+    return null;
+  }
+
+  return {
+    title: copy.title,
+    description: copy.description,
+    image: null,
+    canonical: `${origin}${path}`,
+    ogType: "website",
+    index: true,
+    structuredData: [],
+  };
+}
+
+async function cardFor(env: Bindings, url: URL, origin: string): Promise<PageCard | null> {
+  const path = url.pathname;
+  const routed = /^\/(movie|tv)\/([1-9][0-9]*)(?:\/|$)/u.exec(path);
+
+  if (routed) {
+    return titleCard(env, `${routed[1]}:${routed[2]}`, origin);
+  }
+
+  const legacy = /^\/title\/([^/?#]+)/u.exec(path);
+
+  if (legacy) {
+    return titleCard(env, decodeURIComponent(legacy[1]), origin);
+  }
+
+  const person = /^\/person\/([^/?#]+)/u.exec(path);
+
+  if (person) {
+    return personCard(env, decodeURIComponent(person[1]), origin);
+  }
+
+  const collection = /^\/collection\/([1-9][0-9]*)/u.exec(path);
+
+  if (collection) {
+    return collectionCard(env, Number(collection[1]), origin);
+  }
+
+  const revival = /^\/revival\/([^/?#]+)/u.exec(path);
+
+  if (revival) {
+    return revivalWorkCard(env, decodeURIComponent(revival[1]), origin);
+  }
+
+  if (path === "/listings") {
+    return listingsCard(env, url, origin);
+  }
+
+  return staticCard(path, origin);
 }
 
 export async function withPageMetadata(
@@ -131,25 +439,26 @@ export async function withPageMetadata(
     return response;
   }
 
-  const card = await cardFor(env, url.pathname, origin).catch(() => null);
-  const canonical = card ? card.url : canonicalFor(url, origin);
+  const card = await cardFor(env, url, origin).catch(() => null);
+  const canonical = card ? card.canonical : `${origin}${url.pathname}`;
+  const noindex = card ? !card.index : NOINDEX_PATHS.has(url.pathname);
   const head = [
     `<link rel="canonical" href="${escapeAttribute(canonical)}">`,
-    !card && NOINDEX_PATHS.has(url.pathname)
-      ? `<meta name="robots" content="noindex, follow">`
-      : "",
+    noindex ? `<meta name="robots" content="noindex, follow">` : "",
     card
       ? [
-          `<meta property="og:type" content="video.other">`,
+          `<meta property="og:type" content="${escapeAttribute(card.ogType)}">`,
           `<meta property="og:title" content="${escapeAttribute(card.title)}">`,
           `<meta property="og:description" content="${escapeAttribute(card.description)}">`,
-          `<meta property="og:url" content="${escapeAttribute(card.url)}">`,
+          `<meta property="og:url" content="${escapeAttribute(card.canonical)}">`,
           card.image ? `<meta property="og:image" content="${escapeAttribute(card.image)}">` : "",
           `<meta name="twitter:card" content="summary_large_image">`,
           `<meta name="twitter:title" content="${escapeAttribute(card.title)}">`,
           `<meta name="twitter:description" content="${escapeAttribute(card.description)}">`,
           card.image ? `<meta name="twitter:image" content="${escapeAttribute(card.image)}">` : "",
-          `<script type="application/ld+json">${card.structuredData}</script>`,
+          ...card.structuredData.map(
+            (data) => `<script type="application/ld+json">${data}</script>`,
+          ),
         ].join("")
       : "",
   ]

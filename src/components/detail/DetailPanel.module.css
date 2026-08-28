@@ -1,5 +1,6 @@
 .art {
   align-self: start;
+  view-transition-name: title-art;
   aspect-ratio: auto;
   height: 100dvh;
   min-height: 0;
@@ -84,7 +85,7 @@
 
 .save {
   font-size: var(--type-xs);
-  margin: var(--space-2) 0 var(--space-6);
+  margin: var(--space-2) 0 var(--space-2);
   min-height: 50px;
 }
 
@@ -123,7 +124,7 @@
   }
 
   .copy {
-    padding: var(--space-6) var(--space-5) 90px;
+    padding: var(--space-6) var(--gutter) 90px;
   }
 }
 
@@ -134,5 +135,38 @@
 
   .continue:hover {
     transform: none;
+  }
+}
+
+.pageArt {
+  height: calc(100vh - 78px);
+  top: 78px;
+}
+
+.pageCopy {
+  max-width: 1040px;
+  padding: var(--space-8) var(--gutter) 120px;
+}
+
+@media (max-width: 900px) {
+  .pageArt {
+    aspect-ratio: auto;
+    height: clamp(220px, 34vh, 320px);
+    position: relative;
+    top: 0;
+  }
+
+  .pageArt > img,
+  .pageArt > picture > img {
+    object-position: center top;
+  }
+
+  .pageArt::after {
+    display: none;
+  }
+
+  .pageCopy {
+    max-width: none;
+    padding: var(--space-6) var(--gutter) 90px;
   }
 }

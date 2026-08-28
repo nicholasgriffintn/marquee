@@ -1,9 +1,11 @@
+import { sentenceList } from "../lib/string";
 import type { ProviderAvailability } from "./catalog";
 
 export const STREAMING_LIMIT = 4;
 
 const INCLUDED_OFFER = "Subscription";
 const FREE_OFFERS = new Set(["Free", "Free with ads"]);
+const PAID_OFFERS = new Set(["Rent", "Buy"]);
 
 export type WatchTier = "yours" | "included" | "free" | "paid";
 
@@ -73,4 +75,49 @@ export function watchOptions(
   }
 
   return { primary: streaming[0] ?? null, rest: streaming.slice(1), paid };
+}
+
+function providerNames(providers: ProviderAvailability[]) {
+  return sentenceList([...new Set(providers.map((provider) => provider.name))]);
+}
+
+export function availabilityLine(title: string, providers: ProviderAvailability[]) {
+  const included = providers.filter((provider) => provider.offerTypes.includes(INCLUDED_OFFER));
+  const free = providers.filter(
+    (provider) =>
+      !provider.offerTypes.includes(INCLUDED_OFFER) &&
+      provider.offerTypes.some((offer) => FREE_OFFERS.has(offer)),
+  );
+  const paid = providers.filter((provider) =>
+    provider.offerTypes.some((offer) => PAID_OFFERS.has(offer)),
+  );
+  const clauses: string[] = [];
+
+  if (included.length > 0) {
+    clauses.push(`stream ${title} on ${providerNames(included)}`);
+  }
+
+  if (free.length > 0) {
+    const withAds = free.some((provider) => provider.offerTypes.includes("Free with ads"));
+    const subject = clauses.length > 0 ? "it" : title;
+
+    clauses.push(
+      `watch ${subject} free ${withAds ? "with adverts " : ""}on ${providerNames(free)}`,
+    );
+  }
+
+  const opening = clauses.length > 0 ? `Right now you can ${clauses.join(", or ")}.` : "";
+
+  if (paid.length === 0) {
+    return opening;
+  }
+
+  const rentable = paid.some((provider) => provider.offerTypes.includes("Rent"));
+  const buyable = paid.some((provider) => provider.offerTypes.includes("Buy"));
+  const verb = rentable && buyable ? "rent or buy" : rentable ? "rent" : "buy";
+  const closing = opening
+    ? `You can also ${verb} it from ${providerNames(paid)}.`
+    : `Right now you can ${verb} ${title} from ${providerNames(paid)}.`;
+
+  return opening ? `${opening} ${closing}` : closing;
 }

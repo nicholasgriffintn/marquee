@@ -24,6 +24,7 @@ import { useTonight } from "./hooks/useTonight";
 import { useTrending } from "./hooks/useTrending";
 import { useUsher } from "./hooks/useUsher";
 import { classNames } from "./lib/class-names";
+import { APP_INSTANCE } from "./lib/navigation";
 import { titleForItem, titleForRoute } from "./lib/page-title";
 import type { BrowsePreset } from "./pages/BrowsePage";
 import { NotFoundPage } from "./pages/NotFoundPage";
@@ -159,11 +160,13 @@ export function App() {
   const openTmdbId = (movieMatch ?? seriesMatch)?.params.tmdbId ?? "";
   const routedTitleId = openMediaType && openTmdbId ? `${openMediaType}:${openTmdbId}` : "";
   const titleMatch = Boolean(routedTitleId || legacyMatch);
-  const storedBackground = (location.state as { background?: typeof location } | null)?.background;
+  const openedState = location.state as { background?: typeof location; instance?: string } | null;
+  const storedBackground =
+    openedState?.instance === APP_INSTANCE ? openedState.background : undefined;
   const background =
     storedBackground && isTitlePath(storedBackground.pathname) ? undefined : storedBackground;
-  const pageLocation =
-    background ?? (titleMatch ? { ...location, pathname: "/", search: "" } : location);
+  const isOverlay = titleMatch && Boolean(background);
+  const pageLocation = background ?? location;
   const pagePath = pageLocation.pathname;
 
   useEffect(() => {
@@ -250,7 +253,8 @@ export function App() {
       openTriggerRef.current =
         document.activeElement instanceof HTMLElement ? document.activeElement : null;
       void navigate(titlePath(item), {
-        state: { background: openBackgroundRef.current },
+        state: { background: openBackgroundRef.current, instance: APP_INSTANCE },
+        viewTransition: true,
       });
     },
     [navigate],
@@ -262,7 +266,7 @@ export function App() {
       return;
     }
 
-    void navigate("/");
+    void navigate("/", { viewTransition: true });
   }, [background, navigate]);
   const sections = useMemo(
     () =>
@@ -414,6 +418,37 @@ export function App() {
       },
     );
   }
+
+  const titleView = openTitleId ? (
+    <ErrorBoundary label="The title card" resetKey={openTitleId} onRetry={closeDetails}>
+      <TitleOverlay
+        layout={isOverlay ? "overlay" : "page"}
+        titleId={openTitleId}
+        usherMoment={usher.moment?.surface === "title" ? usher.moment : null}
+        onUsherRequest={onTitleMoment}
+        onUsherAction={onUsherAction}
+        onUsherDismiss={(scope) => void usher.dismiss(scope)}
+        title={openDetails.title}
+        isMissing={openDetails.isMissing}
+        isLoading={openDetails.isLoading}
+        titleError={openDetails.error}
+        canSave={isSignedIn}
+        entryState={profile.entryStates[openTitleId]}
+        selectedProviderIds={selectedProviderIds}
+        availabilityEnabled={catalog.providerSources.length > 0}
+        onClose={closeDetails}
+        onOpen={openTitle}
+        onSave={(item) => void saveTitle(item)}
+        onSaveEntry={(entry) => void profile.saveEntry(entry)}
+        onRemove={(id) => void profile.removeEntry(id)}
+        onStatus={profile.setStatus}
+        onUpdateDraft={profile.updateDraft}
+        onTracked={profile.refresh}
+        onLoadEntry={profile.loadEntry}
+        onRetryTitle={openDetails.reload}
+      />
+    </ErrorBoundary>
+  ) : null;
 
   return (
     <div className={styles.shell}>
@@ -592,6 +627,7 @@ export function App() {
                   />
                 }
               />
+
               <Route
                 path="/shelf"
                 element={
@@ -651,6 +687,10 @@ export function App() {
                 }
               />
 
+              <Route path="/movie/:tmdbId/*" element={titleView} />
+              <Route path="/tv/:tmdbId/*" element={titleView} />
+              <Route path="/title/:titleId" element={titleView} />
+
               {Object.entries(LEGACY_BROWSE).map(([path, preset]) => (
                 <Route key={path} path={path} element={<LegacyBrowse preset={preset} />} />
               ))}
@@ -661,35 +701,7 @@ export function App() {
         </ErrorBoundary>
       </main>
 
-      {openTitleId && (
-        <ErrorBoundary label="The title card" resetKey={openTitleId} onRetry={closeDetails}>
-          <TitleOverlay
-            titleId={openTitleId}
-            usherMoment={usher.moment?.surface === "title" ? usher.moment : null}
-            onUsherRequest={onTitleMoment}
-            onUsherAction={onUsherAction}
-            onUsherDismiss={(scope) => void usher.dismiss(scope)}
-            title={openDetails.title}
-            isMissing={openDetails.isMissing}
-            isLoading={openDetails.isLoading}
-            titleError={openDetails.error}
-            canSave={isSignedIn}
-            entryState={profile.entryStates[openTitleId]}
-            selectedProviderIds={selectedProviderIds}
-            availabilityEnabled={catalog.providerSources.length > 0}
-            onClose={closeDetails}
-            onOpen={openTitle}
-            onSave={(item) => void saveTitle(item)}
-            onSaveEntry={(entry) => void profile.saveEntry(entry)}
-            onRemove={(id) => void profile.removeEntry(id)}
-            onStatus={profile.setStatus}
-            onUpdateDraft={profile.updateDraft}
-            onTracked={profile.refresh}
-            onLoadEntry={profile.loadEntry}
-            onRetryTitle={openDetails.reload}
-          />
-        </ErrorBoundary>
-      )}
+      {isOverlay && titleView}
 
       <SiteFooter />
     </div>
