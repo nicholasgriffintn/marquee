@@ -11,17 +11,10 @@ export type AwardSummary = {
   wins: number;
   nominations: number;
   entries: AwardEntry[];
+  summary: string | null;
 };
 
-export type AwardRun = {
-  awardId: string;
-  label: string;
-  total: number;
-  held: number;
-  watched: number;
-};
-
-export const NO_AWARDS: AwardSummary = { wins: 0, nominations: 0, entries: [] };
+export const NO_AWARDS: AwardSummary = { wins: 0, nominations: 0, entries: [], summary: null };
 
 export function isAwardOutcome(value: unknown): value is AwardOutcome {
   return value === "won" || value === "nominated";

@@ -3,11 +3,18 @@ import { awardLine, awardTally, type AwardSummary } from "../domain/awards";
 const SHOWN = 3;
 
 export function AwardsNote({ awards }: { awards: AwardSummary }) {
+  const won = awards.entries.filter((entry) => entry.outcome === "won");
+
   if (awards.entries.length === 0) {
-    return null;
+    return awards.summary ? (
+      <div className="detail-awards">
+        <span>Awards cabinet</span>
+        <p>{awards.summary}</p>
+        <small className="detail-credit">Counted by OMDb, which does not name them</small>
+      </div>
+    ) : null;
   }
 
-  const won = awards.entries.filter((entry) => entry.outcome === "won");
   const listed = won.slice(0, SHOWN);
   const held = won.length - listed.length;
 
@@ -21,7 +28,7 @@ export function AwardsNote({ awards }: { awards: AwardSummary }) {
           {held > 0 ? ` · and ${held} more won` : ""}
         </small>
       )}
-      <small className="detail-credit">Awards from Wikidata</small>
+      <small className="detail-credit">Named awards from Wikidata</small>
     </div>
   );
 }

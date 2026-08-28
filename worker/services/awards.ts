@@ -15,6 +15,7 @@ import type { Bindings } from "../types.ts";
 const TITLE_SAMPLE = 150;
 const PERSON_SAMPLE = 150;
 const REFRESH_DAYS = 30;
+const SOURCE = "wikidata";
 
 function byKey(statements: AwardStatement[]) {
   const grouped = new Map<string, AwardStatement[]>();
@@ -27,7 +28,7 @@ function byKey(statements: AwardStatement[]) {
 }
 
 async function syncTitleAwards(env: Bindings) {
-  const candidates = await titleAwardCandidates(env.DB, TITLE_SAMPLE, REFRESH_DAYS);
+  const candidates = await titleAwardCandidates(env.DB, SOURCE, TITLE_SAMPLE, REFRESH_DAYS);
 
   if (candidates.length === 0) {
     return 0;
@@ -38,9 +39,9 @@ async function syncTitleAwards(env: Bindings) {
 
   await storeTitleAwards(
     env.DB,
+    SOURCE,
     candidates.map((candidate) => ({
       titleId: candidate.titleId,
-      entityId: candidate.entityId,
       entries: grouped.get(candidate.entityId) ?? [],
     })),
   );
@@ -57,7 +58,7 @@ async function syncTitleAwards(env: Bindings) {
 }
 
 async function syncPersonAwards(env: Bindings) {
-  const candidates = await personAwardCandidates(env.DB, PERSON_SAMPLE, REFRESH_DAYS);
+  const candidates = await personAwardCandidates(env.DB, SOURCE, PERSON_SAMPLE, REFRESH_DAYS);
 
   if (candidates.length === 0) {
     return 0;
@@ -68,6 +69,7 @@ async function syncPersonAwards(env: Bindings) {
 
   await storePersonAwards(
     env.DB,
+    SOURCE,
     candidates.map((personId) => ({
       personId,
       entries: grouped.get(String(personId)) ?? [],
