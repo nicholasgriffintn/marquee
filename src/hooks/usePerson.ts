@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
+import { NO_AWARDS, type AwardSummary } from "../domain/awards";
 import type { MediaTitle } from "../domain/catalog";
 import { ApiError, isAbortError, jsonRequest, requestJson } from "../lib/api";
 import { useResource } from "./useResource";
@@ -8,6 +9,7 @@ export type PersonResponse = {
   person: { name: string; titles: number };
   items: MediaTitle[];
   shelf: { shelved: number; watched: number };
+  awards: AwardSummary;
   page: number;
   hasMore: boolean;
 };
@@ -17,6 +19,7 @@ const NO_ITEMS: MediaTitle[] = [];
 export function usePerson(name: string, isSignedIn: boolean) {
   const [person, setPerson] = useState<PersonResponse["person"] | null>(null);
   const [shelf, setShelf] = useState({ shelved: 0, watched: 0 });
+  const [awards, setAwards] = useState<AwardSummary>(NO_AWARDS);
   const [items, setItems] = useState<MediaTitle[]>(NO_ITEMS);
   const [pageState, setPageState] = useState({ key: "", page: 0 });
   const [hasMore, setHasMore] = useState(false);
@@ -49,6 +52,7 @@ export function usePerson(name: string, isSignedIn: boolean) {
 
         setPerson(response.person);
         setShelf(response.shelf);
+        setAwards(response.awards);
         setItems((current) => (page === 0 ? response.items : [...current, ...response.items]));
         setHasMore(response.hasMore);
         setLoadError("");
@@ -107,7 +111,7 @@ export function usePerson(name: string, isSignedIn: boolean) {
   }, [following, name]);
 
   return {
-    data: person ? { person, items, shelf } : null,
+    data: person ? { person, items, shelf, awards } : null,
     following,
     error: loadError,
     saveError,

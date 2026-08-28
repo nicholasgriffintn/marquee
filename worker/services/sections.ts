@@ -1,5 +1,6 @@
 import type { SectionAudience } from "../../src/domain/catalog.ts";
 import { providerRegistry } from "../../src/domain/providers.ts";
+import { PALME_DOR } from "../lib/awards.ts";
 import { logError, logEvent } from "../lib/logging.ts";
 import { titleCase } from "../lib/text.ts";
 import { isKnownTitle } from "../lib/validation.ts";
@@ -36,6 +37,10 @@ const REVENUE = "COALESCE(revenue, 0)";
 const AWARD_WINS = `COALESCE(
   (SELECT award_wins FROM catalog_title_ratings WHERE title_id = catalog_titles.id), 0
 )`;
+const NOMINATIONS = `(SELECT count(*) FROM title_awards
+  WHERE title_id = catalog_titles.id AND outcome = 'nominated')`;
+const WON_NOTHING = `NOT EXISTS (SELECT 1 FROM title_awards
+  WHERE title_id = catalog_titles.id AND outcome = 'won')`;
 
 function dailySeed() {
   return Math.floor(Date.now() / 86_400_000);
@@ -317,6 +322,32 @@ export async function buildSections(env: Bindings) {
     title: "The trophy cabinet",
     description: "Films and series the awards season could not ignore",
     titleIds: await pick(env, used, `${AWARD_WINS} >= 8 AND ${VOTES} >= 150`, `${AWARD_WINS} DESC`),
+  });
+
+  add({
+    id: "palme-dor",
+    title: "The Palme d'Or",
+    description: "Every winner Cannes has crowned that we have in the catalogue",
+    titleIds: await pick(
+      env,
+      used,
+      `EXISTS (SELECT 1 FROM title_awards
+               WHERE title_id = catalog_titles.id
+                 AND award_id = '${PALME_DOR}' AND outcome = 'won')`,
+      "year DESC",
+    ),
+  });
+
+  add({
+    id: "always-a-bridesmaid",
+    title: "Always the bridesmaid",
+    description: "Nominated again and again, and sent home with nothing",
+    titleIds: await pick(
+      env,
+      used,
+      `${NOMINATIONS} >= 3 AND ${WON_NOTHING} AND ${VOTES} >= 100`,
+      `${NOMINATIONS} DESC`,
+    ),
   });
 
   add({
