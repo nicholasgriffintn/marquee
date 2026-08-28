@@ -3923,6 +3923,10 @@ h2 em {
   line-height: 1.5;
   margin: 0;
 }
+.detail-awards small {
+  color: var(--muted);
+  font: 10px/1.6 var(--mono);
+}
 .detail-buzz {
   border-left: 3px solid var(--acid);
   display: flex;
@@ -5029,6 +5033,39 @@ h2 em {
   font: 400 14px/1.6 var(--sans);
   margin: 0 0 14px;
   max-width: 62ch;
+}
+.awards-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  list-style: none;
+  margin: 0 0 26px;
+  max-width: 52ch;
+  padding: 0;
+}
+.awards-strip li {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.awards-strip b {
+  font: 600 14px/1.4 var(--sans);
+}
+.awards-strip small {
+  color: var(--muted);
+  font: 400 13px/1.5 var(--sans);
+}
+.awards-strip-bar {
+  background: rgb(59 63 57 / 12%);
+  border-radius: 2px;
+  display: block;
+  height: 6px;
+  overflow: hidden;
+}
+.awards-strip-bar i {
+  background: var(--acid);
+  display: block;
+  height: 100%;
 }
 .notebook-group {
   margin-bottom: 42px;

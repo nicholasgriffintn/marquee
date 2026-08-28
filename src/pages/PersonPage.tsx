@@ -1,5 +1,6 @@
 import { useParams } from "react-router-dom";
 
+import { AwardsNote } from "../components/AwardsNote";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { TitleCard } from "../components/TitleCard";
 import { UsherMark } from "../components/usher/UsherMark";
@@ -71,6 +72,7 @@ export function PersonPage({
               {saveError}
             </p>
           )}
+          {data && <AwardsNote awards={data.awards} />}
         </div>
       </div>
 
