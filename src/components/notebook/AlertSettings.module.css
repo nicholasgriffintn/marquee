@@ -1,0 +1,89 @@
+.form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.address {
+  background: var(--panel);
+  border: 1px solid var(--panel-line);
+  color: var(--white);
+  flex: 1 1 280px;
+  font: var(--weight-regular) var(--type-body) / 1 var(--sans);
+  min-height: 44px;
+  padding: 0 var(--space-3);
+}
+
+.submit {
+  font: var(--weight-bold) var(--type-xs) / 1 var(--sans);
+  letter-spacing: 0;
+  min-height: 44px;
+  text-transform: none;
+}
+
+.state {
+  align-self: center;
+  color: var(--muted);
+  font: var(--weight-bold) var(--type-label) / 1 var(--mono);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.confirmed {
+  color: var(--acid);
+}
+
+.status {
+  color: var(--paper);
+  font: italic var(--weight-regular) var(--type-body) / 1.5 var(--serif);
+  margin: var(--space-3) 0 0;
+  max-width: 56ch;
+}
+
+.dismiss {
+  background: none;
+  border: 0;
+  color: var(--acid);
+  cursor: pointer;
+  font: var(--weight-medium) var(--type-sm) / 1 var(--sans);
+  margin-left: var(--space-2);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.kinds {
+  display: grid;
+  gap: var(--space-2);
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 0;
+}
+
+.kinds label {
+  align-items: start;
+  cursor: pointer;
+  display: flex;
+  gap: var(--space-3);
+}
+
+.kinds input {
+  accent-color: var(--acid);
+  height: 18px;
+  margin-top: 2px;
+  width: 18px;
+}
+
+.kinds span {
+  display: grid;
+  gap: 3px;
+}
+
+.kinds strong {
+  color: var(--white);
+  font: var(--weight-medium) var(--type-body) / 1.3 var(--sans);
+}
+
+.kinds small {
+  color: var(--muted);
+  font: var(--weight-regular) var(--type-sm) / 1.4 var(--sans);
+}

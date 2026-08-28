@@ -1,5 +1,6 @@
 import type { MediaTitle, SourceWork } from "../../domain/catalog";
 import { sourceWorkMeta } from "../../lib/media";
+import { Text } from "../../ui";
 import { collectionCaption, TitleTrack } from "./TitleTrack";
 
 export function SourceWorkLine({ source }: { source: SourceWork | null }) {
@@ -7,7 +8,11 @@ export function SourceWorkLine({ source }: { source: SourceWork | null }) {
     return null;
   }
 
-  return <p className="detail-original">{sourceWorkMeta(source)}</p>;
+  return (
+    <Text size="sm" tone="inkMuted">
+      {sourceWorkMeta(source)}
+    </Text>
+  );
 }
 
 export function SourceWorkTrack({

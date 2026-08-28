@@ -23,11 +23,15 @@ import { useTitle } from "./hooks/useTitle";
 import { useTonight } from "./hooks/useTonight";
 import { useTrending } from "./hooks/useTrending";
 import { useUsher } from "./hooks/useUsher";
+import { classNames } from "./lib/class-names";
 import { titleForItem, titleForRoute } from "./lib/page-title";
 import type { BrowsePreset } from "./pages/BrowsePage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { SignedOutShelf } from "./pages/SignedOutShelf";
 import { TonightPage } from "./pages/TonightPage";
+import { Page, StatusNote } from "./ui";
+
+import styles from "./App.module.css";
 
 const BrowsePage = lazy(() =>
   import("./pages/BrowsePage").then((m) => ({ default: m.BrowsePage })),
@@ -69,12 +73,9 @@ const NotebookPage = lazy(() =>
 
 function RouteFallback() {
   return (
-    <section className="page-section">
-      <p className="availability-empty">
-        <i className="availability-spinner" aria-hidden="true" />
-        Loading…
-      </p>
-    </section>
+    <Page>
+      <StatusNote busy>Loading…</StatusNote>
+    </Page>
   );
 }
 
@@ -415,8 +416,8 @@ export function App() {
   }
 
   return (
-    <div className="site-shell">
-      <a href="#main-content" className="skip-link">
+    <div className={styles.shell}>
+      <a href="#main-content" className={styles.skipLink}>
         Skip to content
       </a>
       <SiteHeader
@@ -427,7 +428,7 @@ export function App() {
         shelvedCount={profile.shelved}
         onSignOut={() => void session.logout()}
         searchSlot={
-          <ErrorBoundary label="The search box" resetKey={pagePath}>
+          <ErrorBoundary label="The search box" compact resetKey={pagePath}>
             <SearchBox
               query={query}
               results={search.items}
@@ -447,16 +448,19 @@ export function App() {
       />
 
       {session.error && (
-        <p className="auth-message" role="alert">
+        <p className={styles.authMessage} role="alert">
           {session.error}
         </p>
       )}
 
-      <p className={`sync-message${profile.message ? " visible" : ""}`} aria-live="polite">
+      <p
+        className={classNames(styles.syncMessage, profile.message && styles.syncMessageVisible)}
+        aria-live="polite"
+      >
         {profile.message}
       </p>
 
-      <main id="main-content" className="site-main">
+      <main id="main-content">
         <ErrorBoundary
           variant="page"
           label="this page"

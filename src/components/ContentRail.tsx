@@ -13,9 +13,12 @@ import type { CatalogSection, MediaTitle } from "../domain/catalog";
 import { useNearViewport } from "../hooks/useNearViewport";
 import { startJourney } from "../lib/journey";
 import { track } from "../lib/telemetry";
+import { Skeleton } from "../ui";
+import { Rail, RailEmpty, RailHeading, RailPager, RailTrack } from "./rail/Rail";
 import { TitleCard } from "./TitleCard";
-import { ChevronIcon } from "./ui";
 import { UsherMark } from "./usher/UsherMark";
+
+import styles from "./ContentRail.module.css";
 
 type RailScroll = {
   overflowing: boolean;
@@ -198,57 +201,41 @@ export function ContentRail({
   }, [section]);
 
   return (
-    <section className={`content-rail${byUsher ? " rail-by-usher" : ""}`} ref={railRef}>
-      <div className="rail-heading">
-        <div>
-          {byUsher ? (
-            <span className="rail-eyebrow">
-              <Link to="/usher" className="rail-usher-link" aria-label="Who is the Usher?">
-                <UsherMark face="idle" crop="head" className="rail-usher" />
+    <Rail railRef={railRef}>
+      <RailHeading
+        eyebrow={
+          byUsher ? (
+            <>
+              <Link to="/usher" className={styles.usherLink} aria-label="Who is the Usher?">
+                <UsherMark face="idle" crop="head" className={styles.usherMark} />
               </Link>
               <b>The Usher</b>
               {section.description && <em>· {section.description}</em>}
-            </span>
+            </>
           ) : section.reason ? (
-            <span className="rail-eyebrow rail-because">
+            <>
               <b>{section.reason}</b>
               {section.description && <em>· {section.description}</em>}
-            </span>
+            </>
           ) : (
-            <span>{section.description}</span>
-          )}
-          <h2>{section.title}</h2>
-        </div>
-        {scroll.overflowing && (
-          <div className="rail-pager">
-            <span className="rail-pages" aria-hidden="true">
-              {Array.from({ length: scroll.pages }, (_, index) => (
-                <i
-                  key={`${section.id}-page-${index}`}
-                  className={index === scroll.page ? "is-current" : undefined}
-                />
-              ))}
-            </span>
-            <button
-              type="button"
-              aria-label={`Scroll ${section.title} back`}
-              disabled={scroll.atStart}
-              onClick={() => turn(-1)}
-            >
-              <ChevronIcon back />
-            </button>
-            <button
-              type="button"
-              aria-label={`Scroll ${section.title} forward`}
-              disabled={scroll.atEnd}
-              onClick={() => turn(1)}
-            >
-              <ChevronIcon />
-            </button>
-          </div>
-        )}
-      </div>
-      <div className="rail-track" ref={trackRef}>
+            section.description
+          )
+        }
+        heading={section.title}
+        actions={
+          scroll.overflowing ? (
+            <RailPager
+              pages={scroll.pages}
+              page={scroll.page}
+              atStart={scroll.atStart}
+              atEnd={scroll.atEnd}
+              label={section.title}
+              onTurn={turn}
+            />
+          ) : undefined
+        }
+      />
+      <RailTrack trackRef={trackRef}>
         {section.items.length ? (
           near ? (
             section.items.map((item, index) => (
@@ -262,13 +249,13 @@ export function ContentRail({
           ) : (
             section.items
               .slice(0, 4)
-              .map((item) => <span key={item.id} className="skeleton skeleton-reel" />)
+              .map((item) => <Skeleton key={item.id} className={styles.pending} />)
           )
         ) : (
-          <p className="rail-empty">No titles found.</p>
+          <RailEmpty>No titles found.</RailEmpty>
         )}
         {trailing}
-      </div>
-    </section>
+      </RailTrack>
+    </Rail>
   );
 }

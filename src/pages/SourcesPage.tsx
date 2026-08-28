@@ -1,9 +1,12 @@
 import { Link } from "react-router-dom";
 
-import { PageTitle } from "../components/PageTitle";
-import { ProviderBadge } from "../components/ui";
+import { ProviderBadge } from "../components/ProviderBadge";
+import { SourceStatus } from "../components/sources/SourceStatus";
 import type { Provider, ProvidersResponse } from "../domain/catalog";
 import type { ProviderCategory } from "../domain/providers";
+import { Callout, Heading, Page, PageHeader, Stat, StatGrid, Text } from "../ui";
+
+import styles from "./SourcesPage.module.css";
 
 const CREDITS: { name: string; href: string; note: string; logo?: string }[] = [
   {
@@ -132,31 +135,29 @@ export function SourcesPage({
   stats: ProvidersResponse["stats"];
 }) {
   return (
-    <section className="page-section sources-page">
-      <PageTitle
+    <Page>
+      <PageHeader
         heading={
           <>
             Where all this <em>actually comes from.</em>
           </>
         }
-      >
-        <p>
-          None of it is mine. I did not make a single one of these films and I do not own a frame of
-          them. What I have is a very long list of who does, and the good manners to say so. Below
-          is every service I know about, and exactly how much I can tell you about each.
-        </p>
-      </PageTitle>
+        description="None of it is mine. I did not make a single one of these films and I do not own a frame of them. What I have is a very long list of who does, and the good manners to say so. Below is every service I know about, and exactly how much I can tell you about each."
+      />
 
-      <section className="source-attribution" aria-labelledby="source-attribution-title">
-        <h2 id="source-attribution-title">On the record</h2>
-        <p className="source-terms-lede">
-          Everything above stands on somebody else's work. Here is whose, and what they are owed.
-        </p>
-        <div className="source-credits">
+      <section className={styles.attribution} aria-labelledby="source-attribution-title">
+        <Heading level={2} size="label" tone="accent" id="source-attribution-title">
+          On the record
+        </Heading>
+        <Text tone="muted" leading="relaxed" className={styles.attributionLede}>
+          Everything above stands on somebody else&apos;s work. Here is whose, and what they are
+          owed.
+        </Text>
+        <div className={styles.credits}>
           {CREDITS.map((credit) => (
             <a key={credit.name} href={credit.href} target="_blank" rel="noreferrer">
               {credit.logo ? (
-                <img className="tmdb-logo" src={credit.logo} alt={credit.name} />
+                <img className={styles.logo} src={credit.logo} alt={credit.name} />
               ) : (
                 <strong>{credit.name}</strong>
               )}
@@ -164,11 +165,11 @@ export function SourcesPage({
             </a>
           ))}
           {Array.from({ length: (3 - (CREDITS.length % 3)) % 3 }, (_, index) => (
-            <span className="source-credit-blank" key={index} aria-hidden="true" />
+            <span className={styles.creditBlank} key={index} aria-hidden="true" />
           ))}
         </div>
 
-        <div className="source-terms">
+        <div className={styles.terms}>
           <p>
             Cinema listings are published by the chains themselves — Cineworld, Picturehouse and Vue
             — and are read exactly as they are given. Where a chain publishes days but not times,
@@ -212,47 +213,35 @@ export function SourcesPage({
           </p>
         </div>
       </section>
-      <div className="source-summary">
-        <div>
-          <strong>{stats.configured}</strong>
-          <span>services listed</span>
-        </div>
-        <div>
-          <strong>{stats.feeds}</strong>
-          <span>with availability data</span>
-        </div>
-        <div>
-          <strong>{stats.links}</strong>
-          <span>link out only</span>
-        </div>
-        <div>
-          <strong>{stats.markers}</strong>
-          <span>listed, no data yet</span>
-        </div>
-      </div>
+      <StatGrid surface="accent" columns={4} className={styles.summary}>
+        <Stat value={stats.configured} label="services listed" size="lg" />
+        <Stat value={stats.feeds} label="with availability data" size="lg" />
+        <Stat value={stats.links} label="link out only" size="lg" />
+        <Stat value={stats.markers} label="listed, no data yet" size="lg" />
+      </StatGrid>
 
-      <section className="source-tiers" aria-labelledby="tiers-title">
-        <h2 id="tiers-title">Three kinds of door</h2>
-        <dl>
+      <section className={styles.tiers} aria-labelledby="tiers-title">
+        <Heading level={2} size="label" tone="accent" id="tiers-title" className={styles.rule}>
+          Three kinds of door
+        </Heading>
+        <dl className={styles.tierList}>
           {["feed", "link", "marker"].map((status) => (
             <div key={status}>
-              <dt className={`source-status source-status-${status}`}>
+              <SourceStatus as="dt" status={status} className={styles.tierLabel}>
                 {STATUS_COPY[status]?.label}
-              </dt>
+              </SourceStatus>
               <dd>{STATUS_COPY[status]?.note}</dd>
             </div>
           ))}
         </dl>
       </section>
 
-      {providerError && (
-        <p className="catalogue-error" role="alert">
-          {providerError}
-        </p>
-      )}
+      {providerError && <Callout>{providerError}</Callout>}
 
-      <section className="source-directory" aria-labelledby="directory-title">
-        <h2 id="directory-title">The directory</h2>
+      <section className={styles.directory} aria-labelledby="directory-title">
+        <Heading level={2} size="label" tone="accent" id="directory-title" className={styles.rule}>
+          The directory
+        </Heading>
 
         {CATEGORIES.map((category) => {
           const listed = providers.filter((provider) => provider.category === category.name);
@@ -262,18 +251,18 @@ export function SourcesPage({
           }
 
           return (
-            <div className="source-shelf" key={category.name}>
-              <p className="source-shelf-head">
+            <div className={styles.shelf} key={category.name}>
+              <p className={styles.shelfHead}>
                 <span>{category.name}</span>
                 <em>{category.aside}</em>
                 <small>{listed.length}</small>
               </p>
-              <ul>
+              <ul className={styles.shelfList}>
                 {listed.map((provider) => (
                   <li key={provider.id}>
                     <ProviderBadge provider={provider} compact />
-                    <span className="source-entry">
-                      <span className="source-entry-name">
+                    <span className={styles.entry}>
+                      <span className={styles.entryName}>
                         {provider.homepage ? (
                           <a href={provider.homepage} target="_blank" rel="noreferrer">
                             {provider.name}
@@ -283,7 +272,7 @@ export function SourcesPage({
                         )}
                         {provider.stale && (
                           <span
-                            className="source-stale"
+                            className={styles.stale}
                             title={`${provider.sourceLabel} did not answer on the last sweep. This is the last good listing.`}
                           >
                             not answering
@@ -292,9 +281,9 @@ export function SourcesPage({
                       </span>
                       <small>{provider.sourceLabel}</small>
                     </span>
-                    <span className={`source-status source-status-${provider.status}`}>
+                    <SourceStatus status={provider.status}>
                       {STATUS_COPY[provider.status]?.label ?? provider.status}
-                    </span>
+                    </SourceStatus>
                   </li>
                 ))}
               </ul>
@@ -303,11 +292,11 @@ export function SourcesPage({
         })}
       </section>
 
-      <p className="source-redirect">
-        Which of them you actually pay for is your business, not this page's. I keep that in{" "}
+      <Text tone="muted" leading="relaxed" className={styles.redirect}>
+        Which of them you actually pay for is your business, not this page&apos;s. I keep that in{" "}
         <Link to="/notebook#services">your notebook</Link>, where you can change it without
         announcing it to anyone.
-      </p>
-    </section>
+      </Text>
+    </Page>
   );
 }

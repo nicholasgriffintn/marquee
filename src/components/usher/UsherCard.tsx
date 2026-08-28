@@ -1,5 +1,8 @@
 import type { UsherMoment } from "../../domain/usher";
+import { Button, Cluster, Text } from "../../ui";
 import { UsherMark } from "./UsherMark";
+
+import styles from "./UsherCard.module.css";
 
 export function UsherCard({
   moment,
@@ -13,22 +16,24 @@ export function UsherCard({
   const actions = moment.actions ?? [];
 
   return (
-    <div className="usher-card">
-      <UsherMark face={moment.face} crop="head" />
-      <p>{moment.line}</p>
-      <div className="usher-confirm">
+    <div className={styles.card}>
+      <UsherMark face={moment.face} crop="head" className={styles.mark} />
+      <Text family="serif" className={styles.line}>
+        {moment.line}
+      </Text>
+      <Cluster gap={2}>
         {actions.map((action) => (
-          <button
+          <Button
             key={action.id}
-            type="button"
-            className={actions.length === 1 ? "usher-primary" : ""}
+            variant={actions.length === 1 ? "primary" : "secondary"}
+            size="md"
             onClick={() => onAction(moment, action.id)}
           >
             {action.label}
-          </button>
+          </Button>
         ))}
-      </div>
-      <button type="button" className="usher-card-mute" onClick={() => onDismiss("kind")}>
+      </Cluster>
+      <button type="button" className={styles.mute} onClick={() => onDismiss("kind")}>
         Stop asking
       </button>
     </div>

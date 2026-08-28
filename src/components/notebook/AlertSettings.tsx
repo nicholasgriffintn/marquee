@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
+import { classNames } from "../../lib/class-names";
 import { jsonMutation, mutateJson, queryJson } from "../../lib/query-client";
+import { Button } from "../../ui";
+import { NotebookGroup } from "./NotebookSection";
+
+import styles from "./AlertSettings.module.css";
 
 type AlertKindRow = { kind: string; enabled: boolean };
 
@@ -111,21 +116,19 @@ export function AlertSettings({ isSignedIn }: { isSignedIn: boolean }) {
   }
 
   return (
-    <div className="notebook-group">
-      <h2>When I should write to you</h2>
-      <p className="notebook-lede">
-        I will only write about things you have already put on your shelf, never more than a handful
-        a week, and never twice about the same thing.
-      </p>
-
+    <NotebookGroup
+      heading="When I should write to you"
+      lede="I will only write about things you have already put on your shelf, never more than a handful a week, and never twice about the same thing."
+    >
       <form
-        className="notebook-guest-form"
+        className={styles.form}
         onSubmit={(event) => {
           event.preventDefault();
           void saveAddress();
         }}
       >
         <input
+          className={styles.address}
           type="email"
           value={draft}
           maxLength={200}
@@ -133,26 +136,32 @@ export function AlertSettings({ isSignedIn }: { isSignedIn: boolean }) {
           aria-label="Where I should write"
           onChange={(event) => setDraft(event.target.value)}
         />
-        <button type="submit" className="notebook-primary" disabled={!draft.trim()}>
+        <Button
+          variant="primary"
+          size="lg"
+          type="submit"
+          className={styles.submit}
+          disabled={!draft.trim()}
+        >
           {config.email ? "Change the address" : "Use this address"}
-        </button>
-        <span className={`alert-state${config.verified ? " confirmed" : ""}`}>
+        </Button>
+        <span className={classNames(styles.state, config.verified && styles.confirmed)}>
           {config.email ? (config.verified ? "Confirmed" : "Not confirmed yet") : "No address"}
         </span>
       </form>
 
       {(status || confirmation) && (
-        <p className="notebook-import-status" aria-live="polite">
+        <p className={styles.status} aria-live="polite">
           {status || CONFIRM_COPY[confirmation] || ""}
           {confirmation && (
-            <button type="button" className="alert-dismiss" onClick={clearConfirmation}>
+            <button type="button" className={styles.dismiss} onClick={clearConfirmation}>
               Right you are
             </button>
           )}
         </p>
       )}
 
-      <ul className="alert-kinds">
+      <ul className={styles.kinds}>
         {config.kinds.map((row) => (
           <li key={row.kind}>
             <label>
@@ -170,6 +179,6 @@ export function AlertSettings({ isSignedIn }: { isSignedIn: boolean }) {
           </li>
         ))}
       </ul>
-    </div>
+    </NotebookGroup>
   );
 }

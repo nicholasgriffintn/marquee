@@ -2,8 +2,12 @@ import { useState, type MouseEvent } from "react";
 
 import type { ProviderAvailability } from "../domain/catalog";
 import { STREAMING_LIMIT, watchOptions, type WatchOption } from "../domain/watch";
-import { ArrowIcon, ChevronIcon, ProviderBadge } from "./ui";
+import { classNames } from "../lib/class-names";
+import { ArrowIcon, ChevronIcon, Eyebrow, StatusNote } from "../ui";
+import { ProviderBadge } from "./ProviderBadge";
 import type { Exit } from "./usher/ExitDoor";
+
+import styles from "./WatchBlock.module.css";
 
 function WatchLink({
   option,
@@ -19,7 +23,7 @@ function WatchLink({
       href={option.href}
       target="_blank"
       rel="noreferrer"
-      className={primary ? "watch-button" : "watch-option"}
+      className={primary ? styles.primary : styles.option}
       onClick={onLeave({
         href: option.href,
         label: option.provider.name,
@@ -63,12 +67,13 @@ export function WatchBlock({
   if (!primary && rest.length === 0 && paid.length === 0) {
     if (isRefreshing) {
       return (
-        <div className="watch-actions">
-          <span>Watch now</span>
-          <p className="availability-empty">
-            <i className="availability-spinner" aria-hidden="true" />
+        <div className={styles.block}>
+          <Eyebrow size="sm" weight="heavy" tone="inkMuted">
+            Watch now
+          </Eyebrow>
+          <StatusNote busy surface="paper">
             Checking where this is streaming…
-          </p>
+          </StatusNote>
         </div>
       );
     }
@@ -78,9 +83,11 @@ export function WatchBlock({
     }
 
     return (
-      <div className="watch-actions">
-        <span>Watch now</span>
-        <p className="availability-empty">No streaming options found.</p>
+      <div className={styles.block}>
+        <Eyebrow size="sm" weight="heavy" tone="inkMuted">
+          Watch now
+        </Eyebrow>
+        <StatusNote surface="paper">No streaming options found.</StatusNote>
       </div>
     );
   }
@@ -91,12 +98,14 @@ export function WatchBlock({
   const paidOpen = showPaid || !primary;
 
   return (
-    <div className="watch-actions">
-      <span>Watch now</span>
+    <div className={styles.block}>
+      <Eyebrow size="sm" weight="heavy" tone="inkMuted">
+        Watch now
+      </Eyebrow>
       {primary && <WatchLink option={primary} primary onLeave={onLeave} />}
 
       {shown.length > 0 && (
-        <div className={`watch-grid${showAll ? " expanded" : ""}`}>
+        <div className={classNames(styles.grid, showAll && styles.wide)}>
           {shown.map((option) => (
             <WatchLink key={option.provider.id} option={option} onLeave={onLeave} />
           ))}
@@ -104,18 +113,18 @@ export function WatchBlock({
       )}
 
       {held.length > 0 && !showAll && (
-        <button type="button" className="watch-more" onClick={() => setShowAll(true)}>
+        <button type="button" className={styles.more} onClick={() => setShowAll(true)}>
           Show {held.length} more way{held.length === 1 ? "" : "s"} to watch
           <ChevronIcon />
         </button>
       )}
 
       {paid.length > 0 && (
-        <div className="watch-paid">
+        <div className={styles.paid}>
           {primary && (
             <button
               type="button"
-              className="watch-more"
+              className={styles.more}
               aria-expanded={paidOpen}
               onClick={() => setShowPaid((open) => !open)}
             >
@@ -125,7 +134,7 @@ export function WatchBlock({
             </button>
           )}
           {paidOpen && (
-            <div className="watch-grid expanded">
+            <div className={classNames(styles.grid, styles.wide)}>
               {paid.map((option) => (
                 <WatchLink key={option.provider.id} option={option} onLeave={onLeave} />
               ))}
@@ -133,7 +142,7 @@ export function WatchBlock({
           )}
         </div>
       )}
-      <p className="watch-credit">
+      <p className={styles.credit}>
         {fromJustWatch && (
           <>
             Availability from{" "}

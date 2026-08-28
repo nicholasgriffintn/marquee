@@ -1,0 +1,59 @@
+.root {
+  display: block;
+  font-family: var(--mono);
+  line-height: 1;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.sm {
+  font-size: var(--type-label-sm);
+}
+
+.md {
+  font-size: var(--type-label);
+}
+
+.lg {
+  font-size: var(--type-label-lg);
+}
+
+.regular {
+  font-weight: var(--weight-regular);
+}
+
+.bold {
+  font-weight: var(--weight-bold);
+}
+
+.heavy {
+  font-weight: var(--weight-heavy);
+}
+
+.label {
+  letter-spacing: var(--tracking-label);
+}
+
+.wide {
+  letter-spacing: var(--tracking-label-wide);
+}
+
+.toneDefault {
+  color: inherit;
+}
+
+.toneMuted {
+  color: var(--muted);
+}
+
+.toneAccent {
+  color: var(--acid);
+}
+
+.toneInk {
+  color: var(--ink);
+}
+
+.toneInkMuted {
+  color: var(--muted-on-paper);
+}

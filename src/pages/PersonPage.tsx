@@ -2,10 +2,14 @@ import { useParams } from "react-router-dom";
 
 import { AwardsNote } from "../components/AwardsNote";
 import { ErrorBoundary } from "../components/ErrorBoundary";
+import { LoadMore, ResultsGrid, ResultsSkeleton } from "../components/ResultsGrid";
 import { TitleCard } from "../components/TitleCard";
 import { UsherMark } from "../components/usher/UsherMark";
 import type { MediaTitle } from "../domain/catalog";
 import { usePerson } from "../hooks/usePerson";
+import { Button, Callout, EmptyState, Eyebrow, Heading, Page, Text } from "../ui";
+
+import styles from "./PersonPage.module.css";
 
 function shelfLine(shelved: number, watched: number) {
   if (shelved === 0) {
@@ -29,93 +33,79 @@ export function PersonPage({
 
   if (!data && (error || !isLoading)) {
     return (
-      <section className="page-section">
-        <div className="notebook-head">
-          <UsherMark face="unimpressed" crop="head" className="notebook-mark" />
+      <Page>
+        <div className={styles.head}>
+          <UsherMark face="unimpressed" crop="head" className={styles.mark} />
           <div>
-            <p className="page-eyebrow">On the credits</p>
-            <h1>{name}</h1>
-            <p className="notebook-lede">{error || "Nobody here by that name."}</p>
+            <Eyebrow tone="accent" tracking="wide" className={styles.eyebrow}>
+              On the credits
+            </Eyebrow>
+            <Heading level={1} size="heading" family="serif" className={styles.name}>
+              {name}
+            </Heading>
+            <Text tone="muted" leading="relaxed" className={styles.lede}>
+              {error || "Nobody here by that name."}
+            </Text>
           </div>
         </div>
-      </section>
+      </Page>
     );
   }
 
   const person = data?.person;
 
   return (
-    <section className="page-section">
-      <div className="notebook-head">
-        <UsherMark face="thinking" crop="head" className="notebook-mark" />
+    <Page>
+      <div className={styles.head}>
+        <UsherMark face="thinking" crop="head" className={styles.mark} />
         <div>
-          <p className="page-eyebrow">On the credits</p>
-          <h1>{person?.name ?? name}</h1>
-          <p className="notebook-lede">
+          <Eyebrow tone="accent" tracking="wide" className={styles.eyebrow}>
+            On the credits
+          </Eyebrow>
+          <Heading level={1} size="heading" family="serif" className={styles.name}>
+            {person?.name ?? name}
+          </Heading>
+          <Text tone="muted" leading="relaxed" className={styles.lede}>
             {person
               ? `${person.titles} title${person.titles === 1 ? "" : "s"} in the catalogue. ${
                   isSignedIn ? shelfLine(data?.shelf.shelved ?? 0, data?.shelf.watched ?? 0) : ""
                 }`
               : "Looking them up…"}
-          </p>
+          </Text>
           {isSignedIn && person && (
-            <button
-              type="button"
-              className={following ? "link-button" : "link-button link-button-primary"}
+            <Button
+              variant={following ? "secondary" : "primary"}
+              size="md"
+              className={styles.follow}
               onClick={() => void toggleFollow()}
             >
               {following ? "Stop watching for them" : "Tell me when they turn up"}
-            </button>
+            </Button>
           )}
-          {saveError && (
-            <p className="catalogue-error" role="alert">
-              {saveError}
-            </p>
-          )}
+          {saveError && <Callout>{saveError}</Callout>}
           {data && <AwardsNote awards={data.awards} />}
         </div>
       </div>
 
-      {error && (
-        <p className="auth-message" role="alert">
-          {error}
-        </p>
-      )}
+      {error && <Callout>{error}</Callout>}
 
       {data && data.items.length > 0 && (
         <ErrorBoundary label="This filmography">
-          <div className="results-grid">
+          <ResultsGrid>
             {data.items.map((item) => (
               <TitleCard key={item.id} item={item} onOpen={onOpen} />
             ))}
-          </div>
+          </ResultsGrid>
         </ErrorBoundary>
       )}
 
-      {isLoading && (!data || data.items.length === 0) && (
-        <div className="results-grid" aria-hidden="true">
-          {[0, 1, 2, 3, 4, 5].map((card) => (
-            <div className="rail-card" key={card}>
-              <span className="skeleton skeleton-poster" />
-            </div>
-          ))}
-        </div>
-      )}
+      {isLoading && (!data || data.items.length === 0) && <ResultsSkeleton poster />}
 
       {!isLoading && data && data.items.length === 0 && !error && (
-        <div className="search-empty">
-          <h2>Nothing here.</h2>
-          <p>Nothing of theirs in the catalogue yet.</p>
-        </div>
+        <EmptyState heading="Nothing here." description="Nothing of theirs in the catalogue yet." />
       )}
 
-      {hasMore && (
-        <div className="browse-more">
-          <button type="button" onClick={loadMore} disabled={isLoading}>
-            {isLoading ? "Loading…" : "Show more"}
-          </button>
-        </div>
-      )}
-    </section>
+      {hasMore && <LoadMore isLoading={isLoading} onClick={loadMore} />}
+    </Page>
   );
 }

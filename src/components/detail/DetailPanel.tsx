@@ -18,19 +18,33 @@ import { focusableElements } from "../../lib/focus";
 import { detailMeta, languageLabel } from "../../lib/media";
 import { track } from "../../lib/telemetry";
 import type { EntryStatus, ViewingEntry } from "../../types";
+import {
+  ArrowIcon,
+  Button,
+  ChipLink,
+  Eyebrow,
+  Heading,
+  PlusIcon,
+  StatusNote,
+  TabList,
+  TabPanel,
+  Text,
+  type TabItem,
+} from "../../ui";
 import { ShowingsBlock } from "../cinema/ShowingsBlock";
 import { ErrorBoundary } from "../ErrorBoundary";
+import { Poster } from "../Poster";
 import { RevivalBlock } from "../revival/RevivalBlock";
 import { SeasonsBlock } from "../seasons";
 import { ShelfForm } from "../ShelfForm";
 import { TrailerBlock } from "../TrailerBlock";
-import { ArrowIcon, PlusIcon, Poster } from "../ui";
 import { ExitDoor } from "../usher/ExitDoor";
 import { WatchBlock } from "../WatchBlock";
 import { AirLine } from "./AirLine";
 import { BuzzNote } from "./BuzzNote";
 import { CastAndStaff } from "./CastAndStaff";
 import { CreditsBlock } from "./CreditsBlock";
+import { DetailCredit } from "./DetailNote";
 import { FilmingLine } from "./FilmingLine";
 import { MarqueeRead } from "./MarqueeRead";
 import { ScoreRow } from "./ScoreRow";
@@ -44,8 +58,14 @@ import { VisualFormatLine } from "./VisualFormatLine";
 import { WatchNext } from "./WatchNext";
 import { WatchOrder } from "./WatchOrder";
 
+import styles from "./DetailPanel.module.css";
+
 const SIMILAR_LIMIT = 12;
 const DETAIL_TABS = ["overview", "episodes"] as const;
+const TAB_LABELS: Record<(typeof DETAIL_TABS)[number], string> = {
+  overview: "Overview",
+  episodes: "Episodes",
+};
 const KEYWORDS_SHOWN = 8;
 const STUDIOS_SHOWN = 2;
 const COUNTRIES_SHOWN = 2;
@@ -212,17 +232,21 @@ export function DetailPanel({
 
   return (
     <>
-      <Poster item={item} wide />
-      <div className="detail-copy">
-        <h2 id="detail-title">{item.title}</h2>
-        <p className="detail-meta">
+      <Poster item={item} wide className={styles.art} />
+      <div className={styles.copy}>
+        <Heading level={2} size="title" id="detail-title" tone="ink">
+          {item.title}
+        </Heading>
+        <Eyebrow weight="regular" tone="inkMuted" className={styles.meta}>
           {item.mediaType === "movie" ? "Film" : "Television"} · {detailMeta(item)}
-        </p>
+        </Eyebrow>
         {item.originalTitle && item.originalTitle !== item.title && (
-          <p className="detail-original">Original title · {item.originalTitle}</p>
+          <Eyebrow weight="regular" tone="inkMuted" className={styles.line}>
+            Original title · {item.originalTitle}
+          </Eyebrow>
         )}
         {(item.studios?.length || spokenIn || madeIn) && (
-          <p className="detail-original">
+          <Eyebrow weight="regular" tone="inkMuted" className={styles.line}>
             {[
               item.studios?.slice(0, STUDIOS_SHOWN).join(", "),
               madeIn ? `From ${madeIn}` : null,
@@ -230,47 +254,47 @@ export function DetailPanel({
             ]
               .filter(Boolean)
               .join(" · ")}
-          </p>
+          </Eyebrow>
         )}
         <SourceWorkLine source={adaptations.source} />
-        {item.tagline && <p className="detail-tagline">{item.tagline}</p>}
-        {isSeries && (
-          <div className="detail-tabs" role="tablist" aria-label="Overview or episodes">
-            {DETAIL_TABS.map((name) => (
-              <button
-                type="button"
-                key={name}
-                role="tab"
-                id={`detail-tab-${name}`}
-                aria-selected={tab === name}
-                aria-controls={`detail-panel-${name}`}
-                className={`detail-tab${tab === name ? " selected" : ""}`}
-                onClick={() => setTab(name)}
-              >
-                {name === "overview" ? "Overview" : "Episodes"}
-                {name === "episodes" && item.episodeCount ? <em>{item.episodeCount}</em> : null}
-              </button>
-            ))}
-          </div>
+        {item.tagline && (
+          <Text family="serif" italic className={styles.tagline}>
+            {item.tagline}
+          </Text>
         )}
-        <div
-          className="detail-tab-panel"
-          id="detail-panel-overview"
-          role={isSeries ? "tabpanel" : undefined}
-          aria-labelledby={isSeries ? "detail-tab-overview" : undefined}
+        {isSeries && (
+          <TabList
+            label="Overview or episodes"
+            idPrefix="detail"
+            surface="paper"
+            selected={tab}
+            tabs={DETAIL_TABS.map((name): TabItem => ({
+              id: name,
+              label: TAB_LABELS[name],
+              count: name === "episodes" ? (item.episodeCount ?? undefined) : undefined,
+            }))}
+            onSelect={(next) => setTab(next as DetailTab)}
+          />
+        )}
+        <TabPanel
+          id="overview"
+          idPrefix="detail"
+          labelled={isSeries}
           hidden={isSeries && tab !== "overview"}
         >
-          <p className="detail-synopsis">{item.overview || "No synopsis available."}</p>
+          <Text size="lede" leading="relaxed" className={styles.synopsis}>
+            {item.overview || "No synopsis available."}
+          </Text>
           {item.anime?.background && (
-            <p className="detail-background">
+            <Text size="sm" leading="relaxed" className={styles.background}>
               {item.anime.background}
-              <small className="detail-credit">Background from MyAnimeList</small>
-            </p>
+              <DetailCredit>Background from MyAnimeList</DetailCredit>
+            </Text>
           )}
           <MarqueeRead insight={insight} isLoading={isInsightLoading} />
           <AirLine item={item} nextEpisode={nextEpisode} />
           {continueAt && (
-            <button type="button" className="detail-continue" onClick={resumeWatching}>
+            <button type="button" className={styles.continue} onClick={resumeWatching}>
               <span>
                 Continue S{continueAt.season} E{continueAt.episode}
               </span>
@@ -280,17 +304,25 @@ export function DetailPanel({
           {canSave && (
             <ErrorBoundary label="The shelf card">
               {entryState.status === "idle" || entryState.status === "loading" ? (
-                <p className="availability-empty" aria-live="polite">
-                  <i className="availability-spinner" aria-hidden="true" />
+                <StatusNote busy surface="paper" live="polite">
                   Checking your shelf…
-                </p>
+                </StatusNote>
               ) : entryState.status === "error" ? (
-                <div className="availability-empty" role="alert">
-                  <p>Your saved shelf entry could not be checked. No changes have been made.</p>
+                <div role="alert" className={styles.entryError}>
+                  <StatusNote surface="paper">
+                    Your saved shelf entry could not be checked. No changes have been made.
+                  </StatusNote>
                   {entryState.retryable && (
-                    <button type="button" className="save-button" onClick={onRetryEntry}>
+                    <Button
+                      variant="primary"
+                      size="lg"
+                      surface="paper"
+                      fullWidth
+                      className={styles.save}
+                      onClick={onRetryEntry}
+                    >
                       Try again
-                    </button>
+                    </Button>
                   )}
                 </div>
               ) : entryState.entry ? (
@@ -305,9 +337,16 @@ export function DetailPanel({
                   onUpdateDraft={onUpdateDraft}
                 />
               ) : (
-                <button type="button" className="save-button" onClick={() => onSave(item)}>
+                <Button
+                  variant="primary"
+                  size="lg"
+                  surface="paper"
+                  fullWidth
+                  className={styles.save}
+                  onClick={() => onSave(item)}
+                >
                   <PlusIcon /> Save to my shelf
-                </button>
+                </Button>
               )}
             </ErrorBoundary>
           )}
@@ -354,7 +393,7 @@ export function DetailPanel({
               onOpen={onOpen}
               footer={
                 collection.hasMore ? (
-                  <Link className="detail-similar-more" to={collectionPath(item.collection.id)}>
+                  <Link className={styles.collectionLink} to={collectionPath(item.collection.id)}>
                     See the whole collection
                   </Link>
                 ) : undefined
@@ -369,15 +408,15 @@ export function DetailPanel({
           {item.visualFormat && <VisualFormatLine format={item.visualFormat} />}
           <FilmingLine titleId={item.id} />
           {item.keywords?.length ? (
-            <div className="detail-chips">
+            <div className={styles.chips}>
               {item.keywords.slice(0, KEYWORDS_SHOWN).map((keyword) => (
-                <Link
+                <ChipLink
                   key={keyword}
+                  surface="paper"
                   to={`/listings?type=${item.mediaType}&keywords=${encodeURIComponent(keyword)}`}
-                  className="detail-chip"
                 >
                   {keyword}
-                </Link>
+                </ChipLink>
               ))}
             </div>
           ) : null}
@@ -399,14 +438,13 @@ export function DetailPanel({
             onOpen={onOpen}
           />
           <SourceLinks item={item} onLeave={leaveVia} />
-        </div>
+        </TabPanel>
         {isSeries && (
-          <div
-            className="detail-tab-panel"
-            id="detail-panel-episodes"
-            role="tabpanel"
-            aria-labelledby="detail-tab-episodes"
+          <TabPanel
+            id="episodes"
+            idPrefix="detail"
             hidden={tab !== "episodes"}
+            className={styles.episodes}
           >
             <ErrorBoundary label="The episode guide">
               <SeasonsBlock
@@ -419,7 +457,7 @@ export function DetailPanel({
                 onTracked={entry ? undefined : onTracked}
               />
             </ErrorBoundary>
-          </div>
+          </TabPanel>
         )}
       </div>
       {exit && <ExitDoor exit={exit} onLeave={() => report(exit)} onClose={dismiss} />}

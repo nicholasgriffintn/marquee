@@ -1,0 +1,28 @@
+.usherLink {
+  display: block;
+  flex: 0 0 auto;
+  line-height: 0;
+  opacity: 0.85;
+  transition: opacity 0.14s ease;
+}
+
+.usherLink:hover {
+  opacity: 1;
+}
+
+.usherMark {
+  flex: 0 0 auto;
+  height: 26px;
+  width: 36px;
+}
+
+.pending {
+  aspect-ratio: 16 / 9;
+  min-width: 260px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .usherLink {
+    transition: none;
+  }
+}

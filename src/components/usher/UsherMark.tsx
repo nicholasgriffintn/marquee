@@ -1,6 +1,9 @@
 import type { ReactElement } from "react";
 
 import type { UsherFace } from "../../domain/usher";
+import { classNames } from "../../lib/class-names";
+
+import styles from "./UsherMark.module.css";
 
 const LIMBS = "M124 300q-34 12-52 32M394 300q30-6 51 0M219 372l-33 84M293 372l33 84";
 
@@ -60,7 +63,7 @@ const FACES: Record<UsherFace, ReactElement> = {
 export function UsherMark({
   face = "idle",
   crop = "full",
-  className = "",
+  className,
 }: {
   face?: UsherFace;
   crop?: "full" | "head";
@@ -68,7 +71,7 @@ export function UsherMark({
 }) {
   return (
     <svg
-      className={`usher-mark${className ? ` ${className}` : ""}`}
+      className={classNames(styles.mark, className)}
       viewBox={crop === "head" ? "108 98 296 200" : "0 0 600 512"}
       // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- the svg paths are the image, role=img is the standard pattern
       role="img"

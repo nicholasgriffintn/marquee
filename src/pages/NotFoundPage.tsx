@@ -1,27 +1,27 @@
-import { Link } from "react-router-dom";
-
-import { PageTitle } from "../components/PageTitle";
 import { UsherMark } from "../components/usher/UsherMark";
+import { ButtonLink, EmptyState, Page, PageHeader, TextLink } from "../ui";
+
+import styles from "./NotFoundPage.module.css";
 
 export function NotFoundPage() {
   return (
-    <section className="page-section">
-      <PageTitle heading="Not found">
-        <p>That page does not exist.</p>
-      </PageTitle>
-      <div className="search-empty lost">
-        <UsherMark face="unimpressed" crop="head" />
-        <h2>Wrong door.</h2>
-        <p>Nothing showing down here. The screens are the other way.</p>
-        <div className="lost-actions">
-          <Link className="button-link" to="/">
-            Back to tonight
-          </Link>
-          <Link className="lost-aside" to="/usher">
-            Who are you, anyway?
-          </Link>
-        </div>
-      </div>
-    </section>
+    <Page>
+      <PageHeader heading="Not found" description="That page does not exist." />
+      <EmptyState
+        mark={<UsherMark face="unimpressed" crop="head" className={styles.mark} />}
+        heading="Wrong door."
+        description="Nothing showing down here. The screens are the other way."
+        actions={
+          <>
+            <ButtonLink to="/" variant="primary" size="lg">
+              Back to tonight
+            </ButtonLink>
+            <TextLink to="/usher" variant="aside">
+              Who are you, anyway?
+            </TextLink>
+          </>
+        }
+      />
+    </Page>
   );
 }

@@ -2,9 +2,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { clockLabel, runtimeLabel, type RevivalWork } from "../../domain/revival";
 import { useProgressReporter } from "../../hooks/useRevival";
+import { classNames } from "../../lib/class-names";
 import { track } from "../../lib/telemetry";
+import { PlayIcon } from "../../ui";
 import { ArtPlaceholder } from "../ArtPlaceholder";
-import { PlayIcon } from "../ui";
+
+import styles from "./ReelPlayer.module.css";
 
 const FINISHED_RATIO = 0.97;
 const RESUME_FLOOR_SECONDS = 5;
@@ -115,8 +118,8 @@ export function ReelPlayer({
   const resuming = startAt >= RESUME_FLOOR_SECONDS;
 
   return (
-    <div className="revival-player">
-      <div className={`revival-player-frame${started ? " is-running" : ""}`}>
+    <div className={styles.player}>
+      <div className={classNames(styles.frame, started && styles.running)}>
         {/* oxlint-disable-next-line jsx-a11y/media-has-caption -- public-domain archive footage, no caption track exists */}
         <video
           ref={videoRef}
@@ -138,7 +141,7 @@ export function ReelPlayer({
         {!started && (
           <button
             type="button"
-            className={`revival-curtain${raising ? " raising" : ""}`}
+            className={classNames(styles.curtain, raising && styles.raising)}
             aria-hidden={raising}
             tabIndex={raising ? -1 : undefined}
             onClick={raise}
@@ -148,11 +151,11 @@ export function ReelPlayer({
             ) : (
               <ArtPlaceholder seed={work.id} label={work.title} wide />
             )}
-            <span className="revival-curtain-face">
-              <span className="revival-curtain-play" aria-hidden="true">
+            <span className={styles.face}>
+              <span className={styles.play} aria-hidden="true">
                 <PlayIcon />
               </span>
-              <span className="revival-curtain-copy">
+              <span className={styles.copy}>
                 <strong>{resuming ? "Back to your seat" : "Start the projector"}</strong>
                 <small>
                   {resuming
@@ -166,7 +169,7 @@ export function ReelPlayer({
         )}
       </div>
       {error && (
-        <p className="revival-error" role="alert">
+        <p className={styles.error} role="alert">
           {error}
         </p>
       )}

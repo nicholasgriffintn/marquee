@@ -2,8 +2,11 @@ import { useState, type MouseEvent } from "react";
 
 import type { CinemaListing, Screening } from "../../domain/cinema";
 import { dayLabel, displayAttributes, distanceLabel, screeningTime } from "../../domain/cinema";
-import { ArrowIcon } from "../ui";
+import { classNames } from "../../lib/class-names";
+import { ArrowIcon, Eyebrow, StatusNote } from "../../ui";
 import type { Exit } from "../usher/ExitDoor";
+
+import styles from "./ShowingsBlock.module.css";
 
 const ATTRIBUTE_LABELS: Record<string, string> = {
   imax: "IMAX",
@@ -64,7 +67,7 @@ function ExactDay({
         return screening.bookingUrl ? (
           <a
             key={screening.id}
-            className="showtime"
+            className={styles.time}
             href={screening.bookingUrl}
             target="_blank"
             rel="noreferrer"
@@ -78,7 +81,7 @@ function ExactDay({
             {attributes.length > 0 && <small>{attributes.map(attributeLabel).join(" · ")}</small>}
           </a>
         ) : (
-          <span key={screening.id} className="showtime showtime-flat">
+          <span key={screening.id} className={classNames(styles.time, styles.timeFlat)}>
             <b>{time}</b>
           </span>
         );
@@ -111,8 +114,8 @@ function Listing({
   const link = coarse.find((screening) => screening.bookingUrl)?.bookingUrl ?? cinema.bookingUrl;
 
   return (
-    <li className="showings-cinema">
-      <div className="showings-cinema-head">
+    <li className={styles.cinema}>
+      <div className={styles.cinemaHead}>
         <span>
           <b>{cinema.name}</b>
           {distance && <em>{distance}</em>}
@@ -121,18 +124,18 @@ function Listing({
       </div>
 
       {days.length > 0 ? (
-        <div className="showings-days">
+        <div className={styles.days}>
           {days.map(([day, forDay]) => (
-            <div className="showings-day" key={day}>
-              <span className="showings-day-label">{dayLabel(day)}</span>
-              <div className="showings-times">
+            <div className={styles.day} key={day}>
+              <span className={styles.dayLabel}>{dayLabel(day)}</span>
+              <div className={styles.times}>
                 <ExactDay screenings={forDay} cinemaName={cinema.name} onLeave={onLeave} />
               </div>
             </div>
           ))}
         </div>
       ) : (
-        <div className="showings-coarse">
+        <div className={styles.coarse}>
           <p>
             {coarseDays.length > 0
               ? `On ${coarseDays.map((day) => dayLabel(day)).join(", ")}.`
@@ -144,7 +147,7 @@ function Listing({
               href={link}
               target="_blank"
               rel="noreferrer"
-              className="showings-link"
+              className={styles.link}
               onClick={onLeave({ href: link, label: cinema.name, kind: "cinema" })}
             >
               Their listings <ArrowIcon />
@@ -179,9 +182,13 @@ export function ShowingsBlock({
 
   if (isLoading) {
     return (
-      <div className="showings">
-        <span className="showings-eyebrow">On round here</span>
-        <p className="showings-empty">Let me check the boards.</p>
+      <div className={styles.block}>
+        <Eyebrow size="sm" weight="heavy" tone="inkMuted">
+          On round here
+        </Eyebrow>
+        <StatusNote busy surface="paper">
+          Let me check the boards.
+        </StatusNote>
       </div>
     );
   }
@@ -189,9 +196,11 @@ export function ShowingsBlock({
   if (listings.length === 0) {
     if (error) {
       return (
-        <div className="showings">
-          <span className="showings-eyebrow">On round here</span>
-          <p className="showings-empty">Couldn't check local showings.</p>
+        <div className={styles.block}>
+          <Eyebrow size="sm" weight="heavy" tone="inkMuted">
+            On round here
+          </Eyebrow>
+          <StatusNote surface="paper">Couldn&apos;t check local showings.</StatusNote>
         </div>
       );
     }
@@ -202,13 +211,13 @@ export function ShowingsBlock({
   const listing = listings.find((entry) => entry.cinema.id === chosen) ?? listings[0];
 
   return (
-    <div className="showings">
-      <span className="showings-eyebrow">
+    <div className={styles.block}>
+      <Eyebrow size="sm" weight="heavy" tone="inkMuted" className={styles.eyebrow}>
         On round here{placeLabel ? <em>· {placeLabel}</em> : null}
-      </span>
+      </Eyebrow>
       {listings.length > 1 && (
-        <label className="showings-picker">
-          <span>Which house</span>
+        <label className={styles.picker}>
+          <span className={styles.pickerLabel}>Which house</span>
           <select value={listing.cinema.id} onChange={(event) => setChosen(event.target.value)}>
             {listings.map((entry) => (
               <option key={entry.cinema.id} value={entry.cinema.id}>
@@ -219,10 +228,10 @@ export function ShowingsBlock({
           <small>{listings.length.toLocaleString()} nearby, nearest first</small>
         </label>
       )}
-      <ul className="showings-list">
+      <ul className={styles.list}>
         <Listing key={listing.cinema.id} listing={listing} onLeave={onLeave} />
       </ul>
-      <p className="showings-foot">
+      <p className={styles.foot}>
         Other people's houses. I only know what they put on the board. Where they are comes from{" "}
         <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">
           © OpenStreetMap contributors

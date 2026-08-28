@@ -1,0 +1,54 @@
+.projection {
+  align-items: center;
+  background: var(--panel);
+  border: 1px solid var(--panel-line);
+  border-left: 3px solid var(--acid);
+  display: flex;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+  padding: var(--space-4) var(--space-5);
+}
+
+.projectionMark {
+  flex: 0 0 auto;
+  height: 40px;
+  width: 56px;
+}
+
+.projectionLine {
+  font-size: var(--type-body);
+  line-height: 1.45;
+  max-width: 66ch;
+}
+
+.projectionLine strong {
+  color: var(--white);
+  font-style: normal;
+}
+
+.message {
+  background: var(--blue);
+  color: var(--white);
+  font: var(--type-label-sm) var(--mono);
+  margin: 0;
+  opacity: 0;
+  padding: 0 var(--gutter);
+  position: fixed;
+  right: 0;
+  top: 78px;
+  transform: translateY(-100%);
+  transition: 0.2s ease;
+  z-index: 55;
+}
+
+.messageVisible {
+  opacity: 1;
+  padding-block: var(--space-2);
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .message {
+    transition: none;
+  }
+}

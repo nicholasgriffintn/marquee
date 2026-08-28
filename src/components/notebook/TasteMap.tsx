@@ -1,9 +1,14 @@
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 
 import type { MapNeighbour, MapPoint, TasteMapResponse } from "../../domain/notebook";
+import { classNames } from "../../lib/class-names";
 import { queryJson } from "../../lib/query-client";
-import { ArrowIcon } from "../ui";
+import { ArrowIcon } from "../../ui";
+import { NotebookEmpty } from "./NotebookSection";
 import { TasteMapCard } from "./TasteMapCard";
+
+import styles from "./TasteMap.module.css";
+import cardStyles from "./TasteMapCard.module.css";
 
 const SIZE = 560;
 const PAD = 34;
@@ -45,7 +50,11 @@ const TastePoint = memo(function TastePoint({
 
   return (
     <g
-      className={`taste-point${point.weight >= 0 ? " liked" : " cooled"}${active ? " active" : ""}`}
+      className={classNames(
+        styles.point,
+        point.weight >= 0 ? styles.liked : styles.cooled,
+        active && styles.active,
+      )}
       tabIndex={0}
       // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- svg <g> point, a native button can't render inside svg
       role="button"
@@ -67,7 +76,7 @@ const TastePoint = memo(function TastePoint({
         }
       }}
     >
-      <circle cx={cx} cy={cy} r={size + 8} className="taste-point-hit" />
+      <circle cx={cx} cy={cy} r={size + 8} className={styles.hit} />
       <circle cx={cx} cy={cy} r={size} />
     </g>
   );
@@ -77,12 +86,12 @@ function MapSummary({ map, landed }: { map: TasteMapResponse; landed: number }) 
   const axes = map.axes;
 
   return (
-    <div className="taste-card taste-card-blank">
-      <p className="taste-card-hint">
+    <div className={classNames(cardStyles.card, cardStyles.blank)}>
+      <p className={cardStyles.hint}>
         Hover a mark, or tab to one, and I will tell you what it is.
       </p>
 
-      <dl className="taste-card-facts">
+      <dl className={cardStyles.facts}>
         <div>
           <dt>On this table</dt>
           <dd>
@@ -93,7 +102,7 @@ function MapSummary({ map, landed }: { map: TasteMapResponse; landed: number }) 
           <div>
             <dt>Left to right</dt>
             <dd>
-              <span className="taste-axis-range">
+              <span className={cardStyles.range}>
                 {axes.x.low} <ArrowIcon /> {axes.x.high}
               </span>
             </dd>
@@ -103,7 +112,7 @@ function MapSummary({ map, landed }: { map: TasteMapResponse; landed: number }) 
           <div>
             <dt>Bottom to top</dt>
             <dd>
-              <span className="taste-axis-range">
+              <span className={cardStyles.range}>
                 {axes.y.low} <ArrowIcon /> {axes.y.high}
               </span>
             </dd>
@@ -232,41 +241,37 @@ export function TasteMap({ isSignedIn }: { isSignedIn: boolean }) {
   }
 
   if (error) {
-    return (
-      <p className="notebook-empty" role="alert">
-        {error}
-      </p>
-    );
+    return <NotebookEmpty>{error}</NotebookEmpty>;
   }
 
   if (map === null) {
-    return <p className="notebook-empty">Finding a flat enough table…</p>;
+    return <NotebookEmpty>Finding a flat enough table…</NotebookEmpty>;
   }
 
   if (map.status === "sparse") {
     return (
-      <p className="notebook-empty">
+      <NotebookEmpty>
         Not enough on the shelf to draw it yet — I need four things you have marked, and I have{" "}
         {map.shelfCount}. Rate a few more and I will map them.
-      </p>
+      </NotebookEmpty>
     );
   }
 
   if (map.status === "pending") {
     return (
-      <p className="notebook-empty">
+      <NotebookEmpty>
         I have {map.shelfCount} on your shelf but I have only read {map.mappedCount} of them
         properly. I am reading the rest now — come back in a minute and the map will be here.
-      </p>
+      </NotebookEmpty>
     );
   }
 
   const axes = map.axes;
 
   return (
-    <div className="taste-map">
-      <div className="taste-map-frame">
-        <div className="taste-map-readout">
+    <div>
+      <div className={styles.frame}>
+        <div className={styles.readout}>
           {active ? (
             <TasteMapCard
               point={active}
@@ -290,16 +295,16 @@ export function TasteMap({ isSignedIn }: { isSignedIn: boolean }) {
             y="0"
             width={SIZE}
             height={SIZE}
-            className="taste-map-ground"
+            className={styles.ground}
             onClick={() => setPinned(null)}
           />
 
           {axes.x && (
             <>
-              <text className="taste-map-axis" x={PAD} y={SIZE - 10} textAnchor="start">
+              <text className={styles.axis} x={PAD} y={SIZE - 10} textAnchor="start">
                 {axes.x.low}
               </text>
-              <text className="taste-map-axis" x={SIZE - PAD} y={SIZE - 10} textAnchor="end">
+              <text className={styles.axis} x={SIZE - PAD} y={SIZE - 10} textAnchor="end">
                 {axes.x.high}
               </text>
             </>
@@ -308,7 +313,7 @@ export function TasteMap({ isSignedIn }: { isSignedIn: boolean }) {
           {axes.y && (
             <>
               <text
-                className="taste-map-axis"
+                className={styles.axis}
                 x={14}
                 y={SIZE - PAD}
                 textAnchor="start"
@@ -317,7 +322,7 @@ export function TasteMap({ isSignedIn }: { isSignedIn: boolean }) {
                 {axes.y.low}
               </text>
               <text
-                className="taste-map-axis"
+                className={styles.axis}
                 x={14}
                 y={PAD}
                 textAnchor="end"
@@ -331,7 +336,7 @@ export function TasteMap({ isSignedIn }: { isSignedIn: boolean }) {
           {threads.map((thread) => (
             <line
               key={thread.titleId}
-              className="taste-thread"
+              className={styles.thread}
               x1={thread.from.cx}
               y1={thread.from.cy}
               x2={thread.to.cx}
@@ -357,21 +362,21 @@ export function TasteMap({ isSignedIn }: { isSignedIn: boolean }) {
         </svg>
       </div>
 
-      <ul className="taste-map-key">
-        <li className="liked">
+      <ul className={styles.key}>
+        <li className={styles.keyLiked}>
           <svg viewBox="0 0 16 16" aria-hidden="true">
             <circle cx="8" cy="8" r="6" />
           </svg>
           Landed with you
         </li>
-        <li className="cooled">
+        <li className={styles.keyCooled}>
           <svg viewBox="0 0 16 16" aria-hidden="true">
             <circle cx="8" cy="8" r="6" />
           </svg>
           Did not
         </li>
-        <li className="sized">Bigger means stronger feelings either way</li>
-        <li className="sized">
+        <li>Bigger means stronger feelings either way</li>
+        <li>
           {map.mappedCount} of {map.shelfCount} marks placed
         </li>
       </ul>

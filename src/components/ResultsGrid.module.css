@@ -1,0 +1,24 @@
+.grid {
+  display: grid;
+  gap: var(--space-6) 18px;
+  grid-template-columns: repeat(auto-fill, minmax(clamp(230px, 22vw, 300px), 1fr));
+}
+
+.card {
+  min-width: 0;
+  scroll-snap-align: none;
+}
+
+.poster {
+  aspect-ratio: 2 / 3;
+}
+
+.meta {
+  margin-top: 11px;
+}
+
+.more {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-7) 0 0;
+}

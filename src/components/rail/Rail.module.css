@@ -1,0 +1,201 @@
+.rail {
+  margin-bottom: var(--space-8);
+  position: relative;
+}
+
+.bleed::after {
+  background: linear-gradient(90deg, transparent, var(--ink));
+  bottom: 0;
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: clamp(24px, var(--gutter), 82px);
+  z-index: 1;
+}
+
+.heading {
+  align-items: end;
+  display: flex;
+  gap: var(--space-6);
+  justify-content: space-between;
+  padding-bottom: 17px;
+}
+
+.headingBleed {
+  padding-inline: var(--gutter);
+}
+
+.headingMain {
+  min-width: 0;
+}
+
+.eyebrow {
+  align-items: center;
+  display: flex;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.eyebrow b {
+  flex: 0 0 auto;
+  font-weight: inherit;
+  white-space: nowrap;
+}
+
+.eyebrow em {
+  font-style: normal;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.title {
+  margin-top: var(--space-1);
+}
+
+.track {
+  display: grid;
+  gap: 13px;
+  grid-auto-columns: minmax(260px, 24vw);
+  grid-auto-flow: column;
+  overflow-x: auto;
+  padding-bottom: 13px;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+
+.trackBleed {
+  padding-inline: var(--gutter);
+  scroll-padding-inline: var(--gutter);
+}
+
+.track::-webkit-scrollbar {
+  display: none;
+}
+
+.track > * {
+  scroll-snap-align: start;
+}
+
+.track > *:last-child {
+  scroll-snap-align: end;
+}
+
+.empty {
+  border: 1px dashed var(--line);
+  color: var(--muted);
+  margin: 0;
+  padding: var(--space-6);
+  width: min(560px, 82vw);
+}
+
+.pager {
+  align-items: center;
+  display: flex;
+  gap: var(--space-2);
+}
+
+.pages {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.pages i {
+  background: var(--line);
+  height: 2px;
+  transition: background 0.18s;
+  width: 22px;
+}
+
+.pageCurrent {
+  background: var(--acid);
+}
+
+.pagerButton {
+  align-items: center;
+  background: none;
+  border: 1px solid var(--panel-line);
+  color: var(--muted);
+  display: flex;
+  height: 30px;
+  justify-content: center;
+  padding: 0;
+  transition:
+    border-color 0.18s,
+    color 0.18s;
+  width: 30px;
+}
+
+.pagerButton:hover:not(:disabled) {
+  border-color: var(--acid);
+  color: var(--acid);
+}
+
+.pagerButton:disabled {
+  color: var(--line);
+  cursor: not-allowed;
+}
+
+.pagerButton svg {
+  height: 15px;
+  width: 15px;
+}
+
+@media (pointer: coarse) {
+  .pagerButton {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .rail {
+    margin-bottom: var(--space-7);
+  }
+
+  .heading {
+    align-items: start;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+  }
+
+  .headingBleed {
+    padding-inline: 18px;
+  }
+
+  .headingMain {
+    flex: 1 0 100%;
+  }
+
+  .pager {
+    flex: 0 0 auto;
+  }
+
+  .pages {
+    display: none;
+  }
+
+  .track {
+    grid-auto-columns: minmax(142px, 42vw);
+  }
+
+  .trackBleed {
+    padding-inline: 18px;
+    scroll-padding-inline: 18px;
+  }
+}
+
+@media (max-width: 430px) {
+  .track {
+    grid-auto-columns: minmax(138px, 42vw);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pages i,
+  .pagerButton {
+    transition: none;
+  }
+}

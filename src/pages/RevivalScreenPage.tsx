@@ -1,10 +1,9 @@
 import { Link, useParams } from "react-router-dom";
 
 import { ErrorBoundary } from "../components/ErrorBoundary";
-import { PageTitle } from "../components/PageTitle";
+import { Rail, RailHeading, RailTrack } from "../components/rail/Rail";
 import { ReelCard } from "../components/revival/ReelCard";
 import { ReelPlayer } from "../components/revival/ReelPlayer";
-import { ExternalLinkIcon } from "../components/ui";
 import { UsherMark } from "../components/usher/UsherMark";
 import {
   CONDITION_LABELS,
@@ -19,6 +18,21 @@ import {
   workMeta,
 } from "../domain/revival";
 import { useScreening } from "../hooks/useRevival";
+import {
+  ButtonLink,
+  Callout,
+  ChipTag,
+  EmptyState,
+  ExternalLinkIcon,
+  Fact,
+  FactList,
+  Page,
+  PageHeader,
+  Skeleton,
+  Text,
+} from "../ui";
+
+import styles from "./RevivalScreenPage.module.css";
 
 export function RevivalScreenPage({ isSignedIn }: { isSignedIn: boolean }) {
   const { workId } = useParams();
@@ -26,40 +40,40 @@ export function RevivalScreenPage({ isSignedIn }: { isSignedIn: boolean }) {
 
   if (isLoading) {
     return (
-      <section className="page-section">
-        <div className="reel-frame skeleton" />
-      </section>
+      <Page>
+        <Skeleton shape="art" />
+      </Page>
     );
   }
 
   if (!screening) {
     return (
-      <section className="page-section">
-        <div className="search-empty lost">
-          <UsherMark face="unimpressed" crop="head" />
-          <h2>Nothing showing under that name.</h2>
-          <p>{error || "That print is not on our shelves."}</p>
-          <Link className="button-link" to="/revival">
-            Back to the revival house
-          </Link>
-        </div>
-      </section>
+      <Page>
+        <EmptyState
+          mark={<UsherMark face="unimpressed" crop="head" className={styles.mark} />}
+          heading="Nothing showing under that name."
+          description={error || "That print is not on our shelves."}
+          actions={
+            <ButtonLink to="/revival" variant="primary" size="lg">
+              Back to the revival house
+            </ButtonLink>
+          }
+        />
+      </Page>
     );
   }
 
   const { work } = screening;
 
   return (
-    <section className="page-section revival-screen revival-shelves">
-      <PageTitle heading={work.title}>
-        <p>{workMeta(work) || "Public domain in the UK"}</p>
-      </PageTitle>
+    <Page>
+      <PageHeader heading={work.title} description={workMeta(work) || "Public domain in the UK"} />
 
       {work.contentNotice && (
-        <aside className="content-notice" role="note">
-          <strong>Before you start</strong>
-          <p>{work.contentNotice}</p>
-        </aside>
+        <Callout role="note" className={styles.notice}>
+          <strong className={styles.noticeLabel}>Before you start</strong>
+          <Text size="sm">{work.contentNotice}</Text>
+        </Callout>
       )}
 
       <ErrorBoundary label="The projector" resetKey={work.id}>
@@ -71,16 +85,18 @@ export function RevivalScreenPage({ isSignedIn }: { isSignedIn: boolean }) {
         />
       </ErrorBoundary>
 
-      <p className="print-condition" data-condition={work.condition}>
+      <p className={styles.condition} data-condition={work.condition}>
         <span>{CONDITION_LABELS[work.condition]}</span>
         <em>{CONDITION_NOTES[work.condition]}</em>
       </p>
 
       {work.synopsis && (
-        <div className="revival-synopsis">
-          <p className="detail-synopsis">{work.synopsis}</p>
+        <div>
+          <Text size="lede" leading="relaxed" className={styles.synopsis}>
+            {work.synopsis}
+          </Text>
           {work.synopsisCredit && (
-            <p className="revival-synopsis-credit">
+            <p className={styles.credit}>
               Extract from the Wikipedia article{" "}
               <a href={work.synopsisCredit.url} target="_blank" rel="noreferrer">
                 {work.synopsisCredit.article}
@@ -96,60 +112,50 @@ export function RevivalScreenPage({ isSignedIn }: { isSignedIn: boolean }) {
       )}
 
       {work.tags.length > 0 && (
-        <div className="revival-tags">
+        <div className={styles.tags}>
           {work.tags
             .filter((tag) => tag.kind !== "language")
             .map((tag) => (
-              <span key={`${tag.kind}-${tag.slug}`} className={`revival-tag tag-${tag.kind}`}>
+              <ChipTag
+                key={`${tag.kind}-${tag.slug}`}
+                selected={tag.kind === "genre"}
+                className={styles.tag}
+              >
                 {tag.label}
-              </span>
+              </ChipTag>
             ))}
         </div>
       )}
 
-      <dl className="revival-provenance">
-        <div>
-          <dt>Rights note</dt>
-          <dd>
-            {rightsSummary(work)}
-            {work.rightsNote ? ` · ${work.rightsNote}` : ""}
-          </dd>
-        </div>
-        <div>
-          <dt>UK standing</dt>
-          <dd>{ukStanding(work)}</dd>
-        </div>
-        <div>
-          <dt>Hosted by</dt>
-          <dd>{deliveryNote(work)}</dd>
-        </div>
-        <div>
-          <dt>Source record</dt>
-          <dd>
-            <a href={work.sourceUrl} target="_blank" rel="noreferrer">
-              {SOURCE_LABELS[work.source]} <ExternalLinkIcon />
-            </a>
-          </dd>
-        </div>
+      <FactList min="220px" className={styles.provenance}>
+        <Fact term="Rights note">
+          {rightsSummary(work)}
+          {work.rightsNote ? ` · ${work.rightsNote}` : ""}
+        </Fact>
+        <Fact term="UK standing">{ukStanding(work)}</Fact>
+        <Fact term="Hosted by">{deliveryNote(work)}</Fact>
+        <Fact term="Source record">
+          <a className={styles.sourceLink} href={work.sourceUrl} target="_blank" rel="noreferrer">
+            {SOURCE_LABELS[work.source]} <ExternalLinkIcon />
+          </a>
+        </Fact>
         {work.titleId && (
-          <div>
-            <dt>In the catalogue</dt>
-            <dd>
-              <Link to={`/${work.titleId.replace(":", "/")}`}>Open the title card</Link>
-            </dd>
-          </div>
+          <Fact term="In the catalogue">
+            <Link className={styles.sourceLink} to={`/${work.titleId.replace(":", "/")}`}>
+              Open the title card
+            </Link>
+          </Fact>
         )}
-      </dl>
+      </FactList>
 
       {screening.prints.length > 0 && (
-        <section className="revival-prints" aria-labelledby="revival-prints-title">
-          <div className="rail-heading">
-            <div>
-              <span>{screening.prints.length + 1} copies of this survive in the archives.</span>
-              <h2 id="revival-prints-title">Other prints</h2>
-            </div>
-          </div>
-          <ul className="revival-print-list">
+        <Rail bleed={false} className={styles.prints}>
+          <RailHeading
+            bleed={false}
+            eyebrow={`${screening.prints.length + 1} copies of this survive in the archives.`}
+            heading="Other prints"
+          />
+          <ul className={styles.printList}>
             {screening.prints.map((print) => (
               <li key={print.id}>
                 <Link to={revivalPath(print)}>
@@ -159,24 +165,19 @@ export function RevivalScreenPage({ isSignedIn }: { isSignedIn: boolean }) {
               </li>
             ))}
           </ul>
-        </section>
+        </Rail>
       )}
 
       {screening.alsoShowing.length > 0 && (
-        <section className="content-rail">
-          <div className="rail-heading">
-            <div>
-              <span>Still running down here.</span>
-              <h2>Also showing</h2>
-            </div>
-          </div>
-          <div className="rail-track">
+        <Rail bleed={false}>
+          <RailHeading bleed={false} eyebrow="Still running down here." heading="Also showing" />
+          <RailTrack bleed={false}>
             {screening.alsoShowing.map((other) => (
               <ReelCard key={other.id} work={other} />
             ))}
-          </div>
-        </section>
+          </RailTrack>
+        </Rail>
       )}
-    </section>
+    </Page>
   );
 }

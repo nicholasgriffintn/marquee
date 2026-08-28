@@ -1,7 +1,10 @@
 import { useState } from "react";
 
 import { useLinks } from "../../hooks/useLinks";
+import { classNames } from "../../lib/class-names";
 import { formatDate } from "../../lib/dates";
+
+import styles from "./ConnectionsPanel.module.css";
 
 export function ConnectionsPanel({ isSignedIn }: { isSignedIn: boolean }) {
   const connections = useLinks(isSignedIn);
@@ -25,7 +28,7 @@ export function ConnectionsPanel({ isSignedIn }: { isSignedIn: boolean }) {
 
   return (
     <>
-      <div className="connection-row">
+      <div className={styles.row}>
         <strong>Trakt</strong>
         {trakt?.available === false ? (
           <small>Not configured on this deployment.</small>
@@ -35,14 +38,18 @@ export function ConnectionsPanel({ isSignedIn }: { isSignedIn: boolean }) {
               {trakt.account ? `${trakt.account} needs reconnecting` : "Needs reconnecting"} · Trakt
               stopped accepting our access, so syncing is paused.
             </small>
-            <span className="spacer" />
+            <span className={styles.spacer} />
             <a
-              className="link-button link-button-primary"
+              className={classNames(styles.button, styles.primary)}
               href="/api/links/trakt/start?returnTo=/notebook"
             >
               Reconnect Trakt
             </a>
-            <button type="button" onClick={() => void connections.unlinkTrakt()}>
+            <button
+              type="button"
+              className={styles.button}
+              onClick={() => void connections.unlinkTrakt()}
+            >
               Unlink
             </button>
           </>
@@ -59,9 +66,10 @@ export function ConnectionsPanel({ isSignedIn }: { isSignedIn: boolean }) {
               {connections.pushStatus === "done" ? " · sent" : ""}
               {connections.pushStatus === "timeout" ? " · still sending, check back shortly" : ""}
             </small>
-            <span className="spacer" />
+            <span className={styles.spacer} />
             <button
               type="button"
+              className={styles.button}
               disabled={connections.syncStatus === "running"}
               onClick={() => void connections.syncTrakt()}
             >
@@ -69,21 +77,26 @@ export function ConnectionsPanel({ isSignedIn }: { isSignedIn: boolean }) {
             </button>
             <button
               type="button"
+              className={styles.button}
               disabled={connections.pushStatus === "running"}
               onClick={() => setConfirmPush(true)}
             >
               Send it there
             </button>
-            <button type="button" onClick={() => void connections.unlinkTrakt()}>
+            <button
+              type="button"
+              className={styles.button}
+              onClick={() => void connections.unlinkTrakt()}
+            >
               Unlink
             </button>
           </>
         ) : (
           <>
             <small>Import your watch history, ratings and watchlist.</small>
-            <span className="spacer" />
+            <span className={styles.spacer} />
             <a
-              className="link-button link-button-primary"
+              className={classNames(styles.button, styles.primary)}
               href="/api/links/trakt/start?returnTo=/notebook"
             >
               Connect Trakt
@@ -93,17 +106,17 @@ export function ConnectionsPanel({ isSignedIn }: { isSignedIn: boolean }) {
       </div>
 
       {confirmPush && trakt?.connected && (
-        <div className="connection-row">
+        <div className={styles.row}>
           <strong>Send it there</strong>
           <small>
             {connections.pending
               ? `${connections.pending.watched} watched, ${connections.pending.rated} rated and ${connections.pending.listed} waiting would go onto your Trakt account. Only what has changed since the last send.`
               : "Your shelf would go onto your Trakt account."}
           </small>
-          <span className="spacer" />
+          <span className={styles.spacer} />
           <button
             type="button"
-            className="link-button-primary"
+            className={classNames(styles.button, styles.primary)}
             onClick={() => {
               void connections.pushTrakt();
               setConfirmPush(false);
@@ -111,18 +124,18 @@ export function ConnectionsPanel({ isSignedIn }: { isSignedIn: boolean }) {
           >
             Send it
           </button>
-          <button type="button" onClick={() => setConfirmPush(false)}>
+          <button type="button" className={styles.button} onClick={() => setConfirmPush(false)}>
             Leave it
           </button>
         </div>
       )}
 
-      <div className="connection-row">
+      <div className={styles.row}>
         <strong>API tokens</strong>
         <small>Connect Marquee to an agent over MCP at /mcp.</small>
-        <span className="spacer" />
+        <span className={styles.spacer} />
         <input
-          className="token-field"
+          className={styles.field}
           value={tokenLabel}
           maxLength={60}
           placeholder="Token name, e.g. Claude"
@@ -131,7 +144,7 @@ export function ConnectionsPanel({ isSignedIn }: { isSignedIn: boolean }) {
         />
         <button
           type="button"
-          className="link-button-primary"
+          className={classNames(styles.button, styles.primary)}
           onClick={() => {
             void connections.createToken(tokenLabel);
             setTokenLabel("");
@@ -142,28 +155,36 @@ export function ConnectionsPanel({ isSignedIn }: { isSignedIn: boolean }) {
         </button>
       </div>
       {connections.freshToken && (
-        <div className="connection-row">
+        <div className={styles.row}>
           <strong>Copy it now</strong>
-          <code className="token-value">{connections.freshToken}</code>
-          <span className="spacer" />
-          <button type="button" onClick={() => void copyToken(connections.freshToken ?? "")}>
+          <code className={styles.token}>{connections.freshToken}</code>
+          <span className={styles.spacer} />
+          <button
+            type="button"
+            className={styles.button}
+            onClick={() => void copyToken(connections.freshToken ?? "")}
+          >
             {tokenCopied ? "Copied" : "Copy"}
           </button>
-          <button type="button" onClick={connections.dismissToken}>
+          <button type="button" className={styles.button} onClick={connections.dismissToken}>
             Done
           </button>
         </div>
       )}
       {connections.tokens.length > 0 && (
-        <ul className="token-list">
+        <ul className={styles.tokens}>
           {connections.tokens.map((token) => (
             <li key={token.id}>
               <strong>{token.label}</strong>
               <small>
                 {token.lastUsedAt ? `used ${formatDate(token.lastUsedAt, {})}` : "never used"}
               </small>
-              <span className="spacer" />
-              <button type="button" onClick={() => void connections.revokeToken(token.id)}>
+              <span className={styles.spacer} />
+              <button
+                type="button"
+                className={styles.button}
+                onClick={() => void connections.revokeToken(token.id)}
+              >
                 Revoke
               </button>
             </li>
@@ -171,7 +192,7 @@ export function ConnectionsPanel({ isSignedIn }: { isSignedIn: boolean }) {
         </ul>
       )}
       {connections.error && (
-        <div className="connection-row">
+        <div className={styles.row}>
           <p role="alert">{connections.error}</p>
         </div>
       )}

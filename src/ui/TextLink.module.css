@@ -1,0 +1,74 @@
+.link {
+  color: inherit;
+  transition: color var(--duration) var(--ease);
+}
+
+.underline {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.underline:hover,
+.underline:focus-visible {
+  color: var(--acid);
+}
+
+.aside {
+  color: var(--muted);
+  font: italic var(--weight-regular) var(--type-body) / 1 var(--serif);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.aside:hover,
+.aside:focus-visible {
+  color: var(--acid);
+}
+
+.accent {
+  align-items: center;
+  color: var(--acid);
+  display: inline-flex;
+  gap: var(--space-1);
+}
+
+.accent:hover,
+.accent:focus-visible {
+  color: var(--white);
+}
+
+.plain:hover,
+.plain:focus-visible {
+  color: var(--acid);
+}
+
+.paper.underline:hover,
+.paper.underline:focus-visible,
+.paper.plain:hover,
+.paper.plain:focus-visible {
+  color: var(--blue);
+}
+
+.paper.aside {
+  color: var(--muted-on-paper);
+}
+
+.paper.aside:hover,
+.paper.aside:focus-visible {
+  color: var(--blue);
+}
+
+.paper.accent {
+  color: var(--acid-ink);
+}
+
+.paper.accent:hover,
+.paper.accent:focus-visible {
+  color: var(--ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .link {
+    transition: none;
+  }
+}

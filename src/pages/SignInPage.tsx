@@ -1,28 +1,32 @@
 import { AuthFlow, AuthProvider, type ExternalAuthProvider } from "@ngriffin_uk/auth-react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 
 import { UsherMark } from "../components/usher/UsherMark";
 import { useResource } from "../hooks/useResource";
+import { classNames } from "../lib/class-names";
+import { ButtonLink, Heading, Page, Text } from "../ui";
+
+import styles from "./SignInPage.module.css";
 
 const CLASS_NAMES = {
-  signIn: "box-office-flow",
-  title: "box-office-title",
-  description: "box-office-description",
-  providerList: "box-office-providers",
-  providerButton: "box-office-provider",
-  separator: "box-office-separator",
-  error: "box-office-error",
-  status: "box-office-status",
-  form: "box-office-form",
-  field: "box-office-field",
-  label: "box-office-label",
-  input: "box-office-input",
-  inputContainer: "box-office-input-wrap",
-  inputIcon: "box-office-input-icon",
-  button: "box-office-provider",
-  magicLinkButton: "box-office-provider",
-  linkButton: "box-office-link",
-  actions: "box-office-actions",
+  signIn: styles.flow,
+  title: styles.hiddenTitle,
+  description: styles.hiddenTitle,
+  providerList: styles.providers,
+  providerButton: styles.provider,
+  separator: styles.separator,
+  error: styles.error,
+  status: styles.status,
+  form: styles.form,
+  field: styles.field,
+  label: styles.label,
+  input: styles.input,
+  inputContainer: styles.inputWrap,
+  inputIcon: styles.inputIcon,
+  button: styles.provider,
+  magicLinkButton: styles.provider,
+  linkButton: styles.link,
+  actions: styles.actions,
 } as const;
 
 export function SignInPage({
@@ -41,44 +45,50 @@ export function SignInPage({
   const returnTo = params.get("returnTo") ?? "/";
 
   return (
-    <section className="page-section box-office">
-      <div className="box-office-bulbs" aria-hidden="true">
+    <Page className={styles.page}>
+      <div className={styles.bulbs} aria-hidden="true">
         {Array.from({ length: 16 }, (_, index) => (
-          <i key={index} className={index === 6 ? "dead" : ""} />
+          <i key={index} className={classNames(index === 6 && styles.dead)} />
         ))}
       </div>
 
-      <div className="box-office-inner">
-        <div className="box-office-figure" aria-hidden="true">
-          <UsherMark face={isSignedIn ? "pleased" : "idle"} className="usher-figure" />
+      <div className={styles.inner}>
+        <div className={styles.figure} aria-hidden="true">
+          <UsherMark face={isSignedIn ? "pleased" : "idle"} className={styles.figureMark} />
         </div>
 
-        <div className="box-office-window">
-          <p className="box-office-eyebrow">
+        <div className={styles.window}>
+          <p className={styles.eyebrow}>
             <span>Box office</span>
             <em>Open all hours</em>
           </p>
 
           {isSignedIn ? (
-            <div className="box-office-body">
-              <h1>You already have a ticket.</h1>
-              <p className="box-office-line">Same seat as last time. Nobody has moved it.</p>
-              <Link className="button-link" to={returnTo}>
+            <div className={styles.body}>
+              <Heading level={1} size="title" family="serif" tone="ink" className={styles.title}>
+                You already have a ticket.
+              </Heading>
+              <Text tone="ink" className={styles.line}>
+                Same seat as last time. Nobody has moved it.
+              </Text>
+              <ButtonLink to={returnTo} variant="primary" size="lg">
                 Go on through
-              </Link>
+              </ButtonLink>
             </div>
           ) : (
-            <div className="box-office-body">
-              <h1>Admit one.</h1>
-              <p className="box-office-line">
+            <div className={styles.body}>
+              <Heading level={1} size="title" family="serif" tone="ink" className={styles.title}>
+                Admit one.
+              </Heading>
+              <Text tone="ink" className={styles.line}>
                 Tickets are free. I only need to know whose seat it is, so I can keep your shelf and
                 stop offering you things you have already seen.
-              </p>
+              </Text>
 
               {isSessionLoading || methods === null ? (
-                <p className="box-office-status">Opening the window…</p>
+                <p className={styles.status}>Opening the window…</p>
               ) : methods.providers.length === 0 && !methods.magicLink ? (
-                <p className="box-office-error">
+                <p className={styles.error}>
                   The window is shut. No sign-in method is configured on this deployment.
                 </p>
               ) : (
@@ -116,18 +126,18 @@ export function SignInPage({
                 </AuthProvider>
               )}
 
-              <p className="box-office-small">
+              <p className={styles.small}>
                 We keep your name and avatar, nothing else. Your shelf stays yours.
               </p>
             </div>
           )}
 
-          <p className="box-office-stub" aria-hidden="true">
+          <p className={styles.stub} aria-hidden="true">
             <span>Admit one</span>
             <em>Marquee · est. 1974</em>
           </p>
         </div>
       </div>
-    </section>
+    </Page>
   );
 }

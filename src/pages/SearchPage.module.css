@@ -1,0 +1,62 @@
+.usher {
+  align-items: center;
+  background: var(--panel);
+  border: 1px solid var(--panel-line);
+  border-left: 3px solid var(--acid);
+  color: var(--white);
+  display: flex;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+  max-width: 560px;
+  padding: var(--space-4) var(--space-5);
+  text-decoration: none;
+  transition: border-color 0.14s ease;
+}
+
+.usher:hover {
+  border-color: var(--acid);
+}
+
+.usherMark {
+  flex: 0 0 auto;
+  height: 40px;
+  width: 56px;
+}
+
+.usherCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.usherCopy strong {
+  font: var(--weight-bold) var(--type-compact) / 1 var(--sans);
+}
+
+.usherCopy small {
+  color: var(--muted);
+  font: var(--weight-regular) var(--type-sm) / 1.4 var(--sans);
+}
+
+.usherArrow {
+  color: var(--acid);
+  font-style: normal;
+  margin-left: auto;
+}
+
+.usherArrow svg {
+  height: 20px;
+  width: 20px;
+}
+
+.moment {
+  margin-top: var(--space-5);
+  width: min(440px, 100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .usher {
+    transition: none;
+  }
+}

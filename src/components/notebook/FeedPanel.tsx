@@ -1,7 +1,11 @@
 import { useState } from "react";
 
 import { useFeeds } from "../../hooks/useFeeds";
+import { classNames } from "../../lib/class-names";
 import { formatDate } from "../../lib/dates";
+import { NotebookAside } from "./NotebookSection";
+
+import connectionStyles from "./ConnectionsPanel.module.css";
 
 function webcal(url: string) {
   return url.replace(/^https?:/u, "webcal:");
@@ -28,7 +32,7 @@ export function FeedPanel({ isSignedIn }: { isSignedIn: boolean }) {
 
   return (
     <>
-      <div className="connection-row">
+      <div className={connectionStyles.row}>
         <strong>Your own diary</strong>
         <small>
           {feeds.keys.subscribed
@@ -39,12 +43,20 @@ export function FeedPanel({ isSignedIn }: { isSignedIn: boolean }) {
               }.`
             : "Episodes and releases from your shelf, in whatever calendar you already keep."}
         </small>
-        <span className="spacer" />
-        <button type="button" className="link-button-primary" onClick={() => void feeds.cutKey()}>
+        <span className={connectionStyles.spacer} />
+        <button
+          type="button"
+          className={classNames(connectionStyles.button, connectionStyles.primary)}
+          onClick={() => void feeds.cutKey()}
+        >
           {feeds.keys.subscribed ? "Cut a new key" : "Cut a key"}
         </button>
         {feeds.keys.subscribed && (
-          <button type="button" onClick={() => void feeds.dropKey()}>
+          <button
+            type="button"
+            className={connectionStyles.button}
+            onClick={() => void feeds.dropKey()}
+          >
             Take it back
           </button>
         )}
@@ -52,15 +64,15 @@ export function FeedPanel({ isSignedIn }: { isSignedIn: boolean }) {
 
       {fresh && (
         <>
-          <p className="notebook-aside">
+          <NotebookAside>
             I keep no copy of these. Put them somewhere now — a new key retires the old one and
             anything subscribed to it goes quiet.
-          </p>
-          <div className="connection-row">
+          </NotebookAside>
+          <div className={connectionStyles.row}>
             <strong>Calendar</strong>
-            <code className="token-value">{webcal(feeds.keys.calendarUrl ?? "")}</code>
-            <span className="spacer" />
-            <a className="link-button" href={webcal(feeds.keys.calendarUrl ?? "")}>
+            <code className={connectionStyles.token}>{webcal(feeds.keys.calendarUrl ?? "")}</code>
+            <span className={connectionStyles.spacer} />
+            <a className={connectionStyles.button} href={webcal(feeds.keys.calendarUrl ?? "")}>
               Subscribe
             </a>
             <button
@@ -70,11 +82,15 @@ export function FeedPanel({ isSignedIn }: { isSignedIn: boolean }) {
               {copied === "calendar" ? "Copied" : "Copy"}
             </button>
           </div>
-          <div className="connection-row">
+          <div className={connectionStyles.row}>
             <strong>Reader</strong>
-            <code className="token-value">{feeds.keys.alertsUrl}</code>
-            <span className="spacer" />
-            <button type="button" onClick={() => void copy("reader", feeds.keys.alertsUrl ?? "")}>
+            <code className={connectionStyles.token}>{feeds.keys.alertsUrl}</code>
+            <span className={connectionStyles.spacer} />
+            <button
+              type="button"
+              className={connectionStyles.button}
+              onClick={() => void copy("reader", feeds.keys.alertsUrl ?? "")}
+            >
               {copied === "reader" ? "Copied" : "Copy"}
             </button>
           </div>
@@ -82,7 +98,7 @@ export function FeedPanel({ isSignedIn }: { isSignedIn: boolean }) {
       )}
 
       {feeds.error && (
-        <div className="connection-row">
+        <div className={connectionStyles.row}>
           <p role="alert">{feeds.error}</p>
         </div>
       )}

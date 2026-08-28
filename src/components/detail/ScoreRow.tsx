@@ -1,15 +1,10 @@
 import type { MediaTitle } from "../../domain/catalog";
 import { blendedRating } from "../../domain/ratings";
 import { compactCount, moneyLabel, scoreLabel, votesLabel } from "../../lib/media";
+import { Stat, StatGrid, Text } from "../../ui";
+import { DetailNote } from "./DetailNote";
 
-function Score({ value, label }: { value: string; label: string }) {
-  return (
-    <div>
-      <strong>{value}</strong>
-      <span>{label}</span>
-    </div>
-  );
-}
+import styles from "./ScoreRow.module.css";
 
 export function ScoreRow({ item }: { item: MediaTitle }) {
   const consensus = blendedRating(item);
@@ -20,52 +15,49 @@ export function ScoreRow({ item }: { item: MediaTitle }) {
 
   return (
     <>
-      <div className="score-row">
+      <StatGrid surface="paper" columns={2} className={styles.grid}>
         {consensus && consensus.sources.length > 1 && (
-          <Score
+          <Stat
             value={consensus.score.toFixed(1)}
             label={`Marquee consensus · ${consensus.sources.length} sources`}
           />
         )}
-        <Score value={scoreLabel(item)} label="TMDB user score" />
-        <Score value={item.tmdbVoteCount.toLocaleString()} label="TMDB votes" />
+        <Stat value={scoreLabel(item)} label="TMDB user score" />
+        <Stat value={item.tmdbVoteCount.toLocaleString()} label="TMDB votes" />
         {ratings?.imdbScore != null && (
-          <Score value={ratings.imdbScore.toFixed(1)} label={`IMDb${imdbVotes}`} />
+          <Stat value={ratings.imdbScore.toFixed(1)} label={`IMDb${imdbVotes}`} />
         )}
-        {ratings?.rottenTomatoes && (
-          <Score value={ratings.rottenTomatoes} label="Rotten Tomatoes" />
-        )}
-        {ratings?.metascore != null && <Score value={`${ratings.metascore}`} label="Metascore" />}
+        {ratings?.rottenTomatoes && <Stat value={ratings.rottenTomatoes} label="Rotten Tomatoes" />}
+        {ratings?.metascore != null && <Stat value={`${ratings.metascore}`} label="Metascore" />}
         {ratings?.animeScore != null && (
-          <Score value={ratings.animeScore.toFixed(1)} label={`MyAnimeList${animeVotes}`} />
+          <Stat value={ratings.animeScore.toFixed(1)} label={`MyAnimeList${animeVotes}`} />
         )}
         {anime?.rank != null && (
-          <Score value={`#${anime.rank.toLocaleString()}`} label="MyAnimeList rank" />
+          <Stat value={`#${anime.rank.toLocaleString()}`} label="MyAnimeList rank" />
         )}
         {anime?.popularity != null && (
-          <Score value={`#${anime.popularity.toLocaleString()}`} label="MyAnimeList popularity" />
+          <Stat value={`#${anime.popularity.toLocaleString()}`} label="MyAnimeList popularity" />
         )}
         {anime?.members != null && anime.members > 0 && (
-          <Score value={compactCount(anime.members)} label="MyAnimeList members" />
+          <Stat value={compactCount(anime.members)} label="MyAnimeList members" />
         )}
         {ratings?.boxOffice != null && ratings.boxOffice > 0 && (
-          <Score value={moneyLabel(ratings.boxOffice)} label="Box office" />
+          <Stat value={moneyLabel(ratings.boxOffice)} label="Box office" />
         )}
         {item.revenue != null && item.revenue > 0 && !ratings?.boxOffice && (
-          <Score value={moneyLabel(item.revenue)} label="Worldwide gross" />
+          <Stat value={moneyLabel(item.revenue)} label="Worldwide gross" />
         )}
-      </div>
+      </StatGrid>
       {anime?.statusBreakdown && (
-        <div className="detail-awards">
-          <span>MyAnimeList lists</span>
-          <p>
+        <DetailNote label="MyAnimeList lists" accent="acid">
+          <Text size="xs">
             {compactCount(anime.statusBreakdown.watching)} watching ·{" "}
             {compactCount(anime.statusBreakdown.completed)} completed ·{" "}
             {compactCount(anime.statusBreakdown.planToWatch)} planning ·{" "}
             {compactCount(anime.statusBreakdown.onHold)} on hold ·{" "}
             {compactCount(anime.statusBreakdown.dropped)} dropped
-          </p>
-        </div>
+          </Text>
+        </DetailNote>
       )}
     </>
   );

@@ -1,4 +1,8 @@
 import type { TitleInsight } from "../../hooks/useTitleInsight";
+import { Skeleton, Text } from "../../ui";
+import { DetailNote } from "./DetailNote";
+
+import styles from "./MarqueeRead.module.css";
 
 export function MarqueeRead({
   insight,
@@ -12,15 +16,14 @@ export function MarqueeRead({
   }
 
   return (
-    <div className="detail-insight">
-      <span>
-        <i>AI</i> Marquee read
-      </span>
+    <DetailNote label="Marquee read" badge="AI">
       {insight ? (
         <>
-          <p>{insight.hook}</p>
+          <Text family="serif" className={styles.hook}>
+            {insight.hook}
+          </Text>
           {insight.moods.length > 0 && (
-            <div className="detail-moods">
+            <div className={styles.moods}>
               {insight.moods.map((mood) => (
                 <em key={mood}>{mood}</em>
               ))}
@@ -29,10 +32,10 @@ export function MarqueeRead({
         </>
       ) : (
         <>
-          <span className="skeleton skeleton-line" />
-          <span className="skeleton skeleton-line short" />
+          <Skeleton />
+          <Skeleton short />
         </>
       )}
-    </div>
+    </DetailNote>
   );
 }

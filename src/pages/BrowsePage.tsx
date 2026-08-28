@@ -1,12 +1,14 @@
-import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { ErrorBoundary } from "../components/ErrorBoundary";
-import { PageTitle } from "../components/PageTitle";
+import { AdvancedFacets, ClearFilters, Facet, FilterBar } from "../components/filters/FilterBar";
+import { ProviderBadge } from "../components/ProviderBadge";
+import { LoadMore, ResultsGrid, ResultsSkeleton } from "../components/ResultsGrid";
+import { SearchField } from "../components/SearchField";
 import { TitleCard } from "../components/TitleCard";
-import { ProviderBadge, SearchField, VerticalChevronIcon } from "../components/ui";
 import type { MediaTitle, Provider } from "../domain/catalog";
 import { useBrowse, useFilmingPlaces, useGenres, useKeywords } from "../hooks/useBrowse";
+import { Chip, EmptyState, Page, PageHeader } from "../ui";
 
 export type BrowsePreset = {
   title: string;
@@ -56,12 +58,6 @@ export function BrowsePage({
   const selectedKeywords = (params.get("keywords") ?? "").split(",").filter(Boolean);
   const selectedProviders = (params.get("providers") ?? "").split(",").filter(Boolean);
   const selectedPlaces = (params.get("places") ?? "").split(",").filter(Boolean);
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(
-    selectedGenres.length > 0 ||
-      selectedKeywords.length > 0 ||
-      selectedProviders.length > 0 ||
-      selectedPlaces.length > 0,
-  );
   const query = params.get("q") ?? "";
   const sortParam = params.get("sort");
   const sort: BrowsePreset["sort"] =
@@ -116,12 +112,10 @@ export function BrowsePage({
     sort !== preset.sort;
 
   return (
-    <section className="page-section">
-      <PageTitle heading={preset.title}>
-        <p>{preset.description}</p>
-      </PageTitle>
+    <Page>
+      <PageHeader heading={preset.title} description={preset.description} />
 
-      <div className="browse-filters">
+      <FilterBar>
         <SearchField
           value={query}
           onChange={(value) => update({ q: value })}
@@ -129,156 +123,132 @@ export function BrowsePage({
           label={`Search ${preset.title}`}
         />
 
-        <div className="browse-facet">
-          <span>Kind</span>
-          <div className="browse-chips">
-            {KINDS.map((option) => (
-              <button
-                type="button"
-                key={option.value || "all"}
-                className={mediaType === option.value ? "selected" : ""}
-                aria-pressed={mediaType === option.value}
-                onClick={() => update({ type: option.value })}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        </div>
+        <Facet label="Kind">
+          {KINDS.map((option) => (
+            <Chip
+              key={option.value || "all"}
+              selected={mediaType === option.value}
+              pressed={mediaType === option.value}
+              onClick={() => update({ type: option.value })}
+            >
+              {option.label}
+            </Chip>
+          ))}
+        </Facet>
 
-        <div className="browse-facet">
-          <span>Sort</span>
-          <div className="browse-chips">
-            {SORTS.map((option) => (
-              <button
-                type="button"
-                key={option.value}
-                className={sort === option.value ? "selected" : ""}
-                aria-pressed={sort === option.value}
-                onClick={() => update({ sort: option.value === preset.sort ? "" : option.value })}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        </div>
+        <Facet label="Sort">
+          {SORTS.map((option) => (
+            <Chip
+              key={option.value}
+              selected={sort === option.value}
+              pressed={sort === option.value}
+              onClick={() =>
+                update({
+                  sort: option.value === preset.sort ? "" : option.value,
+                })
+              }
+            >
+              {option.label}
+            </Chip>
+          ))}
+        </Facet>
 
-        <button
-          type="button"
-          className="browse-more-filters browse-more-filters-open"
-          aria-expanded={showAdvancedFilters}
-          onClick={() => setShowAdvancedFilters(true)}
+        <AdvancedFacets
+          defaultOpen={
+            selectedGenres.length > 0 ||
+            selectedKeywords.length > 0 ||
+            selectedProviders.length > 0 ||
+            selectedPlaces.length > 0
+          }
         >
-          Show more filters <VerticalChevronIcon />
-        </button>
-
-        <div className={`browse-advanced${showAdvancedFilters ? " expanded" : ""}`}>
-          <div className="browse-facet">
-            <span>Genre</span>
-            <div className="browse-chips">
-              {genres.map((genre) => (
-                <button
-                  type="button"
-                  key={genre}
-                  className={selectedGenres.includes(genre) ? "selected" : ""}
-                  aria-pressed={selectedGenres.includes(genre)}
-                  onClick={() => update({ genres: toggle(selectedGenres, genre).join(",") })}
-                >
-                  {genre}
-                </button>
-              ))}
-            </div>
-          </div>
+          <Facet label="Genre">
+            {genres.map((genre) => (
+              <Chip
+                key={genre}
+                selected={selectedGenres.includes(genre)}
+                pressed={selectedGenres.includes(genre)}
+                onClick={() => update({ genres: toggle(selectedGenres, genre).join(",") })}
+              >
+                {genre}
+              </Chip>
+            ))}
+          </Facet>
 
           {shownKeywords.length > 0 && (
-            <div className="browse-facet">
-              <span>Tag</span>
-              <div className="browse-chips">
-                {shownKeywords.map((keyword) => (
-                  <button
-                    type="button"
-                    key={keyword}
-                    className={selectedKeywords.includes(keyword) ? "selected" : ""}
-                    aria-pressed={selectedKeywords.includes(keyword)}
-                    onClick={() =>
-                      update({ keywords: toggle(selectedKeywords, keyword).join(",") })
-                    }
-                  >
-                    {keyword}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <Facet label="Tag">
+              {shownKeywords.map((keyword) => (
+                <Chip
+                  key={keyword}
+                  selected={selectedKeywords.includes(keyword)}
+                  pressed={selectedKeywords.includes(keyword)}
+                  onClick={() =>
+                    update({
+                      keywords: toggle(selectedKeywords, keyword).join(","),
+                    })
+                  }
+                >
+                  {keyword}
+                </Chip>
+              ))}
+            </Facet>
           )}
 
           {shownPlaces.length > 0 && (
-            <div className="browse-facet">
-              <span>Shot in</span>
-              <div className="browse-chips">
-                {shownPlaces.map((place) => (
-                  <button
-                    type="button"
-                    key={place}
-                    className={selectedPlaces.includes(place) ? "selected" : ""}
-                    aria-pressed={selectedPlaces.includes(place)}
-                    onClick={() => update({ places: toggle(selectedPlaces, place).join(",") })}
-                  >
-                    {place}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <Facet label="Shot in">
+              {shownPlaces.map((place) => (
+                <Chip
+                  key={place}
+                  selected={selectedPlaces.includes(place)}
+                  pressed={selectedPlaces.includes(place)}
+                  onClick={() => update({ places: toggle(selectedPlaces, place).join(",") })}
+                >
+                  {place}
+                </Chip>
+              ))}
+            </Facet>
           )}
 
           {filterable.length > 0 && (
-            <div className="browse-facet">
-              <span>Source</span>
-              <div className="browse-chips browse-chips-sources">
-                {filterable.slice(0, 24).map((provider) => (
-                  <button
-                    type="button"
-                    key={provider.id}
-                    className={selectedProviders.includes(provider.id) ? "selected" : ""}
-                    aria-pressed={selectedProviders.includes(provider.id)}
-                    title={provider.name}
-                    onClick={() =>
-                      update({ providers: toggle(selectedProviders, provider.id).join(",") })
-                    }
-                  >
-                    <ProviderBadge provider={provider} compact />
-                    <small>{provider.name}</small>
-                  </button>
-                ))}
-              </div>
-            </div>
+            <Facet label="Source" wide>
+              {filterable.slice(0, 24).map((provider) => (
+                <Chip
+                  key={provider.id}
+                  selected={selectedProviders.includes(provider.id)}
+                  pressed={selectedProviders.includes(provider.id)}
+                  title={provider.name}
+                  onClick={() =>
+                    update({
+                      providers: toggle(selectedProviders, provider.id).join(","),
+                    })
+                  }
+                >
+                  <ProviderBadge provider={provider} compact />
+                  <small>{provider.name}</small>
+                </Chip>
+              ))}
+            </Facet>
           )}
-
-          <button
-            type="button"
-            className="browse-more-filters browse-more-filters-close"
-            aria-expanded={showAdvancedFilters}
-            onClick={() => setShowAdvancedFilters(false)}
-          >
-            Show less filters <VerticalChevronIcon up />
-          </button>
-        </div>
+        </AdvancedFacets>
 
         {hasFilters && (
-          <button
-            type="button"
-            className="browse-clear"
+          <ClearFilters
             onClick={() =>
-              update({ genres: "", keywords: "", places: "", providers: "", q: "", sort: "" })
+              update({
+                genres: "",
+                keywords: "",
+                places: "",
+                providers: "",
+                q: "",
+                sort: "",
+              })
             }
-          >
-            Clear filters
-          </button>
+          />
         )}
-      </div>
+      </FilterBar>
 
       {browse.items.length > 0 && (
         <ErrorBoundary label="These listings">
-          <div className="results-grid">
+          <ResultsGrid>
             {browse.items.map((item, index) => (
               <TitleCard
                 key={item.id}
@@ -287,35 +257,20 @@ export function BrowsePage({
                 rank={sort === "popularity" || sort === "trending" ? index + 1 : undefined}
               />
             ))}
-          </div>
+          </ResultsGrid>
         </ErrorBoundary>
       )}
 
-      {browse.isLoading && browse.items.length === 0 && (
-        <div className="results-grid" aria-hidden="true">
-          {[0, 1, 2, 3, 4, 5, 6, 7].map((card) => (
-            <div className="rail-card" key={card}>
-              <span className="skeleton skeleton-art" />
-              <span className="skeleton skeleton-meta" />
-            </div>
-          ))}
-        </div>
-      )}
+      {browse.isLoading && browse.items.length === 0 && <ResultsSkeleton count={8} />}
 
       {!browse.isLoading && browse.items.length === 0 && (
-        <div className="search-empty">
-          <h2>{browse.error || "Nothing matches those filters."}</h2>
-          <p>Try removing a genre or a source.</p>
-        </div>
+        <EmptyState
+          heading={browse.error || "Nothing matches those filters."}
+          description="Try removing a genre or a source."
+        />
       )}
 
-      {browse.hasMore && (
-        <div className="browse-more">
-          <button type="button" onClick={browse.loadMore} disabled={browse.isLoading}>
-            {browse.isLoading ? "Loading…" : "Show more"}
-          </button>
-        </div>
-      )}
-    </section>
+      {browse.hasMore && <LoadMore isLoading={browse.isLoading} onClick={browse.loadMore} />}
+    </Page>
   );
 }

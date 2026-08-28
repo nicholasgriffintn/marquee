@@ -9,13 +9,21 @@ import { FeedPanel } from "../components/notebook/FeedPanel";
 import { GuestList } from "../components/notebook/GuestList";
 import { ImportPanel } from "../components/notebook/ImportPanel";
 import { NotebookIndex, type Divider } from "../components/notebook/NotebookIndex";
-import { NotebookSection } from "../components/notebook/NotebookSection";
+import {
+  NotebookAside,
+  NotebookEmpty,
+  NotebookSection,
+  NotebookSubheading,
+} from "../components/notebook/NotebookSection";
 import { ServicesPanel } from "../components/notebook/ServicesPanel";
 import { TasteMap } from "../components/notebook/TasteMap";
 import { UsherMark } from "../components/usher/UsherMark";
 import type { Provider, ProvidersResponse } from "../domain/catalog";
 import type { Belief, Guest } from "../domain/notebook";
 import { jsonMutation, mutateJson, queryJson } from "../lib/query-client";
+import { Eyebrow, Heading, Page, Text } from "../ui";
+
+import styles from "./NotebookPage.module.css";
 
 type NotebookResponse = { beliefs: Belief[] };
 
@@ -156,47 +164,55 @@ export function NotebookPage({
 
   if (!isSignedIn) {
     return (
-      <section className="page-section notebook">
-        <div className="notebook-head">
-          <UsherMark face="idle" crop="head" className="notebook-mark" />
+      <Page>
+        <div className={styles.head}>
+          <UsherMark face="idle" crop="head" className={styles.mark} />
           <div>
-            <p className="page-eyebrow">The Usher's notebook</p>
-            <h1>I only keep one of these per ticket.</h1>
-            <p className="notebook-lede">
+            <Eyebrow tone="accent" tracking="wide" className={styles.eyebrow}>
+              The Usher&apos;s notebook
+            </Eyebrow>
+            <Heading level={1} size="heading" family="serif" className={styles.title}>
+              I only keep one of these per ticket.
+            </Heading>
+            <Text tone="muted" leading="relaxed" className={styles.lede}>
               <Link to="/sign-in?returnTo=%2Fnotebook">Come to the box office</Link> and I will
-              start yours. Thirty years of other people's evenings in here already.
-            </p>
+              start yours. Thirty years of other people&apos;s evenings in here already.
+            </Text>
           </div>
         </div>
-      </section>
+      </Page>
     );
   }
 
   return (
-    <section className="page-section notebook">
-      <div className="notebook-head">
-        <UsherMark face="thinking" crop="head" className="notebook-mark" />
+    <Page>
+      <div className={styles.head}>
+        <UsherMark face="thinking" crop="head" className={styles.mark} />
         <div>
-          <p className="page-eyebrow">The Usher's notebook</p>
-          <h1>What I have worked out about you.</h1>
-          <p className="notebook-lede">
-            Thirty years of other people's evenings in the front of this book. Your page is at the
-            back. Nothing in it is a secret — correct it, set it aside for a night, or tear it out.
-            I will not take it personally.
-          </p>
+          <Eyebrow tone="accent" tracking="wide" className={styles.eyebrow}>
+            The Usher&apos;s notebook
+          </Eyebrow>
+          <Heading level={1} size="heading" family="serif" className={styles.title}>
+            What I have worked out about you.
+          </Heading>
+          <Text tone="muted" leading="relaxed" className={styles.lede}>
+            Thirty years of other people&apos;s evenings in the front of this book. Your page is at
+            the back. Nothing in it is a secret — correct it, set it aside for a night, or tear it
+            out. I will not take it personally.
+          </Text>
         </div>
       </div>
 
       {error && (
-        <p className="notebook-error" role="alert">
+        <Text tone="warning" leading="relaxed" role="alert" className={styles.error}>
           {error}
-        </p>
+        </Text>
       )}
 
-      <div className="notebook-body">
+      <div className={styles.body}>
         <NotebookIndex dividers={DIVIDERS} />
 
-        <div className="notebook-pages">
+        <div className={styles.pages}>
           <NotebookSection
             id="notes"
             number={1}
@@ -205,7 +221,7 @@ export function NotebookPage({
           >
             <ErrorBoundary label="These notes">
               {beliefs === null ? (
-                <p className="notebook-empty">Finding my glasses…</p>
+                <NotebookEmpty>Finding my glasses…</NotebookEmpty>
               ) : (
                 <BeliefList
                   beliefs={beliefs}
@@ -276,32 +292,32 @@ export function NotebookPage({
             title={DIVIDERS[5].label}
             lede="Bring your history in from somewhere else, or hand a key to something that is not a person."
           >
-            <h3>What you brought with you</h3>
-            <p className="notebook-aside">
+            <NotebookSubheading>What you brought with you</NotebookSubheading>
+            <NotebookAside>
               Letterboxd will give you your whole account under Settings, Data, Export. Hand me
               diary.csv or ratings.csv and I will fill in what I have missed.
-            </p>
+            </NotebookAside>
             <ErrorBoundary label="The import">
               <ImportPanel onImported={() => setReloads((count) => count + 1)} />
             </ErrorBoundary>
 
-            <h3>Accounts and keys</h3>
+            <NotebookSubheading>Accounts and keys</NotebookSubheading>
             <ErrorBoundary label="These connections">
               <ConnectionsPanel isSignedIn={isSignedIn} />
             </ErrorBoundary>
 
-            <h3>Somewhere other than here</h3>
-            <p className="notebook-aside">
+            <NotebookSubheading>Somewhere other than here</NotebookSubheading>
+            <NotebookAside>
               What is coming goes in your calendar, and what I would have written to you about goes
               in your reader. Both are yours alone, both are links rather than accounts, and either
               can be taken back.
-            </p>
+            </NotebookAside>
             <ErrorBoundary label="These subscriptions">
               <FeedPanel isSignedIn={isSignedIn} />
             </ErrorBoundary>
           </NotebookSection>
         </div>
       </div>
-    </section>
+    </Page>
   );
 }

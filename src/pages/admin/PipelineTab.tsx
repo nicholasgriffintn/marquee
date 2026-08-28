@@ -3,8 +3,12 @@ import { useState } from "react";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
 import type { AdminOverview, AdminPipeline } from "../../hooks/useAdmin";
 import { useResource } from "../../hooks/useResource";
+import { classNames } from "../../lib/class-names";
 import { parseDatabaseDate } from "../../lib/dates";
+import { Callout, Chip, Panel, TabPanel } from "../../ui";
 import { RUN_STATUSES, type RunStatus } from "./config";
+
+import styles from "./admin.module.css";
 
 function stamp(value: string) {
   return parseDatabaseDate(value)?.toLocaleString() ?? "never";
@@ -28,23 +32,17 @@ export function PipelineTab({
 
   return (
     <ErrorBoundary label="The pipeline">
-      <div role="tabpanel" id="admin-panel-pipeline" aria-labelledby="admin-tab-pipeline">
-        {error && (
-          <p className="catalogue-error" role="alert">
-            {error}
-          </p>
-        )}
+      <TabPanel id="pipeline" idPrefix="admin">
+        {error && <Callout>{error}</Callout>}
         {pipeline && pipeline.lastRuns.length > 0 && (
-          <section className="panel-block" aria-labelledby="admin-runs-title">
-            <h2 id="admin-runs-title">Recent jobs</h2>
-            <p className="admin-note">Last {pipeline.runWindowHours} hours</p>
-            <div className="admin-filters">
+          <Panel heading="Recent jobs">
+            <p className={styles.note}>Last {pipeline.runWindowHours} hours</p>
+            <div className={styles.filters}>
               {RUN_STATUSES.map((status) => (
-                <button
-                  type="button"
+                <Chip
                   key={status}
-                  aria-pressed={runStatus === status}
-                  className={`admin-chip${runStatus === status ? " selected" : ""}`}
+                  pressed={runStatus === status}
+                  selected={runStatus === status}
                   onClick={() => setRunStatus(status)}
                 >
                   {status}
@@ -53,28 +51,27 @@ export function PipelineTab({
                       ? pipeline.lastRuns.length
                       : pipeline.lastRuns.filter((run) => run.status === status).length}
                   </em>
-                </button>
+                </Chip>
               ))}
             </div>
-            <ul className="admin-list">
+            <ul className={styles.list}>
               {runs.map((run) => (
                 <li key={`${run.jobType}-${run.status}`}>
                   <strong>{run.jobType}</strong>
-                  <small className={`run-status run-status-${run.status}`}>
+                  <small className={classNames(run.status === "failed" && styles.failed)}>
                     {run.status} · {run.runs.toLocaleString()}
                     {run.subjects < run.runs ? ` · ${run.subjects.toLocaleString()} unique` : ""}
                   </small>
-                  <span className="spacer" />
+                  <span className={styles.spacer} />
                   <time dateTime={run.lastRunAt}>{stamp(run.lastRunAt)}</time>
                 </li>
               ))}
             </ul>
-          </section>
+          </Panel>
         )}
         {pipeline && pipeline.failures.length > 0 && (
-          <section className="panel-block" aria-labelledby="admin-failures-title">
-            <h2 id="admin-failures-title">Latest failures</h2>
-            <ul className="failure-list">
+          <Panel heading="Latest failures">
+            <ul className={styles.failures}>
               {pipeline.failures.map((failure) => (
                 <li key={`${failure.jobType}-${failure.startedAt}-${failure.subjectId ?? ""}`}>
                   <strong>{failure.jobType}</strong>
@@ -86,12 +83,11 @@ export function PipelineTab({
                 </li>
               ))}
             </ul>
-          </section>
+          </Panel>
         )}
         {pipeline && pipeline.enrichment.length > 0 && (
-          <section className="panel-block" aria-labelledby="admin-enrichment-title">
-            <h2 id="admin-enrichment-title">Enrichment coverage</h2>
-            <ul className="admin-list">
+          <Panel heading="Enrichment coverage">
+            <ul className={styles.list}>
               {pipeline.enrichment.map((source) => {
                 const recorded = source.titles + source.misses;
                 const hitRate = recorded > 0 ? Math.round((source.titles / recorded) * 100) : null;
@@ -117,7 +113,7 @@ export function PipelineTab({
                       <small>{source.attempted.toLocaleString()} attempted · 24h</small>
                     )}
                     {source.silentFailures > 0 && (
-                      <code className="run-status-failed">
+                      <code className={styles.failed}>
                         {source.silentFailures.toLocaleString()} failed silently ({silentRate}%)
                       </code>
                     )}
@@ -125,22 +121,22 @@ export function PipelineTab({
                       <code>{source.pending.toLocaleString()} retrying soon</code>
                     )}
                     {isPaused && pausedUntil && (
-                      <code className="run-status-failed">
+                      <code className={styles.failed}>
                         paused until {pausedUntil.toLocaleString()}
                         {budget && budget.consecutivePauses > 1
                           ? ` · ${budget.consecutivePauses}x in a row`
                           : ""}
                       </code>
                     )}
-                    <span className="spacer" />
+                    <span className={styles.spacer} />
                     <time dateTime={source.newest}>{stamp(source.newest)}</time>
                   </li>
                 );
               })}
             </ul>
-          </section>
+          </Panel>
         )}
-      </div>
+      </TabPanel>
     </ErrorBoundary>
   );
 }

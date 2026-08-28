@@ -2,7 +2,13 @@ import { useState } from "react";
 
 import type { Provider, ProvidersResponse } from "../../domain/catalog";
 import type { ProviderCategory } from "../../domain/providers";
-import { CloseIcon, ExternalLinkIcon, MinusIcon, PlusIcon, ProviderBadge } from "../ui";
+import { classNames } from "../../lib/class-names";
+import { Callout, CloseIcon, ExternalLinkIcon, MinusIcon, PlusIcon } from "../../ui";
+import { ProviderBadge } from "../ProviderBadge";
+import { SourceStatus } from "../sources/SourceStatus";
+import { NotebookEmpty } from "./NotebookSection";
+
+import styles from "./ServicesPanel.module.css";
 
 const CATEGORIES: Array<{ id: string; name: ProviderCategory }> = [
   { id: "subscription", name: "Subscription" },
@@ -68,15 +74,15 @@ export function ServicesPanel({
 
   return (
     <>
-      <div className="services-summary">
-        <p>
+      <div className={styles.summary}>
+        <p className={styles.count}>
           <strong>{selectedProviderIds.length || "No"}</strong>
           <span>
             {selectedProviderIds.length === 1 ? "service you pay for" : "services you pay for"}
           </span>
         </p>
         {chosen.length > 0 ? (
-          <ul className="services-chosen">
+          <ul className={styles.chosen}>
             {chosen.map((provider) => (
               <li key={provider.id}>
                 <ProviderBadge provider={provider} compact />
@@ -92,15 +98,16 @@ export function ServicesPanel({
             ))}
           </ul>
         ) : (
-          <p className="services-none">
+          <p className={styles.none}>
             Nothing ticked, so I assume everything. Tick a few and I will stop offering you things
             behind doors you cannot open.
           </p>
         )}
       </div>
 
-      <div className="services-controls">
+      <div className={styles.controls}>
         <input
+          className={styles.search}
           type="search"
           value={query}
           maxLength={40}
@@ -108,7 +115,7 @@ export function ServicesPanel({
           aria-label="Find a service"
           onChange={(event) => setQuery(event.target.value)}
         />
-        <label className="services-mine">
+        <label className={styles.mine}>
           <input
             type="checkbox"
             checked={minesOnly}
@@ -116,18 +123,14 @@ export function ServicesPanel({
           />
           Only mine
         </label>
-        <small>
+        <small className={styles.tally}>
           {total} of {stats.configured} listed
         </small>
       </div>
 
-      {providerError && (
-        <p className="catalogue-error" role="alert">
-          {providerError}
-        </p>
-      )}
+      {providerError && <Callout>{providerError}</Callout>}
 
-      <div className="source-list" aria-label="Streaming providers">
+      <div className={styles.list} aria-label="Streaming providers">
         {groups.map((group) => {
           const picked = group.all.filter((provider) =>
             selectedProviderIds.includes(provider.id),
@@ -142,7 +145,7 @@ export function ServicesPanel({
 
           return (
             <details
-              className="source-group"
+              className={styles.group}
               key={group.id}
               open={isOpen}
               onToggle={(event) => {
@@ -156,12 +159,12 @@ export function ServicesPanel({
                 }
               }}
             >
-              <summary>
-                <span className="source-group-toggle" aria-hidden="true">
-                  <PlusIcon className="source-group-plus" />
-                  <MinusIcon className="source-group-minus" />
+              <summary className={styles.groupSummary}>
+                <span className={styles.toggle} aria-hidden="true">
+                  <PlusIcon className={styles.plus} />
+                  <MinusIcon className={styles.minus} />
                 </span>
-                <span className="source-group-name">{group.name}</span>
+                <span className={styles.groupName}>{group.name}</span>
                 <small>
                   {group.shown.length}
                   {picked > 0 ? ` · ${picked} yours` : ""}
@@ -173,18 +176,22 @@ export function ServicesPanel({
                 const isLive = hasLiveFeed(provider);
 
                 return (
-                  <div className={`source-row${isSelected ? " selected" : ""}`} key={provider.id}>
-                    <ProviderBadge provider={provider} />
-                    <div className="source-name">
+                  <div
+                    className={classNames(styles.row, isSelected && styles.selected)}
+                    key={provider.id}
+                  >
+                    <ProviderBadge provider={provider} className={styles.badge} />
+                    <div className={styles.name}>
                       <strong>{provider.name}</strong>
                       <span>{provider.sourceLabel}</span>
                     </div>
-                    <span className={`source-status source-status-${provider.status}`}>
+                    <SourceStatus status={provider.status}>
                       {provider.status === "marker" ? "TBD" : provider.status.toUpperCase()}
-                    </span>
+                    </SourceStatus>
                     {provider.status === "feed" && (
                       <button
                         type="button"
+                        className={styles.action}
                         disabled={!isLive}
                         aria-pressed={isSelected}
                         aria-label={`${provider.name}${isSelected ? ", selected" : ""}`}
@@ -194,13 +201,16 @@ export function ServicesPanel({
                       </button>
                     )}
                     {provider.status === "link" && provider.homepage && (
-                      <a href={provider.homepage} target="_blank" rel="noreferrer">
+                      <a
+                        className={styles.action}
+                        href={provider.homepage}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
                         Open <ExternalLinkIcon />
                       </a>
                     )}
-                    {provider.status === "marker" && (
-                      <span className="source-marker-action">—</span>
-                    )}
+                    {provider.status === "marker" && <span className={styles.markerAction}>—</span>}
                   </div>
                 );
               })}
@@ -210,9 +220,9 @@ export function ServicesPanel({
       </div>
 
       {total === 0 && (
-        <p className="notebook-empty">
+        <NotebookEmpty>
           Nothing by that name. The list is only as good as what publishes a feed.
-        </p>
+        </NotebookEmpty>
       )}
     </>
   );

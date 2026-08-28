@@ -1,0 +1,11 @@
+.bar {
+  background: var(--panel-tile);
+  height: 2px;
+  overflow: hidden;
+}
+
+.bar i {
+  background: var(--acid);
+  display: block;
+  height: 100%;
+}

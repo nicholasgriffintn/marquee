@@ -2,10 +2,14 @@ import { useState } from "react";
 
 import { ErrorBoundary } from "../../components/ErrorBoundary";
 import type { AdminOverview } from "../../hooks/useAdmin";
+import { classNames } from "../../lib/class-names";
 import { parseDatabaseDate } from "../../lib/dates";
+import { Panel, Stat, StatGrid, StatusNote, TabPanel } from "../../ui";
 import { COUNT_LABELS } from "./config";
 import { ProgressBar } from "./ProgressBar";
 import { SampleModal } from "./SampleModal";
+
+import styles from "./admin.module.css";
 
 type BackfillRow = {
   mediaType: string;
@@ -75,27 +79,23 @@ export function OverviewTab({
 
   return (
     <ErrorBoundary label="The readouts">
-      <div role="tabpanel" id="admin-panel-overview" aria-labelledby="admin-tab-overview">
-        {!overview && loading && (
-          <p className="admin-note">
-            <i className="availability-spinner" aria-hidden="true" /> Reading the pipeline…
-          </p>
-        )}
+      <TabPanel id="overview" idPrefix="admin">
+        {!overview && loading && <StatusNote busy>Reading the pipeline…</StatusNote>}
         {overview && (
-          <section className="panel-block" aria-labelledby="admin-counts-title">
-            <h2 id="admin-counts-title">Catalogue</h2>
-            <p className="admin-note">
+          <Panel heading="Catalogue">
+            <p className={styles.note}>
               Availability is only kept fresh for the working set — everything on a shelf or a
               pinned list, everything a rail can surface, anything with an insight or an air date
               ahead of it, plus the most popular titles. The rest of the catalogue is searchable and
               fills in its providers when something actually reaches for it. Click a number for a
               sample of what is behind it.
             </p>
-            <div className="admin-counts">
+            <StatGrid min="130px">
               {COUNT_LABELS.map((count) => (
-                <button
-                  type="button"
+                <Stat
                   key={count.key}
+                  value={(overview.catalogue[count.key] ?? 0).toLocaleString()}
+                  label={count.label}
                   onClick={() =>
                     setSample({
                       type: "count",
@@ -103,23 +103,19 @@ export function OverviewTab({
                       label: count.label,
                     })
                   }
-                >
-                  <strong>{(overview.catalogue[count.key] ?? 0).toLocaleString()}</strong>
-                  <span>{count.label}</span>
-                </button>
+                />
               ))}
-            </div>
-          </section>
+            </StatGrid>
+          </Panel>
         )}
         {overview && overview.backfill.length > 0 && (
-          <section className="panel-block" aria-labelledby="admin-backfill-title">
-            <h2 id="admin-backfill-title">Catalogue backfill</h2>
-            <p className="admin-note">
+          <Panel heading="Catalogue backfill">
+            <p className={styles.note}>
               TMDB stops paginating any single query at page 500, so the sweep walks it as dated
               windows and halves any window that overflows that cap. Each window keeps its own
               cursor, so every sweep resumes the crawl instead of restarting it.
             </p>
-            <ul className="admin-list">
+            <ul className={styles.list}>
               {backfillSummary(overview.backfill).map(([mediaType, row]) => (
                 <li key={mediaType}>
                   <strong>{mediaType === "movie" ? "Films" : "Series"}</strong>
@@ -129,7 +125,7 @@ export function OverviewTab({
                     {(row.measured + row.awaiting).toLocaleString()} windows mapped
                     {row.splitting > 0 ? ` · ${row.splitting.toLocaleString()} split` : ""}
                   </small>
-                  <span className="spacer" />
+                  <span className={styles.spacer} />
                   <code>
                     {row.titles.toLocaleString()} titles in range
                     {row.awaiting > 0 ? " so far" : ""}
@@ -138,16 +134,15 @@ export function OverviewTab({
                 </li>
               ))}
             </ul>
-          </section>
+          </Panel>
         )}
         {overview && overview.budgets.length > 0 && (
-          <section className="panel-block" aria-labelledby="admin-budgets-title">
-            <h2 id="admin-budgets-title">Call budgets</h2>
-            <div className="budget-grid">
+          <Panel heading="Call budgets">
+            <div className={styles.budgets}>
               {overview.budgets.map((budget) => (
                 <div
                   key={budget.source}
-                  className={`budget-cell${budget.pausedUntil ? " budget-cell-paused" : ""}`}
+                  className={classNames(styles.budget, budget.pausedUntil && styles.budgetPaused)}
                 >
                   <strong>{budget.source}</strong>
                   <span>
@@ -158,6 +153,7 @@ export function OverviewTab({
                   <ProgressBar done={budget.used} total={budget.callLimit} />
                   <button
                     type="button"
+                    className={styles.budgetAction}
                     onClick={() =>
                       setSample({
                         type: "budget",
@@ -169,16 +165,20 @@ export function OverviewTab({
                     See sample
                   </button>
                   {budget.pausedUntil && (
-                    <button type="button" onClick={() => onResume(budget.source)}>
+                    <button
+                      type="button"
+                      className={styles.budgetAction}
+                      onClick={() => onResume(budget.source)}
+                    >
                       Resume now
                     </button>
                   )}
                 </div>
               ))}
             </div>
-          </section>
+          </Panel>
         )}
-      </div>
+      </TabPanel>
       {sample && (
         <SampleModal
           type={sample.type}

@@ -2,10 +2,10 @@ import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { ErrorBoundary } from "../components/ErrorBoundary";
-import { PageTitle } from "../components/PageTitle";
+import { Rail, RailEmpty, RailHeading, RailTrack } from "../components/rail/Rail";
 import { ProjectionNote } from "../components/revival/ProjectionNote";
 import { ReelCard } from "../components/revival/ReelCard";
-import { SearchField } from "../components/ui";
+import { SearchField } from "../components/SearchField";
 import { UsherMark } from "../components/usher/UsherMark";
 import { revivalPath, workMeta, type RevivalBillSlot, type RevivalShelf } from "../domain/revival";
 import { useNearViewport } from "../hooks/useNearViewport";
@@ -16,6 +16,19 @@ import {
   useVaultSearch,
   useVaultTotal,
 } from "../hooks/useRevival";
+import {
+  ButtonLink,
+  Callout,
+  EmptyState,
+  Eyebrow,
+  Heading,
+  Page,
+  PageHeader,
+  Skeleton,
+  Text,
+} from "../ui";
+
+import styles from "./RevivalPage.module.css";
 
 const BILL_SKELETON_SLOTS = [0, 1, 2, 3];
 const SHELF_SKELETON_RAILS = [0, 1];
@@ -30,21 +43,16 @@ function Shelf({ shelf }: { shelf: RevivalShelf }) {
   }
 
   return (
-    <section className="content-rail" ref={ref}>
-      <div className="rail-heading">
-        <div>
-          <span>{shelf.description}</span>
-          <h2>{shelf.title}</h2>
-        </div>
-      </div>
-      <div className="rail-track">
+    <Rail bleed={false} railRef={ref}>
+      <RailHeading bleed={false} eyebrow={shelf.description} heading={shelf.title} />
+      <RailTrack bleed={false}>
         {near
           ? shelf.works.map((work) => <ReelCard key={`${shelf.id}-${work.id}`} work={work} />)
           : shelf.works
               .slice(0, 4)
-              .map((work) => <span key={work.id} className="skeleton skeleton-reel" />)}
-      </div>
-    </section>
+              .map((work) => <Skeleton key={work.id} className={styles.reel} />)}
+      </RailTrack>
+    </Rail>
   );
 }
 
@@ -54,44 +62,40 @@ function Bill({ bill }: { bill: RevivalBillSlot[] }) {
   }
 
   return (
-    <section className="revival-bill" aria-labelledby="revival-bill-title">
-      <div className="rail-heading">
-        <div>
-          <span>Programmed for today, and different tomorrow.</span>
-          <h2 id="revival-bill-title">Tonight&rsquo;s bill</h2>
-        </div>
-      </div>
-      <ol className="revival-bill-list">
-        {bill.map((entry, index) => (
+    <Rail bleed={false} className={styles.bill}>
+      <RailHeading
+        bleed={false}
+        eyebrow="Programmed for today, and different tomorrow."
+        heading="Tonight’s bill"
+      />
+      <ol className={styles.billList}>
+        {bill.map((entry) => (
           <li key={entry.work.id}>
             <Link to={revivalPath(entry.work)}>
-              <span className="revival-bill-slot">{entry.slot}</span>
+              <span className={styles.slot}>{entry.slot}</span>
               <strong>{entry.work.title}</strong>
               <small>{workMeta(entry.work) || entry.note}</small>
             </Link>
-            {index === 0 && <span className="revival-bill-rule" aria-hidden="true" />}
           </li>
         ))}
       </ol>
-    </section>
+    </Rail>
   );
 }
 
 function BillSkeleton() {
   return (
-    <section className="revival-bill" aria-hidden="true">
-      <div className="rail-heading">
-        <div>
-          <span className="skeleton skeleton-eyebrow" />
-          <span className="skeleton skeleton-heading" />
-        </div>
+    <section className={styles.bill} aria-hidden="true">
+      <div className={styles.skeletonHead}>
+        <Skeleton shape="eyebrow" />
+        <Skeleton shape="heading" />
       </div>
-      <ol className="revival-bill-list">
+      <ol className={styles.billList}>
         {BILL_SKELETON_SLOTS.map((slot) => (
           <li key={slot}>
-            <span className="revival-bill-row">
-              <span className="skeleton skeleton-bill-slot" />
-              <span className="skeleton skeleton-bill-title" />
+            <span className={styles.billRow}>
+              <Skeleton className={styles.slotSkeleton} />
+              <Skeleton className={styles.titleSkeleton} />
             </span>
           </li>
         ))}
@@ -104,19 +108,17 @@ function ShelvesSkeleton() {
   return (
     <div aria-hidden="true">
       {SHELF_SKELETON_RAILS.map((rail) => (
-        <div className="content-rail" key={rail}>
-          <div className="rail-heading">
-            <div>
-              <span className="skeleton skeleton-eyebrow" />
-              <span className="skeleton skeleton-heading" />
-            </div>
+        <Rail bleed={false} key={rail}>
+          <div className={styles.skeletonHead}>
+            <Skeleton shape="eyebrow" />
+            <Skeleton shape="heading" />
           </div>
-          <div className="rail-track">
+          <RailTrack bleed={false}>
             {SHELF_SKELETON_REELS.map((reel) => (
-              <span className="skeleton skeleton-reel" key={reel} />
+              <Skeleton className={styles.reel} key={reel} />
             ))}
-          </div>
-        </div>
+          </RailTrack>
+        </Rail>
       ))}
     </div>
   );
@@ -132,64 +134,56 @@ export function RevivalPage({ isReady, isSignedIn }: { isReady: boolean; isSigne
   const error = bill.error || shelves.error;
 
   return (
-    <section className="page-section revival-shelves">
-      <PageTitle heading="The revival house">
-        <p>
-          The small screen at the back. When the building came down, the sign went in a skip and
-          this did not. The prints are out of copyright, the projectionist is somewhere behind that
-          door, and the ticket is nothing. {total ? `${total.toLocaleString()} in the vault.` : ""}
-        </p>
-      </PageTitle>
+    <Page>
+      <PageHeader
+        heading="The revival house"
+        description={`The small screen at the back. When the building came down, the sign went in a skip and this did not. The prints are out of copyright, the projectionist is somewhere behind that door, and the ticket is nothing. ${total ? `${total.toLocaleString()} in the vault.` : ""}`}
+      />
 
-      {error && (
-        <p className="auth-message" role="alert">
-          {error}
-        </p>
-      )}
+      {error && <Callout>{error}</Callout>}
 
-      <div className="revival-search">
+      <div className={styles.search}>
         <SearchField
           value={query}
           onChange={setQuery}
           placeholder="Search the vault"
           label="Search the vault"
+          className={styles.searchField}
         />
         {search.isActive && (
-          <span>
+          <Eyebrow size="sm" weight="regular">
             {search.isSearching
               ? "Looking…"
               : `${search.works.length.toLocaleString()} of ${total.toLocaleString()} in the vault`}
-          </span>
+          </Eyebrow>
         )}
       </div>
 
       {search.isActive ? (
-        <section className="content-rail" aria-busy={search.isSearching}>
-          <div className="rail-heading">
-            <div>
-              <span>
-                {search.isSearching ? "Going through the shelves." : "What the vault turned up."}
-              </span>
-              <h2>Search results</h2>
-            </div>
-          </div>
+        <Rail bleed={false} busy={search.isSearching}>
+          <RailHeading
+            bleed={false}
+            eyebrow={
+              search.isSearching ? "Going through the shelves." : "What the vault turned up."
+            }
+            heading="Search results"
+          />
           {search.isSearching ? (
-            <div className="rail-track">
-              <span className="skeleton skeleton-reel" />
-              <span className="skeleton skeleton-reel" />
-              <span className="skeleton skeleton-reel" />
-              <span className="skeleton skeleton-reel" />
-            </div>
+            <RailTrack bleed={false}>
+              {BILL_SKELETON_SLOTS.map((slot) => (
+                <Skeleton key={slot} className={styles.reel} />
+              ))}
+            </RailTrack>
           ) : search.works.length ? (
-            <div className="rail-track">
+            <RailTrack bleed={false}>
               {search.works.map((work) => (
                 <ReelCard key={`search-${work.id}`} work={work} />
               ))}
-            </div>
+            </RailTrack>
           ) : (
-            <p className="rail-empty">Nothing under that name.</p>
+            <RailEmpty>Nothing under that name.</RailEmpty>
           )}
-        </section>
+        </Rail>
       ) : (
         <>
           {bill.isLoading ? <BillSkeleton /> : <Bill bill={bill.bill} />}
@@ -216,47 +210,48 @@ export function RevivalPage({ isReady, isSignedIn }: { isReady: boolean; isSigne
           ))}
 
           {!shelves.isLoading && !shelves.shelves.length && (
-            <div className="search-empty">
-              <UsherMark face="dormant" crop="head" />
-              <h2>Nothing threaded yet.</h2>
-              <p>
-                The projectionist is still going through the vault. Come back when he has found
-                something worth showing.
-              </p>
-              <Link className="button-link" to="/">
-                Back to tonight
-              </Link>
-            </div>
+            <EmptyState
+              mark={<UsherMark face="dormant" crop="head" className={styles.mark} />}
+              heading="Nothing threaded yet."
+              description="The projectionist is still going through the vault. Come back when he has found something worth showing."
+              actions={
+                <ButtonLink to="/" variant="primary" size="lg">
+                  Back to tonight
+                </ButtonLink>
+              }
+            />
           )}
 
           {shelves.shelves.length > 0 && (
             <>
               <ProjectionNote seed={total} />
 
-              <div className="revival-note">
-                <p className="revival-note-head">On what we are allowed to show you</p>
-                <p>
+              <div className={styles.note}>
+                <Heading level={2} size="label" tone="muted" className={styles.noteHead}>
+                  On what we are allowed to show you
+                </Heading>
+                <Text size="sm" leading="relaxed" className={styles.noteLine}>
                   Every print here was published as public domain by the archive holding it. That is
                   their claim, and we pass it on. Whether we thread it up ourselves depends on one
                   thing: UK copyright runs for seventy years after the last of the principal
                   director, the screenwriters and the composer has died. Past that, the print is
                   ours to keep and we serve it from our own vault.
-                </p>
-                <p>
+                </Text>
+                <Text size="sm" leading="relaxed" className={styles.noteLine}>
                   Not past it, and we do not touch the reel. The play button sends you to the
                   archive that holds it and they show it to you, exactly as they would if you had
                   walked in there yourself. Every print says which of the two it is, and why, on its
                   own page. I would rather tell you where a thing came from than have you wonder.
-                </p>
-                <p>
+                </Text>
+                <Text size="sm" leading="relaxed">
                   If you think something here is on the wrong shelf, say so. It comes down the same
                   day, and we argue about it afterwards.
-                </p>
+                </Text>
               </div>
             </>
           )}
         </>
       )}
-    </section>
+    </Page>
   );
 }

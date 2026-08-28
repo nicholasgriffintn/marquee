@@ -8,6 +8,11 @@ import {
   strengthLabel,
   type Belief,
 } from "../../domain/notebook";
+import { classNames } from "../../lib/class-names";
+import { Button, Text } from "../../ui";
+import { NotebookEmpty, NotebookSubheading } from "./NotebookSection";
+
+import styles from "./BeliefList.module.css";
 
 function suspendLabel(belief: Belief) {
   if (!belief.suspendedUntil) {
@@ -43,31 +48,33 @@ export function BeliefList({
 
   if (beliefs.length === 0) {
     return (
-      <p className="notebook-empty">
+      <NotebookEmpty>
         The page is blank. Watch a few things, rate them honestly, and it will fill itself in.
-      </p>
+      </NotebookEmpty>
     );
   }
 
   return (
     <>
       {[...grouped.entries()].map(([group, items]) => (
-        <div className="notebook-shelf" key={group}>
-          <h3>{GROUP_TITLES[group] ?? "Other observations"}</h3>
-          <ul className="notebook-list">
+        <div className={styles.shelf} key={group}>
+          <NotebookSubheading>{GROUP_TITLES[group] ?? "Other observations"}</NotebookSubheading>
+          <ul className={styles.list}>
             {items.map((belief) => {
               const suspended = isSuspended(belief);
 
               return (
                 <li
                   key={belief.id}
-                  className={`notebook-note${suspended ? " suspended" : ""}${
-                    busy === belief.id ? " busy" : ""
-                  }`}
+                  className={classNames(
+                    styles.note,
+                    suspended && styles.suspended,
+                    busy === belief.id && styles.busy,
+                  )}
                 >
                   {editing?.id === belief.id ? (
                     <form
-                      className="notebook-edit"
+                      className={styles.edit}
                       onSubmit={(event) => {
                         event.preventDefault();
                         onAct(belief, { action: "rewrite", value: editing.value });
@@ -75,6 +82,7 @@ export function BeliefList({
                       }}
                     >
                       <input
+                        className={styles.editInput}
                         value={editing.value}
                         maxLength={160}
                         aria-label="Rewrite this note"
@@ -82,17 +90,19 @@ export function BeliefList({
                           setEditing({ id: belief.id, value: event.target.value })
                         }
                       />
-                      <button type="submit" className="notebook-primary">
+                      <Button variant="primary" size="sm" type="submit" className={styles.editSave}>
                         Put that down instead
-                      </button>
-                      <button type="button" onClick={() => setEditing(null)}>
+                      </Button>
+                      <Button variant="secondary" size="sm" onClick={() => setEditing(null)}>
                         Leave it
-                      </button>
+                      </Button>
                     </form>
                   ) : (
                     <>
-                      <p className="notebook-value">{belief.value}</p>
-                      <p className="notebook-meta">
+                      <Text family="serif" className={styles.value}>
+                        {belief.value}
+                      </Text>
+                      <p className={styles.meta}>
                         <span>{confidenceLabel(belief.confidence)}</span>
                         <em>{strengthLabel(belief.strength)}</em>
                         {belief.evidence > 0 && (
@@ -103,10 +113,11 @@ export function BeliefList({
                         {belief.edited && <small>in your words</small>}
                         {suspended && <strong>{suspendLabel(belief)}</strong>}
                       </p>
-                      <div className="notebook-actions">
+                      <div className={styles.actions}>
                         {suspended ? (
                           <button
                             type="button"
+                            className={styles.action}
                             disabled={busy === belief.id}
                             onClick={() => onAct(belief, { action: "restore" })}
                           >
@@ -116,6 +127,7 @@ export function BeliefList({
                           <>
                             <button
                               type="button"
+                              className={styles.action}
                               disabled={busy === belief.id}
                               onClick={() => setEditing({ id: belief.id, value: belief.value })}
                             >
@@ -123,6 +135,7 @@ export function BeliefList({
                             </button>
                             <button
                               type="button"
+                              className={styles.action}
                               disabled={busy === belief.id}
                               onClick={() => onAct(belief, { action: "suspend", scope: "tonight" })}
                             >
@@ -130,6 +143,7 @@ export function BeliefList({
                             </button>
                             <button
                               type="button"
+                              className={styles.action}
                               disabled={busy === belief.id}
                               onClick={() => onAct(belief, { action: "suspend", scope: "week" })}
                             >
@@ -139,7 +153,7 @@ export function BeliefList({
                         )}
                         <button
                           type="button"
-                          className="notebook-forget"
+                          className={classNames(styles.action, styles.forget)}
                           disabled={busy === belief.id}
                           onClick={() => onAct(belief, { action: "forget" })}
                         >

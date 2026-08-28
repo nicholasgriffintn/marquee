@@ -16,23 +16,26 @@ import {
   type ProfileEntryState,
 } from "../domain/profile-entry";
 import type { UsherMoment } from "../domain/usher";
+import { classNames } from "../lib/class-names";
 import type { EntryStatus, ViewingEntry } from "../types";
+import { Button, CloseIcon, EmptyState, Skeleton, VisuallyHidden } from "../ui";
 import { DetailPanel } from "./detail/DetailPanel";
-import { CloseIcon } from "./ui";
 import { UsherCard } from "./usher/UsherCard";
 import { UsherMark } from "./usher/UsherMark";
+
+import styles from "./TitleOverlay.module.css";
 
 function DialogShell({
   panelRef,
   closeRef,
-  panelClassName,
+  isMissingShell = false,
   labelledBy,
   onClose,
   children,
 }: {
   panelRef: RefObject<HTMLDialogElement | null>;
   closeRef: RefObject<HTMLButtonElement | null>;
-  panelClassName: string;
+  isMissingShell?: boolean;
   labelledBy?: string;
   onClose: () => void;
   children: ReactNode;
@@ -44,14 +47,14 @@ function DialogShell({
 
   return (
     <div
-      className="detail-backdrop"
+      className={styles.backdrop}
       role="presentation"
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
       {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
       <dialog
         ref={panelRef}
-        className={panelClassName}
+        className={classNames(styles.panel, isMissingShell && styles.panelMissing)}
         aria-modal="true"
         aria-labelledby={labelledBy}
         onCancel={(event) => {
@@ -63,7 +66,7 @@ function DialogShell({
         <button
           ref={closeRef}
           type="button"
-          className="detail-close"
+          className={styles.close}
           onClick={onClose}
           aria-label="Close details"
         >
@@ -77,36 +80,44 @@ function DialogShell({
 
 function MissingContent({ onRetry }: { onRetry?: () => void }) {
   return (
-    <div className="detail-copy search-empty lost">
-      <UsherMark face="unimpressed" crop="head" />
-      <h2 id="detail-title">{onRetry ? "The programme slipped." : "Not in the building."}</h2>
-      <p>
-        {onRetry
+    <EmptyState
+      className={styles.missing}
+      mark={<UsherMark face="unimpressed" crop="head" className={styles.mark} />}
+      heading={onRetry ? "The programme slipped." : "Not in the building."}
+      headingId="detail-title"
+      size="title"
+      surface="paper"
+      description={
+        onRetry
           ? "I could not check the catalogue just now. Nothing has been marked missing."
-          : "I have no record of that one. It may never have been booked here."}
-      </p>
-      {onRetry ? (
-        <button type="button" onMouseDown={(event) => event.stopPropagation()} onClick={onRetry}>
-          Try again
-        </button>
-      ) : null}
-    </div>
+          : "I have no record of that one. It may never have been booked here."
+      }
+      actions={
+        onRetry ? (
+          <Button
+            variant="primary"
+            size="lg"
+            surface="paper"
+            onMouseDown={(event) => event.stopPropagation()}
+            onClick={onRetry}
+          >
+            Try again
+          </Button>
+        ) : undefined
+      }
+    />
   );
 }
 
 function LoadingContent() {
   return (
-    <div className="detail-copy">
-      <span className="visually-hidden" id="detail-title">
-        Loading title details…
-      </span>
-      <div className="hero-skeleton" aria-hidden="true">
-        <span className="skeleton skeleton-title" />
-        <span className="skeleton skeleton-meta" />
-        <span className="skeleton skeleton-line" />
-        <span className="skeleton skeleton-line short" />
-        <span className="skeleton skeleton-button" />
-      </div>
+    <div className={styles.loading}>
+      <VisuallyHidden id="detail-title">Loading title details…</VisuallyHidden>
+      <Skeleton shape="title" />
+      <Skeleton shape="meta" />
+      <Skeleton shape="line" />
+      <Skeleton shape="line" short />
+      <Skeleton shape="button" />
     </div>
   );
 }
@@ -227,7 +238,7 @@ export function TitleOverlay({
       <DialogShell
         panelRef={panelRef}
         closeRef={closeRef}
-        panelClassName="detail-panel detail-panel-missing"
+        isMissingShell
         labelledBy="detail-title"
         onClose={onClose}
       >
@@ -246,7 +257,6 @@ export function TitleOverlay({
     <DialogShell
       panelRef={panelRef}
       closeRef={closeRef}
-      panelClassName="detail-panel"
       labelledBy="detail-title"
       onClose={onClose}
     >

@@ -1,0 +1,37 @@
+.field {
+  align-items: center;
+  background: var(--panel);
+  border: 1px solid var(--panel-line);
+  display: flex;
+  gap: var(--space-2);
+  max-width: 420px;
+  padding: 0 var(--space-4);
+}
+
+.field:focus-within {
+  border-color: var(--acid);
+}
+
+.icon {
+  color: var(--acid);
+  display: flex;
+}
+
+.icon svg {
+  height: 16px;
+  width: 16px;
+}
+
+.input {
+  background: none;
+  border: 0;
+  color: var(--white);
+  min-width: 0;
+  outline: 0;
+  padding: 13px 0;
+  width: 100%;
+}
+
+.input::placeholder {
+  color: var(--muted);
+}

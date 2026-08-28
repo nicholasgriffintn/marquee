@@ -1,6 +1,9 @@
 import { useState } from "react";
 
 import type { Guest } from "../../domain/notebook";
+import { Button } from "../../ui";
+
+import styles from "./GuestList.module.css";
 
 export function GuestList({
   guests,
@@ -16,14 +19,14 @@ export function GuestList({
   return (
     <>
       {guests.length > 0 && (
-        <ul className="notebook-guest-list">
+        <ul className={styles.guests}>
           {guests.map((guest) => (
             <li key={guest.id}>
               <strong>{guest.name}</strong>
               <small>
                 {guest.vetoes.length ? `No ${guest.vetoes.join(", ")}` : "No hard vetoes"}
               </small>
-              <button type="button" onClick={() => onRemove(guest)}>
+              <button type="button" className={styles.remove} onClick={() => onRemove(guest)}>
                 Show them out
               </button>
             </li>
@@ -32,7 +35,7 @@ export function GuestList({
       )}
 
       <form
-        className="notebook-guest-form"
+        className={styles.form}
         onSubmit={(event) => {
           event.preventDefault();
           onSave(
@@ -46,6 +49,7 @@ export function GuestList({
         }}
       >
         <input
+          className={styles.name}
           value={draft.name}
           maxLength={40}
           placeholder="Name"
@@ -53,15 +57,22 @@ export function GuestList({
           onChange={(event) => setDraft({ ...draft, name: event.target.value })}
         />
         <input
+          className={styles.vetoes}
           value={draft.vetoes}
           maxLength={120}
           placeholder="Will not sit through… (horror, musicals)"
           aria-label="What they will not sit through"
           onChange={(event) => setDraft({ ...draft, vetoes: event.target.value })}
         />
-        <button type="submit" className="notebook-primary" disabled={!draft.name.trim()}>
+        <Button
+          variant="primary"
+          size="lg"
+          type="submit"
+          className={styles.submit}
+          disabled={!draft.name.trim()}
+        >
           Save them a seat
-        </button>
+        </Button>
       </form>
     </>
   );

@@ -2,8 +2,11 @@ import { useState } from "react";
 
 import type { Provider } from "../../domain/catalog";
 import type { UsherMoment } from "../../domain/usher";
+import { Button, Cluster, Text } from "../../ui";
 import { UsherAnswer } from "./UsherAnswer";
 import { UsherMark } from "./UsherMark";
+
+import styles from "./UsherBanner.module.css";
 
 export function UsherBanner({
   moment,
@@ -30,10 +33,12 @@ export function UsherBanner({
   }
 
   return (
-    <aside className="usher-banner" aria-label="The Usher">
-      <UsherMark face={moment.face} crop="head" />
-      <div className="usher-banner-body">
-        <p className="usher-banner-line">{moment.line}</p>
+    <aside className={styles.banner} aria-label="The Usher">
+      <UsherMark face={moment.face} crop="head" className={styles.mark} />
+      <div className={styles.body}>
+        <Text family="serif" className={styles.line}>
+          {moment.line}
+        </Text>
         {moment.question ? (
           <UsherAnswer
             question={moment.question}
@@ -42,21 +47,21 @@ export function UsherBanner({
             onSubmit={(value) => void submit(value)}
           />
         ) : (
-          <div className="usher-confirm">
+          <Cluster gap={2}>
             {(moment.actions ?? []).map((action) => (
-              <button
+              <Button
                 key={action.id}
-                type="button"
-                className={action.id === "dismiss" ? "" : "usher-primary"}
+                variant={action.id === "dismiss" ? "secondary" : "primary"}
+                size="md"
                 onClick={() => onAction(moment, action.id)}
               >
                 {action.label}
-              </button>
+              </Button>
             ))}
-          </div>
+          </Cluster>
         )}
       </div>
-      <div className="usher-banner-foot">
+      <div className={styles.foot}>
         {moment.question && (
           <button type="button" onClick={() => onSkip(questionId)}>
             Skip

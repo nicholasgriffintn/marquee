@@ -2,7 +2,9 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { useTitleCredits, type CreditSeason, type TitleCredit } from "../../hooks/useTitleCredits";
-import { Dropdown, type DropdownOption } from "../ui";
+import { Dropdown, Heading, StatusNote, type DropdownOption } from "../../ui";
+
+import styles from "./CreditsBlock.module.css";
 
 const CREW_ORDER = [
   "Director",
@@ -75,22 +77,26 @@ export function CreditsBlock({ titleId }: { titleId: string }) {
   ];
 
   return (
-    <section className="detail-credits" aria-labelledby="detail-credits-title">
-      <h3 id="detail-credits-title">Who made it{total > 0 ? ` · ${total} credited` : ""}</h3>
+    <section className={styles.credits} aria-labelledby="detail-credits-title">
+      <Heading level={3} size="label" tone="inkMuted" id="detail-credits-title">
+        Who made it{total > 0 ? ` · ${total} credited` : ""}
+      </Heading>
       {seasons.length > 0 && (
         <Dropdown
           label="Choose a season"
-          className="credit-season-dropdown"
+          size="compact"
           trigger={seasonOptions.find((option) => option.selected)?.content}
           options={seasonOptions}
           onSelect={(key) => choose(key === "series" ? null : Number(key))}
         />
       )}
       {jobs.length === 0 && cast.length === 0 && (
-        <p className="detail-credits-empty">{isLoading ? "Reading…" : "Not read yet."}</p>
+        <StatusNote busy={isLoading} surface="paper">
+          {isLoading ? "Reading…" : "Not read yet."}
+        </StatusNote>
       )}
       {jobs.length > 0 && (
-        <dl className="detail-crew">
+        <dl className={styles.crew}>
           {jobs.map(([job, names]) => (
             <div key={job}>
               <dt>{job}</dt>
@@ -107,7 +113,7 @@ export function CreditsBlock({ titleId }: { titleId: string }) {
         </dl>
       )}
       {cast.length > 0 && (
-        <ul className="detail-cast">
+        <ul className={styles.cast}>
           {cast.map((credit) => (
             <li key={`${credit.personId}-${credit.episodeNumber ?? "s"}`}>
               <Link to={`/person/${encodeURIComponent(credit.name)}`}>
@@ -124,12 +130,22 @@ export function CreditsBlock({ titleId }: { titleId: string }) {
         </ul>
       )}
       {(page > 1 || hasMore) && (
-        <div className="detail-credit-pager">
-          <button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+        <div className={styles.pager}>
+          <button
+            type="button"
+            className={styles.pagerButton}
+            disabled={page <= 1}
+            onClick={() => setPage(page - 1)}
+          >
             Back
           </button>
-          <span>Page {page}</span>
-          <button type="button" disabled={!hasMore} onClick={() => setPage(page + 1)}>
+          <span className={styles.pagerLabel}>Page {page}</span>
+          <button
+            type="button"
+            className={styles.pagerButton}
+            disabled={!hasMore}
+            onClick={() => setPage(page + 1)}
+          >
             More
           </button>
         </div>

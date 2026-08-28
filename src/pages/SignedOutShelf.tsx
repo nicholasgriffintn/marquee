@@ -1,20 +1,21 @@
-import { Link } from "react-router-dom";
-
-import { PageTitle } from "../components/PageTitle";
+import { ButtonLink, EmptyState, Page, PageHeader } from "../ui";
 
 export function SignedOutShelf() {
   return (
-    <section className="page-section">
-      <PageTitle heading="My shelf">
-        <p>Sign in to keep a shelf of what you have watched.</p>
-      </PageTitle>
-      <div className="search-empty">
-        <h2>You are signed out.</h2>
-        <p>Your shelf lives with your account, so sign in to see it.</p>
-        <Link className="button-link" to="/sign-in?returnTo=%2Fshelf">
-          Get a ticket
-        </Link>
-      </div>
-    </section>
+    <Page>
+      <PageHeader
+        heading="My shelf"
+        description="Sign in to keep a shelf of what you have watched."
+      />
+      <EmptyState
+        heading="You are signed out."
+        description="Your shelf lives with your account, so sign in to see it."
+        actions={
+          <ButtonLink to="/sign-in?returnTo=%2Fshelf" variant="primary" size="lg">
+            Get a ticket
+          </ButtonLink>
+        }
+      />
+    </Page>
   );
 }

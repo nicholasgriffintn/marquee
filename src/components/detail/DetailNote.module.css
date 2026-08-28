@@ -1,0 +1,92 @@
+.note {
+  border-left: 3px solid;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: var(--space-5) 0 0;
+  padding: 2px 0 2px 15px;
+}
+
+.line {
+  border-left: 3px solid;
+  color: var(--ink);
+  font-size: var(--type-sm);
+  line-height: var(--leading-normal);
+  margin: var(--space-5) 0 0;
+  padding-left: 15px;
+}
+
+.accentBlue {
+  border-color: var(--blue);
+}
+
+.accentAcid {
+  border-color: var(--acid);
+}
+
+.accentLine {
+  border-color: var(--paper-line);
+}
+
+.accentNone {
+  border-left: 0;
+  padding-left: 0;
+}
+
+.label {
+  align-items: center;
+  display: flex;
+  gap: var(--space-2);
+}
+
+.lineLabel {
+  color: var(--blue);
+  font: var(--weight-bold) var(--type-label) var(--mono);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.badge {
+  align-items: center;
+  background: var(--blue);
+  color: var(--white);
+  display: inline-flex;
+  font-style: normal;
+  height: 20px;
+  justify-content: center;
+  width: 20px;
+}
+
+.credit {
+  color: var(--muted-on-paper);
+  display: block;
+  font: var(--type-label-sm) var(--mono);
+  letter-spacing: 0.06em;
+  margin-top: 5px;
+  text-transform: uppercase;
+}
+
+.note > p {
+  font-size: var(--type-md);
+  line-height: var(--leading-normal);
+  margin: 0;
+}
+
+.note > small {
+  color: var(--muted-on-paper);
+  font: var(--type-label) / 1.6 var(--mono);
+}
+
+.note a {
+  color: var(--blue);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.note a:hover,
+.note a:focus-visible {
+  background: var(--acid);
+  color: var(--ink);
+  outline: none;
+  text-decoration: none;
+}

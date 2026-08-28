@@ -1,14 +1,36 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
 
 import type { MediaTitle } from "../../domain/catalog";
 import type { UsherFace } from "../../domain/usher";
 import type { CuratorState } from "../../hooks/useCurator";
 import type { UsherPickState } from "../../hooks/useUsher";
-import { heroTitleClass, mediaMeta, scoreLabel } from "../../lib/media";
+import { classNames } from "../../lib/class-names";
+import { mediaMeta, scoreLabel } from "../../lib/media";
+import { ExternalLinkIcon, Text } from "../../ui";
+import {
+  HeroAction,
+  HeroActionLink,
+  HeroActions,
+  HeroArt,
+  HeroGradient,
+  HeroMeta,
+  HeroTitle,
+} from "../hero/Hero";
 import { TitleArt } from "../TitleArt";
-import { ChevronIcon, ExternalLinkIcon } from "../ui";
-import { UsherMark } from "./UsherMark";
+import {
+  UsherByline,
+  UsherCaret,
+  UsherExit,
+  UsherFacts,
+  UsherFigure,
+  UsherHero as UsherHeroShell,
+  UsherHeroCopy,
+  UsherHeroSkeleton,
+  UsherNarration,
+  UsherRefusal,
+} from "./UsherHeroShell";
+
+import styles from "./UsherHero.module.css";
 
 const REFINEMENTS = ["Shorter", "Lighter", "Older", "Weirder", "More acclaimed"];
 
@@ -41,30 +63,22 @@ export function UsherHero({
 
   if (aside) {
     return (
-      <section className="hero-section usher-hero usher-hero-aside hero-empty">
-        <div className="hero-gradient" />
-        <button type="button" className="usher-exit" onClick={onClear}>
-          <ChevronIcon back /> Back to tonight
-        </button>
-        <div className="usher-hero-figure" aria-hidden="true">
-          <UsherMark face="idle" className="usher-figure" />
-        </div>
-        <div className="hero-copy">
-          <div className="usher-hero-head">
-            <UsherMark face="idle" crop="head" />
-            <p>
-              <span>The Usher</span>
-              <em>since you asked</em>
-            </p>
-          </div>
-          <p className="usher-aside-line">{aside}</p>
-          <div className="hero-actions">
-            <Link className="button-link" to="/usher">
+      <UsherHeroShell empty>
+        <HeroGradient />
+        <UsherExit onClick={onClear} />
+        <UsherFigure face="idle" />
+        <UsherHeroCopy>
+          <UsherByline face="idle" note="since you asked" />
+          <Text family="serif" className={styles.asideLine}>
+            {aside}
+          </Text>
+          <HeroActions>
+            <HeroActionLink to="/usher" variant="primary">
               There is a film about it
-            </Link>
-          </div>
-        </div>
-      </section>
+            </HeroActionLink>
+          </HeroActions>
+        </UsherHeroCopy>
+      </UsherHeroShell>
     );
   }
 
@@ -79,128 +93,84 @@ export function UsherHero({
   const line = isPick ? pick.line : curator.summary || curator.status || "Reading the room.";
 
   return (
-    <section
-      className={`hero-section usher-hero${isPick ? " usher-hero-pick" : ""}${
-        active?.backdropUrl ? "" : " hero-empty"
-      }`}
-    >
-      {active && (
-        <div className="hero-art" aria-hidden="true">
-          <TitleArt
-            url={active.backdropUrl}
-            seed={active.id}
-            label={active.title}
-            width={1280}
-            kind="backdrop"
-            wide
-            eager
-          />
-        </div>
-      )}
-      <div className="hero-gradient" />
+    <UsherHeroShell empty={!active?.backdropUrl}>
+      {active && <HeroArt item={active} />}
+      <HeroGradient />
 
-      <button type="button" className="usher-exit" onClick={onClear}>
-        <ChevronIcon back /> Back to tonight
-      </button>
+      <UsherExit onClick={onClear} />
 
-      {isPick && (
-        <div className="usher-hero-figure" aria-hidden="true">
-          <UsherMark face={face} className="usher-figure" />
-        </div>
-      )}
+      {isPick && <UsherFigure face={face} />}
 
-      <div className="hero-copy">
-        <div className="usher-hero-head">
-          <UsherMark face={face} crop="head" />
-          <p>
-            <span>The Usher</span>
-            <em>
-              {isPick
-                ? isThinking
-                  ? "picking something"
-                  : "my pick for tonight"
-                : `you asked: “${curator.prompt}”`}
-            </em>
-          </p>
-        </div>
+      <UsherHeroCopy>
+        <UsherByline
+          face={face}
+          note={
+            isPick
+              ? isThinking
+                ? "picking something"
+                : "my pick for tonight"
+              : `you asked: “${curator.prompt}”`
+          }
+        />
 
         {failure ? (
-          <div className="honest-empty" aria-live="polite">
-            <h1>No.</h1>
-            <p>{failure}</p>
-          </div>
+          <UsherRefusal heading="No.">{failure}</UsherRefusal>
         ) : active ? (
           <>
-            <h1 className={heroTitleClass(active.title)}>{active.title}</h1>
-            <p className="hero-meta">
+            <HeroTitle title={active.title} />
+            <HeroMeta>
               {mediaMeta(active)} · {scoreLabel(active)}
-            </p>
-            <p className="usher-narration" aria-live="polite">
+            </HeroMeta>
+            <UsherNarration>
               {line}
-              {curator.isStreaming && !isPick && <i className="curator-caret" />}
-            </p>
-            {isPick && pick.facts.length > 0 && (
-              <ul className="usher-facts">
-                {pick.facts.map((fact) => (
-                  <li key={fact}>{fact}</li>
-                ))}
-              </ul>
-            )}
-            <div className="hero-actions">
-              <button type="button" className="hero-play" onClick={() => onOpen(active)}>
-                <span className="play-icon">
-                  <ExternalLinkIcon />
-                </span>{" "}
+              {curator.isStreaming && !isPick && <UsherCaret />}
+            </UsherNarration>
+            {isPick && <UsherFacts facts={pick.facts} />}
+            <HeroActions>
+              <HeroAction
+                variant="primary"
+                icon={<ExternalLinkIcon />}
+                onClick={() => onOpen(active)}
+              >
                 See where to watch
-              </button>
+              </HeroAction>
               {isPick ? (
                 <>
-                  <button
-                    type="button"
-                    className="usher-pin"
-                    disabled={isThinking}
-                    onClick={() => onReject()}
-                  >
+                  <HeroAction variant="outline" disabled={isThinking} onClick={() => onReject()}>
                     Not that
-                  </button>
-                  <button
-                    type="button"
-                    className="usher-quiet"
+                  </HeroAction>
+                  <HeroAction
+                    variant="quiet"
                     disabled={isThinking}
                     onClick={() => onReject("never")}
                   >
                     Never suggest this again
-                  </button>
+                  </HeroAction>
                 </>
               ) : (
                 curator.items.length > 1 && (
-                  <button
-                    type="button"
-                    className="usher-pin"
+                  <HeroAction
+                    variant="outline"
                     disabled={isPinned || curator.isStreaming}
                     onClick={onPin}
                   >
                     {isPinned ? "Pinned" : "Pin this shelf"}
-                  </button>
+                  </HeroAction>
                 )
               )}
-            </div>
+            </HeroActions>
           </>
         ) : (
-          <div className="hero-skeleton" aria-hidden="true">
-            <span className="skeleton skeleton-title" />
-            <span className="skeleton skeleton-meta" />
-            <span className="skeleton skeleton-line" />
-          </div>
+          <UsherHeroSkeleton />
         )}
 
         {!isPick && curator.items.length > 1 && (
-          <div className="usher-strip" aria-label="The rest of the selection">
+          <div className={styles.strip} aria-label="The rest of the selection">
             {curator.items.map((item) => (
               <button
                 key={item.id}
                 type="button"
-                className={item.id === active?.id ? "active" : ""}
+                className={classNames(styles.stripItem, item.id === active?.id && styles.stripOn)}
                 aria-current={item.id === active?.id}
                 onClick={() => setSelection({ prompt: curator.prompt, id: item.id })}
               >
@@ -217,12 +187,13 @@ export function UsherHero({
         )}
 
         {!isPick && curator.items.length > 0 && !curator.isStreaming && (
-          <div className="curator-refine">
-            <span>Refine</span>
+          <div className={styles.refine}>
+            <span className={styles.refineLabel}>Refine</span>
             {REFINEMENTS.map((refinement) => (
               <button
                 key={refinement}
                 type="button"
+                className={styles.refineButton}
                 disabled={isAsking}
                 onClick={() => onAsk(refinement, true)}
               >
@@ -231,7 +202,7 @@ export function UsherHero({
             ))}
           </div>
         )}
-      </div>
-    </section>
+      </UsherHeroCopy>
+    </UsherHeroShell>
   );
 }

@@ -1,8 +1,10 @@
 import { useId } from "react";
 
-import { Modal } from "../../components/ui";
 import { useResource } from "../../hooks/useResource";
 import { parseDatabaseDate } from "../../lib/dates";
+import { Callout, Heading, Modal, StatusNote } from "../../ui";
+
+import styles from "./SampleModal.module.css";
 
 type SampleCell = string | number | null;
 
@@ -43,22 +45,20 @@ export function SampleModal({
   );
 
   return (
-    <Modal onClose={onClose} labelledBy={titleId} className="sample-modal">
-      <h2 id={titleId}>{label}</h2>
-      {error && (
-        <p className="catalogue-error" role="alert">
-          {error}
-        </p>
-      )}
+    <Modal onClose={onClose} labelledBy={titleId}>
+      <Heading level={2} size="subhead" id={titleId} className={styles.title}>
+        {label}
+      </Heading>
+      {error && <Callout>{error}</Callout>}
       {isLoading && (
-        <p className="admin-note">
-          <i className="availability-spinner" aria-hidden="true" /> Reading a sample…
-        </p>
+        <StatusNote busy surface="paper">
+          Reading a sample…
+        </StatusNote>
       )}
-      {data && data.rows.length === 0 && <p className="admin-note">Nothing here yet.</p>}
+      {data && data.rows.length === 0 && <StatusNote surface="paper">Nothing here yet.</StatusNote>}
       {data && data.rows.length > 0 && (
-        <div className="sample-table-wrap">
-          <table className="sample-table">
+        <div className={styles.wrap}>
+          <table className={styles.table}>
             <thead>
               <tr>
                 {data.columns.map((column) => (

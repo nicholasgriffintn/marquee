@@ -1,0 +1,351 @@
+.heroShell {
+  position: relative;
+}
+
+.heroSkeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 560px;
+}
+
+.heroEmpty {
+  margin-top: var(--space-3);
+  max-width: 560px;
+}
+
+.providers {
+  background: var(--panel);
+  border-block: 1px solid var(--panel-line);
+  color: var(--white);
+  padding: var(--space-5) var(--gutter) var(--space-6);
+  position: relative;
+}
+
+.providers::after {
+  background: linear-gradient(90deg, transparent, var(--panel));
+  bottom: 28px;
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+  top: 64px;
+  width: clamp(20px, 4vw, 60px);
+}
+
+.providersHead {
+  align-items: end;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: var(--space-5);
+}
+
+.providersHead strong {
+  font-size: var(--type-lede);
+}
+
+.providersManage {
+  align-items: center;
+  background: none;
+  border: 0;
+  color: inherit;
+  display: inline-flex;
+  font: var(--weight-bold) var(--type-label-lg) var(--mono);
+  gap: var(--space-2);
+}
+
+.picker {
+  display: grid;
+  gap: var(--space-1);
+  grid-auto-columns: minmax(64px, 78px);
+  grid-auto-flow: column;
+  overflow-x: auto;
+  padding-bottom: var(--space-1);
+  scrollbar-width: none;
+}
+
+.picker::-webkit-scrollbar {
+  display: none;
+}
+
+.all {
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--white);
+  cursor: pointer;
+  flex: 0 0 auto;
+  font: var(--weight-bold) var(--type-label-lg) / 1 var(--mono);
+  letter-spacing: 1px;
+  padding: 0 var(--space-3);
+  text-transform: uppercase;
+  transition:
+    background 0.14s ease,
+    border-color 0.14s ease,
+    color 0.14s ease;
+}
+
+.all:hover:not(.allActive) {
+  border-color: var(--acid);
+  color: var(--acid);
+}
+
+.allActive {
+  background: var(--acid);
+  border-color: var(--acid);
+  color: var(--ink);
+}
+
+.provider {
+  background: var(--panel-tile);
+  border: 0;
+  color: var(--white);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  height: 62px;
+  justify-content: center;
+  min-width: 64px;
+  padding: 7px;
+  text-align: center;
+  transition:
+    background 0.14s ease,
+    transform 0.14s ease;
+}
+
+.provider:hover {
+  background: var(--panel-line);
+  transform: translateY(-2px);
+}
+
+.provider small {
+  color: var(--muted);
+  font: 8px var(--mono);
+}
+
+.providerOn {
+  box-shadow: inset 0 -6px 0 var(--acid);
+}
+
+.providerOn small {
+  color: var(--acid);
+}
+
+.providerBadge {
+  background: none;
+  border: 0;
+  height: 30px;
+  padding: 0;
+  transition: opacity 0.14s ease;
+  width: 100%;
+}
+
+.filtering .provider:not(.providerOn) .providerBadge {
+  opacity: 0.4;
+}
+
+.provider:hover .providerBadge {
+  opacity: 1;
+}
+
+.providerError {
+  margin-top: var(--space-4);
+}
+
+.error {
+  margin: var(--space-5) var(--gutter);
+}
+
+.building {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  font: var(--weight-bold) var(--type-label) var(--mono);
+  gap: 9px;
+  letter-spacing: var(--tracking-label);
+  margin: 0;
+  padding: var(--space-6) var(--gutter) 0;
+  text-transform: uppercase;
+}
+
+.building i {
+  align-items: center;
+  background: var(--blue);
+  color: var(--white);
+  display: inline-flex;
+  font-style: normal;
+  height: 20px;
+  justify-content: center;
+  width: 20px;
+}
+
+.rails {
+  padding: 50px 0 90px;
+}
+
+.railSkeletonHead {
+  display: grid;
+  padding: 0 var(--gutter) 17px;
+}
+
+.railSkeletonMeta {
+  margin-top: 11px;
+}
+
+.schedule {
+  margin-bottom: var(--space-8);
+}
+
+.scheduleHead {
+  align-items: baseline;
+  display: flex;
+  gap: var(--space-3);
+  padding: 18px var(--gutter) var(--space-3);
+}
+
+.scheduleHead strong {
+  font-size: var(--type-lede);
+}
+
+.scheduleHead small {
+  color: var(--muted);
+  font: var(--type-label) var(--mono);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.scheduleList {
+  display: grid;
+  gap: 13px;
+  grid-auto-columns: minmax(232px, 22vw);
+  grid-auto-flow: column;
+  overflow-x: auto;
+  padding: 0 var(--gutter) 13px;
+  scroll-padding-inline: var(--gutter);
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+
+.scheduleList::-webkit-scrollbar {
+  display: none;
+}
+
+.scheduleItem {
+  background: none;
+  border: 0;
+  border-top: 1px solid var(--line);
+  color: var(--white);
+  cursor: pointer;
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  min-width: 0;
+  padding: var(--space-4) 0;
+  scroll-snap-align: start;
+  text-align: left;
+}
+
+.scheduleItem:disabled {
+  cursor: default;
+}
+
+.scheduleItem:not(:disabled):hover {
+  background: #181b17;
+}
+
+.scheduleItem time {
+  color: var(--acid);
+  font: var(--type-label) var(--mono);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.scheduleItem strong {
+  font-size: var(--type-body);
+}
+
+.scheduleItem small {
+  color: var(--muted);
+  font-size: var(--type-xs);
+  line-height: 1.4;
+}
+
+@media (max-width: 1100px) {
+  .picker {
+    grid-auto-columns: 100px;
+  }
+}
+
+@media (max-width: 760px) {
+  .providers {
+    padding-inline: 18px;
+  }
+
+  .providersHead {
+    align-items: start;
+    gap: var(--space-3);
+  }
+
+  .rails {
+    padding-top: var(--space-7);
+  }
+
+  .railSkeletonHead {
+    padding-inline: 18px;
+  }
+
+  .schedule {
+    background: var(--panel);
+    margin: 0 18px var(--space-7);
+    padding: 18px;
+  }
+
+  .scheduleHead {
+    padding: 0 0 var(--space-3);
+  }
+
+  .scheduleHead strong {
+    font-size: var(--type-subhead);
+  }
+
+  .scheduleHead small {
+    font-size: var(--type-label-xs);
+    margin-left: auto;
+  }
+
+  .scheduleList {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    overflow: visible;
+    padding: 0;
+  }
+
+  .scheduleItem {
+    column-gap: var(--space-2);
+    grid-template-columns: 54px minmax(0, 1fr);
+    padding: var(--space-3) 0;
+  }
+
+  .scheduleItem time {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+  }
+
+  .scheduleItem strong,
+  .scheduleItem small {
+    grid-column: 2;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .all,
+  .provider,
+  .providerBadge {
+    transition: none;
+  }
+
+  .provider:hover {
+    transform: none;
+  }
+}

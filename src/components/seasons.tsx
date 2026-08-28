@@ -15,8 +15,24 @@ import {
   type SeasonSummary,
 } from "../domain/seasons";
 import { useSeasons, type EpisodePatch, type EpisodeTracker } from "../hooks/useSeasons";
+import { classNames } from "../lib/class-names";
 import { artwork, artworkSrcSet } from "../lib/media";
-import { ArrowIcon, CheckIcon, ChevronIcon, Dropdown, StarIcon, type DropdownOption } from "./ui";
+import {
+  ArrowIcon,
+  Button,
+  CheckIcon,
+  ChevronIcon,
+  Dropdown,
+  Eyebrow,
+  Heading,
+  Skeleton,
+  StarIcon,
+  Text,
+  TextArea,
+  type DropdownOption,
+} from "../ui";
+
+import styles from "./seasons.module.css";
 
 const STARS = [1, 2, 3, 4, 5];
 
@@ -30,12 +46,12 @@ function StarRow({
   onRate: (rating: number | null) => void;
 }) {
   return (
-    <div className="episode-stars" aria-label={label}>
+    <div className={styles.stars} aria-label={label}>
       {STARS.map((star) => (
         <button
           type="button"
           key={star}
-          className={(rating ?? 0) >= star ? "active" : ""}
+          className={classNames(styles.star, (rating ?? 0) >= star && styles.starOn)}
           aria-label={`${star} star${star === 1 ? "" : "s"}`}
           aria-pressed={rating === star}
           onClick={() => onRate(rating === star ? null : star)}
@@ -62,9 +78,9 @@ function NoteEditor({
 
   if (draft === null) {
     return (
-      <div className="episode-note-rest">
-        {notes ? <p>{notes}</p> : null}
-        <button type="button" className="episode-note-open" onClick={() => setDraft(notes)}>
+      <div className={styles.noteRest}>
+        {notes ? <p className={styles.noteText}>{notes}</p> : null}
+        <button type="button" className={styles.noteOpen} onClick={() => setDraft(notes)}>
           {notes ? "Edit note" : "Add a note"}
         </button>
       </div>
@@ -72,27 +88,31 @@ function NoteEditor({
   }
 
   return (
-    <div className="episode-note">
-      <textarea
+    <div className={styles.note}>
+      <TextArea
+        surface="paper"
+        className={styles.noteInput}
         maxLength={2_000}
         value={draft}
         aria-label={label}
         placeholder={placeholder}
         onChange={(event) => setDraft(event.target.value)}
       />
-      <div className="episode-note-actions">
-        <button
-          type="button"
+      <div className={styles.noteActions}>
+        <Button
+          variant="primary"
+          size="sm"
+          surface="paper"
           onClick={() => {
             onSave(draft.trim());
             setDraft(null);
           }}
         >
           Save note
-        </button>
-        <button type="button" className="quiet" onClick={() => setDraft(null)}>
+        </Button>
+        <Button variant="secondary" size="sm" surface="paper" onClick={() => setDraft(null)}>
           Cancel
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -130,12 +150,17 @@ function EpisodeRow({
 
   return (
     <li
-      className={`episode-row${canTrack ? "" : " plain"}${watched ? " watched" : ""}${aired ? "" : " unaired"}`}
+      className={classNames(
+        styles.row,
+        !canTrack && styles.rowPlain,
+        watched && styles.rowWatched,
+        !aired && styles.rowUnaired,
+      )}
     >
       {canTrack && (
         <button
           type="button"
-          className="episode-tick"
+          className={styles.tick}
           aria-pressed={watched}
           aria-label={`${watched ? "Unmark" : "Mark"} ${label} as watched`}
           onClick={() => onSave({ ...patch, watched: !watched })}
@@ -143,10 +168,10 @@ function EpisodeRow({
           {watched ? <CheckIcon /> : null}
         </button>
       )}
-      <div className="episode-body">
+      <div className={styles.body}>
         <button
           type="button"
-          className="episode-head"
+          className={styles.head}
           aria-expanded={open}
           aria-controls={panelId}
           onClick={onToggle}
@@ -157,14 +182,14 @@ function EpisodeRow({
             </strong>
             <small>{meta.join(" · ")}</small>
           </span>
-          {marked && !open && <i className="episode-marked" aria-hidden="true" />}
+          {marked && !open && <i className={styles.marked} aria-hidden="true" />}
           <ChevronIcon />
         </button>
         {open && (
-          <div className="episode-detail" id={panelId}>
+          <div className={styles.detail} id={panelId}>
             {episode.stillUrl && (
               <img
-                className="episode-still"
+                className={styles.still}
                 src={artwork(episode.stillUrl, 320, "backdrop") ?? episode.stillUrl}
                 srcSet={artworkSrcSet(episode.stillUrl, 320, "backdrop")}
                 alt=""
@@ -172,9 +197,9 @@ function EpisodeRow({
                 decoding="async"
               />
             )}
-            {episode.overview && <p className="episode-overview">{episode.overview}</p>}
+            {episode.overview && <p className={styles.overview}>{episode.overview}</p>}
             {canTrack && (
-              <div className="episode-actions">
+              <div className={styles.actions}>
                 <StarRow
                   label={`Rate ${episode.name}`}
                   rating={entry?.rating ?? null}
@@ -185,7 +210,7 @@ function EpisodeRow({
                 {aired && !watched && (
                   <button
                     type="button"
-                    className="episode-through"
+                    className={styles.through}
                     onClick={() => onMarkThrough(episode.episodeNumber)}
                   >
                     I am up to here
@@ -232,25 +257,36 @@ function SeasonHeader({
   const overview = detail?.overview || summary.overview;
 
   return (
-    <div className="season-head">
-      <div className="season-head-copy">
-        <h4>{seasonLabel(summary.seasonNumber, summary.name)}</h4>
-        <p>
+    <div className={styles.seasonHead}>
+      <div>
+        <Heading level={4} size="compact" family="serif" className={styles.seasonName}>
+          {seasonLabel(summary.seasonNumber, summary.name)}
+        </Heading>
+        <Text size="xs" tone="inkMuted">
           {total ? `${total} episode${total === 1 ? "" : "s"}` : "Episode count unknown"}
           {summary.airDate ? ` · first shown ${airLabel(summary.airDate)}` : ""}
           {aired > 0 && canTrack ? ` · ${watched} of ${aired} watched so far` : ""}
-        </p>
-        {overview && <p className="season-overview">{overview}</p>}
+        </Text>
+        {overview && (
+          <Text size="sm" className={styles.seasonOverview}>
+            {overview}
+          </Text>
+        )}
       </div>
       {canTrack && aired > 0 && (
-        <div className="season-track">
-          <div className="season-bar" role="presentation">
+        <div className={styles.track}>
+          <div className={styles.bar} role="presentation">
             <i style={{ width: `${percent}%` }} />
           </div>
-          <div className="season-track-actions">
-            <button type="button" onClick={() => onMarkSeason(watched < aired)}>
+          <div className={styles.trackActions}>
+            <Button
+              variant="secondary"
+              size="sm"
+              surface="paper"
+              onClick={() => onMarkSeason(watched < aired)}
+            >
               {watched < aired ? "Mark the series watched" : "Clear the series"}
-            </button>
+            </Button>
           </div>
           <StarRow
             label={`Rate ${seasonLabel(summary.seasonNumber, summary.name)}`}
@@ -306,25 +342,29 @@ export function SeasonsBlock({
 
   const invite =
     canTrack && !shelved ? (
-      <p className="seasons-invite">
+      <Text size="sm" className={styles.invite}>
         Tick an episode, rate one or keep a note and the show goes on your shelf by itself.
-      </p>
+      </Text>
     ) : null;
 
   if (isLoading && seasons.length === 0) {
     return (
-      <section className="seasons-block">
-        <span className="seasons-label">Series and episodes</span>
-        <span className="skeleton skeleton-line" />
-        <span className="skeleton skeleton-line short" />
+      <section className={styles.block}>
+        <Eyebrow size="sm" weight="heavy" tracking="wide" tone="inkMuted">
+          Series and episodes
+        </Eyebrow>
+        <Skeleton />
+        <Skeleton short />
       </section>
     );
   }
 
   if (seasons.length === 0) {
     return (
-      <section className="seasons-block">
-        <p className="seasons-empty">No episode guide for this one yet.</p>
+      <section className={styles.block}>
+        <Text size="sm" tone="inkMuted" italic>
+          No episode guide for this one yet.
+        </Text>
       </section>
     );
   }
@@ -354,11 +394,13 @@ export function SeasonsBlock({
   });
 
   return (
-    <section className="seasons-block">
-      <div className="seasons-top">
-        <span className="seasons-label">Series and episodes</span>
+    <section className={styles.block}>
+      <div className={styles.top}>
+        <Eyebrow size="sm" weight="heavy" tracking="wide" tone="inkMuted">
+          Series and episodes
+        </Eyebrow>
         {canTrack && progress && progress.aired > 0 && (
-          <p className="seasons-progress">
+          <p className={styles.progress}>
             {progress.watched} of {progress.aired} episodes watched so far
             {progress.upNext
               ? ` · up next ${episodeLabel(progress.upNext.season, progress.upNext.episode)}`
@@ -366,7 +408,7 @@ export function SeasonsBlock({
             {progress.upNext && progress.upNext.season !== selected ? (
               <button
                 type="button"
-                className="seasons-jump"
+                className={styles.jump}
                 onClick={() => selectSeason(progress.upNext?.season ?? null)}
               >
                 Take me there <ArrowIcon />
@@ -379,7 +421,6 @@ export function SeasonsBlock({
 
       <Dropdown
         label="Choose a series"
-        className="season-dropdown"
         trigger={seasonOptions.find((option) => option.selected)?.content}
         options={seasonOptions}
         onSelect={(key) => selectSeason(Number(key))}
@@ -398,22 +439,32 @@ export function SeasonsBlock({
         />
       )}
 
-      {tracker.message && <p className="seasons-message">{tracker.message}</p>}
-      {error && !season && <p className="seasons-message">{error}</p>}
+      {tracker.message && (
+        <Text size="sm" tone="warning">
+          {tracker.message}
+        </Text>
+      )}
+      {error && !season && (
+        <Text size="sm" tone="warning">
+          {error}
+        </Text>
+      )}
 
       {isLoadingSeason && (
-        <div className="season-loading">
-          <span className="skeleton skeleton-line" />
-          <span className="skeleton skeleton-line short" />
+        <div className={styles.loading}>
+          <Skeleton />
+          <Skeleton short />
         </div>
       )}
 
       {season && season.episodes.length === 0 && (
-        <p className="seasons-empty">Nothing announced for this one yet.</p>
+        <Text size="sm" tone="inkMuted" italic>
+          Nothing announced for this one yet.
+        </Text>
       )}
 
       {season && (
-        <ol className="episode-list">
+        <ol className={styles.list}>
           {season.episodes.map((episode) => {
             const key = `${episode.seasonNumber}-${episode.episodeNumber}`;
 
@@ -448,9 +499,9 @@ export function SeasonsBlock({
       )}
 
       {!canTrack && (
-        <p className="seasons-signed-out">
+        <Text size="sm" tone="inkMuted" italic>
           Sign in and you can tick these off, rate them and keep notes against each one.
-        </p>
+        </Text>
       )}
     </section>
   );

@@ -1,0 +1,73 @@
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+
+  50% {
+    opacity: 0.95;
+  }
+}
+
+.skeleton {
+  animation: pulse 1.5s ease-in-out infinite;
+  background: linear-gradient(
+    90deg,
+    var(--panel-tile),
+    var(--panel-raised),
+    var(--panel-tile)
+  );
+  display: block;
+}
+
+.title {
+  height: var(--type-display);
+  width: min(430px, 68vw);
+}
+
+.heading {
+  height: var(--type-section);
+  width: 250px;
+}
+
+.eyebrow {
+  height: 9px;
+  margin-bottom: var(--space-2);
+  width: 150px;
+}
+
+.meta {
+  height: 11px;
+  width: 220px;
+}
+
+.line {
+  height: 13px;
+  width: 100%;
+}
+
+.button {
+  height: var(--control-height);
+  margin-top: var(--space-2);
+  width: 190px;
+}
+
+.art {
+  aspect-ratio: 16 / 9;
+  width: 100%;
+}
+
+.block {
+  height: 100%;
+  width: 100%;
+}
+
+.short {
+  width: 72%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}

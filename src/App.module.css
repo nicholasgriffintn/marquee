@@ -1,0 +1,67 @@
+.shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  overflow-x: clip;
+}
+
+.skipLink {
+  background: var(--acid);
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  color: var(--ink);
+  font: var(--weight-bold) var(--type-sm) var(--sans);
+  height: 1px;
+  left: var(--space-3);
+  overflow: hidden;
+  padding: var(--space-3) var(--space-4);
+  position: absolute;
+  top: var(--space-3);
+  white-space: nowrap;
+  width: 1px;
+  z-index: 100;
+}
+
+.skipLink:focus {
+  clip: auto;
+  clip-path: none;
+  height: auto;
+  outline: 3px solid var(--ink);
+  outline-offset: 3px;
+  width: auto;
+}
+
+.authMessage {
+  background: #39201c;
+  border-left: 5px solid var(--coral);
+  color: var(--white);
+  margin: 0;
+  padding: var(--space-3) var(--gutter);
+}
+
+.syncMessage {
+  background: var(--blue);
+  color: var(--white);
+  font: var(--type-label-sm) var(--mono);
+  margin: 0;
+  opacity: 0;
+  padding: 0 var(--gutter);
+  position: fixed;
+  right: 0;
+  top: 78px;
+  transform: translateY(-100%);
+  transition: 0.2s ease;
+  z-index: 55;
+}
+
+.syncMessageVisible {
+  opacity: 1;
+  padding-block: var(--space-2);
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .syncMessage {
+    transition: none;
+  }
+}

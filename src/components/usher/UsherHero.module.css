@@ -1,0 +1,73 @@
+.asideLine {
+  color: var(--white);
+  font-size: var(--type-heading);
+  line-height: 1.3;
+  margin: 6px 0 var(--space-1);
+  max-width: 26ch;
+}
+
+.strip {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding-bottom: var(--space-1);
+  scrollbar-width: none;
+}
+
+.strip::-webkit-scrollbar {
+  display: none;
+}
+
+.stripItem {
+  background: none;
+  border: 2px solid transparent;
+  cursor: pointer;
+  flex: 0 0 auto;
+  padding: 0;
+  width: 58px;
+}
+
+.stripOn {
+  border-color: var(--acid);
+}
+
+.stripItem img,
+.stripItem picture > img {
+  display: block;
+  height: 87px;
+  object-fit: cover;
+  width: 100%;
+}
+
+.refine {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: var(--space-1) 0 var(--space-3);
+}
+
+.refineLabel {
+  color: var(--muted);
+  font: 8px var(--mono);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.refineButton {
+  background: none;
+  border: 1px solid var(--panel-line);
+  color: var(--white);
+  font: var(--weight-bold) var(--type-label) var(--mono);
+  padding: 6px var(--space-2);
+}
+
+.refineButton:hover:not(:disabled) {
+  border-color: var(--acid);
+  color: var(--acid);
+}
+
+.refineButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}

@@ -1,0 +1,234 @@
+.hero {
+  align-items: flex-end;
+  background: #1b2019;
+  display: flex;
+  min-height: 540px;
+  overflow: hidden;
+  position: relative;
+}
+
+.empty {
+  background: #1b2019;
+}
+
+.art {
+  inset: 0 0 0 32%;
+  mask-image: linear-gradient(90deg, transparent 0, #000 30%);
+  overflow: hidden;
+  position: absolute;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 30%);
+}
+
+.art img,
+.art picture > img {
+  display: block;
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.gradient {
+  background:
+    linear-gradient(
+      90deg,
+      #11130f 0 26%,
+      rgba(17, 19, 15, 0.62) 50%,
+      rgba(17, 19, 15, 0.12) 78%,
+      rgba(17, 19, 15, 0.28)
+    ),
+    linear-gradient(0deg, rgba(17, 19, 15, 0.96), transparent 45%);
+  inset: 0;
+  position: absolute;
+}
+
+.copy {
+  max-width: 690px;
+  min-width: 0;
+  padding: 72px var(--gutter) 118px;
+  position: relative;
+  z-index: 2;
+}
+
+.title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  font-size: var(--type-display);
+  font-weight: var(--weight-medium);
+  letter-spacing: -0.076em;
+  -webkit-line-clamp: 4;
+  line-height: 0.84;
+  margin: 0 0 -0.28em;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  padding-bottom: 0.28em;
+}
+
+.titleSmall {
+  font-size: var(--type-title);
+}
+
+.titleTiny {
+  font-size: var(--type-heading);
+  line-height: 1.02;
+}
+
+.meta {
+  letter-spacing: 0.04em;
+  margin-top: 18px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.lede {
+  color: #d1d4cc;
+  font-size: var(--type-lede);
+  line-height: 1.55;
+  margin: 18px 0 25px;
+  max-width: 560px;
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.action {
+  align-items: center;
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: var(--type-label-lg);
+  font-weight: var(--weight-heavy);
+  gap: 9px;
+  min-height: var(--control-height);
+  padding: 0 var(--space-4);
+}
+
+.actionIcon {
+  display: inline-flex;
+  transition: transform var(--duration) var(--ease);
+}
+
+.actionIcon svg {
+  height: 14px;
+  width: 14px;
+}
+
+.actionPrimary {
+  background: var(--acid);
+  border-color: var(--acid);
+  color: var(--ink);
+  transition:
+    transform var(--duration) var(--ease),
+    box-shadow var(--duration) var(--ease);
+}
+
+.actionPrimary:hover {
+  box-shadow: var(--shadow-pop);
+  transform: translate(-2px, -2px);
+}
+
+.actionPrimary:hover .actionIcon {
+  transform: translate(2px, -2px);
+}
+
+.actionSecondary {
+  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.actionOutline {
+  border-color: var(--acid);
+  color: var(--acid);
+  font: var(--weight-bold) var(--type-xs) / 1 var(--mono);
+  letter-spacing: 1px;
+  padding: 0 var(--space-5);
+  text-transform: uppercase;
+}
+
+.actionOutline:hover:not(:disabled) {
+  background: var(--acid);
+  color: var(--ink);
+}
+
+.actionOutline:disabled {
+  border-color: var(--line);
+  color: var(--muted);
+  cursor: default;
+}
+
+.actionQuiet {
+  background: none;
+  border: 0;
+  color: var(--muted);
+  font: var(--weight-medium) var(--type-sm) / 1 var(--sans);
+  letter-spacing: 0;
+  padding: 0 6px;
+  text-decoration: underline;
+  text-transform: none;
+  text-underline-offset: 4px;
+}
+
+.actionQuiet:hover {
+  color: var(--white);
+}
+
+@media (max-width: 1250px) {
+  .copy {
+    padding-bottom: var(--space-2);
+  }
+}
+
+@media (max-width: 1100px) {
+  .art {
+    left: 24%;
+  }
+}
+
+@media (max-width: 760px) {
+  .hero {
+    min-height: 590px;
+  }
+
+  .art {
+    inset: 0;
+    opacity: 0.72;
+  }
+
+  .gradient {
+    background:
+      linear-gradient(90deg, rgba(17, 19, 15, 0.97), rgba(17, 19, 15, 0.48)),
+      linear-gradient(0deg, #11130f 0 20%, transparent 68%);
+  }
+
+  .copy {
+    box-sizing: border-box;
+    padding: 80px var(--space-5) 70px;
+    width: 100%;
+  }
+
+  .title {
+    font-size: clamp(54px, 16vw, 76px);
+  }
+
+  .lede {
+    font-size: var(--type-md);
+    max-width: 92%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .actionPrimary,
+  .actionIcon {
+    transition: none;
+  }
+
+  .actionPrimary:hover,
+  .actionPrimary:hover .actionIcon {
+    transform: none;
+  }
+}

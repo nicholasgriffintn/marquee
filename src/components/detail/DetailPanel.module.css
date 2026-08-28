@@ -1,0 +1,138 @@
+.art {
+  align-self: start;
+  aspect-ratio: auto;
+  height: 100dvh;
+  min-height: 0;
+  position: sticky;
+  top: 0;
+  transform: translateZ(0);
+}
+
+.art > img,
+.art > picture > img {
+  object-fit: cover;
+  object-position: left top;
+}
+
+.art::after {
+  backdrop-filter: blur(18px);
+  bottom: 0;
+  content: "";
+  mask-image: linear-gradient(90deg, transparent, #000 78%);
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 96px;
+}
+
+.copy {
+  padding: 62px var(--space-7);
+}
+
+.meta {
+  margin: var(--space-3) 0 var(--space-6);
+}
+
+.line {
+  margin-top: 6px;
+}
+
+.tagline {
+  font-size: var(--type-compact);
+  line-height: 1.4;
+  margin-top: var(--space-2);
+}
+
+.synopsis {
+  margin-top: var(--space-4);
+}
+
+.background {
+  border-left: 2px solid var(--paper-line);
+  color: var(--muted-on-paper);
+  margin-top: var(--space-4);
+  padding-left: var(--space-3);
+}
+
+.continue {
+  align-items: center;
+  background: var(--ink);
+  border: 0;
+  color: var(--white);
+  display: flex;
+  font: var(--weight-heavy) var(--type-label-lg) var(--mono);
+  justify-content: space-between;
+  letter-spacing: var(--tracking-label);
+  margin-top: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  text-transform: uppercase;
+  transition:
+    transform var(--duration) var(--ease),
+    box-shadow var(--duration) var(--ease);
+  width: 100%;
+}
+
+.continue:hover {
+  box-shadow: 5px 5px 0 var(--acid);
+  transform: translate(-2px, -2px);
+}
+
+.entryError {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.save {
+  font-size: var(--type-xs);
+  margin: var(--space-2) 0 var(--space-6);
+  min-height: 50px;
+}
+
+.collectionLink {
+  color: var(--acid-ink);
+  text-decoration: underline;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px var(--space-2);
+  margin-top: var(--space-5);
+}
+
+.episodes {
+  margin-top: 18px;
+}
+
+@media (max-width: 760px) {
+  .art {
+    height: 300px;
+    min-height: 0;
+    position: relative;
+  }
+
+  .art > img,
+  .art > picture > img {
+    object-position: center top;
+  }
+
+  .art::after {
+    display: none;
+  }
+
+  .copy {
+    padding: var(--space-6) var(--space-5) 90px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .continue {
+    transition: none;
+  }
+
+  .continue:hover {
+    transform: none;
+  }
+}

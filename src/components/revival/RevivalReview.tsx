@@ -8,8 +8,12 @@ import {
   type RevivalWork,
 } from "../../domain/revival";
 import { useResource } from "../../hooks/useResource";
+import { classNames } from "../../lib/class-names";
 import { jsonMutation, mutateJson } from "../../lib/query-client";
-import { ExternalLinkIcon } from "../ui";
+import { Button, Callout, Chip, ExternalLinkIcon, Panel, Stat, StatGrid } from "../../ui";
+
+import adminStyles from "../../pages/admin/admin.module.css";
+import styles from "./RevivalReview.module.css";
 
 type ReviewWork = RevivalWork & {
   status: RevivalStatus;
@@ -101,9 +105,8 @@ export function RevivalReview({ revision: outerRevision = 0 }: { revision?: numb
   );
 
   return (
-    <section className="panel-block" aria-labelledby="admin-revival-title">
-      <h2 id="admin-revival-title">The vault</h2>
-      <p className="admin-note">
+    <Panel heading="The vault">
+      <p className={adminStyles.note}>
         Nothing plays until it is approved. A print clears on its own only when every named author
         has a death date and the last of them is more than 70 years past, or when a European archive
         has released it outright. An unknown author is not treated as no author, so anything free in
@@ -111,42 +114,34 @@ export function RevivalReview({ revision: outerRevision = 0 }: { revision?: numb
       </p>
 
       {data && (
-        <div className="admin-counts">
+        <StatGrid min="130px">
           {STAT_LABELS.filter(({ key }) => data.stats[key] !== undefined).map(({ key, label }) => (
-            <div key={key}>
-              <strong>{(data.stats[key] ?? 0).toLocaleString()}</strong>
-              <span>{label}</span>
-            </div>
+            <Stat key={key} value={(data.stats[key] ?? 0).toLocaleString()} label={label} />
           ))}
-        </div>
+        </StatGrid>
       )}
 
-      <div className="admin-actions">
+      <div className={adminStyles.actions}>
         {TABS.map((tab) => (
-          <button
-            type="button"
+          <Button
             key={tab.id}
-            className={status === tab.id ? "link-button-primary" : undefined}
+            variant={status === tab.id ? "primary" : "secondary"}
+            size="md"
             onClick={() => setStatus(tab.id)}
           >
             {tab.label}
-          </button>
+          </Button>
         ))}
       </div>
 
-      {error && (
-        <p className="auth-message" role="alert">
-          {error}
-        </p>
-      )}
+      {error && <Callout>{error}</Callout>}
 
-      <div className="admin-filters">
+      <div className={adminStyles.filters}>
         {SOURCES.map((entry) => (
-          <button
-            type="button"
+          <Chip
             key={entry.id || "all"}
-            aria-pressed={source === entry.id}
-            className={`admin-chip${source === entry.id ? " selected" : ""}`}
+            pressed={source === entry.id}
+            selected={source === entry.id}
             onClick={() => setSource(entry.id)}
           >
             {entry.label}
@@ -155,10 +150,10 @@ export function RevivalReview({ revision: outerRevision = 0 }: { revision?: numb
                 ? (data?.works.filter((work) => work.source === entry.id).length ?? 0)
                 : (data?.works.length ?? 0)}
             </em>
-          </button>
+          </Chip>
         ))}
         <input
-          className="admin-search"
+          className={adminStyles.search}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Find a title"
@@ -166,7 +161,7 @@ export function RevivalReview({ revision: outerRevision = 0 }: { revision?: numb
         />
       </div>
 
-      <ul className="admin-list revival-review">
+      <ul className={classNames(adminStyles.list, styles.review)}>
         {shown.map((work) => (
           <li key={work.id}>
             <strong>{work.title}</strong>
@@ -177,13 +172,14 @@ export function RevivalReview({ revision: outerRevision = 0 }: { revision?: numb
               {work.mirrorState === "mirrored" ? " · mirrored" : ""}
               {work.mirrorError ? ` · ${work.mirrorError}` : ""}
             </small>
-            <span className="spacer" />
-            <a href={work.sourceUrl} target="_blank" rel="noreferrer">
+            <span className={adminStyles.spacer} />
+            <a className={styles.source} href={work.sourceUrl} target="_blank" rel="noreferrer">
               Source <ExternalLinkIcon />
             </a>
             {work.status !== "approved" && (
               <button
                 type="button"
+                className={adminStyles.rowAction}
                 disabled={pending === work.id}
                 onClick={() => void decide(work.id, "approve")}
               >
@@ -193,6 +189,7 @@ export function RevivalReview({ revision: outerRevision = 0 }: { revision?: numb
             {work.status === "approved" && (
               <button
                 type="button"
+                className={adminStyles.rowAction}
                 disabled={pending === work.id}
                 onClick={() => void decide(work.id, "mirror")}
               >
@@ -202,6 +199,7 @@ export function RevivalReview({ revision: outerRevision = 0 }: { revision?: numb
             {work.status !== "rejected" && (
               <button
                 type="button"
+                className={adminStyles.rowAction}
                 disabled={pending === work.id}
                 onClick={() => void decide(work.id, "reject")}
               >
@@ -210,8 +208,8 @@ export function RevivalReview({ revision: outerRevision = 0 }: { revision?: numb
             )}
           </li>
         ))}
-        {data && shown.length === 0 && <li className="rail-empty">Nothing in this pile.</li>}
+        {data && shown.length === 0 && <li className={adminStyles.empty}>Nothing in this pile.</li>}
       </ul>
-    </section>
+    </Panel>
   );
 }

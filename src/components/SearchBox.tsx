@@ -2,8 +2,11 @@ import { useEffect, useRef, useState } from "react";
 
 import type { MediaTitle } from "../domain/catalog";
 import { useActiveOption } from "../hooks/useActiveOption";
+import { classNames } from "../lib/class-names";
+import { ArrowIcon, SearchIcon } from "../ui";
 import { TitleArt } from "./TitleArt";
-import { ArrowIcon, SearchIcon } from "./ui";
+
+import styles from "./SearchBox.module.css";
 
 export function SearchBox({
   query,
@@ -76,12 +79,13 @@ export function SearchBox({
   }
 
   return (
-    <div className="search-box-wrap" ref={boxRef}>
-      <label className="search-box">
-        <span aria-hidden="true">
+    <div className={styles.wrap} ref={boxRef}>
+      <label className={styles.box}>
+        <span aria-hidden="true" className={styles.icon}>
           <SearchIcon />
         </span>
         <input
+          className={styles.input}
           value={query}
           onChange={(event) => {
             onQueryChange(event.target.value);
@@ -107,7 +111,7 @@ export function SearchBox({
 
       {showPanel && (
         // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- select/datalist can't implement an aria-activedescendant combobox
-        <div className="search-suggestions" id="search-suggestions" role="listbox">
+        <div className={styles.panel} id="search-suggestions" role="listbox">
           {suggestions.map((item, index) => (
             <button
               type="button"
@@ -120,7 +124,7 @@ export function SearchBox({
               // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- select/datalist can't implement an aria-activedescendant combobox
               role="option"
               aria-selected={index === active}
-              className={`search-suggestion${index === active ? " active" : ""}`}
+              className={classNames(styles.option, index === active && styles.optionActive)}
               onMouseEnter={() => setActive(index)}
               onClick={() => {
                 setIsOpen(false);
@@ -128,7 +132,7 @@ export function SearchBox({
               }}
             >
               <TitleArt url={item.posterUrl} seed={item.id} label={item.title} width={160} />
-              <span>
+              <span className={styles.optionCopy}>
                 <strong>{item.title}</strong>
                 <small>
                   {[
@@ -143,7 +147,7 @@ export function SearchBox({
             </button>
           ))}
 
-          <p className="search-suggestion-empty" aria-live="polite">
+          <p className={styles.empty} aria-live="polite">
             {suggestions.length > 0
               ? ""
               : isSearching
@@ -153,7 +157,7 @@ export function SearchBox({
                   : "No matches yet."}
           </p>
 
-          <button type="button" tabIndex={-1} className="search-suggestion-all" onClick={submit}>
+          <button type="button" tabIndex={-1} className={styles.all} onClick={submit}>
             See all results for “{query.trim()}” <ArrowIcon />
           </button>
         </div>

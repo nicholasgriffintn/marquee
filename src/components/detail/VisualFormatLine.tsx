@@ -1,4 +1,5 @@
 import type { TitleVisualFormat } from "../../domain/catalog";
+import { DetailLine } from "./DetailNote";
 
 export function VisualFormatLine({ format }: { format: TitleVisualFormat }) {
   const parts = [format.colours.join(" and "), format.aspectRatios.join(" and ")].filter(Boolean);
@@ -8,9 +9,8 @@ export function VisualFormatLine({ format }: { format: TitleVisualFormat }) {
   }
 
   return (
-    <p className="detail-next">
-      <span>Shot in</span> {parts.join(" · ")}
-      <small className="detail-credit">Visual format from Wikidata</small>
-    </p>
+    <DetailLine label="Shot in" credit="Visual format from Wikidata">
+      {parts.join(" · ")}
+    </DetailLine>
   );
 }

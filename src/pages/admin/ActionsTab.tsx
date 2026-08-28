@@ -1,6 +1,9 @@
 import { ErrorBoundary } from "../../components/ErrorBoundary";
 import type { AdminAction } from "../../hooks/useAdmin";
+import { Button, Panel, TabPanel } from "../../ui";
 import { ACTION_GROUPS } from "./config";
+
+import styles from "./admin.module.css";
 
 export function ActionsTab({
   pending,
@@ -11,27 +14,26 @@ export function ActionsTab({
 }) {
   return (
     <ErrorBoundary label="The controls">
-      <div role="tabpanel" id="admin-panel-actions" aria-labelledby="admin-tab-actions">
+      <TabPanel id="actions" idPrefix="admin">
         {ACTION_GROUPS.map((group) => (
-          <section className="panel-block" key={group.title} aria-label={group.title}>
-            <h2>{group.title}</h2>
-            <p className="admin-note">{group.note}</p>
-            <div className="admin-actions">
+          <Panel heading={group.title} key={group.title}>
+            <p className={styles.note}>{group.note}</p>
+            <div className={styles.actions}>
               {group.actions.map((action) => (
-                <button
-                  type="button"
+                <Button
                   key={action.id}
-                  className="link-button-primary"
+                  variant="primary"
+                  size="md"
                   disabled={Boolean(pending)}
                   onClick={() => onRun(action.id)}
                 >
                   {pending === action.id ? "Starting…" : action.label}
-                </button>
+                </Button>
               ))}
             </div>
-          </section>
+          </Panel>
         ))}
-      </div>
+      </TabPanel>
     </ErrorBoundary>
   );
 }

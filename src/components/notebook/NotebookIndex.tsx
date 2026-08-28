@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
 
+import { classNames } from "../../lib/class-names";
+
+import styles from "./NotebookIndex.module.css";
+
 export type Divider = { id: string; label: string; aside: string };
 
 export function NotebookIndex({ dividers }: { dividers: Divider[] }) {
@@ -35,14 +39,14 @@ export function NotebookIndex({ dividers }: { dividers: Divider[] }) {
   }, [dividers]);
 
   return (
-    <nav className="notebook-index" aria-label="Notebook contents">
-      <p className="notebook-index-head" aria-hidden="true">
+    <nav className={styles.index} aria-label="Notebook contents">
+      <p className={styles.head} aria-hidden="true">
         Contents
       </p>
-      <ol>
+      <ol className={styles.list}>
         {dividers.map((divider, index) => (
-          <li key={divider.id} className={active === divider.id ? "active" : ""}>
-            <a href={`#${divider.id}`}>
+          <li key={divider.id} className={classNames(active === divider.id && styles.active)}>
+            <a href={`#${divider.id}`} className={styles.link}>
               <i aria-hidden="true">{String(index + 1).padStart(2, "0")}</i>
               <span>
                 <strong>{divider.label}</strong>

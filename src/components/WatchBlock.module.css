@@ -1,0 +1,144 @@
+.block {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-6);
+}
+
+.primary {
+  align-items: center;
+  background: var(--blue);
+  color: var(--white);
+  display: grid;
+  font-size: var(--type-xs);
+  font-weight: var(--weight-heavy);
+  gap: var(--space-3);
+  grid-template-columns: 30px 1fr 20px;
+  padding: var(--space-3);
+  transition:
+    transform var(--duration) var(--ease),
+    box-shadow var(--duration) var(--ease);
+}
+
+.primary:hover {
+  box-shadow: 5px 5px 0 var(--ink);
+  transform: translate(-2px, -2px);
+}
+
+.primary > svg {
+  transition: transform var(--duration) var(--ease);
+}
+
+.primary:hover > svg {
+  transform: translateX(3px);
+}
+
+.primary > span {
+  display: flex;
+  flex-direction: column;
+}
+
+.primary small {
+  font: 8px var(--mono);
+  font-weight: var(--weight-regular);
+  opacity: 0.75;
+}
+
+.grid,
+.paid {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.option {
+  align-items: center;
+  background: none;
+  border: 1px solid var(--paper-line);
+  color: var(--ink);
+  display: grid;
+  font-size: var(--type-xs);
+  font-weight: var(--weight-bold);
+  gap: var(--space-2);
+  grid-template-columns: 22px 1fr 16px;
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  transition:
+    border-color var(--duration) var(--ease),
+    color var(--duration) var(--ease);
+}
+
+.option:hover {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+.option > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.option > svg {
+  height: 14px;
+  width: 14px;
+}
+
+.more {
+  align-items: center;
+  background: none;
+  border: 0;
+  color: var(--blue);
+  display: flex;
+  font: var(--weight-heavy) var(--type-label) var(--mono);
+  gap: 7px;
+  letter-spacing: 0.09em;
+  padding: var(--space-1) 0;
+  text-transform: uppercase;
+}
+
+.more > svg {
+  height: 14px;
+  transform: rotate(90deg);
+  transition: transform var(--duration) var(--ease);
+  width: 14px;
+}
+
+.more[aria-expanded="true"] > svg {
+  transform: rotate(-90deg);
+}
+
+.more:hover {
+  color: var(--ink);
+}
+
+.credit {
+  color: var(--muted-on-paper);
+  font: var(--type-label) / 1.6 var(--mono);
+  letter-spacing: 0.04em;
+  margin: var(--space-2) 0 0;
+}
+
+.credit a {
+  color: #2a4bc9;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+@media (min-width: 760px) {
+  .wide {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .primary,
+  .primary > svg,
+  .option,
+  .more > svg {
+    transition: none;
+  }
+
+  .primary:hover {
+    transform: none;
+  }
+}

@@ -1,8 +1,10 @@
 import { watchOrderCaption } from "../../domain/anime";
 import type { MediaTitle } from "../../domain/catalog";
 import type { WatchOrderEntry } from "../../hooks/useWatchOrder";
-import { TitleArt } from "../TitleArt";
-import { ArrowIcon } from "../ui";
+import { DetailNote } from "./DetailNote";
+import { TitlePair } from "./TitlePair";
+
+import styles from "./WatchOrder.module.css";
 
 export function WatchOrder({
   label,
@@ -18,28 +20,15 @@ export function WatchOrder({
   }
 
   return (
-    <div className="detail-order">
-      <span>{label}</span>
+    <DetailNote label={label} accent="none" className={styles.block}>
       {entries.map((entry) => (
-        <button
-          type="button"
+        <TitlePair
           key={entry.item.id}
-          className="detail-pair"
-          onClick={() => onOpen(entry.item)}
-        >
-          <TitleArt
-            url={entry.item.posterUrl}
-            seed={entry.item.id}
-            label={entry.item.title}
-            width={160}
-          />
-          <span>
-            <strong>{entry.item.title}</strong>
-            <small>{watchOrderCaption(entry.relation, entry.item)}</small>
-          </span>
-          <ArrowIcon />
-        </button>
+          item={entry.item}
+          caption={watchOrderCaption(entry.relation, entry.item)}
+          onOpen={onOpen}
+        />
       ))}
-    </div>
+    </DetailNote>
   );
 }

@@ -4,27 +4,27 @@ import type { MediaTitle } from "../../domain/catalog";
 import type { Guest } from "../../domain/notebook";
 import { orderPhrase, USHER_ORDER, type TonightOrder } from "../../domain/usher";
 import type { OrderResult, UsherOrderState } from "../../hooks/useUsher";
-import { heroTitleClass, mediaMeta, scoreLabel } from "../../lib/media";
+import { classNames } from "../../lib/class-names";
+import { mediaMeta, scoreLabel } from "../../lib/media";
+import { ExternalLinkIcon, Heading, Text } from "../../ui";
+import { HeroAction, HeroActions, HeroArt, HeroGradient, HeroMeta, HeroTitle } from "../hero/Hero";
 import { TitleArt } from "../TitleArt";
-import { ChevronIcon, ExternalLinkIcon } from "../ui";
-import { UsherMark } from "./UsherMark";
+import {
+  UsherByline,
+  UsherExit,
+  UsherFacts,
+  UsherFigure,
+  UsherHero,
+  UsherHeroCopy,
+  UsherHeroSkeleton,
+  UsherNarration,
+  UsherRefusal,
+} from "./UsherHeroShell";
+
+import styles from "./UsherOrder.module.css";
 
 function serviceLine(service: string) {
   return service ? `On ${service}.` : "Not on anything you have. Rent it, or take a backup.";
-}
-
-function UsherFacts({ facts }: { facts: string[] }) {
-  if (facts.length === 0) {
-    return null;
-  }
-
-  return (
-    <ul className="usher-facts">
-      {facts.map((fact) => (
-        <li key={fact}>{fact}</li>
-      ))}
-    </ul>
-  );
 }
 
 export function UsherOrder({
@@ -81,105 +81,70 @@ export function UsherOrder({
 
     return (
       <>
-        <section
-          className={`hero-section usher-hero usher-hero-pick usher-order-result${
-            pick?.item.backdropUrl ? "" : " hero-empty"
-          }`}
-        >
-          {pick?.item.backdropUrl && (
-            <div className="hero-art" aria-hidden="true">
-              <TitleArt
-                url={pick.item.backdropUrl}
-                seed={pick.item.id}
-                label={pick.item.title}
-                width={1280}
-                kind="backdrop"
-                wide
-                eager
-              />
-            </div>
-          )}
-          <div className="hero-gradient" />
+        <UsherHero empty={!pick?.item.backdropUrl}>
+          {pick?.item.backdropUrl && <HeroArt item={pick.item} />}
+          <HeroGradient />
+          <UsherExit onClick={onClose} />
+          <UsherFigure face={face} />
 
-          <button type="button" className="usher-exit" onClick={onClose}>
-            <ChevronIcon back /> Back to tonight
-          </button>
-
-          <div className="usher-hero-figure" aria-hidden="true">
-            <UsherMark face={face} className="usher-figure" />
-          </div>
-
-          <div className="hero-copy">
-            <div className="usher-hero-head">
-              <UsherMark face={face} crop="head" />
-              <p>
-                <span>The Usher</span>
-                <em>{state.isWorking ? "checking the racks" : heading}</em>
-              </p>
-            </div>
+          <UsherHeroCopy>
+            <UsherByline face={face} note={state.isWorking ? "checking the racks" : heading} />
 
             {state.error ? (
-              <div className="honest-empty" aria-live="polite">
-                <h1>Nothing doing.</h1>
-                <p>{state.error}</p>
-                <div className="hero-actions">
-                  <button type="button" className="usher-pin" onClick={restart}>
+              <UsherRefusal heading="Nothing doing.">
+                {state.error}
+                <HeroActions className={styles.errorActions}>
+                  <HeroAction variant="outline" onClick={restart}>
                     Change my answers
-                  </button>
-                </div>
-              </div>
+                  </HeroAction>
+                </HeroActions>
+              </UsherRefusal>
             ) : pick ? (
               <>
-                <h1 className={heroTitleClass(pick.item.title)}>{pick.item.title}</h1>
-                <p className="hero-meta">
+                <HeroTitle title={pick.item.title} />
+                <HeroMeta>
                   {mediaMeta(pick.item)} · {scoreLabel(pick.item)}
-                </p>
-                <p className="usher-narration" aria-live="polite">
-                  {pick.line}
-                </p>
-                <p className="usher-order-service">{serviceLine(pick.service)}</p>
+                </HeroMeta>
+                <UsherNarration>{pick.line}</UsherNarration>
+                <p className={styles.service}>{serviceLine(pick.service)}</p>
                 <UsherFacts facts={pick.facts} />
-                <div className="hero-actions">
-                  <button type="button" className="hero-play" onClick={() => onOpen(pick.item)}>
-                    <span className="play-icon">
-                      <ExternalLinkIcon />
-                    </span>{" "}
+                <HeroActions>
+                  <HeroAction
+                    variant="primary"
+                    icon={<ExternalLinkIcon />}
+                    onClick={() => onOpen(pick.item)}
+                  >
                     See where to watch
-                  </button>
-                  <button type="button" className="usher-pin" onClick={onAnother}>
+                  </HeroAction>
+                  <HeroAction variant="outline" onClick={onAnother}>
                     Something else
-                  </button>
-                  <button type="button" className="usher-quiet" onClick={restart}>
+                  </HeroAction>
+                  <HeroAction variant="quiet" onClick={restart}>
                     Change my answers
-                  </button>
-                </div>
+                  </HeroAction>
+                </HeroActions>
               </>
             ) : (
-              <div className="hero-skeleton" aria-hidden="true">
-                <span className="skeleton skeleton-title" />
-                <span className="skeleton skeleton-meta" />
-                <span className="skeleton skeleton-line" />
-                <span className="skeleton skeleton-line short" />
-              </div>
+              <UsherHeroSkeleton lines={2} />
             )}
-          </div>
-        </section>
+          </UsherHeroCopy>
+        </UsherHero>
 
         {state.backups.length > 0 && (
-          <div className="usher-backups">
-            <p className="usher-backups-head">
-              <span>If you don't fancy it</span>
+          <div className={styles.backups}>
+            <p className={styles.backupsHead}>
+              <span>If you don&apos;t fancy it</span>
               <em>Both checked. Both fine.</em>
             </p>
-            <div className="usher-backups-list">
+            <div className={styles.backupsList}>
               {state.backups.map((backup: OrderResult) => (
                 <button
                   key={backup.item.id}
                   type="button"
-                  className="usher-backup"
+                  className={styles.backup}
                   onClick={() => onOpen(backup.item)}
                 >
-                  <span className="usher-backup-art">
+                  <span className={styles.backupArt}>
                     <TitleArt
                       url={backup.item.posterUrl}
                       seed={backup.item.id}
@@ -187,11 +152,11 @@ export function UsherOrder({
                       width={160}
                     />
                   </span>
-                  <span className="usher-backup-copy">
+                  <span className={styles.backupCopy}>
                     <strong>{backup.item.title}</strong>
                     <small>{mediaMeta(backup.item)}</small>
                     <em>{backup.line}</em>
-                    <span className="usher-backup-service">{serviceLine(backup.service)}</span>
+                    <span className={styles.backupService}>{serviceLine(backup.service)}</span>
                     <UsherFacts facts={backup.facts} />
                   </span>
                 </button>
@@ -204,46 +169,43 @@ export function UsherOrder({
   }
 
   return (
-    <section className="hero-section usher-hero usher-order-pad hero-empty">
-      <div className="hero-gradient" />
+    <UsherHero empty>
+      <HeroGradient />
+      <UsherExit onClick={onClose} />
+      <UsherFigure face="idle" />
 
-      <button type="button" className="usher-exit" onClick={onClose}>
-        <ChevronIcon back /> Back to tonight
-      </button>
+      <UsherHeroCopy>
+        <UsherByline face="idle" note="taking your order" />
 
-      <div className="usher-hero-figure" aria-hidden="true">
-        <UsherMark face="idle" className="usher-figure" />
-      </div>
-
-      <div className="hero-copy">
-        <div className="usher-hero-head">
-          <UsherMark face="idle" crop="head" />
-          <p>
-            <span>The Usher</span>
-            <em>taking your order</em>
-          </p>
-        </div>
-
-        <div className="usher-order-pad-inner" key={step?.id ?? "done"}>
-          <p className="usher-order-count">
+        <div className={styles.pad} key={step?.id ?? "done"}>
+          <p className={styles.count}>
             {index + 1} of {USHER_ORDER.length}
           </p>
-          {reply ? <p className="usher-order-reply">{reply}</p> : null}
-          <h1 className="usher-question">{step?.line}</h1>
-          <p className="usher-hint">{step?.hint}</p>
+          {reply ? <p className={styles.reply}>{reply}</p> : null}
+          <Heading level={1} size="heading" family="serif" className={styles.question}>
+            {step?.line}
+          </Heading>
+          <Text size="sm" tone="muted" className={styles.hint}>
+            {step?.hint}
+          </Text>
 
-          <div className="usher-options usher-options-wrap">
+          <div className={styles.options}>
             {(step?.options ?? []).map((option) => (
-              <button key={option.value} type="button" onClick={() => choose(option.value)}>
+              <button
+                key={option.value}
+                type="button"
+                className={styles.option}
+                onClick={() => choose(option.value)}
+              >
                 {option.label}
               </button>
             ))}
           </div>
 
           {step?.id === "company" && guests.length > 0 && (
-            <div className="usher-seats">
-              <span>Anyone I know?</span>
-              <div>
+            <div className={styles.seats}>
+              <span className={styles.seatsLabel}>Anyone I know?</span>
+              <div className={styles.seatsRow}>
                 {guests.map((guest) => {
                   const isSeated = seated.includes(guest.id);
 
@@ -251,7 +213,7 @@ export function UsherOrder({
                     <button
                       key={guest.id}
                       type="button"
-                      className={isSeated ? "seated" : ""}
+                      className={classNames(styles.seat, isSeated && styles.seated)}
                       aria-pressed={isSeated}
                       title={guest.vetoes.length ? `No ${guest.vetoes.join(", ")}` : undefined}
                       onClick={() =>
@@ -271,14 +233,14 @@ export function UsherOrder({
           )}
         </div>
 
-        <p className="usher-order-ticket" aria-hidden="true">
+        <p className={styles.ticket} aria-hidden="true">
           {USHER_ORDER.map((entry) => (
-            <span key={entry.id} className={answers[entry.id] ? "filled" : ""}>
+            <span key={entry.id} className={answers[entry.id] ? styles.ticketFilled : undefined}>
               {entry.options.find((option) => option.value === answers[entry.id])?.label ?? "—"}
             </span>
           ))}
         </p>
-      </div>
-    </section>
+      </UsherHeroCopy>
+    </UsherHero>
   );
 }

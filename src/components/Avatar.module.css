@@ -1,0 +1,28 @@
+.avatar {
+  align-items: center;
+  background: var(--blue);
+  color: var(--white);
+  display: flex;
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-weight: var(--weight-heavy);
+  justify-content: center;
+  object-fit: cover;
+  text-transform: uppercase;
+}
+
+.sm {
+  font-size: var(--type-label-sm);
+  height: 26px;
+  width: 26px;
+}
+
+.md {
+  font-size: var(--type-label-lg);
+  height: 38px;
+  width: 38px;
+}
+
+.round {
+  border-radius: 50%;
+}

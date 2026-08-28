@@ -1,0 +1,143 @@
+.player {
+  display: grid;
+  gap: var(--space-2);
+  margin: 6px 0 var(--space-5);
+}
+
+.frame {
+  aspect-ratio: 16 / 9;
+  background: var(--ink);
+  border: 1px solid var(--line);
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+
+.frame video {
+  display: block;
+  height: 100%;
+  object-fit: contain;
+  width: 100%;
+}
+
+.running {
+  background: #000;
+}
+
+.curtain {
+  background: var(--ink);
+  border: 0;
+  cursor: pointer;
+  display: block;
+  inset: 0;
+  padding: 0;
+  position: absolute;
+  transition: transform 0.46s cubic-bezier(0.4, 0, 0.2, 1);
+  width: 100%;
+  will-change: transform;
+}
+
+.raising {
+  pointer-events: none;
+  transform: translateY(-100%);
+}
+
+.raising .face {
+  opacity: 0;
+  transition: opacity var(--duration) var(--ease);
+}
+
+.curtain > img {
+  display: block;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.5;
+  width: 100%;
+}
+
+.curtain > img {
+  filter: grayscale(1) contrast(1.08) brightness(0.82);
+}
+
+.curtain::after {
+  background: linear-gradient(0deg, rgba(17, 19, 15, 0.86), rgba(17, 19, 15, 0.28));
+  content: "";
+  inset: 0;
+  position: absolute;
+}
+
+.face {
+  align-items: center;
+  bottom: var(--space-5);
+  display: flex;
+  gap: var(--space-3);
+  left: var(--space-5);
+  position: absolute;
+  right: var(--space-5);
+  z-index: 2;
+}
+
+.play {
+  align-items: center;
+  background: var(--acid);
+  color: var(--ink);
+  display: flex;
+  flex: 0 0 auto;
+  height: 44px;
+  justify-content: center;
+  transition: transform var(--duration) var(--ease);
+  width: 44px;
+}
+
+.play svg {
+  height: 17px;
+  width: 17px;
+}
+
+.curtain:hover .play {
+  transform: scale(1.06);
+}
+
+.copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: left;
+}
+
+.copy strong {
+  color: var(--paper);
+  font-size: var(--type-body);
+  letter-spacing: -0.01em;
+}
+
+.copy small {
+  color: var(--muted);
+  font: var(--type-label) var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.error {
+  color: var(--coral);
+  font: var(--type-label) var(--mono);
+  letter-spacing: 0.06em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .curtain,
+  .play {
+    transition: none;
+  }
+
+  .raising {
+    opacity: 0;
+    transform: none;
+  }
+
+  .curtain:hover .play {
+    transform: none;
+  }
+}

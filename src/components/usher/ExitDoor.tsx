@@ -8,7 +8,10 @@ import {
 } from "react";
 
 import { focusableElements } from "../../lib/focus";
+import { Button, Cluster, Heading, Text } from "../../ui";
 import { UsherMark } from "./UsherMark";
+
+import styles from "./ExitDoor.module.css";
 
 export type ExitKind = "provider" | "trailer" | "tmdb" | "wikipedia" | "imdb" | "cinema" | "other";
 
@@ -181,44 +184,46 @@ export function ExitDoor({
     // Clicking the backdrop dismisses the dialog same as Escape or "Stay here" -
     // both keyboard-reachable, so the backdrop itself doesn't need its own key handler.
     // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions
-    <dialog ref={shadeRef} className="exit-shade" onClick={onShadeClick} onCancel={onCancel}>
+    <dialog ref={shadeRef} className={styles.shade} onClick={onShadeClick} onCancel={onCancel}>
       <div
         ref={dialogRef}
-        className="exit-door"
+        className={styles.door}
         role="alertdialog"
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
         tabIndex={-1}
       >
-        <p className="exit-sign" aria-hidden="true">
+        <p className={styles.sign} aria-hidden="true">
           <span>Exit</span>
         </p>
 
-        <div className="exit-body">
-          <UsherMark face="unimpressed" crop="head" />
+        <div className={styles.body}>
+          <UsherMark face="unimpressed" crop="head" className={styles.mark} />
           <div>
-            <h2 id={titleId}>You are leaving the building.</h2>
-            <p className="exit-line" id={descriptionId}>
+            <Heading level={2} size="subhead" family="serif" id={titleId} className={styles.title}>
+              You are leaving the building.
+            </Heading>
+            <Text family="serif" italic id={descriptionId} className={styles.line}>
               {LINES[exit.kind](exit.label)}
-            </p>
-            <p className="exit-host">
+            </Text>
+            <p className={styles.host}>
               {exit.label} <em>{hostOf(exit.href)}</em>
             </p>
           </div>
         </div>
 
-        <div className="exit-actions">
-          <button type="button" className="exit-go" onClick={leave}>
+        <Cluster gap={2} className={styles.actions}>
+          <Button variant="primary" size="md" onClick={leave}>
             Go through
-          </button>
-          <button type="button" ref={stayRef} onClick={onClose}>
+          </Button>
+          <Button variant="secondary" size="md" buttonRef={stayRef} onClick={onClose}>
             Stay here
-          </button>
-        </div>
+          </Button>
+        </Cluster>
 
-        <label className="exit-skip">
-          <input type="checkbox" ref={skipRef} />
+        <label className={styles.skip}>
+          <input type="checkbox" ref={skipRef} className={styles.skipBox} />
           Stop telling me. I know where the door is.
         </label>
       </div>

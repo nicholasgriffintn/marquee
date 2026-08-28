@@ -1,0 +1,61 @@
+.form {
+  border-top: 1px solid var(--paper-line);
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin: var(--space-6) 0 var(--space-6);
+  padding-top: var(--space-5);
+}
+
+.scope {
+  margin-top: -6px;
+}
+
+.status {
+  align-items: center;
+  color: var(--ink);
+  display: flex;
+  font-size: var(--type-sm);
+  gap: var(--space-2);
+}
+
+.status select {
+  background: var(--ink-soft);
+  border: 1px solid var(--line);
+  color: var(--white);
+  font: var(--type-label) var(--mono);
+  padding: 7px 9px;
+}
+
+.rating {
+  align-items: center;
+  display: flex;
+  gap: 2px;
+}
+
+.ratingLabel {
+  font-size: var(--type-sm);
+  margin-right: var(--space-3);
+}
+
+.star {
+  background: none;
+  border: 0;
+  color: #4b5048;
+  padding: 0 2px;
+}
+
+.star svg {
+  height: 20px;
+  width: 20px;
+}
+
+.starOn {
+  color: var(--acid);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}

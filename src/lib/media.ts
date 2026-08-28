@@ -148,7 +148,9 @@ export function changeLabel(delta: number) {
   return `${percent >= 0 ? "+" : ""}${percent.toLocaleString()}%`;
 }
 
-export function heroTitleClass(title: string) {
+export type HeroTitleSize = "full" | "small" | "tiny";
+
+export function heroTitleSize(title: string): HeroTitleSize {
   const longestWord = Math.max(
     ...title
       .trim()
@@ -158,14 +160,14 @@ export function heroTitleClass(title: string) {
   );
 
   if (title.length > 46 || longestWord > 20) {
-    return "hero-title hero-title-tiny";
+    return "tiny";
   }
 
   if (title.length > 26 || longestWord > 13) {
-    return "hero-title hero-title-small";
+    return "small";
   }
 
-  return "hero-title";
+  return "full";
 }
 
 export function scoreLabel(item: MediaTitle) {

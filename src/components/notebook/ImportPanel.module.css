@@ -1,0 +1,37 @@
+.drop {
+  align-items: center;
+  border: 1px dashed var(--panel-line);
+  cursor: pointer;
+  display: inline-flex;
+  gap: var(--space-3);
+  padding: var(--space-3) 18px;
+}
+
+.drop:hover {
+  border-color: var(--acid);
+}
+
+.busy {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+.input {
+  color: var(--muted);
+  font: var(--weight-regular) var(--type-sm) / 1 var(--sans);
+  max-width: 260px;
+}
+
+.label {
+  color: var(--acid);
+  font: var(--weight-bold) var(--type-label) / 1 var(--mono);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.status {
+  color: var(--paper);
+  font: italic var(--weight-regular) var(--type-body) / 1.5 var(--serif);
+  margin: var(--space-3) 0 0;
+  max-width: 56ch;
+}

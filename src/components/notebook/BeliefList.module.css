@@ -1,0 +1,126 @@
+.shelf {
+  margin-bottom: var(--space-6);
+}
+
+.list {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.note {
+  background: var(--panel-tile);
+  border: 1px solid var(--panel-line);
+  border-left: 3px solid var(--acid);
+  padding: var(--space-4) 18px;
+}
+
+.suspended {
+  border-left-color: var(--line);
+  opacity: 0.62;
+}
+
+.busy {
+  opacity: 0.5;
+}
+
+.value {
+  color: var(--white);
+  font-size: var(--type-compact);
+  line-height: 1.4;
+  margin-bottom: var(--space-2);
+}
+
+.meta {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px var(--space-3);
+  margin: 0 0 var(--space-3);
+}
+
+.meta span {
+  color: var(--acid);
+  font: var(--weight-bold) var(--type-label) / 1 var(--mono);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.meta em {
+  color: var(--paper);
+  font: italic var(--weight-regular) var(--type-sm) / 1 var(--serif);
+}
+
+.meta small {
+  color: var(--muted);
+  font: var(--weight-regular) var(--type-xs) / 1 var(--sans);
+}
+
+.meta strong {
+  color: var(--coral);
+  font: var(--weight-bold) var(--type-label) / 1 var(--mono);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px var(--space-3);
+}
+
+.action {
+  background: none;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  font: var(--weight-medium) var(--type-xs) / 1 var(--sans);
+  padding: 2px 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.action:hover {
+  color: var(--white);
+}
+
+.forget:hover {
+  color: var(--coral);
+}
+
+.action:disabled {
+  cursor: progress;
+  opacity: 0.6;
+  text-decoration: none;
+}
+
+.edit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.editInput {
+  background: var(--panel);
+  border: 1px solid var(--acid);
+  color: var(--white);
+  flex: 1 1 100%;
+  font: var(--weight-regular) var(--type-body) / 1 var(--sans);
+  min-height: 42px;
+  padding: 0 var(--space-3);
+}
+
+.editSave {
+  font: var(--weight-bold) var(--type-xs) / 1 var(--sans);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+@media (max-width: 620px) {
+  .list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

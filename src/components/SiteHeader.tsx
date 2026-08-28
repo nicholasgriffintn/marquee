@@ -1,8 +1,13 @@
 import { type ReactNode, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 
+import { classNames } from "../lib/class-names";
 import type { User } from "../types";
-import { MarqueeLogo, TicketIcon } from "./ui";
+import { Eyebrow, TicketIcon } from "../ui";
+import { Avatar } from "./Avatar";
+import { Brand } from "./Brand";
+
+import styles from "./SiteHeader.module.css";
 
 const NAV: { to: string; label: string; private: boolean; admin?: boolean }[] = [
   { to: "/", label: "Tonight", private: false },
@@ -13,14 +18,6 @@ const NAV: { to: string; label: string; private: boolean; admin?: boolean }[] = 
   { to: "/notebook", label: "Notebook", private: true },
   { to: "/admin", label: "Admin", private: true, admin: true },
 ];
-
-function AccountAvatar({ user }: { user: User }) {
-  return user.avatarUrl ? (
-    <img src={user.avatarUrl} alt="" />
-  ) : (
-    <span className="avatar-fallback">{user.name.slice(0, 1)}</span>
-  );
-}
 
 function AccountTools({ user, onSignOut }: { user: User; onSignOut: () => void }) {
   const menuRef = useRef<HTMLDetailsElement>(null);
@@ -54,17 +51,17 @@ function AccountTools({ user, onSignOut }: { user: User; onSignOut: () => void }
   }, []);
 
   return (
-    <div className="account-tools">
-      <AccountAvatar user={user} />
-      <span className="account-name">{user.name}</span>
-      <button className="account-sign-out" type="button" onClick={onSignOut}>
+    <div className={styles.account}>
+      <Avatar url={user.avatarUrl} name={user.name} className={styles.accountAvatar} />
+      <span className={styles.accountName}>{user.name}</span>
+      <button className={styles.accountSignOut} type="button" onClick={onSignOut}>
         Sign out
       </button>
-      <details className="account-menu" ref={menuRef}>
+      <details className={styles.accountMenu} ref={menuRef}>
         <summary ref={summaryRef} aria-label={`Open account menu for ${user.name}`}>
-          <AccountAvatar user={user} />
+          <Avatar url={user.avatarUrl} name={user.name} />
         </summary>
-        <div className="account-menu-popover">
+        <div className={styles.accountPopover}>
           <strong>{user.name}</strong>
           <button type="button" onClick={onSignOut}>
             Sign out
@@ -78,18 +75,18 @@ function AccountTools({ user, onSignOut }: { user: User; onSignOut: () => void }
 function SignInLink({ returnTo }: { returnTo: string }) {
   return (
     <Link
-      className="sign-in-button"
+      className={styles.signIn}
       to={`/sign-in?returnTo=${encodeURIComponent(returnTo)}`}
       aria-label="Sign in"
     >
-      <span className="sign-in-icon">
-        <TicketIcon />
+      <span className={styles.signInIcon}>
+        <TicketIcon className={styles.ticket} />
       </span>
-      <span className="sign-in-copy">
+      <span className={styles.signInCopy}>
         <strong>Sign in</strong>
         <small>get a ticket</small>
       </span>
-      <span className="sign-in-mobile-copy">Get a ticket</span>
+      <span className={styles.signInCompact}>Get a ticket</span>
     </Link>
   );
 }
@@ -114,30 +111,31 @@ export function SiteHeader({
   const isSignedIn = Boolean(user);
 
   return (
-    <header className="site-header">
-      <Link to="/" className="brand">
-        <MarqueeLogo />
-        <span>Marquee</span>
-      </Link>
-      <nav aria-label="Primary navigation">
+    <header className={styles.header}>
+      <Brand to="/" hideLabelOnMobile className={styles.brand} />
+      <nav aria-label="Primary navigation" className={styles.nav}>
         {NAV.filter(
           (item) => (!item.private || isSignedIn) && (!item.admin || user?.role === "admin"),
         ).map((item) => (
           <Link
             key={item.to}
             to={item.to}
-            className={currentPath === item.to ? "active" : ""}
+            className={classNames(styles.navLink, currentPath === item.to && styles.navLinkActive)}
             aria-current={currentPath === item.to ? "page" : undefined}
           >
             {item.label}
-            {item.to === "/shelf" && shelvedCount > 0 && <sup>{shelvedCount}</sup>}
+            {item.to === "/shelf" && shelvedCount > 0 && (
+              <sup className={styles.navCount}>{shelvedCount}</sup>
+            )}
           </Link>
         ))}
       </nav>
-      <div className="header-tools">
-        {searchSlot}
+      <div className={styles.tools}>
+        <div className={styles.search}>{searchSlot}</div>
         {isSessionLoading ? (
-          <span className="session-loading">Checking session</span>
+          <Eyebrow size="sm" weight="regular" className={styles.sessionLoading}>
+            Checking session
+          </Eyebrow>
         ) : user ? (
           <AccountTools user={user} onSignOut={onSignOut} />
         ) : (

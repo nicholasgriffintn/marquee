@@ -1,0 +1,33 @@
+.badge {
+  align-items: center;
+  background: rgba(127, 130, 122, 0.18);
+  border: 1px solid rgba(127, 130, 122, 0.35);
+  color: inherit;
+  display: inline-flex;
+  font-size: var(--type-label);
+  font-weight: 900;
+  height: 32px;
+  justify-content: center;
+  min-width: 32px;
+  overflow: hidden;
+  padding: 3px;
+}
+
+.badge:has(img) {
+  background: none;
+  padding: 0;
+}
+
+.badge img {
+  height: 100%;
+  object-fit: contain;
+  width: 100%;
+}
+
+.compact {
+  font-size: var(--type-label-xs);
+  height: 23px;
+  max-width: 74px;
+  min-width: 23px;
+  padding: 2px 4px;
+}

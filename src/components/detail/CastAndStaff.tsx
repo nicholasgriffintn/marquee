@@ -1,7 +1,10 @@
 import { useState } from "react";
 
 import type { AnimeCharacter, AnimeStaffMember, MediaTitle } from "../../domain/catalog";
-import { ChevronIcon } from "../ui";
+import { ChevronIcon } from "../../ui";
+import { DetailCredit } from "./DetailNote";
+
+import styles from "./DetailList.module.css";
 
 const SHOWN = 6;
 
@@ -11,9 +14,9 @@ function CharacterList({ characters }: { characters: AnimeCharacter[] }) {
   const visible = showAll ? characters : characters.slice(0, SHOWN);
 
   return (
-    <div className="theme-list">
-      <span>Cast</span>
-      <ol>
+    <div className={styles.group}>
+      <span className={styles.groupLabel}>Cast</span>
+      <ol className={styles.list}>
         {visible.map((character, index) => (
           // oxlint-disable-next-line react/no-array-index-key -- AnimeCharacter has no stable id, list order is API-fixed
           <li key={`${character.name}-${index}`}>
@@ -24,7 +27,7 @@ function CharacterList({ characters }: { characters: AnimeCharacter[] }) {
         ))}
       </ol>
       {held > 0 && !showAll && (
-        <button type="button" className="watch-more" onClick={() => setShowAll(true)}>
+        <button type="button" className={styles.more} onClick={() => setShowAll(true)}>
           Show {held} more
           <ChevronIcon />
         </button>
@@ -39,9 +42,9 @@ function StaffList({ staff }: { staff: AnimeStaffMember[] }) {
   const visible = showAll ? staff : staff.slice(0, SHOWN);
 
   return (
-    <div className="theme-list">
-      <span>Staff</span>
-      <ol>
+    <div className={styles.group}>
+      <span className={styles.groupLabel}>Staff</span>
+      <ol className={styles.list}>
         {visible.map((member, index) => (
           // oxlint-disable-next-line react/no-array-index-key -- AnimeStaffMember has no stable id, list order is API-fixed
           <li key={`${member.name}-${index}`}>
@@ -51,7 +54,7 @@ function StaffList({ staff }: { staff: AnimeStaffMember[] }) {
         ))}
       </ol>
       {held > 0 && !showAll && (
-        <button type="button" className="watch-more" onClick={() => setShowAll(true)}>
+        <button type="button" className={styles.more} onClick={() => setShowAll(true)}>
           Show {held} more
           <ChevronIcon />
         </button>
@@ -69,10 +72,10 @@ export function CastAndStaff({ item }: { item: MediaTitle }) {
   }
 
   return (
-    <section className="theme-songs" aria-label="Cast and staff">
+    <section className={styles.block} aria-label="Cast and staff">
       {characters.length > 0 && <CharacterList characters={characters} />}
       {staff.length > 0 && <StaffList staff={staff} />}
-      <p className="detail-credit">Cast and crew from AniList</p>
+      <DetailCredit>Cast and crew from AniList</DetailCredit>
     </section>
   );
 }

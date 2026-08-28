@@ -1,0 +1,20 @@
+.review li {
+  flex-wrap: wrap;
+}
+
+.review small {
+  flex-basis: 100%;
+  order: 3;
+}
+
+.source {
+  align-items: center;
+  color: var(--acid);
+  display: inline-flex;
+  gap: var(--space-1);
+}
+
+.source svg {
+  height: 13px;
+  width: 13px;
+}

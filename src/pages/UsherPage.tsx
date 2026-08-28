@@ -3,6 +3,10 @@ import { Link } from "react-router-dom";
 
 import { UsherMark } from "../components/usher/UsherMark";
 import type { UsherFace } from "../domain/usher";
+import { classNames } from "../lib/class-names";
+import { Fact, FactList, Heading } from "../ui";
+
+import styles from "./UsherPage.module.css";
 
 type Scene = {
   id: string;
@@ -98,17 +102,17 @@ export function UsherPage() {
       return undefined;
     }
 
-    const scenes = [...root.querySelectorAll<HTMLElement>(".reel-scene")];
+    const scenes = [...root.querySelectorAll<HTMLElement>(`.${styles.scene}`)];
 
     for (const scene of scenes) {
-      scene.classList.add("reel-pending");
+      scene.classList.add(styles.pending);
     }
 
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
           if (entry.isIntersecting) {
-            entry.target.classList.add("reel-shown");
+            entry.target.classList.add(styles.shown);
             observer.unobserve(entry.target);
           }
         }
@@ -124,54 +128,47 @@ export function UsherPage() {
   }, []);
 
   return (
-    <div className="reel" ref={rootRef}>
-      <div className="reel-grain" aria-hidden="true" />
+    <div className={styles.reel} ref={rootRef}>
+      <div className={styles.grain} aria-hidden="true" />
 
-      <div className="reel-bulbs" aria-hidden="true">
+      <div className={styles.bulbs} aria-hidden="true">
         {Array.from({ length: 18 }, (_, index) => (
-          <i key={index} className={index === 11 ? "dead" : ""} />
+          <i key={index} className={classNames(index === 11 && styles.dead)} />
         ))}
       </div>
 
-      <section className="reel-card">
-        <div className="reel-cert">
-          <p className="reel-cert-board">The British Board of Movie Night</p>
-          <div className="reel-cert-mark">
+      <section className={styles.card}>
+        <div className={styles.cert}>
+          <p className={styles.certBoard}>The British Board of Movie Night</p>
+          <div className={styles.certMark}>
             <UsherMark face="idle" crop="head" />
           </div>
-          <h1>The Usher</h1>
-          <dl>
-            <div>
-              <dt>Certificate</dt>
-              <dd>U — suitable for all</dd>
-            </div>
-            <div>
-              <dt>Running time</dt>
-              <dd>Two minutes</dd>
-            </div>
-            <div>
-              <dt>Format</dt>
-              <dd>Presented in Marqueevision</dd>
-            </div>
-          </dl>
-          <p className="reel-cert-note">
+          <Heading level={1} size="title" family="serif" tone="ink" className={styles.certTitle}>
+            The Usher
+          </Heading>
+          <FactList min="100%" className={styles.certFacts}>
+            <Fact term="Certificate">U — suitable for all</Fact>
+            <Fact term="Running time">Two minutes</Fact>
+            <Fact term="Format">Presented in Marqueevision</Fact>
+          </FactList>
+          <p className={styles.certNote}>
             Contains one fall from height, mild disdain for popular things, and no apologies.
           </p>
         </div>
-        <p className="reel-scroll" aria-hidden="true">
+        <p className={styles.scroll} aria-hidden="true">
           Scroll to begin
         </p>
       </section>
 
       {SCENES.map((scene, index) => (
-        <section className="reel-scene" key={scene.id} aria-labelledby={`${scene.id}-slug`}>
-          <div className="reel-inner">
-            <h2 className="reel-slug" id={`${scene.id}-slug`}>
+        <section className={styles.scene} key={scene.id} aria-labelledby={`${scene.id}-slug`}>
+          <div className={styles.inner}>
+            <h2 className={styles.slug} id={`${scene.id}-slug`}>
               <i>{String(index + 1).padStart(2, "0")}</i>
               {scene.slug}
             </h2>
-            <div className="reel-body">
-              <div className="reel-action">
+            <div className={styles.body}>
+              <div className={styles.action}>
                 {scene.action.map((line) => (
                   <p key={line}>{line}</p>
                 ))}
@@ -180,23 +177,23 @@ export function UsherPage() {
                   <p>{scene.line}</p>
                 </blockquote>
               </div>
-              <figure className="reel-figure">
-                <UsherMark face={scene.face} className="usher-figure" />
+              <figure className={styles.figure}>
+                <UsherMark face={scene.face} className={styles.figureMark} />
               </figure>
             </div>
           </div>
-          <div className="reel-perf" aria-hidden="true" />
+          <div className={styles.perf} aria-hidden="true" />
         </section>
       ))}
 
-      <section className="reel-scene reel-dark" aria-labelledby="now-slug">
-        <div className="reel-beam" aria-hidden="true" />
-        <div className="reel-inner">
-          <h2 className="reel-slug" id="now-slug">
+      <section className={classNames(styles.scene, styles.dark)} aria-labelledby="now-slug">
+        <div className={styles.beam} aria-hidden="true" />
+        <div className={styles.inner}>
+          <h2 className={styles.slug} id="now-slug">
             <i>{String(SCENES.length + 1).padStart(2, "0")}</i>
             Int. Here — Now
           </h2>
-          <div className="reel-action reel-action-wide">
+          <div className={classNames(styles.action, styles.actionWide)}>
             <p>
               There is no building. There is a catalogue of very nearly everything, a viewer who
               cannot decide, and a man with a torch who has seen all of it and has opinions about
@@ -207,20 +204,20 @@ export function UsherPage() {
               <p>Evening. Rows are lettered. Mind the step.</p>
             </blockquote>
           </div>
-          <figure className="reel-figure reel-figure-now" aria-hidden="true">
-            <UsherMark face="idle" className="usher-figure" />
+          <figure className={classNames(styles.figure, styles.figureNow)} aria-hidden="true">
+            <UsherMark face="idle" className={styles.figureMark} />
           </figure>
 
-          <Link className="reel-cta" to="/">
+          <Link className={styles.cta} to="/">
             Find your seat
           </Link>
         </div>
       </section>
 
-      <section className="reel-credits" aria-label="End credits">
-        <div className="reel-credit-roll">
-          <p className="reel-end">The End</p>
-          <dl>
+      <section className={styles.credits} aria-label="End credits">
+        <div className={styles.roll}>
+          <p className={styles.end}>The End</p>
+          <dl className={styles.rollList}>
             <div>
               <dt>The Usher</dt>
               <dd>Himself</dd>
@@ -270,7 +267,7 @@ export function UsherPage() {
               <dd>Two, in thirty years</dd>
             </div>
           </dl>
-          <p className="reel-fine">
+          <p className={styles.fine}>
             No letters of the alphabet were harmed in the making of this cinema.
           </p>
         </div>

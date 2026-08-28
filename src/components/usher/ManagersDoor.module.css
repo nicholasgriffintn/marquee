@@ -1,0 +1,118 @@
+.office {
+  min-height: calc(100vh - 78px);
+}
+
+.inner {
+  align-items: center;
+  display: grid;
+  gap: clamp(28px, 6vw, 76px);
+  grid-template-columns: minmax(0, 260px) minmax(0, 1fr);
+  margin: 0 auto;
+  max-width: 900px;
+}
+
+.door {
+  aspect-ratio: 5 / 9;
+  background: linear-gradient(160deg, #23281f, #191c18);
+  border: 3px solid var(--ink);
+  box-shadow:
+    inset 0 0 0 10px #1f231c,
+    12px 12px 0 rgba(0, 0, 0, 0.45);
+  padding: var(--space-5);
+  position: relative;
+}
+
+.glass {
+  align-items: center;
+  background:
+    repeating-linear-gradient(-18deg, rgba(243, 240, 231, 0.09) 0 3px, transparent 3px 7px),
+    rgba(243, 240, 231, 0.14);
+  border: 2px solid var(--ink);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  height: 54%;
+  justify-content: center;
+  text-align: center;
+}
+
+.name {
+  color: var(--acid);
+  font: var(--weight-medium) var(--type-subhead) / 1 var(--serif);
+  letter-spacing: 0.06em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.sub {
+  color: rgba(243, 240, 231, 0.72);
+  font: var(--weight-bold) 8px/1 var(--mono);
+  letter-spacing: var(--tracking-label-wide);
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.note {
+  background: var(--paper);
+  color: var(--ink);
+  font: var(--weight-bold) var(--type-label) / 1.35 var(--mono);
+  left: 50%;
+  letter-spacing: 1px;
+  margin: 0;
+  padding: 9px var(--space-3);
+  position: absolute;
+  text-align: center;
+  text-transform: uppercase;
+  top: 63%;
+  transform: translateX(-50%) rotate(-3deg);
+}
+
+.handle {
+  background: var(--paper-deep);
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  bottom: 27%;
+  display: block;
+  height: 16px;
+  left: var(--space-5);
+  position: absolute;
+  width: 16px;
+}
+
+.lede {
+  margin: var(--space-3) 0 var(--space-6);
+  max-width: 42ch;
+}
+
+.aside {
+  align-items: center;
+  border-left: 3px solid var(--acid);
+  display: flex;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+  padding-left: var(--space-3);
+}
+
+.mark {
+  flex: 0 0 auto;
+  height: 40px;
+  width: 56px;
+}
+
+.asideLine {
+  font-size: var(--type-lg);
+  line-height: 1.35;
+}
+
+@media (max-width: 700px) {
+  .inner {
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 420px;
+  }
+
+  .door {
+    margin: 0 auto;
+    max-width: 220px;
+    width: 100%;
+  }
+}

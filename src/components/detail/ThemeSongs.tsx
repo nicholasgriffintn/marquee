@@ -1,7 +1,10 @@
 import { useState } from "react";
 
 import type { AnimeTheme, MediaTitle } from "../../domain/catalog";
-import { ChevronIcon } from "../ui";
+import { ChevronIcon } from "../../ui";
+import { DetailCredit } from "./DetailNote";
+
+import styles from "./DetailList.module.css";
 
 const SHOWN = 3;
 
@@ -11,9 +14,9 @@ function ThemeList({ label, songs }: { label: string; songs: AnimeTheme[] }) {
   const visible = showAll ? songs : songs.slice(0, SHOWN);
 
   return (
-    <div className="theme-list">
-      <span>{label}</span>
-      <ol>
+    <div className={styles.group}>
+      <span className={styles.groupLabel}>{label}</span>
+      <ol className={styles.list}>
         {visible.map((song, index) => (
           // oxlint-disable-next-line react/no-array-index-key -- AnimeTheme has no stable id, list order is API-fixed
           <li key={`${song.title}-${index}`}>
@@ -24,7 +27,7 @@ function ThemeList({ label, songs }: { label: string; songs: AnimeTheme[] }) {
         ))}
       </ol>
       {held > 0 && !showAll && (
-        <button type="button" className="watch-more" onClick={() => setShowAll(true)}>
+        <button type="button" className={styles.more} onClick={() => setShowAll(true)}>
           Show {held} more
           <ChevronIcon />
         </button>
@@ -42,10 +45,10 @@ export function ThemeSongs({ item }: { item: MediaTitle }) {
   }
 
   return (
-    <section className="theme-songs" aria-label="Opening and ending themes">
+    <section className={styles.block} aria-label="Opening and ending themes">
       {openings.length > 0 && <ThemeList label="Openings" songs={openings} />}
       {endings.length > 0 && <ThemeList label="Endings" songs={endings} />}
-      <p className="detail-credit">Themes from MyAnimeList</p>
+      <DetailCredit>Themes from MyAnimeList</DetailCredit>
     </section>
   );
 }

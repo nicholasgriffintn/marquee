@@ -1,0 +1,19 @@
+.hook {
+  font-size: var(--type-compact);
+  line-height: 1.45;
+}
+
+.moods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.moods em {
+  border: 1px solid var(--blue);
+  color: var(--blue);
+  font: var(--weight-bold) var(--type-label-sm) var(--mono);
+  font-style: normal;
+  padding: var(--space-1) 9px;
+  text-transform: uppercase;
+}

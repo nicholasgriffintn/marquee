@@ -1,0 +1,42 @@
+.brand {
+  align-items: center;
+  background: none;
+  border: 0;
+  color: inherit;
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 11px;
+  padding: 0;
+}
+
+.mark {
+  align-items: center;
+  background: var(--acid);
+  color: var(--ink);
+  display: inline-flex;
+  font: var(--weight-heavy) 16px/1 var(--sans);
+  height: 35px;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+  transform: rotate(-2deg);
+  width: 35px;
+}
+
+.mark img {
+  display: block;
+  height: 100%;
+  width: 100%;
+}
+
+.label {
+  font-size: var(--type-lg);
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.05em;
+}
+
+@media (max-width: 760px) {
+  .labelResponsive {
+    display: none;
+  }
+}

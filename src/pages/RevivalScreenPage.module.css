@@ -1,0 +1,146 @@
+.mark {
+  height: 58px;
+  margin: 0 0 var(--space-4);
+  width: 80px;
+}
+
+.notice {
+  background: rgba(255, 110, 86, 0.08);
+  display: grid;
+  gap: 6px;
+  margin: 0 0 18px;
+}
+
+.noticeLabel {
+  color: var(--coral);
+  font: var(--weight-heavy) var(--type-label-sm) var(--mono);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.condition {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin: 0 0 18px;
+}
+
+.condition span {
+  color: var(--muted);
+  font: var(--weight-bold) var(--type-label) / 1 var(--mono);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.condition[data-condition="pristine"] span {
+  color: var(--acid);
+}
+
+.condition[data-condition="rough"] span {
+  color: var(--coral);
+}
+
+.condition em {
+  color: var(--paper);
+  font: italic var(--weight-regular) var(--type-body) / 1.5 var(--serif);
+}
+
+.synopsis {
+  max-width: 68ch;
+}
+
+.credit {
+  color: var(--muted);
+  font: var(--weight-regular) var(--type-label-lg) var(--mono);
+  line-height: 1.6;
+  margin: var(--space-2) 0 0;
+  max-width: 68ch;
+}
+
+.credit a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 18px 0 var(--space-1);
+}
+
+.tag {
+  font-weight: var(--weight-regular);
+  letter-spacing: 0.04em;
+  padding: 5px 9px;
+  text-transform: none;
+}
+
+.provenance {
+  border-top: 1px solid var(--line);
+  gap: 0;
+  margin: var(--space-5) 0 var(--space-2);
+}
+
+.provenance > div {
+  border-bottom: 1px solid var(--line);
+  gap: 5px;
+  padding: var(--space-3) var(--space-2);
+}
+
+.sourceLink {
+  align-items: center;
+  color: var(--acid);
+  display: inline-flex;
+  gap: var(--space-1);
+}
+
+.sourceLink svg {
+  height: 13px;
+  width: 13px;
+}
+
+.prints {
+  margin-block: var(--space-7);
+}
+
+.printList {
+  border-top: 1px solid var(--line);
+  display: grid;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.printList > li {
+  border-bottom: 1px solid var(--line);
+}
+
+.printList a {
+  align-items: baseline;
+  color: inherit;
+  display: grid;
+  gap: var(--space-1) var(--space-5);
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding-block: var(--space-3);
+  text-decoration: none;
+}
+
+.printList a:hover strong,
+.printList a:focus-visible strong {
+  color: var(--acid);
+}
+
+.printList small {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: var(--type-xs);
+  letter-spacing: 0.02em;
+}
+
+@media (max-width: 640px) {
+  .printList a {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

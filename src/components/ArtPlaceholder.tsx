@@ -1,4 +1,7 @@
+import { classNames } from "../lib/class-names";
 import { hashString } from "../lib/string";
+
+import styles from "./ArtPlaceholder.module.css";
 
 const TALL = [
   "/posters/eclipse.jpg",
@@ -52,7 +55,7 @@ export function ArtPlaceholder({
 
   return (
     <img
-      className={`art-placeholder${wide ? " art-placeholder-wide" : ""}`}
+      className={classNames(styles.art, wide && styles.wide)}
       src={art}
       alt={`${label} artwork`}
       height={wide ? "620" : "1200"}

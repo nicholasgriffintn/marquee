@@ -1,0 +1,47 @@
+.pair {
+  align-items: center;
+  background: var(--white);
+  border: 1px solid var(--paper-line);
+  color: var(--ink);
+  display: grid;
+  gap: 13px;
+  grid-template-columns: 40px 1fr 20px;
+  padding: 9px var(--space-3);
+  text-align: left;
+}
+
+.pair:hover {
+  border-color: var(--blue);
+}
+
+.pair > img,
+.pair > picture > img {
+  background: var(--paper-deep);
+  display: block;
+  height: 58px;
+  object-fit: cover;
+  width: 40px;
+}
+
+.copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.copy strong {
+  font-size: var(--type-md);
+  letter-spacing: var(--tracking-snug);
+}
+
+.copy small {
+  color: var(--muted-on-paper);
+  font: var(--type-label) var(--mono);
+}
+
+@media (max-width: 760px) {
+  .pair {
+    grid-template-columns: 34px 1fr 18px;
+  }
+}

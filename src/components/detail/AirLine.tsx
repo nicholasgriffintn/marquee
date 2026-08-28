@@ -1,6 +1,7 @@
 import type { MediaTitle } from "../../domain/catalog";
 import type { NextEpisode } from "../../hooks/useAvailability";
 import { formatDate, formatDateTime } from "../../lib/dates";
+import { DetailLine } from "./DetailNote";
 
 function upcomingAirDate(item: MediaTitle) {
   return item.nextAirDate && item.nextAirDate >= new Date().toISOString().slice(0, 10)
@@ -17,10 +18,9 @@ export function AirLine({
 }) {
   if (nextEpisode) {
     return (
-      <p className="detail-next">
-        <span>Next episode</span>
+      <DetailLine label="Next episode" credit="Schedule from TVmaze">
         {nextEpisode.season && nextEpisode.episode
-          ? ` S${nextEpisode.season}E${nextEpisode.episode}`
+          ? `S${nextEpisode.season}E${nextEpisode.episode}`
           : ""}
         {nextEpisode.episodeName ? ` · ${nextEpisode.episodeName}` : ""} ·{" "}
         {formatDateTime(nextEpisode.airsAt, {
@@ -31,8 +31,7 @@ export function AirLine({
           minute: "2-digit",
         })}
         {nextEpisode.network ? ` · ${nextEpisode.network}` : ""}
-        <small className="detail-credit">Schedule from TVmaze</small>
-      </p>
+      </DetailLine>
     );
   }
 
@@ -40,11 +39,14 @@ export function AirLine({
 
   if (upcoming) {
     return (
-      <p className="detail-next">
-        <span>Next episode</span>{" "}
-        {formatDate(upcoming, { weekday: "long", day: "numeric", month: "long" })}, date only
-        <small className="detail-credit">Schedule from TVmaze</small>
-      </p>
+      <DetailLine label="Next episode" credit="Schedule from TVmaze">
+        {formatDate(upcoming, {
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+        })}
+        , date only
+      </DetailLine>
     );
   }
 
@@ -53,20 +55,21 @@ export function AirLine({
 
   if (item.mediaType !== "tv" || !item.lastAirDate) {
     return slot ? (
-      <p className="detail-next">
-        <span>{slotLabel}</span> {slot}
-        <small className="detail-credit">Slot from MyAnimeList</small>
-      </p>
+      <DetailLine label={slotLabel} credit="Slot from MyAnimeList">
+        {slot}
+      </DetailLine>
     ) : null;
   }
 
   return (
-    <p className="detail-next">
-      <span>Last shown</span>{" "}
-      {formatDate(item.lastAirDate, { day: "numeric", month: "long", year: "numeric" })}
+    <DetailLine label="Last shown" credit={slot ? "Slot from MyAnimeList" : undefined}>
+      {formatDate(item.lastAirDate, {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })}
       {item.status ? ` · ${item.status}` : ""}
       {slot ? ` · ${slot}` : ""}
-      {slot ? <small className="detail-credit">Slot from MyAnimeList</small> : null}
-    </p>
+    </DetailLine>
   );
 }

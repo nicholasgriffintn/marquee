@@ -1,0 +1,24 @@
+.line {
+  color: var(--acid);
+  font: var(--type-label-sm) var(--mono);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.line em {
+  color: var(--muted);
+  font-style: normal;
+  margin-left: 7px;
+}
+
+@media (max-width: 760px) {
+  .line {
+    font-size: var(--type-label-xs);
+    line-height: 1.45;
+  }
+
+  .line em {
+    display: block;
+    margin-left: 0;
+  }
+}

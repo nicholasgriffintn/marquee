@@ -1,0 +1,19 @@
+.mark {
+  height: 58px;
+  margin: 0 0 var(--space-4);
+  width: 80px;
+}
+
+.panel {
+  margin: var(--space-4) 0;
+}
+
+.compact {
+  font-size: var(--type-xs);
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+}
+
+.lead {
+  font-weight: var(--weight-bold);
+}

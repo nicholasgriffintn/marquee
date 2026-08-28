@@ -1,0 +1,11 @@
+.card img,
+.card picture > img {
+  filter: grayscale(1) contrast(1.08) brightness(0.82);
+}
+
+.free {
+  color: var(--acid);
+  font: var(--weight-heavy) var(--type-label-sm) var(--mono);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}

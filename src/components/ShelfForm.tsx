@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 
 import { runConfirmedRemoval } from "../domain/profile-entry";
+import { classNames } from "../lib/class-names";
 import { isEntryStatus, type EntryStatus, type ViewingEntry } from "../types";
-import { StarIcon } from "./ui";
+import { Button, Eyebrow, StarIcon, Text, TextArea } from "../ui";
+
+import styles from "./ShelfForm.module.css";
 
 const STATUSES: { value: EntryStatus; label: string }[] = [
   { value: "watchlist", label: "On my watchlist" },
@@ -53,15 +56,17 @@ export function ShelfForm({
   }
 
   return (
-    <div className="shelf-form">
-      <span className="shelf-form-label">On your shelf</span>
+    <div className={styles.form}>
+      <Eyebrow size="sm" weight="heavy" tracking="wide" tone="inkMuted">
+        On your shelf
+      </Eyebrow>
       {isSeries && (
-        <p className="shelf-form-scope">
+        <Text size="xs" tone="inkMuted" italic className={styles.scope}>
           The whole show. Individual episodes and runs keep their own marks above.
-        </p>
+        </Text>
       )}
 
-      <label className="status-input">
+      <label className={styles.status}>
         Watch status
         <select
           value={entry.status}
@@ -79,13 +84,13 @@ export function ShelfForm({
         </select>
       </label>
 
-      <div className="rating-input" aria-label={`Rate ${title}`}>
-        <span>Your rating</span>
+      <div className={styles.rating} aria-label={`Rate ${title}`}>
+        <span className={styles.ratingLabel}>Your rating</span>
         {[1, 2, 3, 4, 5].map((rating) => (
           <button
             type="button"
             key={rating}
-            className={(entry.rating ?? 0) >= rating ? "active" : ""}
+            className={classNames(styles.star, (entry.rating ?? 0) >= rating && styles.starOn)}
             aria-pressed={entry.rating === rating}
             onClick={() =>
               onSave({
@@ -101,7 +106,8 @@ export function ShelfForm({
         ))}
       </div>
 
-      <textarea
+      <TextArea
+        surface="paper"
         maxLength={2_000}
         value={entry.thoughts}
         onChange={(event) => onUpdateDraft(entry.titleId, { thoughts: event.target.value })}
@@ -109,24 +115,27 @@ export function ShelfForm({
         aria-label={`Notes about ${title}`}
       />
 
-      <div className="shelf-form-actions">
-        <button
-          type="button"
+      <div className={styles.actions}>
+        <Button
+          variant="primary"
+          size="lg"
+          surface="paper"
           disabled={pending !== null}
           onClick={() => guard("save", () => onSave(entry))}
         >
           {pending === "save" ? "Saving…" : "Save note"}
-        </button>
-        <button
-          type="button"
-          className="danger"
+        </Button>
+        <Button
+          variant="danger"
+          size="lg"
+          surface="paper"
           disabled={pending !== null}
           onClick={() =>
             runConfirmedRemoval(confirmRemove, () => guard("remove", () => onRemove(entry.titleId)))
           }
         >
           {pending === "remove" ? "Removing…" : "Remove from shelf"}
-        </button>
+        </Button>
       </div>
     </div>
   );

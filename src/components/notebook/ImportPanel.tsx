@@ -1,7 +1,10 @@
 import { useState } from "react";
 
+import { classNames } from "../../lib/class-names";
 import { dedupeRows, parseLetterboxdCsv } from "../../lib/letterboxd";
 import { jsonMutation, mutateJson } from "../../lib/query-client";
+
+import styles from "./ImportPanel.module.css";
 
 const BATCH = 100;
 
@@ -64,18 +67,19 @@ export function ImportPanel({ onImported }: { onImported: () => void }) {
 
   return (
     <>
-      <label className={`notebook-import${isImporting ? " busy" : ""}`}>
+      <label className={classNames(styles.drop, isImporting && styles.busy)}>
         <input
+          className={styles.input}
           type="file"
           accept=".csv,text/csv"
           multiple
           disabled={isImporting}
           onChange={(event) => void importCsv(event.target.files)}
         />
-        <span>{isImporting ? "Reading…" : "Hand it over"}</span>
+        <span className={styles.label}>{isImporting ? "Reading…" : "Hand it over"}</span>
       </label>
       {status && (
-        <p className="notebook-import-status" aria-live="polite">
+        <p className={styles.status} aria-live="polite">
           {status}
         </p>
       )}

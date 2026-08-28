@@ -2,8 +2,19 @@ import { useEffect, useMemo, useState } from "react";
 
 import { ContentRail } from "../components/ContentRail";
 import { ErrorBoundary } from "../components/ErrorBoundary";
-import { TitleArt } from "../components/TitleArt";
-import { ArrowIcon, ExternalLinkIcon, ProviderBadge } from "../components/ui";
+import {
+  Hero,
+  HeroAction,
+  HeroActions,
+  HeroArt,
+  HeroCopy,
+  HeroGradient,
+  HeroLede,
+  HeroMeta,
+  HeroTitle,
+} from "../components/hero/Hero";
+import { ProviderBadge } from "../components/ProviderBadge";
+import { Rail, RailTrack } from "../components/rail/Rail";
 import { UsherBanner } from "../components/usher/UsherBanner";
 import { UsherCard } from "../components/usher/UsherCard";
 import { UsherConsole } from "../components/usher/UsherConsole";
@@ -16,10 +27,16 @@ import type { TonightOrder, UsherMoment } from "../domain/usher";
 import type { CuratorState } from "../hooks/useCurator";
 import type { ScheduledEpisode } from "../hooks/useTonight";
 import type { UsherOrderState, UsherPickState } from "../hooks/useUsher";
+import { classNames } from "../lib/class-names";
 import { parseDate } from "../lib/dates";
-import { heroTitleClass, mediaMeta, scoreLabel } from "../lib/media";
+import { mediaMeta, scoreLabel } from "../lib/media";
+import { ArrowIcon, Callout, ExternalLinkIcon, Heading, Skeleton, StatusNote, Text } from "../ui";
+
+import styles from "./TonightPage.module.css";
 
 const IDLE_NUDGE_MS = 40_000;
+const RAIL_SKELETONS = [0, 1];
+const CARD_SKELETONS = [0, 1, 2, 3, 4];
 
 function formatAirTime(value: string) {
   const airsAt = parseDate(value);
@@ -29,7 +46,10 @@ function formatAirTime(value: string) {
   }
 
   const isToday = airsAt.toDateString() === new Date().toDateString();
-  const time = airsAt.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  const time = airsAt.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 
   return isToday ? time : `${airsAt.toLocaleDateString(undefined, { weekday: "short" })} ${time}`;
 }
@@ -160,7 +180,7 @@ export function TonightPage({
 
   return (
     <>
-      <div className="hero-shell">
+      <div className={styles.heroShell}>
         <ErrorBoundary label="The front of house">
           {onboardingMoment ? (
             <UsherOnboarding
@@ -195,64 +215,47 @@ export function TonightPage({
               onReject={onRejectPick}
             />
           ) : (
-            <section
-              className={`hero-section${readyFeatured?.backdropUrl ? "" : " hero-empty"}${
-                readyFeatured ? "" : " hero-loading"
-              }`}
-            >
-              {readyFeatured && (
-                <div className="hero-art" aria-hidden="true">
-                  <TitleArt
-                    url={readyFeatured.backdropUrl}
-                    seed={readyFeatured.id}
-                    label={readyFeatured.title}
-                    width={1280}
-                    kind="backdrop"
-                    wide
-                    eager
-                  />
-                </div>
-              )}
-              <div className="hero-gradient" />
-              <div className="hero-copy">
+            <Hero empty={!readyFeatured?.backdropUrl}>
+              {readyFeatured && <HeroArt item={readyFeatured} />}
+              <HeroGradient />
+              <HeroCopy>
                 {readyFeatured ? (
                   <>
-                    <h1 className={heroTitleClass(readyFeatured.title)}>{readyFeatured.title}</h1>
-                    <p className="hero-meta">
+                    <HeroTitle title={readyFeatured.title} />
+                    <HeroMeta>
                       {mediaMeta(readyFeatured)} · {scoreLabel(readyFeatured)}
-                    </p>
-                    <p className="hero-lede">
-                      {readyFeatured.overview || "No synopsis available."}
-                    </p>
-                    <div className="hero-actions">
-                      <button
-                        type="button"
-                        className="hero-play"
+                    </HeroMeta>
+                    <HeroLede>{readyFeatured.overview || "No synopsis available."}</HeroLede>
+                    <HeroActions>
+                      <HeroAction
+                        variant="primary"
+                        icon={<ExternalLinkIcon />}
                         onClick={() => onOpen(readyFeatured)}
                       >
-                        <span className="play-icon">
-                          <ExternalLinkIcon />
-                        </span>{" "}
                         See where to watch
-                      </button>
-                    </div>
+                      </HeroAction>
+                    </HeroActions>
                   </>
                 ) : !isHeroReady ? (
-                  <div className="hero-skeleton" aria-hidden="true">
-                    <span className="skeleton skeleton-title" />
-                    <span className="skeleton skeleton-meta" />
-                    <span className="skeleton skeleton-line" />
-                    <span className="skeleton skeleton-line short" />
-                    <span className="skeleton skeleton-button" />
+                  <div className={styles.heroSkeleton} aria-hidden="true">
+                    <Skeleton shape="title" />
+                    <Skeleton shape="meta" />
+                    <Skeleton />
+                    <Skeleton short />
+                    <Skeleton shape="button" />
                   </div>
                 ) : (
-                  <div className="honest-empty" aria-live="polite">
-                    <h1>Nothing matched.</h1>
-                    <p>{error || "Try another search or change your services."}</p>
+                  <div aria-live="polite">
+                    <Heading level={1} size="display">
+                      Nothing matched.
+                    </Heading>
+                    <Text tone="muted" className={styles.heroEmpty}>
+                      {error || "Try another search or change your services."}
+                    </Text>
                   </div>
                 )}
-              </div>
-            </section>
+              </HeroCopy>
+            </Hero>
           )}
           {!onboardingMoment && !isUsherMode && (
             <UsherConsole
@@ -281,25 +284,31 @@ export function TonightPage({
 
       {!isSessionLoading && (
         <ErrorBoundary label="The service filter">
-          <section className="provider-strip">
-            <div className="provider-strip-heading">
-              <div>
-                <strong>
-                  {selectedProviderIds.length
-                    ? `Showing ${selectedProviderIds.length} service${
-                        selectedProviderIds.length === 1 ? "" : "s"
-                      }`
-                    : "Showing everything"}
-                </strong>
-              </div>
-              <button type="button" onClick={onShowSources}>
+          <section className={styles.providers}>
+            <div className={styles.providersHead}>
+              <strong>
+                {selectedProviderIds.length
+                  ? `Showing ${selectedProviderIds.length} service${
+                      selectedProviderIds.length === 1 ? "" : "s"
+                    }`
+                  : "Showing everything"}
+              </strong>
+              <button type="button" className={styles.providersManage} onClick={onShowSources}>
                 Manage services <ArrowIcon />
               </button>
             </div>
-            <div className={`provider-picker${selectedProviderIds.length ? " filtering" : ""}`}>
+            <div
+              className={classNames(
+                styles.picker,
+                selectedProviderIds.length > 0 && styles.filtering,
+              )}
+            >
               <button
                 type="button"
-                className={`provider-filter-all${selectedProviderIds.length ? "" : " active"}`}
+                className={classNames(
+                  styles.all,
+                  selectedProviderIds.length === 0 && styles.allActive,
+                )}
                 aria-pressed={selectedProviderIds.length === 0}
                 onClick={() => onSelectProviders([])}
               >
@@ -312,7 +321,7 @@ export function TonightPage({
                   <button
                     type="button"
                     key={provider.id}
-                    className={isSelected ? "selected" : ""}
+                    className={classNames(styles.provider, isSelected && styles.providerOn)}
                     onClick={() => toggleProvider(provider.id)}
                     aria-pressed={isSelected}
                     aria-label={
@@ -322,7 +331,7 @@ export function TonightPage({
                     }
                     title={provider.name}
                   >
-                    <ProviderBadge provider={provider} />
+                    <ProviderBadge provider={provider} className={styles.providerBadge} />
                     <small aria-hidden="true">
                       {selectedProviderIds.length > 0 && isSelected ? "ON" : ""}
                     </small>
@@ -331,29 +340,25 @@ export function TonightPage({
               })}
             </div>
             {!filterableProviders.length && (
-              <p className="provider-error" aria-live="polite">
+              <StatusNote tone="warning" live="polite" className={styles.providerError}>
                 {providerError ||
                   (providers.length
                     ? "No live provider feeds are configured."
                     : "Loading providers…")}
-              </p>
+              </StatusNote>
             )}
           </section>
         </ErrorBoundary>
       )}
 
-      {error && readyFeatured && (
-        <p className="catalogue-error" role="alert">
-          {error}
-        </p>
-      )}
+      {error && readyFeatured && <Callout className={styles.error}>{error}</Callout>}
       {isBuildingRails && (
-        <p className="rails-building" aria-live="polite">
+        <p className={styles.building} aria-live="polite">
           <i>AI</i> Building your shelves…
         </p>
       )}
       {trending.length > 1 || sections.length > 0 ? (
-        <div className="rails-section">
+        <div className={styles.rails}>
           {trending.length > 1 && (
             <ErrorBoundary label="The trending shelf">
               <ContentRail section={trendingSection} ranked onOpen={onOpen} />
@@ -361,17 +366,17 @@ export function TonightPage({
           )}
           {episodes.length > 0 && (
             <ErrorBoundary label="Tonight's schedule">
-              <section className="schedule-strip">
-                <div className="schedule-heading">
+              <section className={styles.schedule}>
+                <div className={styles.scheduleHead}>
                   <strong>On tonight</strong>
                   <small>Schedule from TVmaze</small>
                 </div>
-                <div className="schedule-list">
+                <div className={styles.scheduleList}>
                   {episodes.map((episode) => (
                     <button
                       type="button"
                       key={`${episode.showName}-${episode.airsAt}-${episode.episode ?? 0}`}
-                      className="schedule-item"
+                      className={styles.scheduleItem}
                       disabled={!episode.item}
                       onClick={() => episode.item && onOpen(episode.item)}
                     >
@@ -412,24 +417,22 @@ export function TonightPage({
         </div>
       ) : (
         isLoading && (
-          <div className="rails-section" aria-hidden="true">
-            {[0, 1].map((rail) => (
-              <div className="content-rail" key={rail}>
-                <div className="rail-heading">
-                  <div>
-                    <span className="skeleton skeleton-eyebrow" />
-                    <span className="skeleton skeleton-heading" />
-                  </div>
+          <div className={styles.rails} aria-hidden="true">
+            {RAIL_SKELETONS.map((rail) => (
+              <Rail key={rail}>
+                <div className={styles.railSkeletonHead}>
+                  <Skeleton shape="eyebrow" />
+                  <Skeleton shape="heading" />
                 </div>
-                <div className="rail-track">
-                  {[0, 1, 2, 3, 4].map((card) => (
-                    <div className="rail-card" key={card}>
-                      <span className="skeleton skeleton-art" />
-                      <span className="skeleton skeleton-meta" />
+                <RailTrack>
+                  {CARD_SKELETONS.map((card) => (
+                    <div key={card}>
+                      <Skeleton shape="art" />
+                      <Skeleton shape="meta" className={styles.railSkeletonMeta} />
                     </div>
                   ))}
-                </div>
-              </div>
+                </RailTrack>
+              </Rail>
             ))}
           </div>
         )

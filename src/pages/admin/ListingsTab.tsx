@@ -1,6 +1,9 @@
 import { ErrorBoundary } from "../../components/ErrorBoundary";
 import type { AdminListings, AdminOverview } from "../../hooks/useAdmin";
 import { useResource } from "../../hooks/useResource";
+import { Callout, Panel, TabPanel } from "../../ui";
+
+import styles from "./admin.module.css";
 
 function cinemaTotals(rows: { cinemas: number; located: number; screenings: number }[]) {
   const cinemas = rows.reduce((total, row) => total + row.cinemas, 0);
@@ -24,31 +27,25 @@ export function ListingsTab({
 
   return (
     <ErrorBoundary label="The listings">
-      <div role="tabpanel" id="admin-panel-listings" aria-labelledby="admin-tab-listings">
-        {error && (
-          <p className="catalogue-error" role="alert">
-            {error}
-          </p>
-        )}
+      <TabPanel id="listings" idPrefix="admin">
+        {error && <Callout>{error}</Callout>}
         {listings && listings.sections.length > 0 && (
-          <section className="panel-block" aria-labelledby="admin-sections-title">
-            <h2 id="admin-sections-title">Homepage rails</h2>
-            <ul className="admin-list">
+          <Panel heading="Homepage rails">
+            <ul className={styles.list}>
               {listings.sections.map((section) => (
                 <li key={section.id}>
                   <strong>{section.title}</strong>
                   <small>{section.titles} titles</small>
-                  <span className="spacer" />
+                  <span className={styles.spacer} />
                   <code>{section.id}</code>
                 </li>
               ))}
             </ul>
-          </section>
+          </Panel>
         )}
         {listings && (
-          <section className="panel-block" aria-labelledby="admin-cinemas-title">
-            <h2 id="admin-cinemas-title">Cinema listings</h2>
-            <p className="admin-note">
+          <Panel heading="Cinema listings">
+            <p className={styles.note}>
               {cinemaTotals(listings.cinemas)} A cinema without coordinates never shows up in a
               nearby search, and listings are only pulled for the{" "}
               {(overview?.catalogue.interestCells ?? 0).toLocaleString()} places a member has looked
@@ -56,7 +53,7 @@ export function ListingsTab({
               queue.
             </p>
             {listings.cinemas.length > 0 ? (
-              <ul className="admin-list">
+              <ul className={styles.list}>
                 {listings.cinemas.map((row) => (
                   <li key={row.source}>
                     <strong>{row.source}</strong>
@@ -69,19 +66,19 @@ export function ListingsTab({
                     <small>
                       {row.matched.toLocaleString()} / {row.films.toLocaleString()} films matched
                     </small>
-                    <span className="spacer" />
+                    <span className={styles.spacer} />
                     <small>{row.screenings.toLocaleString()} ahead</small>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="admin-note">
+              <p className={styles.note}>
                 No directory yet. Run Refresh cinema directory to pull the chains.
               </p>
             )}
-          </section>
+          </Panel>
         )}
-      </div>
+      </TabPanel>
     </ErrorBoundary>
   );
 }

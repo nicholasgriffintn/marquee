@@ -1,0 +1,339 @@
+.header {
+  align-items: center;
+  backdrop-filter: blur(18px);
+  background: rgba(17, 19, 15, 0.92);
+  border-bottom: 1px solid var(--line);
+  column-gap: clamp(16px, 3vw, 44px);
+  display: flex;
+  height: 78px;
+  padding: 0 var(--gutter);
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
+
+.nav {
+  align-items: stretch;
+  align-self: stretch;
+  display: flex;
+  flex: 1 1 auto;
+  gap: clamp(12px, 1.6vw, 26px);
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.nav::-webkit-scrollbar {
+  display: none;
+}
+
+.navLink {
+  align-items: center;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  display: inline-flex;
+  font: var(--weight-bold) var(--type-label-lg) var(--mono);
+  justify-content: center;
+  letter-spacing: 0.07em;
+  padding: 2px 0 0;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.navLinkActive {
+  border-color: var(--acid);
+  color: var(--white);
+}
+
+.navCount {
+  background: var(--blue);
+  color: var(--white);
+  font: var(--type-label-sm) var(--mono);
+  margin-left: var(--space-1);
+  padding: 2px 5px;
+}
+
+.tools {
+  align-items: center;
+  display: flex;
+  flex: 1 1 auto;
+  gap: var(--space-2);
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.search {
+  flex: 0 1 200px;
+  min-width: 120px;
+  position: relative;
+}
+
+.sessionLoading {
+  font-size: var(--type-label-sm);
+  letter-spacing: 0.06em;
+}
+
+.signIn {
+  align-items: center;
+  background: #171a16;
+  border: 1px solid #4a4f47;
+  display: grid;
+  flex: 0 0 auto;
+  grid-template-columns: 39px auto;
+  height: 40px;
+  min-width: 142px;
+  overflow: hidden;
+  transition:
+    border-color var(--duration) var(--ease),
+    transform var(--duration) var(--ease);
+}
+
+.signIn:hover {
+  border-color: var(--acid);
+  transform: translateY(-1px);
+}
+
+.signInIcon {
+  align-items: center;
+  align-self: stretch;
+  background: var(--acid);
+  color: var(--ink);
+  display: flex;
+  justify-content: center;
+}
+
+.ticket {
+  height: 22px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.6;
+  width: 22px;
+}
+
+.signInCopy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 13px 1px;
+  white-space: nowrap;
+}
+
+.signInCopy strong {
+  font: var(--weight-heavy) var(--type-label-sm) / 1.1 var(--mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.signInCopy small {
+  color: var(--muted);
+  font: 8px/1.3 var(--mono);
+}
+
+.signInCompact {
+  display: none;
+}
+
+.account {
+  align-items: center;
+  border: 1px solid var(--line);
+  display: flex;
+  flex: 0 0 auto;
+  gap: 9px;
+  height: 40px;
+  padding-right: var(--space-2);
+}
+
+.accountName {
+  font-size: var(--type-label-lg);
+  font-weight: var(--weight-bold);
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accountSignOut {
+  background: none;
+  border: 0;
+  border-left: 1px solid var(--line);
+  color: var(--muted);
+  font: var(--type-label-sm) var(--mono);
+  padding: 5px 0 5px 9px;
+  text-transform: uppercase;
+}
+
+.accountSignOut:hover {
+  color: var(--white);
+}
+
+.accountMenu {
+  display: none;
+  position: relative;
+}
+
+.accountMenu summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.accountMenu summary::-webkit-details-marker {
+  display: none;
+}
+
+.accountPopover {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-pop);
+  display: grid;
+  min-width: 170px;
+  padding: var(--space-3);
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 45;
+}
+
+.accountPopover strong {
+  border-bottom: 1px solid var(--line);
+  font-size: var(--type-xs);
+  overflow: hidden;
+  padding: 2px 3px 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accountPopover button {
+  background: none;
+  border: 0;
+  color: var(--muted);
+  font: var(--type-label-sm) var(--mono);
+  padding: 11px 3px 1px;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.accountPopover button:hover {
+  color: var(--white);
+}
+
+@media (max-width: 1100px) {
+  .search {
+    flex-basis: 160px;
+    min-width: 104px;
+  }
+
+  .accountName {
+    display: none;
+  }
+
+  .accountSignOut {
+    border-left: 0;
+    padding-left: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .header {
+    column-gap: var(--space-3);
+    flex-wrap: wrap;
+    height: auto;
+    padding-inline: 18px;
+  }
+
+  .brand,
+  .tools {
+    height: 60px;
+  }
+
+  .brand {
+    order: 0;
+  }
+
+  .search {
+    flex: 1 1 120px;
+  }
+
+  .tools {
+    flex: 1 1 0;
+    order: 1;
+  }
+
+  .account {
+    border: 0;
+    height: 40px;
+    padding: 0;
+  }
+
+  .accountAvatar,
+  .accountName,
+  .accountSignOut {
+    display: none;
+  }
+
+  .accountMenu {
+    display: block;
+  }
+
+  .signIn {
+    border-radius: 999px;
+    display: flex;
+    height: 40px;
+    min-width: 102px;
+    padding-inline: 15px;
+  }
+
+  .signInIcon,
+  .signInCopy {
+    display: none;
+  }
+
+  .signInCompact {
+    display: block;
+    font: var(--weight-bold) var(--type-label-sm) var(--mono);
+    white-space: nowrap;
+  }
+
+  .nav {
+    border-top: 1px solid var(--line);
+    flex: 0 0 calc(100% + 36px);
+    gap: 0;
+    height: 48px;
+    margin-inline: -18px;
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      black 20px,
+      black calc(100% - 20px),
+      transparent
+    );
+    order: 2;
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent,
+      black 20px,
+      black calc(100% - 20px),
+      transparent
+    );
+  }
+
+  .navLink {
+    flex: 0 0 auto;
+    padding: 0 var(--space-3);
+  }
+}
+
+@media (max-width: 430px) {
+  .header {
+    column-gap: var(--space-2);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .signIn {
+    transition: none;
+  }
+
+  .signIn:hover {
+    transform: none;
+  }
+}

@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { ErrorBoundary } from "../components/ErrorBoundary";
-import { PageTitle } from "../components/PageTitle";
-import { ArrowIcon, Poster, SearchIcon, StarIcon } from "../components/ui";
+import { ClearFilters, Facet, FilterBar } from "../components/filters/FilterBar";
+import { Poster } from "../components/Poster";
+import { SearchField } from "../components/SearchField";
 import { UsherCard } from "../components/usher/UsherCard";
 import { UsherMark } from "../components/usher/UsherMark";
 import type { MediaTitle } from "../domain/catalog";
@@ -13,6 +14,19 @@ import type { UsherMoment } from "../domain/usher";
 import { useShelf } from "../hooks/useShelf";
 import { formatDate } from "../lib/dates";
 import type { EntryStatus, ViewingEntry } from "../types";
+import {
+  ArrowIcon,
+  Button,
+  Callout,
+  Chip,
+  EmptyState,
+  Heading,
+  Page,
+  PageHeader,
+  StarIcon,
+} from "../ui";
+
+import styles from "./LibraryPage.module.css";
 
 const SORTS: { value: ShelfSort; label: string }[] = [
   { value: "added", label: "Recently added" },
@@ -180,14 +194,15 @@ export function LibraryPage({
   const hasFilters = Boolean(query || statusFilter || genreFilter);
 
   return (
-    <section className="page-section library-page">
-      <PageTitle heading="My shelf">
-        <p>
-          {savedCount
+    <Page>
+      <PageHeader
+        heading="My shelf"
+        description={
+          savedCount
             ? `${shelf.matched.toLocaleString()} of ${savedCount.toLocaleString()} title${savedCount === 1 ? "" : "s"}. Click a poster to rate it or add notes.`
-            : "Ratings and notes stay in your account and shape your recommendations."}
-        </p>
-      </PageTitle>
+            : "Ratings and notes stay in your account and shape your recommendations."
+        }
+      />
 
       {usherMoment && (
         <UsherCard moment={usherMoment} onAction={onUsherAction} onDismiss={onUsherDismiss} />
@@ -195,28 +210,29 @@ export function LibraryPage({
 
       {lost.length > 0 && (
         <ErrorBoundary label="Lost property">
-          <section className="lost-property">
-            <div className="lost-head">
-              <UsherMark face="unimpressed" crop="head" />
+          <section className={styles.lost}>
+            <div className={styles.lostHead}>
+              <UsherMark face="unimpressed" crop="head" className={styles.lostMark} />
               <div>
-                <span>Lost property</span>
-                <p>
+                <span className={styles.lostLabel}>Lost property</span>
+                <p className={styles.lostLine}>
                   {lost.length === 1 ? "This has" : `These ${lost.length} have`} been in the box
                   since {sinceLabel(lost[lost.length - 1].entry)}. Claim them or I am throwing them
                   out.
                 </p>
               </div>
             </div>
-            <ul className="lost-items">
+            <ul className={styles.lostItems}>
               {lost.map(({ item, entry }) => (
                 <li key={item.id}>
-                  <button type="button" className="lost-poster" onClick={() => onOpen(item)}>
+                  <button type="button" className={styles.lostPoster} onClick={() => onOpen(item)}>
                     <Poster item={item} />
                   </button>
                   <strong>{item.title}</strong>
-                  <div className="lost-buttons">
+                  <div className={styles.lostButtons}>
                     <button
                       type="button"
+                      className={styles.lostClaim}
                       disabled={pendingLost.has(item.id)}
                       onClick={() => void resolveLostItem(item.id, false, () => onClaim(entry))}
                     >
@@ -224,6 +240,7 @@ export function LibraryPage({
                     </button>
                     <button
                       type="button"
+                      className={styles.lostBin}
                       disabled={pendingLost.has(item.id)}
                       onClick={() => void resolveLostItem(item.id, true, () => onDiscard(item.id))}
                     >
@@ -237,118 +254,85 @@ export function LibraryPage({
         </ErrorBoundary>
       )}
 
-      {shelf.error && (
-        <p className="catalogue-error" role="alert">
-          {shelf.error}
-        </p>
-      )}
+      {shelf.error && <Callout>{shelf.error}</Callout>}
 
       {savedCount > 0 && (
-        <div className="browse-filters">
-          <label className="browse-search">
-            <span aria-hidden="true">
-              <SearchIcon />
-            </span>
-            <input
-              value={params.get("q") ?? ""}
-              onChange={(event) => update({ q: event.target.value })}
-              placeholder="Search your shelf"
-              aria-label="Search your shelf"
-            />
-          </label>
+        <FilterBar>
+          <SearchField
+            value={params.get("q") ?? ""}
+            onChange={(value) => update({ q: value })}
+            placeholder="Search your shelf"
+            label="Search your shelf"
+          />
 
-          <div className="browse-facet">
-            <span>Group by</span>
-            <div className="browse-chips">
-              {SORTS.map((option) => (
-                <button
-                  type="button"
-                  key={option.value}
-                  className={sort === option.value ? "selected" : ""}
-                  aria-pressed={sort === option.value}
-                  onClick={() =>
-                    update({
-                      sort: option.value === "added" ? "" : option.value,
-                    })
-                  }
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </div>
+          <Facet label="Group by">
+            {SORTS.map((option) => (
+              <Chip
+                key={option.value}
+                selected={sort === option.value}
+                pressed={sort === option.value}
+                onClick={() => update({ sort: option.value === "added" ? "" : option.value })}
+              >
+                {option.label}
+              </Chip>
+            ))}
+          </Facet>
 
-          <div className="browse-facet">
-            <span>Status</span>
-            <div className="browse-chips">
-              {STATUS_ORDER.map((status) => (
-                <button
-                  type="button"
-                  key={status}
-                  className={statusFilter === status ? "selected" : ""}
-                  aria-pressed={statusFilter === status}
-                  onClick={() => update({ status: statusFilter === status ? "" : status })}
-                >
-                  {STATUS_LABELS[status]}
-                </button>
-              ))}
-            </div>
-          </div>
+          <Facet label="Status">
+            {STATUS_ORDER.map((status) => (
+              <Chip
+                key={status}
+                selected={statusFilter === status}
+                pressed={statusFilter === status}
+                onClick={() => update({ status: statusFilter === status ? "" : status })}
+              >
+                {STATUS_LABELS[status]}
+              </Chip>
+            ))}
+          </Facet>
 
           {genres.length > 1 && (
-            <div className="browse-facet">
-              <span>Genre</span>
-              <div className="browse-chips">
-                {genres.map((genre) => (
-                  <button
-                    type="button"
-                    key={genre}
-                    className={genreFilter === genre ? "selected" : ""}
-                    aria-pressed={genreFilter === genre}
-                    onClick={() => update({ genre: genreFilter === genre ? "" : genre })}
-                  >
-                    {genre}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <Facet label="Genre">
+              {genres.map((genre) => (
+                <Chip
+                  key={genre}
+                  selected={genreFilter === genre}
+                  pressed={genreFilter === genre}
+                  onClick={() => update({ genre: genreFilter === genre ? "" : genre })}
+                >
+                  {genre}
+                </Chip>
+              ))}
+            </Facet>
           )}
 
-          {hasFilters && (
-            <button
-              type="button"
-              className="browse-clear"
-              onClick={() => update({ q: "", status: "", genre: "" })}
-            >
-              Clear filters
-            </button>
-          )}
-        </div>
+          {hasFilters && <ClearFilters onClick={() => update({ q: "", status: "", genre: "" })} />}
+        </FilterBar>
       )}
 
       {groupNames.map((name) => (
         <ErrorBoundary key={name || "all"} label="This shelf">
-          <div className="shelf-group">
+          <div className={styles.group}>
             {name && (
-              <h2>
+              <Heading level={2} size="subhead" className={styles.groupHeading}>
                 {name} <em>{grouped.get(name)?.length}</em>
-              </h2>
+              </Heading>
             )}
-            <div className="shelf-grid">
+            <div className={styles.grid}>
               {grouped.get(name)?.map(({ item, entry }) => (
                 <button
                   type="button"
-                  className="shelf-item"
+                  className={styles.item}
                   key={item.id}
                   onClick={() => onOpen(item)}
                   aria-label={`Open ${item.title}`}
                 >
-                  <Poster item={item} />
+                  <Poster item={item} className={styles.itemPoster} />
                   <strong>{item.title}</strong>
-                  <small className="shelf-item-meta">
+                  <small className={styles.itemMeta}>
                     {STATUS_LABELS[entry.status]}
                     {entry.rating ? (
-                      <span className="shelf-item-rating" aria-label={`${entry.rating} out of 5`}>
+                      <span className={styles.itemRating} aria-label={`${entry.rating} out of 5`}>
                         <span aria-hidden="true">·</span>
                         {Array.from({ length: entry.rating }, (_, index) => index + 1).map(
                           (star) => (
@@ -369,35 +353,40 @@ export function LibraryPage({
       ))}
 
       {shelf.hasMore && (
-        <div className="shelf-more">
-          <button
-            type="button"
-            onClick={() => void shelf.loadMore()}
+        <div className={styles.more}>
+          <Button
+            variant="secondary"
+            size="lg"
             disabled={shelf.isLoadingMore}
+            onClick={() => void shelf.loadMore()}
           >
             {shelf.isLoadingMore
               ? "Fetching…"
               : `Show more · ${(shelf.matched - visible.length).toLocaleString()} to go`}
-          </button>
+          </Button>
         </div>
       )}
 
       {savedCount > 0 && visible.length === 0 && !shelf.isLoading && (
-        <div className="search-empty">
-          <h2>Nothing on your shelf matches.</h2>
-          <p>Try clearing a filter or searching for something else.</p>
-        </div>
+        <EmptyState
+          heading="Nothing on your shelf matches."
+          description="Try clearing a filter or searching for something else."
+        />
       )}
 
       {!savedCount && (
-        <div className="empty-library">
-          <strong>Nothing on your shelf yet.</strong>
-          <p>Save something from Tonight to rate it and keep notes here.</p>
-          <button type="button" onClick={onShowTonight}>
-            Find something <ArrowIcon />
-          </button>
-        </div>
+        <EmptyState
+          className={styles.empty}
+          heading="Nothing on your shelf yet."
+          size="heading"
+          description="Save something from Tonight to rate it and keep notes here."
+          actions={
+            <Button variant="primary" size="lg" onClick={onShowTonight}>
+              Find something <ArrowIcon />
+            </Button>
+          }
+        />
       )}
-    </section>
+    </Page>
   );
 }

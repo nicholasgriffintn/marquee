@@ -1,11 +1,26 @@
 import { ErrorBoundary } from "../components/ErrorBoundary";
+import { ResultsGrid } from "../components/ResultsGrid";
 import { TitleArt } from "../components/TitleArt";
 import { TitleCard } from "../components/TitleCard";
+import { UsherFacts } from "../components/usher/UsherHeroShell";
 import { UsherMark } from "../components/usher/UsherMark";
 import type { MediaTitle } from "../domain/catalog";
 import { useDigest } from "../hooks/useDigest";
 import { formatDateTime, parseDate } from "../lib/dates";
 import { mediaMeta } from "../lib/media";
+import {
+  Button,
+  EmptyState,
+  Eyebrow,
+  Fact,
+  FactList,
+  Heading,
+  Page,
+  StatusNote,
+  Text,
+} from "../ui";
+
+import styles from "./DigestPage.module.css";
 
 const FIRST_ISSUE = Date.UTC(1974, 0, 1);
 
@@ -14,7 +29,10 @@ function issuedOn(value: string | undefined) {
 }
 
 function weekOf(value: string | undefined) {
-  return issuedOn(value).toLocaleDateString(undefined, { day: "numeric", month: "long" });
+  return issuedOn(value).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "long",
+  });
 }
 
 function issueNumber(value: string | undefined) {
@@ -24,7 +42,11 @@ function issueNumber(value: string | undefined) {
 }
 
 function formatWhen(value: string) {
-  return formatDateTime(value, { weekday: "short", hour: "2-digit", minute: "2-digit" });
+  return formatDateTime(value, {
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 export function DigestPage({
@@ -43,45 +65,47 @@ export function DigestPage({
   );
 
   return (
-    <section className="page-section programme-page">
-      <header className="programme">
-        <div className="programme-masthead">
-          <UsherMark face="idle" crop="head" />
+    <Page>
+      <header className={styles.programme}>
+        <div className={styles.masthead}>
+          <UsherMark face="idle" crop="head" className={styles.mastheadMark} />
           <div>
-            <span>The Marquee</span>
-            <p>Week of {weekOf(digest?.createdAt)}</p>
+            <span className={styles.mastheadName}>The Marquee</span>
+            <p className={styles.mastheadWeek}>Week of {weekOf(digest?.createdAt)}</p>
           </div>
-          <em>No. {issueNumber(digest?.createdAt)}</em>
+          <em className={styles.mastheadIssue}>No. {issueNumber(digest?.createdAt)}</em>
         </div>
-        <h1>This week&rsquo;s programme</h1>
-        <p className="programme-note">
+        <Heading level={1} size="title" className={styles.title}>
+          This week&rsquo;s programme
+        </Heading>
+        <Text family="serif" italic tone="muted" className={styles.note}>
           Printed Monday mornings from your own shelf, the schedule, and whatever the town has been
           reading about. Nobody asked me to keep doing this.
-        </p>
+        </Text>
       </header>
 
-      {isSettling && <p className="rails-building">Setting the programme…</p>}
+      {isSettling && <StatusNote busy>Setting the programme…</StatusNote>}
 
       {!isSettling && !isSignedIn && (
-        <div className="honest-empty">
-          <h2>Sign in first.</h2>
-          <p>The programme is set from your own shelf, so it needs to know whose it is.</p>
-        </div>
+        <EmptyState
+          heading="Sign in first."
+          description="The programme is set from your own shelf, so it needs to know whose it is."
+        />
       )}
 
       {!isSettling && isSignedIn && !digest && (
-        <div className="honest-empty">
-          <h2>Nothing to print yet.</h2>
-          <p>Save a few things to your shelf. The first programme goes out on Monday.</p>
-        </div>
+        <EmptyState
+          heading="Nothing to print yet."
+          description="Save a few things to your shelf. The first programme goes out on Monday."
+        />
       )}
 
       {digest?.lead?.item ? (
         <ErrorBoundary label="The pick of the week">
-          <article className="programme-lead">
+          <article className={styles.lead}>
             <button
               type="button"
-              className="programme-lead-art"
+              className={styles.leadArt}
               onClick={() => digest.lead?.item && onOpen(digest.lead.item)}
             >
               <TitleArt
@@ -93,55 +117,53 @@ export function DigestPage({
                 wide
               />
             </button>
-            <div className="programme-lead-copy">
-              <span>The pick of the week</span>
-              <h2>{digest.lead.item.title}</h2>
-              <p className="programme-lead-meta">{mediaMeta(digest.lead.item)}</p>
-              <blockquote>{digest.lead.line}</blockquote>
-              {digest.lead.facts.length > 0 && (
-                <ul className="usher-facts">
-                  {digest.lead.facts.map((fact) => (
-                    <li key={fact}>{fact}</li>
-                  ))}
-                </ul>
-              )}
-              <button
-                type="button"
-                className="programme-lead-open"
+            <div className={styles.leadCopy}>
+              <Eyebrow tone="accent" tracking="wide" className={styles.leadEyebrow}>
+                The pick of the week
+              </Eyebrow>
+              <Heading level={2} size="heading" className={styles.leadTitle}>
+                {digest.lead.item.title}
+              </Heading>
+              <Eyebrow as="p" weight="regular" className={styles.leadMeta}>
+                {mediaMeta(digest.lead.item)}
+              </Eyebrow>
+              <blockquote className={styles.leadQuote}>{digest.lead.line}</blockquote>
+              <UsherFacts facts={digest.lead.facts} className={styles.leadFacts} />
+              <Button
+                variant="primary"
+                size="lg"
                 onClick={() => digest.lead?.item && onOpen(digest.lead.item)}
               >
                 See where to watch
-              </button>
+              </Button>
             </div>
           </article>
         </ErrorBoundary>
       ) : null}
 
       {digest && digest.numbers.shelved > 0 ? (
-        <dl className="programme-numbers">
-          <div>
-            <dt>Added this week</dt>
-            <dd>{digest.numbers.added}</dd>
-          </div>
-          <div>
-            <dt>Finished</dt>
-            <dd>{digest.numbers.finished}</dd>
-          </div>
-          <div>
-            <dt>On your shelf</dt>
-            <dd>{digest.numbers.shelved}</dd>
-          </div>
-          <div>
-            <dt>In the building</dt>
-            <dd>{digest.numbers.catalogue.toLocaleString()}</dd>
-          </div>
-        </dl>
+        <FactList min="120px" className={styles.numbers}>
+          <Fact term="Added this week" size="lg">
+            {digest.numbers.added}
+          </Fact>
+          <Fact term="Finished" size="lg">
+            {digest.numbers.finished}
+          </Fact>
+          <Fact term="On your shelf" size="lg">
+            {digest.numbers.shelved}
+          </Fact>
+          <Fact term="In the building" size="lg">
+            {digest.numbers.catalogue.toLocaleString()}
+          </Fact>
+        </FactList>
       ) : null}
 
       {returning.length > 0 ? (
         <>
-          <h2 className="digest-heading">Back this week</h2>
-          <ul className="digest-episodes">
+          <Heading level={2} size="label" tone="accent" className={styles.heading}>
+            Back this week
+          </Heading>
+          <ul className={styles.episodes}>
             {returning.map((episode) => (
               <li key={`back-${episode.showName}-${episode.airsAt}`}>
                 <time dateTime={episode.airsAt}>{formatWhen(episode.airsAt)}</time>
@@ -155,19 +177,23 @@ export function DigestPage({
 
       {digest?.fresh.length ? (
         <ErrorBoundary label="This week's new titles">
-          <h2 className="digest-heading">New, and close to your taste</h2>
-          <div className="results-grid">
+          <Heading level={2} size="label" tone="accent" className={styles.heading}>
+            New, and close to your taste
+          </Heading>
+          <ResultsGrid>
             {digest.fresh.map((item) => (
               <TitleCard key={item.id} item={item} onOpen={onOpen} />
             ))}
-          </div>
+          </ResultsGrid>
         </ErrorBoundary>
       ) : null}
 
       {digest?.episodes.length ? (
         <>
-          <h2 className="digest-heading">On the schedule</h2>
-          <ul className="digest-episodes">
+          <Heading level={2} size="label" tone="accent" className={styles.heading}>
+            On the schedule
+          </Heading>
+          <ul className={styles.episodes}>
             {digest.episodes.map((episode) => (
               <li key={`${episode.showName}-${episode.airsAt}`}>
                 <time dateTime={episode.airsAt}>{formatWhen(episode.airsAt)}</time>
@@ -185,14 +211,16 @@ export function DigestPage({
 
       {digest?.trending.length ? (
         <ErrorBoundary label="What the town is reading about">
-          <h2 className="digest-heading">What the town is reading about</h2>
-          <div className="results-grid">
+          <Heading level={2} size="label" tone="accent" className={styles.heading}>
+            What the town is reading about
+          </Heading>
+          <ResultsGrid>
             {digest.trending.map((item) => (
               <TitleCard key={item.id} item={item} onOpen={onOpen} />
             ))}
-          </div>
+          </ResultsGrid>
         </ErrorBoundary>
       ) : null}
-    </section>
+    </Page>
   );
 }

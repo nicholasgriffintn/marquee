@@ -1,9 +1,14 @@
 import { useState } from "react";
 
+import { Avatar } from "../../components/Avatar";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
 import type { AdminUser } from "../../hooks/useAdmin";
+import { classNames } from "../../lib/class-names";
 import type { UserRole } from "../../types";
+import { Panel, TabPanel } from "../../ui";
 import { PEOPLE_SEARCH_FROM } from "./config";
+
+import styles from "./admin.module.css";
 
 export function PeopleTab({
   users,
@@ -21,13 +26,12 @@ export function PeopleTab({
 
   return (
     <ErrorBoundary label="The staff list">
-      <div role="tabpanel" id="admin-panel-people" aria-labelledby="admin-tab-people">
-        <section className="panel-block" aria-labelledby="admin-users-title">
-          <h2 id="admin-users-title">People</h2>
+      <TabPanel id="people" idPrefix="admin">
+        <Panel heading="People">
           {users.length >= PEOPLE_SEARCH_FROM && (
-            <div className="admin-filters">
+            <div className={styles.filters}>
               <input
-                className="admin-search"
+                className={styles.search}
                 value={personQuery}
                 onChange={(event) => setPersonQuery(event.target.value)}
                 placeholder="Find a name or login"
@@ -35,22 +39,26 @@ export function PeopleTab({
               />
             </div>
           )}
-          <ul className="admin-list">
+          <ul className={styles.list}>
             {people.map((person) => (
               <li key={person.id}>
-                {person.avatarUrl ? (
-                  <img className="admin-avatar" src={person.avatarUrl} alt="" />
-                ) : (
-                  <span className="avatar-fallback">{person.name.slice(0, 1)}</span>
-                )}
+                <Avatar url={person.avatarUrl} name={person.name} size="sm" shape="round" />
                 <strong>{person.name}</strong>
                 <small>
                   @{person.login} · {person.shelfEntries} saved
                 </small>
-                <span className="spacer" />
-                <span className={`role-badge role-badge-${person.role}`}>{person.role}</span>
+                <span className={styles.spacer} />
+                <span
+                  className={classNames(
+                    styles.roleBadge,
+                    person.role === "admin" && styles.roleBadgeAdmin,
+                  )}
+                >
+                  {person.role}
+                </span>
                 <button
                   type="button"
+                  className={styles.rowAction}
                   onClick={() =>
                     onChangeRole(person.id, person.role === "admin" ? "viewer" : "admin")
                   }
@@ -60,8 +68,8 @@ export function PeopleTab({
               </li>
             ))}
           </ul>
-        </section>
-      </div>
+        </Panel>
+      </TabPanel>
     </ErrorBoundary>
   );
 }

@@ -1,0 +1,108 @@
+.dropdown {
+  position: relative;
+  width: fit-content;
+}
+
+.trigger {
+  align-items: center;
+  background: var(--paper);
+  border: 1px solid var(--paper-line);
+  color: var(--ink);
+  display: inline-flex;
+  font: var(--weight-bold) var(--type-label-lg) var(--sans);
+  gap: var(--space-2);
+  justify-content: space-between;
+  min-height: var(--control-height-sm);
+  min-width: 160px;
+  padding: 0 var(--space-3);
+}
+
+.trigger:hover {
+  border-color: var(--ink);
+}
+
+.trigger > svg {
+  color: var(--muted-on-paper);
+  flex: 0 0 auto;
+  height: 13px;
+  transform: rotate(90deg);
+  transition: transform var(--duration) var(--ease);
+  width: 13px;
+}
+
+.trigger[aria-expanded="true"] > svg {
+  transform: rotate(-90deg);
+}
+
+.compact {
+  font: var(--weight-bold) var(--type-label-lg) var(--mono);
+  letter-spacing: 0.06em;
+  min-height: 28px;
+  text-transform: uppercase;
+}
+
+.panel {
+  background: var(--paper);
+  border: 1px solid var(--paper-line);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
+  left: 0;
+  max-height: min(50vh, 360px);
+  min-width: max(100%, 200px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  position: absolute;
+  top: calc(100% + 6px);
+  z-index: 20;
+}
+
+.option {
+  align-items: center;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--paper-line);
+  color: var(--ink);
+  display: flex;
+  font: var(--weight-bold) var(--type-label-lg) var(--sans);
+  justify-content: space-between;
+  min-height: var(--control-height-sm);
+  padding: 0 var(--space-3);
+  scroll-margin: 6px;
+  text-align: left;
+  width: 100%;
+}
+
+.option:last-child {
+  border-bottom: 0;
+}
+
+.active {
+  background: rgba(201, 243, 93, 0.25);
+}
+
+.selected {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.trigger em,
+.option em {
+  color: var(--acid-ink);
+  font: var(--weight-heavy) var(--type-label-sm) var(--mono);
+  font-style: normal;
+  margin-left: 6px;
+}
+
+.option em svg {
+  height: 11px;
+  width: 11px;
+}
+
+.selected em {
+  color: var(--acid);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trigger > svg {
+    transition: none;
+  }
+}

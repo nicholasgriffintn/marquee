@@ -2,8 +2,12 @@ import { useState } from "react";
 
 import type { Provider } from "../../domain/catalog";
 import type { UsherMoment } from "../../domain/usher";
+import { classNames } from "../../lib/class-names";
+import { Heading, Text } from "../../ui";
 import { UsherAnswer } from "./UsherAnswer";
 import { UsherMark } from "./UsherMark";
+
+import styles from "./UsherOnboarding.module.css";
 
 const SIGN = [".", "T", ".", "O", ".", "N", ".", "I", ".", "G", ".", "H", ".", "T", "."];
 
@@ -32,8 +36,8 @@ export function UsherOnboarding({
   }
 
   return (
-    <section className="hero-section usher-onboarding">
-      <div className="usher-bulbs" aria-hidden="true">
+    <section className={styles.onboarding}>
+      <div className={styles.bulbs} aria-hidden="true">
         {SIGN.map((glyph, index) =>
           glyph === "." ? (
             // oxlint-disable-next-line react/no-array-index-key -- SIGN is a fixed static glyph array, never reordered
@@ -42,7 +46,7 @@ export function UsherOnboarding({
             <span
               // oxlint-disable-next-line react/no-array-index-key -- SIGN is a fixed static glyph array, never reordered
               key={`bulb-${index}-${glyph}`}
-              className={`letter${index === 9 ? " dim" : ""}`}
+              className={classNames(styles.letter, index === 9 && styles.letterDim)}
             >
               {glyph}
             </span>
@@ -50,42 +54,51 @@ export function UsherOnboarding({
         )}
       </div>
 
-      <div className="usher-onboarding-inner">
-        <div className="usher-onboarding-figure" aria-hidden="true">
-          <UsherMark face={moment.face} className="usher-figure" />
+      <div className={styles.inner}>
+        <div className={styles.figure} aria-hidden="true">
+          <UsherMark face={moment.face} />
         </div>
 
-        <div className={`usher-onboarding-body${isSaving ? " saving" : ""}`}>
-          <div className="usher-progress">
-            <UsherMark face={moment.face} crop="head" className="usher-progress-mark" />
-            <span>The Usher</span>
-            <div className="usher-progress-bar">
+        <div className={classNames(styles.body, isSaving && styles.saving)}>
+          <div className={styles.progress}>
+            <UsherMark face={moment.face} crop="head" className={styles.progressMark} />
+            <span className={styles.progressName}>The Usher</span>
+            <div className={styles.progressBar}>
               <i style={{ width: `${Math.round((step / total) * 100)}%` }} />
             </div>
-            <small>
+            <small className={styles.progressCount}>
               {step} of {total}
             </small>
           </div>
 
-          <div className="usher-step" key={moment.id}>
+          <div className={styles.step} key={moment.id}>
             {step === 1 && (
-              <p className="usher-greeting">Evening. Two minutes and I'll know you.</p>
+              <Text family="serif" italic tone="muted" className={styles.greeting}>
+                Evening. Two minutes and I&apos;ll know you.
+              </Text>
             )}
 
-            <h1 className="usher-question">{moment.line}</h1>
-            {moment.question?.hint && <p className="usher-hint">{moment.question.hint}</p>}
+            <Heading level={1} size="heading" family="serif" className={styles.question}>
+              {moment.line}
+            </Heading>
+            {moment.question?.hint && (
+              <Text size="sm" tone="muted" className={styles.hint}>
+                {moment.question.hint}
+              </Text>
+            )}
 
             {moment.question && (
               <UsherAnswer
                 question={moment.question}
                 isSaving={isSaving}
                 providers={providers}
+                size="lg"
                 onSubmit={(value) => void submit(value)}
               />
             )}
           </div>
 
-          <div className="usher-onboarding-foot">
+          <div className={styles.foot}>
             <button type="button" disabled={isSaving} onClick={() => onSkip(questionId)}>
               Skip this one
             </button>

@@ -2,8 +2,10 @@ import type { MouseEvent } from "react";
 
 import type { MediaTitle } from "../../domain/catalog";
 import { identifierLinks } from "../../domain/identifiers";
-import { ArrowIcon } from "../ui";
+import { ArrowIcon, Eyebrow } from "../../ui";
 import type { Exit } from "../usher/ExitDoor";
+
+import styles from "./SourceLinks.module.css";
 
 type LeaveHandler = (exit: Exit) => (event: MouseEvent<HTMLAnchorElement>) => void;
 
@@ -84,11 +86,14 @@ export function SourceLinks({ item, onLeave }: { item: MediaTitle; onLeave: Leav
   });
 
   return (
-    <div className="resource-links">
-      <span>SOURCE LINKS</span>
+    <div className={styles.links}>
+      <Eyebrow size="sm" weight="regular" className={styles.label}>
+        Source links
+      </Eyebrow>
       {shown.map((exit) => (
         <a
           key={exit.label}
+          className={styles.link}
           href={exit.href}
           target="_blank"
           rel="noreferrer"

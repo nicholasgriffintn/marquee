@@ -1,0 +1,75 @@
+.root {
+  margin: 0;
+}
+
+.lede {
+  font-size: var(--type-lede);
+}
+
+.body {
+  font-size: var(--type-body);
+}
+
+.sm {
+  font-size: var(--type-sm);
+}
+
+.xs {
+  font-size: var(--type-xs);
+}
+
+.sans {
+  font-family: var(--sans);
+}
+
+.serif {
+  font-family: var(--serif);
+}
+
+.mono {
+  font-family: var(--mono);
+}
+
+.snug {
+  line-height: var(--leading-snug);
+}
+
+.normal {
+  line-height: var(--leading-normal);
+}
+
+.relaxed {
+  line-height: var(--leading-relaxed);
+}
+
+.italic {
+  font-style: italic;
+}
+
+.measure {
+  max-width: 62ch;
+}
+
+.toneDefault {
+  color: inherit;
+}
+
+.toneMuted {
+  color: var(--muted);
+}
+
+.toneAccent {
+  color: var(--acid);
+}
+
+.toneInk {
+  color: var(--ink);
+}
+
+.toneInkMuted {
+  color: var(--muted-on-paper);
+}
+
+.toneWarning {
+  color: var(--coral);
+}

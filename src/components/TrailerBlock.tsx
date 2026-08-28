@@ -1,8 +1,11 @@
 import { useState } from "react";
 
 import type { MediaTitle } from "../domain/catalog";
+import { classNames } from "../lib/class-names";
 import { artwork } from "../lib/media";
-import { ExternalLinkIcon, PlayIcon } from "./ui";
+import { ExternalLinkIcon, PlayIcon } from "../ui";
+
+import styles from "./TrailerBlock.module.css";
 
 type Video = { key: string; name: string; type: string };
 
@@ -33,8 +36,8 @@ export function TrailerBlock({ item }: { item: MediaTitle }) {
   const still = artwork(item.backdropUrl ?? item.posterUrl, 780, "backdrop");
 
   return (
-    <div className="detail-media">
-      <div className="detail-media-frame">
+    <div className={styles.media}>
+      <div className={styles.frame}>
         {active ? (
           <iframe
             key={active.key}
@@ -48,12 +51,12 @@ export function TrailerBlock({ item }: { item: MediaTitle }) {
         ) : (
           <button
             type="button"
-            className="detail-media-play"
+            className={styles.play}
             onClick={() => setActive(videos[0])}
             aria-label={`Play ${videos[0].name}`}
           >
             {still && <img src={still} alt="" loading="lazy" decoding="async" />}
-            <span className="detail-media-badge">
+            <span className={styles.badge}>
               <i>
                 <PlayIcon />
               </i>{" "}
@@ -64,13 +67,13 @@ export function TrailerBlock({ item }: { item: MediaTitle }) {
           </button>
         )}
       </div>
-      <div className="detail-media-picks">
+      <div className={styles.picks}>
         {videos.length > 1 &&
           videos.map((video) => (
             <button
               type="button"
               key={video.key}
-              className={active?.key === video.key ? "selected" : ""}
+              className={classNames(styles.pick, active?.key === video.key && styles.picked)}
               aria-pressed={active?.key === video.key}
               onClick={() => setActive(video)}
             >
@@ -78,7 +81,7 @@ export function TrailerBlock({ item }: { item: MediaTitle }) {
             </button>
           ))}
         <a
-          className="detail-media-out"
+          className={styles.out}
           href={`https://www.youtube.com/watch?v=${(active ?? videos[0]).key}`}
           target="_blank"
           rel="noreferrer"

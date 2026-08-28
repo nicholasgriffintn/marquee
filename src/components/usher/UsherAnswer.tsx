@@ -3,9 +3,13 @@ import { useEffect, useState } from "react";
 import type { MediaTitle, Provider } from "../../domain/catalog";
 import type { UsherQuestion } from "../../domain/usher";
 import { useActiveOption } from "../../hooks/useActiveOption";
+import { classNames } from "../../lib/class-names";
 import { queryJson } from "../../lib/query-client";
+import { Button, CheckIcon, Cluster, CloseIcon, VisuallyHidden } from "../../ui";
+import { ProviderBadge } from "../ProviderBadge";
 import { TitleArt } from "../TitleArt";
-import { CheckIcon, CloseIcon, ProviderBadge } from "../ui";
+
+import styles from "./UsherAnswer.module.css";
 
 const SEEN_GRID = 18;
 
@@ -15,20 +19,25 @@ export function UsherAnswer({
   question,
   isSaving,
   providers = NO_PROVIDERS,
+  size = "md",
+  layout = "stack",
   onSubmit,
 }: {
   question: UsherQuestion;
   isSaving: boolean;
   providers?: Provider[];
+  size?: "md" | "lg";
+  layout?: "stack" | "inline";
   onSubmit: (value: unknown) => void;
 }) {
   if (question.kind === "single") {
     return (
-      <div className="usher-options">
+      <div className={classNames(styles.options, layout === "inline" && styles.optionsWrap)}>
         {(question.options ?? []).map((option) => (
           <button
             key={option.value}
             type="button"
+            className={classNames(styles.option, size === "lg" && styles.optionLarge)}
             disabled={isSaving}
             onClick={() => onSubmit(option.value)}
           >
@@ -45,6 +54,7 @@ export function UsherAnswer({
         question={question}
         isSaving={isSaving}
         providers={providers}
+        size={size}
         onSubmit={onSubmit}
       />
     );
@@ -61,11 +71,13 @@ function ChipAnswer({
   question,
   isSaving,
   providers,
+  size,
   onSubmit,
 }: {
   question: UsherQuestion;
   isSaving: boolean;
   providers: Provider[];
+  size: "md" | "lg";
   onSubmit: (value: unknown) => void;
 }) {
   const [picked, setPicked] = useState<string[]>([]);
@@ -85,7 +97,9 @@ function ChipAnswer({
 
   return (
     <>
-      <div className={isServices ? "usher-services" : "usher-options usher-options-wrap"}>
+      <div
+        className={isServices ? styles.services : classNames(styles.options, styles.optionsWrap)}
+      >
         {(question.options ?? []).map((option) => {
           const isPicked = picked.includes(option.value);
           const provider = byId.get(option.value);
@@ -94,27 +108,33 @@ function ChipAnswer({
             <button
               key={option.value}
               type="button"
-              className={isPicked ? "picked" : ""}
+              className={classNames(
+                isServices ? styles.service : styles.option,
+                !isServices && size === "lg" && styles.optionLarge,
+                isPicked && styles.picked,
+              )}
               aria-pressed={isPicked}
               disabled={isSaving}
               onClick={() => toggle(option.value)}
             >
-              {isServices && provider && <ProviderBadge provider={provider} />}
+              {isServices && provider && (
+                <ProviderBadge provider={provider} className={styles.serviceBadge} />
+              )}
               <span>{option.label}</span>
             </button>
           );
         })}
       </div>
-      <div className="usher-confirm">
-        <button
-          type="button"
-          className="usher-primary"
+      <Cluster gap={2}>
+        <Button
+          variant="primary"
+          size="md"
           disabled={isSaving || picked.length < (question.min ?? 0)}
           onClick={() => onSubmit(picked)}
         >
           {picked.length ? `That's ${picked.length}` : "None of those"}
-        </button>
-      </div>
+        </Button>
+      </Cluster>
     </>
   );
 }
@@ -200,23 +220,24 @@ function PeopleAnswer({
   return (
     <>
       {picked.length > 0 && (
-        <div className="usher-picked">
+        <div className={styles.chosen}>
           {picked.map((name) => (
             <button
               key={name}
               type="button"
+              className={classNames(styles.option, styles.picked, styles.chosenItem)}
               onClick={() => setPicked((current) => current.filter((entry) => entry !== name))}
             >
               {name} <CloseIcon />
-              <span className="visually-hidden">Remove {name}</span>
+              <VisuallyHidden>Remove {name}</VisuallyHidden>
             </button>
           ))}
         </div>
       )}
 
-      <div className="usher-typeahead">
+      <div className={styles.typeahead}>
         <input
-          className="usher-input"
+          className={classNames(styles.input, styles.typeaheadInput)}
           value={query}
           maxLength={60}
           placeholder={isFull ? `That's ${limit}, the most I'll take` : "Start typing a name…"}
@@ -265,13 +286,13 @@ function PeopleAnswer({
             setIsOpen(true);
           }}
         />
-        <small className="usher-count">
+        <small className={styles.count}>
           {picked.length} of {limit}
         </small>
 
         {showMatches && (
           <div
-            className="usher-matches"
+            className={styles.matches}
             id="usher-matches"
             // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- select/datalist can't implement an aria-activedescendant combobox
             role="listbox"
@@ -289,7 +310,11 @@ function PeopleAnswer({
                 role="option"
                 tabIndex={-1}
                 aria-selected={index === active}
-                className={index === active ? "active" : ""}
+                className={classNames(
+                  styles.option,
+                  styles.match,
+                  index === active && styles.matchActive,
+                )}
                 onMouseEnter={() => setActive(index)}
                 onClick={() => add(name)}
               >
@@ -298,7 +323,7 @@ function PeopleAnswer({
             ))}
           </div>
         )}
-        <p className="usher-note" aria-live="polite">
+        <p className={styles.note} aria-live="polite">
           {isSearching
             ? "Looking…"
             : noMatches
@@ -310,11 +335,17 @@ function PeopleAnswer({
       </div>
 
       {!term && !isFull && offered.length > 0 && (
-        <div className="usher-suggests">
-          <span>Or one of these</span>
-          <div>
+        <div className={styles.suggests}>
+          <span className={styles.suggestsLabel}>Or one of these</span>
+          <div className={styles.suggestsRow}>
             {offered.map((name) => (
-              <button key={name} type="button" disabled={isSaving} onClick={() => add(name)}>
+              <button
+                key={name}
+                type="button"
+                className={styles.suggest}
+                disabled={isSaving}
+                onClick={() => add(name)}
+              >
                 {name}
               </button>
             ))}
@@ -322,16 +353,11 @@ function PeopleAnswer({
         </div>
       )}
 
-      <div className="usher-confirm">
-        <button
-          type="button"
-          className="usher-primary"
-          disabled={isSaving}
-          onClick={() => onSubmit(picked)}
-        >
+      <Cluster gap={2}>
+        <Button variant="primary" size="md" disabled={isSaving} onClick={() => onSubmit(picked)}>
           {picked.length ? `That's the lot (${picked.length})` : "Nobody comes to mind"}
-        </button>
-      </div>
+        </Button>
+      </Cluster>
     </>
   );
 }
@@ -379,14 +405,14 @@ function TitleAnswer({
   return (
     <>
       <input
-        className="usher-input"
+        className={styles.input}
         value={query}
         maxLength={80}
         placeholder="Search for something else…"
         aria-label="Search the catalogue"
         onChange={(event) => setQuery(event.target.value)}
       />
-      <div className="usher-grid">
+      <div className={styles.grid}>
         {grid.map((item) => {
           const isPicked = pickedIds.has(item.id);
 
@@ -394,7 +420,7 @@ function TitleAnswer({
             <button
               key={item.id}
               type="button"
-              className={`usher-grid-card${isPicked ? " picked" : ""}`}
+              className={classNames(styles.card, isPicked && styles.cardPicked)}
               aria-pressed={isPicked}
               onClick={() =>
                 setPicked((current) =>
@@ -406,7 +432,7 @@ function TitleAnswer({
             >
               <TitleArt url={item.posterUrl} seed={item.id} label={item.title} width={160} />
               {isPicked ? (
-                <span className="usher-grid-card-check" aria-hidden="true">
+                <span className={styles.cardCheck} aria-hidden="true">
                   <CheckIcon />
                 </span>
               ) : null}
@@ -415,16 +441,16 @@ function TitleAnswer({
           );
         })}
       </div>
-      <div className="usher-confirm">
-        <button
-          type="button"
-          className="usher-primary"
+      <Cluster gap={2}>
+        <Button
+          variant="primary"
+          size="md"
           disabled={isSaving}
           onClick={() => onSubmit(picked.map((item) => item.id))}
         >
           {picked.length ? `Seen ${picked.length}` : "None of these"}
-        </button>
-      </div>
+        </Button>
+      </Cluster>
     </>
   );
 }

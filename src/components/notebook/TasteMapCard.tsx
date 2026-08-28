@@ -11,8 +11,10 @@ import {
   type MapPoint,
   type TasteMapResponse,
 } from "../../domain/notebook";
+import { StarIcon } from "../../ui";
 import { TitleArt } from "../TitleArt";
-import { StarIcon } from "../ui";
+
+import styles from "./TasteMapCard.module.css";
 
 const POSTER_WIDTH = 92;
 const STARS = [1, 2, 3, 4, 5];
@@ -31,9 +33,9 @@ function markedLabel(stamp: string) {
 
 function Stars({ rating }: { rating: number }) {
   return (
-    <span className="taste-card-stars" aria-label={`${rating} out of 5`}>
+    <span className={styles.stars} aria-label={`${rating} out of 5`}>
       {STARS.map((star) => (
-        <StarIcon key={star} className={star <= rating ? "on" : ""} />
+        <StarIcon key={star} className={star <= rating ? styles.starOn : undefined} />
       ))}
     </span>
   );
@@ -63,9 +65,9 @@ export const TasteMapCard = memo(function TasteMapCard({
   }, [focusSignal]);
 
   return (
-    <div className="taste-card" ref={cardRef} tabIndex={-1}>
-      <div className="taste-card-head">
-        <div className="taste-card-art">
+    <div className={styles.card} ref={cardRef} tabIndex={-1}>
+      <div className={styles.head}>
+        <div className={styles.art}>
           {artReady && (
             <TitleArt
               url={point.posterUrl}
@@ -77,15 +79,17 @@ export const TasteMapCard = memo(function TasteMapCard({
           )}
         </div>
 
-        <div className="taste-card-name">
+        <div className={styles.name}>
           <strong>{point.title}</strong>
           {meta && <span>{meta}</span>}
-          <em className={point.weight >= 0 ? "liked" : "cooled"}>{verdictLabel(point.weight)}</em>
+          <em className={point.weight >= 0 ? styles.liked : styles.cooled}>
+            {verdictLabel(point.weight)}
+          </em>
         </div>
       </div>
 
       {point.genres.length > 0 && (
-        <ul className="taste-card-genres">
+        <ul className={styles.genres}>
           {point.genres.map((genre) => (
             <li key={genre}>{genre}</li>
           ))}
@@ -93,8 +97,8 @@ export const TasteMapCard = memo(function TasteMapCard({
       )}
 
       {point.mark && (
-        <div className="taste-card-mark">
-          <span className="taste-card-label">Your mark</span>
+        <div className={styles.mark}>
+          <span className={styles.label}>Your mark</span>
           <p>
             {markStatusLabel(point.mark.status)}
             {point.mark.rating === null ? "" : " · "}
@@ -105,10 +109,10 @@ export const TasteMapCard = memo(function TasteMapCard({
         </div>
       )}
 
-      {point.overview && <p className="taste-card-overview">{point.overview}</p>}
+      {point.overview && <p className={styles.overview}>{point.overview}</p>}
 
       {(sits || point.scores.length > 0) && (
-        <dl className="taste-card-facts">
+        <dl className={styles.facts}>
           {sits && (
             <div>
               <dt>Where it sits</dt>
@@ -125,12 +129,12 @@ export const TasteMapCard = memo(function TasteMapCard({
       )}
 
       {point.neighbours.length > 0 && (
-        <div className="taste-card-near">
-          <span className="taste-card-label">Closest on your shelf</span>
-          <ul>
+        <div className={styles.near}>
+          <span className={styles.label}>Closest on your shelf</span>
+          <ul className={styles.nearList}>
             {point.neighbours.map((neighbour) => (
               <li key={neighbour.titleId}>
-                <button type="button" onClick={() => onPick(neighbour)}>
+                <button type="button" className={styles.nearItem} onClick={() => onPick(neighbour)}>
                   {neighbour.title}
                   {neighbour.year ? <small>{neighbour.year}</small> : null}
                 </button>
@@ -141,7 +145,7 @@ export const TasteMapCard = memo(function TasteMapCard({
       )}
 
       {point.tmdbId > 0 && (
-        <Link className="taste-map-open" to={titlePath(point)}>
+        <Link className={styles.open} to={titlePath(point)}>
           Open its page
         </Link>
       )}

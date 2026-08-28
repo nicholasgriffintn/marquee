@@ -1,0 +1,27 @@
+.title {
+  margin-bottom: var(--space-3);
+}
+
+.wrap {
+  overflow-x: auto;
+}
+
+.table {
+  border-collapse: collapse;
+  font: var(--type-label-lg) var(--mono);
+  width: 100%;
+}
+
+.table th,
+.table td {
+  border-bottom: 1px solid var(--paper-line);
+  padding: var(--space-2) var(--space-2);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table th {
+  color: var(--muted-on-paper);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}

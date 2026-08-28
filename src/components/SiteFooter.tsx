@@ -1,18 +1,18 @@
 import { Link } from "react-router-dom";
 
-import { MarqueeLogo } from "./ui";
+import { Text } from "../ui";
+import { Brand } from "./Brand";
+
+import styles from "./SiteFooter.module.css";
 
 export function SiteFooter() {
   return (
-    <footer className="site-footer">
-      <div className="brand">
-        <MarqueeLogo />
-        <span>Marquee</span>
-      </div>
-      <p>
+    <footer className={styles.footer}>
+      <Brand />
+      <Text tone="inkMuted" size="sm" className={styles.credits}>
         Data by TMDB · Availability by JustWatch · Cinemas by{" "}
         <a
-          className="footer-link"
+          className={styles.link}
           href="https://www.openstreetmap.org/copyright"
           target="_blank"
           rel="noreferrer"
@@ -20,11 +20,11 @@ export function SiteFooter() {
           © OpenStreetMap contributors
         </a>{" "}
         ·{" "}
-        <Link className="footer-link" to="/sources">
+        <Link className={styles.link} to="/sources">
           Services and sources
         </Link>
-      </p>
-      <Link className="footer-egg" to="/usher">
+      </Text>
+      <Link className={styles.egg} to="/usher">
         Made for movie night
       </Link>
     </footer>

@@ -1,0 +1,17 @@
+.status {
+  color: var(--muted);
+  font: var(--type-label-sm) var(--mono);
+  letter-spacing: 0.08em;
+}
+
+.feed {
+  color: var(--acid);
+}
+
+.link {
+  color: #a6b9ff;
+}
+
+.marker {
+  color: var(--muted);
+}

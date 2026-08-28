@@ -1,0 +1,103 @@
+.track {
+  border-top: 1px solid var(--paper-line);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+  padding-top: var(--space-5);
+}
+
+.labelRow {
+  align-items: baseline;
+  display: flex;
+  gap: var(--space-3);
+  justify-content: space-between;
+}
+
+.strip {
+  display: grid;
+  gap: var(--space-3);
+  grid-auto-columns: 104px;
+  grid-auto-flow: column;
+  overflow-x: auto;
+  padding-bottom: var(--space-2);
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+
+.strip::-webkit-scrollbar {
+  display: none;
+}
+
+.card {
+  background: none;
+  border: 0;
+  color: var(--ink);
+  cursor: pointer;
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  min-width: 0;
+  padding: 0;
+  scroll-snap-align: start;
+  text-align: left;
+}
+
+.card img,
+.card picture > img {
+  aspect-ratio: 2 / 3;
+  background: var(--paper-deep);
+  display: block;
+  height: auto;
+  object-fit: cover;
+  transition:
+    transform var(--duration) var(--ease),
+    box-shadow var(--duration) var(--ease);
+  width: 100%;
+}
+
+.card:hover img,
+.card:hover picture > img {
+  box-shadow: 5px 5px 0 var(--blue);
+  transform: translate(-2px, -2px);
+}
+
+.current {
+  cursor: default;
+}
+
+.current img,
+.current picture > img {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.current strong::after {
+  color: var(--blue);
+  content: " · you are here";
+  font: var(--type-label-sm) var(--mono);
+}
+
+.card strong {
+  font-size: var(--type-xs);
+  letter-spacing: var(--tracking-snug);
+  line-height: 1.2;
+}
+
+.card small {
+  color: var(--muted-on-paper);
+  font: var(--type-label-sm) var(--mono);
+  line-height: 1.4;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card img,
+  .card picture > img {
+    transition: none;
+  }
+
+  .card:hover img,
+  .card:hover picture > img {
+    transform: none;
+  }
+}

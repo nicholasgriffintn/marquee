@@ -1,0 +1,126 @@
+.frame {
+  align-items: start;
+  display: grid;
+  gap: var(--space-6);
+  grid-template-columns: minmax(0, 560px) minmax(240px, 400px);
+  margin-bottom: var(--space-3);
+}
+
+.frame > svg {
+  aspect-ratio: 1;
+  border: 1px solid var(--panel-line);
+  display: block;
+  height: auto;
+  stroke: none;
+  width: 100%;
+}
+
+.axis {
+  fill: var(--muted);
+  font: var(--weight-bold) var(--type-label) / 1 var(--mono);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.ground {
+  fill: var(--panel-tile);
+}
+
+.thread {
+  stroke: var(--white);
+  stroke-dasharray: 3 5;
+  stroke-opacity: 0.3;
+  stroke-width: 1.2;
+}
+
+.point {
+  cursor: pointer;
+  outline: none;
+}
+
+.point circle {
+  stroke: var(--panel-tile);
+  stroke-width: 2;
+  transition:
+    r 0.14s ease,
+    fill 0.14s ease;
+}
+
+.point circle.hit {
+  fill: transparent;
+  stroke: none;
+}
+
+.liked circle {
+  fill: var(--acid);
+}
+
+.cooled circle {
+  fill: none;
+  stroke: var(--coral);
+}
+
+.active circle {
+  stroke: var(--white);
+}
+
+.point:focus-visible circle {
+  stroke: var(--white);
+  stroke-width: 3;
+}
+
+.readout {
+  align-content: start;
+  container-type: inline-size;
+  display: grid;
+  margin: 0;
+  min-height: 0;
+  order: 2;
+}
+
+.key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.key li {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  font: var(--weight-regular) var(--type-xs) / 1 var(--sans);
+  gap: 7px;
+}
+
+.key svg {
+  height: 16px;
+  stroke: none;
+  width: 16px;
+}
+
+.keyLiked circle {
+  fill: var(--acid);
+  stroke: none;
+}
+
+.keyCooled circle {
+  fill: none;
+  stroke: var(--coral);
+  stroke-width: 2;
+}
+
+@media (max-width: 860px) {
+  .frame {
+    gap: 18px;
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .point circle {
+    transition: none;
+  }
+}

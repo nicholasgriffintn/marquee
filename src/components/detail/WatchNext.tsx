@@ -1,7 +1,9 @@
 import type { MediaTitle } from "../../domain/catalog";
 import type { InsightPair } from "../../hooks/useTitleInsight";
-import { TitleArt } from "../TitleArt";
-import { ArrowIcon } from "../ui";
+import { DetailNote } from "./DetailNote";
+import { TitlePair } from "./TitlePair";
+
+import styles from "./WatchNext.module.css";
 
 export function WatchNext({
   pairs,
@@ -15,30 +17,10 @@ export function WatchNext({
   }
 
   return (
-    <div className="detail-pairs">
-      <span>
-        <i>AI</i> Watch next
-      </span>
+    <DetailNote label="Watch next" badge="AI" accent="none" className={styles.block}>
       {pairs.map((pair) => (
-        <button
-          type="button"
-          key={pair.item.id}
-          className="detail-pair"
-          onClick={() => onOpen(pair.item)}
-        >
-          <TitleArt
-            url={pair.item.posterUrl}
-            seed={pair.item.id}
-            label={pair.item.title}
-            width={160}
-          />
-          <span>
-            <strong>{pair.item.title}</strong>
-            <small>{pair.reason}</small>
-          </span>
-          <ArrowIcon />
-        </button>
+        <TitlePair key={pair.item.id} item={pair.item} caption={pair.reason} onOpen={onOpen} />
       ))}
-    </div>
+    </DetailNote>
   );
 }

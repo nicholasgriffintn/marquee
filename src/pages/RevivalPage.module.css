@@ -1,0 +1,115 @@
+.search {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-6);
+}
+
+.searchField {
+  flex: 0 1 420px;
+  width: 100%;
+}
+
+.bill {
+  margin-bottom: var(--space-8);
+}
+
+.billList {
+  border-top: 1px solid var(--line);
+  display: grid;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.billList > li {
+  border-bottom: 1px solid var(--line);
+  position: relative;
+}
+
+.billList a,
+.billRow {
+  align-items: baseline;
+  display: grid;
+  gap: var(--space-1) var(--space-5);
+  grid-template-columns: minmax(170px, 200px) 1fr;
+  padding: var(--space-4) 0;
+}
+
+.slot {
+  color: var(--acid);
+  font: var(--weight-heavy) var(--type-label-sm) var(--mono);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.billList strong {
+  font-size: clamp(17px, 1.8vw, 22px);
+  letter-spacing: var(--tracking-snug);
+}
+
+.billList small {
+  color: var(--muted);
+  font: var(--type-label) var(--mono);
+  grid-column: 2;
+  letter-spacing: 0.05em;
+}
+
+.billList a:hover strong {
+  color: var(--acid);
+}
+
+.slotSkeleton {
+  height: 9px;
+  width: 130px;
+}
+
+.titleSkeleton {
+  height: 20px;
+  width: min(340px, 60%);
+}
+
+.skeletonHead {
+  display: grid;
+  padding-bottom: 17px;
+}
+
+.reel {
+  aspect-ratio: 16 / 9;
+  min-width: 260px;
+}
+
+.mark {
+  height: 58px;
+  margin: 0 0 var(--space-4);
+  width: 80px;
+}
+
+.note {
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  margin: var(--space-6) 0 0;
+  max-width: 68ch;
+  padding-top: 18px;
+}
+
+.noteHead {
+  letter-spacing: 2px;
+  margin-bottom: var(--space-3);
+}
+
+.noteLine {
+  margin-bottom: var(--space-3);
+}
+
+@media (max-width: 700px) {
+  .billList a,
+  .billRow {
+    grid-template-columns: 1fr;
+  }
+
+  .billList small {
+    grid-column: 1;
+  }
+}

@@ -1,7 +1,9 @@
 import { Link } from "react-router-dom";
 
 import { revivalPath, runtimeLabel, SOURCE_LABELS, type RevivalWork } from "../../domain/revival";
-import { PlayIcon } from "../ui";
+import { Eyebrow, PlayIcon } from "../../ui";
+
+import styles from "./RevivalBlock.module.css";
 
 export function RevivalBlock({ works }: { works: RevivalWork[] }) {
   if (works.length === 0) {
@@ -9,11 +11,13 @@ export function RevivalBlock({ works }: { works: RevivalWork[] }) {
   }
 
   return (
-    <div className="watch-actions revival-actions">
-      <span>Playing here, free</span>
+    <div className={styles.block}>
+      <Eyebrow size="sm" weight="heavy" tone="inkMuted">
+        Playing here, free
+      </Eyebrow>
       {works.map((work) => (
-        <Link className="watch-button" key={work.id} to={revivalPath(work)}>
-          <span className="revival-mark">
+        <Link className={styles.reel} key={work.id} to={revivalPath(work)}>
+          <span className={styles.mark}>
             <PlayIcon />
           </span>
           <span>
