@@ -1,3 +1,4 @@
+import { decryptOAuthToken, encryptOAuthToken } from "../lib/token-crypto.ts";
 import type { Bindings } from "../types.ts";
 
 export type LinkProvider = "trakt";
@@ -53,7 +54,7 @@ export async function claimLinkState(env: Bindings, provider: LinkProvider, stat
 }
 
 export async function readLink(env: Bindings, viewerId: string, provider: LinkProvider) {
-  return env.DB.prepare(
+  const row = await env.DB.prepare(
     `SELECT access_token AS accessToken,
             refresh_token AS refreshToken,
             expires_at AS expiresAt,
@@ -65,6 +66,16 @@ export async function readLink(env: Bindings, viewerId: string, provider: LinkPr
   )
     .bind(viewerId, provider)
     .first<LinkRow>();
+
+  if (!row) {
+    return row;
+  }
+
+  return {
+    ...row,
+    accessToken: await decryptOAuthToken(env, row.accessToken),
+    refreshToken: row.refreshToken ? await decryptOAuthToken(env, row.refreshToken) : null,
+  };
 }
 
 export async function saveLink(
@@ -78,6 +89,9 @@ export async function saveLink(
   },
   accountLabel: string | null,
 ) {
+  const accessToken = await encryptOAuthToken(env, link.accessToken);
+  const refreshToken = link.refreshToken ? await encryptOAuthToken(env, link.refreshToken) : null;
+
   await env.DB.prepare(
     `INSERT INTO linked_accounts
        (viewer_id, provider, access_token, refresh_token, expires_at, account_label)
@@ -89,7 +103,7 @@ export async function saveLink(
        account_label = COALESCE(excluded.account_label, linked_accounts.account_label),
        broken_at = NULL`,
   )
-    .bind(viewerId, provider, link.accessToken, link.refreshToken, link.expiresAt, accountLabel)
+    .bind(viewerId, provider, accessToken, refreshToken, link.expiresAt, accountLabel)
     .run();
 }
 

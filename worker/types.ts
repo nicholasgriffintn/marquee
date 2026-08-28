@@ -51,6 +51,7 @@ export type Bindings = {
   TRAKT_CLIENT_ID?: string;
   TRAKT_CLIENT_SECRET?: string;
   MAL_CLIENT_ID?: string;
+  TOKEN_ENCRYPTION_KEY?: string;
 };
 
 export type CatalogSweepParameters = { deep?: boolean };
