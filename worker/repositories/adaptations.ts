@@ -2,7 +2,11 @@ import type { MediaType } from "../../src/domain/catalog.ts";
 import type { SourceWorkRecord } from "../clients/wikidata-adaptations.ts";
 import { clamp } from "../lib/numbers.ts";
 
-export type AdaptationCandidate = { titleId: string; mediaType: MediaType; tmdbId: number };
+export type AdaptationCandidate = {
+  titleId: string;
+  mediaType: MediaType;
+  tmdbId: number;
+};
 
 export type ScannedTitle = { titleId: string; works: SourceWorkRecord[] };
 
@@ -37,18 +41,97 @@ export async function selectAdaptationCandidates(
   return rows.rows;
 }
 
-export async function storeAdaptations(db: Database, source: string, scanned: ScannedTitle[]) {
+function sameIdSet(a: Set<string>, b: Set<string>) {
+  return a.size === b.size && [...a].every((value) => b.has(value));
+}
+
+async function currentWorkLinks(
+  db: Database,
+  titleIds: string[],
+  source: string,
+) {
+  const map = new Map<string, Set<string>>();
+
+  if (titleIds.length === 0) {
+    return map;
+  }
+
+  const rows = await db.query<{ titleId: string; workId: string }>(
+    `SELECT title_id AS "titleId", work_id AS "workId"
+       FROM title_source_works
+       WHERE source = $1 AND title_id IN (${titleIds.map((_, index) => `$${index + 2}`).join(",")})`,
+    [source, ...titleIds],
+  );
+
+  for (const row of rows.rows) {
+    const set = map.get(row.titleId) ?? new Set<string>();
+
+    set.add(row.workId);
+    map.set(row.titleId, set);
+  }
+
+  return map;
+}
+
+async function currentWorkAuthors(db: Database, workIds: string[]) {
+  const map = new Map<string, Set<string>>();
+
+  if (workIds.length === 0) {
+    return map;
+  }
+
+  const rows = await db.query<{ workId: string; name: string }>(
+    `SELECT work_id AS "workId", name
+       FROM source_work_authors
+       WHERE work_id IN (${workIds.map((_, index) => `$${index + 1}`).join(",")})`,
+    workIds,
+  );
+
+  for (const row of rows.rows) {
+    const set = map.get(row.workId) ?? new Set<string>();
+
+    set.add(row.name);
+    map.set(row.workId, set);
+  }
+
+  return map;
+}
+
+export async function storeAdaptations(
+  db: Database,
+  source: string,
+  scanned: ScannedTitle[],
+) {
   let written = 0;
 
+  const linkedWorkIds = await currentWorkLinks(
+    db,
+    scanned.map((entry) => entry.titleId),
+    source,
+  );
+  const workAuthors = await currentWorkAuthors(db, [
+    ...new Set(
+      scanned.flatMap((entry) => entry.works.map((work) => work.workId)),
+    ),
+  ]);
+
   for (const entry of scanned) {
+    const incomingWorkIds = new Set(entry.works.map((work) => work.workId));
+    const linksChanged = !sameIdSet(
+      linkedWorkIds.get(entry.titleId) ?? new Set(),
+      incomingWorkIds,
+    );
+
     // oxlint-disable-next-line no-await-in-loop
     written += await db.transaction(async (transaction) => {
       let statements = 1;
 
-      await transaction.execute(
-        `DELETE FROM title_source_works WHERE title_id = $1 AND source = $2`,
-        [entry.titleId, source],
-      );
+      if (linksChanged) {
+        await transaction.execute(
+          `DELETE FROM title_source_works WHERE title_id = $1 AND source = $2`,
+          [entry.titleId, source],
+        );
+      }
 
       for (const work of entry.works) {
         // oxlint-disable-next-line no-await-in-loop
@@ -62,32 +145,50 @@ export async function storeAdaptations(db: Database, source: string, scanned: Sc
                published_year = excluded.published_year,
                wikidata_id = COALESCE(excluded.wikidata_id, source_works.wikidata_id),
                updated_at = CURRENT_TIMESTAMP`,
-          [work.workId, work.label, work.workType, work.publishedYear, work.wikidataId],
+          [
+            work.workId,
+            work.label,
+            work.workType,
+            work.publishedYear,
+            work.wikidataId,
+          ],
         );
-        // oxlint-disable-next-line no-await-in-loop
-        await transaction.execute(`DELETE FROM source_work_authors WHERE work_id = $1`, [
-          work.workId,
-        ]);
-        statements += 2;
+        statements += 1;
 
-        for (const author of work.authors) {
+        const authorsChanged = !sameIdSet(
+          workAuthors.get(work.workId) ?? new Set(),
+          new Set(work.authors.map((author) => author.name)),
+        );
+
+        if (authorsChanged) {
           // oxlint-disable-next-line no-await-in-loop
           await transaction.execute(
-            `INSERT INTO source_work_authors (work_id, name, wikidata_id)
-               VALUES ($1, $2, $3)
-               ON CONFLICT(work_id, name) DO UPDATE SET wikidata_id = excluded.wikidata_id`,
-            [work.workId, author.name, author.wikidataId],
+            `DELETE FROM source_work_authors WHERE work_id = $1`,
+            [work.workId],
+          );
+          statements += 1;
+
+          for (const author of work.authors) {
+            // oxlint-disable-next-line no-await-in-loop
+            await transaction.execute(
+              `INSERT INTO source_work_authors (work_id, name, wikidata_id)
+                 VALUES ($1, $2, $3)
+                 ON CONFLICT(work_id, name) DO UPDATE SET wikidata_id = excluded.wikidata_id`,
+              [work.workId, author.name, author.wikidataId],
+            );
+            statements += 1;
+          }
+        }
+
+        if (linksChanged) {
+          // oxlint-disable-next-line no-await-in-loop
+          await transaction.execute(
+            `INSERT INTO title_source_works (title_id, work_id, source) VALUES ($1, $2, $3)
+               ON CONFLICT(title_id, work_id, source) DO NOTHING`,
+            [entry.titleId, work.workId, source],
           );
           statements += 1;
         }
-
-        // oxlint-disable-next-line no-await-in-loop
-        await transaction.execute(
-          `INSERT INTO title_source_works (title_id, work_id, source) VALUES ($1, $2, $3)
-             ON CONFLICT(title_id, work_id, source) DO NOTHING`,
-          [entry.titleId, work.workId, source],
-        );
-        statements += 1;
       }
 
       await transaction.execute(
@@ -134,7 +235,10 @@ export async function readTitleSourceWorks(db: Database, titleId: string) {
   const byWork = new Map<string, string[]>();
 
   for (const author of authors.rows) {
-    byWork.set(author.workId, [...(byWork.get(author.workId) ?? []), author.name]);
+    byWork.set(author.workId, [
+      ...(byWork.get(author.workId) ?? []),
+      author.name,
+    ]);
   }
 
   return rows.rows.map((row): StoredSourceWork => ({
@@ -147,7 +251,11 @@ export async function readTitleSourceWorks(db: Database, titleId: string) {
   }));
 }
 
-export async function readAdaptationTitleIds(db: Database, workId: string, limit: number) {
+export async function readAdaptationTitleIds(
+  db: Database,
+  workId: string,
+  limit: number,
+) {
   const rows = await db.query<{ titleId: string }>(
     `SELECT link.title_id AS "titleId"
        FROM title_source_works AS link

@@ -111,6 +111,62 @@ export async function personAwardCandidates(
   return rows.rows;
 }
 
+function awardKey(entry: {
+  awardId: string;
+  ceremonyYear: number | null;
+  outcome: string;
+}) {
+  return `${entry.awardId}|${entry.ceremonyYear ?? 0}|${entry.outcome}`;
+}
+
+function sameAwardSet(existing: Set<string>, entries: AwardStatement[]) {
+  const incoming = new Set(
+    entries.map((entry) =>
+      awardKey({ ...entry, ceremonyYear: entry.ceremonyYear ?? null }),
+    ),
+  );
+
+  return (
+    existing.size === incoming.size &&
+    [...existing].every((key) => incoming.has(key))
+  );
+}
+
+async function currentAwardKeys<Id extends string | number>(
+  db: Database,
+  table: "title_awards" | "person_awards",
+  column: "title_id" | "person_id",
+  ids: Id[],
+  source: string,
+) {
+  const keys = new Map<Id, Set<string>>();
+
+  if (ids.length === 0) {
+    return keys;
+  }
+
+  const rows = await db.query<{
+    id: Id;
+    awardId: string;
+    ceremonyYear: number;
+    outcome: string;
+  }>(
+    `SELECT ${column} AS id, award_id AS "awardId", ceremony_year AS "ceremonyYear", outcome
+       FROM ${table}
+       WHERE source = $1 AND ${column} IN (${ids.map((_, index) => `$${index + 2}`).join(",")})`,
+    [source, ...ids],
+  );
+
+  for (const row of rows.rows) {
+    const set = keys.get(row.id) ?? new Set<string>();
+
+    set.add(awardKey(row));
+    keys.set(row.id, set);
+  }
+
+  return keys;
+}
+
 async function upsertAwards(
   transaction: DatabaseTransaction,
   entries: AwardStatement[],
@@ -134,30 +190,45 @@ export async function storeTitleAwards(
   source: string,
   writes: TitleAwardWrite[],
 ) {
+  const current = await currentAwardKeys(
+    db,
+    "title_awards",
+    "title_id",
+    writes.map((write) => write.titleId),
+    source,
+  );
+
   for (const write of writes) {
+    const unchanged = sameAwardSet(
+      current.get(write.titleId) ?? new Set(),
+      write.entries,
+    );
+
     // oxlint-disable-next-line no-await-in-loop
     await db.transaction(async (transaction) => {
-      await transaction.execute(
-        `DELETE FROM title_awards WHERE title_id = $1 AND source = $2`,
-        [write.titleId, source],
-      );
-      await upsertAwards(transaction, write.entries);
-
-      for (const entry of write.entries) {
-        // oxlint-disable-next-line no-await-in-loop
+      if (!unchanged) {
         await transaction.execute(
-          `INSERT INTO title_awards
-               (title_id, award_id, ceremony_year, outcome, source)
-             VALUES ($1, $2, $3, $4, $5)
-             ON CONFLICT DO NOTHING`,
-          [
-            write.titleId,
-            entry.awardId,
-            entry.ceremonyYear ?? 0,
-            entry.outcome,
-            source,
-          ],
+          `DELETE FROM title_awards WHERE title_id = $1 AND source = $2`,
+          [write.titleId, source],
         );
+        await upsertAwards(transaction, write.entries);
+
+        for (const entry of write.entries) {
+          // oxlint-disable-next-line no-await-in-loop
+          await transaction.execute(
+            `INSERT INTO title_awards
+                 (title_id, award_id, ceremony_year, outcome, source)
+               VALUES ($1, $2, $3, $4, $5)
+               ON CONFLICT DO NOTHING`,
+            [
+              write.titleId,
+              entry.awardId,
+              entry.ceremonyYear ?? 0,
+              entry.outcome,
+              source,
+            ],
+          );
+        }
       }
 
       await transaction.execute(
@@ -177,30 +248,45 @@ export async function storePersonAwards(
   source: string,
   writes: PersonAwardWrite[],
 ) {
+  const current = await currentAwardKeys(
+    db,
+    "person_awards",
+    "person_id",
+    writes.map((write) => write.personId),
+    source,
+  );
+
   for (const write of writes) {
+    const unchanged = sameAwardSet(
+      current.get(write.personId) ?? new Set(),
+      write.entries,
+    );
+
     // oxlint-disable-next-line no-await-in-loop
     await db.transaction(async (transaction) => {
-      await transaction.execute(
-        `DELETE FROM person_awards WHERE person_id = $1 AND source = $2`,
-        [write.personId, source],
-      );
-      await upsertAwards(transaction, write.entries);
-
-      for (const entry of write.entries) {
-        // oxlint-disable-next-line no-await-in-loop
+      if (!unchanged) {
         await transaction.execute(
-          `INSERT INTO person_awards
-               (person_id, award_id, ceremony_year, outcome, source)
-             VALUES ($1, $2, $3, $4, $5)
-             ON CONFLICT DO NOTHING`,
-          [
-            write.personId,
-            entry.awardId,
-            entry.ceremonyYear ?? 0,
-            entry.outcome,
-            source,
-          ],
+          `DELETE FROM person_awards WHERE person_id = $1 AND source = $2`,
+          [write.personId, source],
         );
+        await upsertAwards(transaction, write.entries);
+
+        for (const entry of write.entries) {
+          // oxlint-disable-next-line no-await-in-loop
+          await transaction.execute(
+            `INSERT INTO person_awards
+                 (person_id, award_id, ceremony_year, outcome, source)
+               VALUES ($1, $2, $3, $4, $5)
+               ON CONFLICT DO NOTHING`,
+            [
+              write.personId,
+              entry.awardId,
+              entry.ceremonyYear ?? 0,
+              entry.outcome,
+              source,
+            ],
+          );
+        }
       }
 
       await transaction.execute(

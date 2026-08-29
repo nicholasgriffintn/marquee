@@ -1,6 +1,7 @@
 import type { TitlePlace, TitlePlaces } from "../../src/domain/places.ts";
 import { placePin } from "../../src/domain/places.ts";
 import type { PlaceRecord, TitlePlaceRow } from "../clients/wikidata-places.ts";
+import { queryChunked } from "./catalog-array-utils.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 
 type PlaceRow = {
@@ -34,6 +35,42 @@ function toPlace(row: TitlePlaceReadRow): TitlePlace {
 
 export const PLACE_SOURCE = "wikidata";
 
+function placeKey(kind: string, placeId: string) {
+  return `${kind}|${placeId}`;
+}
+
+function sameSet(a: Set<string>, b: Set<string>) {
+  return a.size === b.size && [...a].every((value) => b.has(value));
+}
+
+async function currentPlaceKeys(
+  db: Database,
+  titleIds: string[],
+  source: string,
+) {
+  const rows = await queryChunked(titleIds, (wave) =>
+    db
+      .query<{ titleId: string; kind: string; placeId: string }>(
+        `SELECT title_id AS "titleId", kind, place_id AS "placeId"
+         FROM catalog_title_places
+         WHERE source = $1 AND title_id IN (${wave.map((_, index) => `$${index + 2}`).join(",")})`,
+        [source, ...wave],
+      )
+      .then((result) => result.rows),
+  );
+
+  const keys = new Map<string, Set<string>>();
+
+  for (const row of rows) {
+    const set = keys.get(row.titleId) ?? new Set<string>();
+
+    set.add(placeKey(row.kind, row.placeId));
+    keys.set(row.titleId, set);
+  }
+
+  return keys;
+}
+
 export async function writeTitlePlaces(
   db: Database,
   titleIds: string[],
@@ -52,6 +89,26 @@ export async function writeTitlePlaces(
   }
 
   const known = new Set(places.keys());
+
+  const current = await currentPlaceKeys(db, titleIds, source);
+  const incoming = new Map<string, Set<string>>();
+
+  for (const row of rows) {
+    const set = incoming.get(row.key) ?? new Set<string>();
+
+    set.add(placeKey(row.kind, row.place.entityId));
+    incoming.set(row.key, set);
+  }
+
+  const changed = new Set(
+    titleIds.filter(
+      (titleId) =>
+        !sameSet(
+          current.get(titleId) ?? new Set(),
+          incoming.get(titleId) ?? new Set(),
+        ),
+    ),
+  );
 
   await db.transaction(async (transaction) => {
     for (const place of places.values()) {
@@ -73,12 +130,14 @@ export async function writeTitlePlaces(
           place.latitude,
           place.longitude,
           place.precisionDegrees,
-          place.countryId && known.has(place.countryId) ? place.countryId : null,
+          place.countryId && known.has(place.countryId)
+            ? place.countryId
+            : null,
         ],
       );
     }
 
-    for (const titleId of titleIds) {
+    for (const titleId of changed) {
       // oxlint-disable-next-line no-await-in-loop
       await transaction.execute(
         `DELETE FROM catalog_title_places WHERE title_id = $1 AND source = $2`,
@@ -87,6 +146,10 @@ export async function writeTitlePlaces(
     }
 
     for (const row of rows) {
+      if (!changed.has(row.key)) {
+        continue;
+      }
+
       // oxlint-disable-next-line no-await-in-loop
       await transaction.execute(
         `INSERT INTO catalog_title_places (title_id, kind, place_id, source)
@@ -112,7 +175,10 @@ export async function writeTitlePlaces(
   return rows.length;
 }
 
-export async function readPlacesForTitle(db: Database, titleId: string): Promise<TitlePlaces> {
+export async function readPlacesForTitle(
+  db: Database,
+  titleId: string,
+): Promise<TitlePlaces> {
   const rows = await db.query<TitlePlaceReadRow>(
     `SELECT DISTINCT tp.title_id AS "titleId", tp.kind, ${PLACE_COLUMNS}
        FROM catalog_title_places AS tp

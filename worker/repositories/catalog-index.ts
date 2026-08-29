@@ -34,7 +34,11 @@ function knownTitleIds(titleIds: string[]) {
   return [...new Set(titleIds.filter(isKnownTitle))];
 }
 
-export function markTitlesForIndexing(db: Database, titleIds: string[], reason: IndexReason) {
+export function markTitlesForIndexing(
+  db: Database,
+  titleIds: string[],
+  reason: IndexReason,
+) {
   const unique = knownTitleIds(titleIds);
 
   if (unique.length === 0) {
@@ -69,19 +73,16 @@ export async function projectTitles(db: Database, titleIds: string[]) {
 
       results.push(
         await transaction.execute(
-          `DELETE FROM catalog_search
-           WHERE title_id IN (
-             SELECT value FROM jsonb_array_elements_text(CAST($1 AS jsonb)) AS entries(value)
-           )`,
-          [ids],
-        ),
-      );
-      results.push(
-        await transaction.execute(
           `INSERT INTO catalog_search (title, original_title, overview, tags, people, title_id)
            SELECT t.title, t.original_title, t.overview, ${TAGS}, ${PEOPLE}, t.id
            FROM catalog_titles AS t
-           WHERE t.id IN (SELECT value FROM jsonb_array_elements_text(CAST($1 AS jsonb)) AS entries(value))`,
+           WHERE t.id IN (SELECT value FROM jsonb_array_elements_text(CAST($1 AS jsonb)) AS entries(value))
+           ON CONFLICT (title_id) DO UPDATE SET
+             title = excluded.title,
+             original_title = excluded.original_title,
+             overview = excluded.overview,
+             tags = excluded.tags,
+             people = excluded.people`,
           [ids],
         ),
       );
@@ -124,7 +125,9 @@ export async function queueSearchRebuild(db: Database) {
   return row?.pending ?? 0;
 }
 
-export async function readSearchIndexState(db: Database): Promise<SearchIndexState> {
+export async function readSearchIndexState(
+  db: Database,
+): Promise<SearchIndexState> {
   const row = await db.first<SearchIndexState>(`SELECT
          (SELECT count(*) FROM catalog_titles) AS titles,
          (SELECT count(*) FROM catalog_search) AS indexed,
