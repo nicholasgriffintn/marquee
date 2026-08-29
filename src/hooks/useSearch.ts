@@ -43,8 +43,6 @@ export function useSearch(query: string, providerIds: string[]) {
   const trimmed = query.trim();
   const providerKey = providerIds.join(",");
 
-  // Results carry the ticket the server signed for this response, so a title
-  // opened from here is attributed to the search that surfaced it and at what rank.
   const serve = useCallback((next: MediaTitle[], journey: string | undefined) => {
     served.current = next;
     setItems(next);

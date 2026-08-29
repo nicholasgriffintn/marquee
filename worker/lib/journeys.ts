@@ -33,9 +33,6 @@ const decoder = new TextDecoder();
 let ephemeralSecret = "";
 let cachedKey: { secret: string; bytes: Uint8Array } | null = null;
 
-// Without a configured secret (local dev, preview) journeys are still signed,
-// but with a key that dies with the isolate: tokens minted before a restart
-// stop verifying rather than being trusted unsigned.
 function secretFor(env: Bindings) {
   if (env.TOKEN_ENCRYPTION_KEY) {
     return env.TOKEN_ENCRYPTION_KEY;
@@ -131,8 +128,6 @@ export async function verifyJourney(env: Bindings, token: unknown): Promise<Jour
   return { id: payload.i, mode: payload.m, angle: payload.a, size: payload.s, issuedAt: payload.t };
 }
 
-// How long the viewer sat with the served set before acting on it. Read from the
-// signed mint time so it cannot be dictated by the client.
 export function journeyLatency(journey: Journey) {
   return clamp(Date.now() - journey.issuedAt, 0, JOURNEY_TTL_MS);
 }

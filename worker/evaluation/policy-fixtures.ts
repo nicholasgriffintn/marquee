@@ -4,14 +4,10 @@ export type PolicyFixture = {
   id: string;
   path: string;
   method: string;
-  /** The policy the guard must apply, or null when the path is deliberately unguarded. */
   expect: PolicyName | null;
   note: string;
 };
 
-// The guard picks the first matching rule, so the order of RULES decides what a
-// path costs. These pin the decisions that are easy to break by inserting a rule
-// in the wrong place.
 export const POLICY_FIXTURES: readonly PolicyFixture[] = [
   {
     id: "search-is-metered",

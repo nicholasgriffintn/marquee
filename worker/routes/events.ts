@@ -36,9 +36,6 @@ eventRoutes.post("/", async (context) => {
   const principal = await sessionPrincipal(context.env, context.req.raw);
   const titleId = isKnownTitle(body?.titleId) ? body.titleId : undefined;
   const [providerId] = validProviderIds([text(body?.providerId, 60) ?? ""]);
-  // Where the impression came from, how it ranked and how long it sat there are
-  // read from the signed journey, never from the caller: an unsigned event is
-  // still counted, but with no angle it cannot move the global scores.
   const journey = await verifyJourney(context.env, body?.journey);
   const rank = journey ? journeyRank(body?.rank, journey) : undefined;
   const event: MarqueeEvent = {

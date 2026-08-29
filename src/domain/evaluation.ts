@@ -26,8 +26,6 @@ export type EvaluationReport = {
   relevance: RelevanceResult[];
   policy: PolicyResult[];
   tally: EvaluationTally;
-  // Mean reciprocal rank across every expectation that could be judged. The one
-  // number to watch when a ranking change lands.
   meanReciprocalRank: number;
   ranAt: string;
 };

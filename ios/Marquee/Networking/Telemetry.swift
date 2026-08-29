@@ -1,8 +1,5 @@
 import Foundation
 
-/// Where a title was served, as signed by the server. The token is opaque here:
-/// the app echoes it back so the worker can attribute the event to the set it
-/// actually served, rather than trusting a label the app made up.
 struct JourneyTicket {
   let token: String
   let rank: Int
@@ -25,8 +22,6 @@ actor Telemetry {
     let startedAt: Date
   }
 
-  /// Matches JOURNEY_TTL_MS on the server; a stale ticket is dropped here rather
-  /// than posted for the worker to reject.
   private static let lifetime: TimeInterval = 30 * 60
   private static let limit = 40
 
@@ -125,8 +120,6 @@ actor Telemetry {
   }
 }
 
-/// Minimal JSON value so an event body can be assembled without a bespoke
-/// Encodable struct per event shape.
 enum JSONValue: Encodable {
   case string(String)
   case number(Double)

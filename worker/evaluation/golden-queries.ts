@@ -2,18 +2,12 @@ export type GoldenQuery = {
   id: string;
   query: string;
   mode: "keyword" | "hybrid";
-  /** Titles that must come back, identified by catalogue id. */
   expect: string[];
-  /** How far down the list an expected title still counts as found. */
   within: number;
-  /** Titles that must not come back at all. */
   absent?: string[];
   note: string;
 };
 
-// Fixtures name titles by catalogue id so a rename upstream cannot quietly turn a
-// miss into a hit. A fixture whose titles are not in the catalogue is reported as
-// skipped rather than failed: that is a coverage gap, not a ranking regression.
 export const GOLDEN_QUERIES: readonly GoldenQuery[] = [
   {
     id: "exact-title",

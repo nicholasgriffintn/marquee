@@ -32,8 +32,6 @@ function scoreFor(entry: AngleScore) {
   return (value + PRIOR_IMPRESSIONS * PRIOR_SCORE) / weight;
 }
 
-// The share of clicks that led nowhere. A rail that is clicked and then abandoned
-// before a provider or a watch is a rail that promised more than it delivered.
 function attritionFor(entry: AngleScore) {
   return entry.clicks > 0 ? clamp(1 - (entry.exits + entry.watched) / entry.clicks, 0, 1) : 0;
 }
@@ -58,8 +56,6 @@ function accumulate(entry: AngleScore, row: Row) {
   if (row.name === "rail_impression") {
     entry.impressions += total;
   } else if (row.name === "rail_click") {
-    // Only clicks carry a meaningful dwell: they are the one event that always
-    // arrives with the journey it was served in.
     entry.clicks += total;
     entry.dwellMs = Math.max(0, Math.round(row.dwell || 0));
   } else if (row.name === "title_view") {
@@ -72,8 +68,6 @@ function accumulate(entry: AngleScore, row: Row) {
 }
 
 export async function computeAngleScores(env: Bindings) {
-  // blob6 only carries an angle when the event arrived with a journey this worker
-  // signed, so unverified client traffic cannot reach these scores at all.
   const rows = await queryAnalytics<Row>(
     env,
     `SELECT blob6 AS source,

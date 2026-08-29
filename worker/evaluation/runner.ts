@@ -89,9 +89,6 @@ function meanReciprocalRank(relevance: RelevanceResult[]) {
   return ranks.reduce<number>((total, rank) => total + (rank ? 1 / rank : 0), 0) / ranks.length;
 }
 
-// Runs the fixture set against the live retrieval and guard code. Queries are run
-// one at a time: this is an operator-triggered read, and the point is a stable
-// number rather than a fast one.
 export async function runEvaluation(env: Bindings): Promise<EvaluationReport> {
   const expected = [...new Set(GOLDEN_QUERIES.flatMap((fixture) => fixture.expect))];
   const known = new Set(

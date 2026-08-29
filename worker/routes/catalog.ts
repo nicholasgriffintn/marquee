@@ -77,9 +77,6 @@ catalogRoutes.get("/", edgeCache(900), async (context) => {
 
     context.header("cache-control", "public, max-age=900");
 
-    // The whole response is edge-cached, so one journey is shared by everyone who
-    // gets the same cached copy. Attribution to an angle stays exact; the id is
-    // not unique per viewer, which is why this surface has its own mode.
     return context.json({
       ...catalogue,
       sections: await ticketSections(context.env, catalogue.sections, "catalogue"),

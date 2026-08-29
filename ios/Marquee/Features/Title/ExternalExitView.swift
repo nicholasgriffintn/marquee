@@ -19,8 +19,6 @@ struct ExternalDestination: Identifiable {
   var providerId: String? = nil
   var monetization: String? = nil
 
-  /// Leaving for a provider is the strongest signal the app can send: it says the
-  /// recommendation was good enough to act on.
   func reportExit() {
     guard kind == .provider, let titleId else { return }
 

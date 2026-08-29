@@ -5,9 +5,6 @@ type Journey = { token: string; rank?: number; startedAt: number };
 const journeys = new Map<string, Journey>();
 const LIMIT = 40;
 
-// A journey is the server's signed record of the set a title was served in. It
-// is deliberately short-lived and replaced on every fresh surface, so opening a
-// title from search never inherits the rail that showed it half an hour ago.
 export function startJourney(titleId: string, token: string | null | undefined, rank?: number) {
   if (!token) {
     journeys.delete(titleId);
