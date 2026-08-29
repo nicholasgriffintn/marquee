@@ -13,6 +13,7 @@ import { rebuildPeopleIndex } from "../repositories/usher.ts";
 import { rebuildWorkingSet } from "../repositories/working-set.ts";
 import { syncAdaptations } from "../services/adaptations.ts";
 import { syncAwards } from "../services/awards.ts";
+import { warmCatalogFacets } from "../services/catalog.ts";
 import { queueCinemaDirectories, queueCinemaScreenings } from "../services/cinema-sync.ts";
 import {
   DEEP_RECONCILE_LIMIT,
@@ -202,6 +203,10 @@ export class CatalogSweep extends WorkflowEntrypoint<WorkerBindings, CatalogSwee
 
     await step.do("prune catalogue gaps", { retries: RETRIES }, async () =>
       withDatabase(this.env, (env) => pruneCatalogueGaps(env.DB, GAP_DISCOVERY.retentionDays)),
+    );
+
+    await step.do("warm catalogue facets", { retries: RETRIES }, async () =>
+      withDatabase(this.env, warmCatalogFacets),
     );
 
     return { deep };

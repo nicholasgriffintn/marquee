@@ -149,7 +149,7 @@ export { CatalogSweep, CuratorSession, DigestWorkflow, RailsWorkflow };
 
 export default {
   async fetch(request, env, context) {
-    const { database, runtime } = await openDatabase(env);
+    const { database, runtime } = openDatabase(env);
 
     try {
       return await app.fetch(request, runtime, context);

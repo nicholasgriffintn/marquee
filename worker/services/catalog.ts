@@ -1,5 +1,5 @@
 import type { MediaTitle, TitleBuzz } from "../../src/domain/catalog.ts";
-import { readCachedValue, writeCachedValue } from "../lib/cache.ts";
+import { withKvCache, writeKvValue } from "../lib/cache.ts";
 import { logError } from "../lib/logging.ts";
 import {
   readAvailability,
@@ -9,6 +9,9 @@ import {
 } from "../repositories/catalog-reader.ts";
 import {
   browseTrending,
+  GENRE_LIMIT_MAX,
+  KEYWORD_LIMIT_MAX,
+  PLACE_LIMIT_MAX,
   readGenres,
   readFilmingPlaces,
   readKeywords,
@@ -290,36 +293,48 @@ export async function browseCatalogue(env: Bindings, browse: BrowseQuery) {
   };
 }
 
-const FACET_CACHE_SECONDS = 3_600;
+const FACET_CACHE_SECONDS = 21_600;
+const TRENDING_CACHE_SECONDS = 1_800;
 
-export async function getGenres(env: Bindings, limit: number) {
-  const cacheKey = `catalog-genres:${limit}`;
-  const cached = await readCachedValue<string[]>(cacheKey);
+const FACETS = {
+  "catalog-genres": { max: GENRE_LIMIT_MAX, read: readGenres },
+  "catalog-keywords": { max: KEYWORD_LIMIT_MAX, read: readKeywords },
+  "catalog-places": { max: PLACE_LIMIT_MAX, read: readFilmingPlaces },
+} as const satisfies Record<
+  string,
+  { max: number; read: (db: Database, max: number) => Promise<string[]> }
+>;
 
-  if (cached) {
-    return cached;
-  }
+type FacetName = keyof typeof FACETS;
 
-  const genres = await readGenres(env.DB, limit);
+async function readFacet(env: Bindings, name: FacetName, limit: number) {
+  const { max, read } = FACETS[name];
+  const values = await withKvCache(env, name, FACET_CACHE_SECONDS, () => read(env.DB, max));
 
-  await writeCachedValue(cacheKey, genres, FACET_CACHE_SECONDS);
-
-  return genres;
+  return values.slice(0, limit);
 }
 
-export async function getKeywords(env: Bindings, limit: number) {
-  const cacheKey = `catalog-keywords:${limit}`;
-  const cached = await readCachedValue<string[]>(cacheKey);
+export async function warmCatalogFacets(env: Bindings) {
+  const names = Object.keys(FACETS) as FacetName[];
+  const warmed = await Promise.all(
+    names.map(async (name) => {
+      const values = await FACETS[name].read(env.DB, FACETS[name].max);
 
-  if (cached) {
-    return cached;
-  }
+      await writeKvValue(env, name, values, FACET_CACHE_SECONDS);
 
-  const keywords = await readKeywords(env.DB, limit);
+      return values.length;
+    }),
+  );
 
-  await writeCachedValue(cacheKey, keywords, FACET_CACHE_SECONDS);
+  return Object.fromEntries(names.map((name, index) => [name, warmed[index]]));
+}
 
-  return keywords;
+export function getGenres(env: Bindings, limit: number) {
+  return readFacet(env, "catalog-genres", limit);
+}
+
+export function getKeywords(env: Bindings, limit: number) {
+  return readFacet(env, "catalog-keywords", limit);
 }
 
 export async function getTonight(
@@ -373,7 +388,7 @@ export async function getTonight(
   };
 }
 
-export async function getTrending(env: Bindings) {
+async function buildTrending(env: Bindings) {
   const ranked = await readTrendingBuzz(env);
   const items = await readRanked(
     env.DB,
@@ -392,17 +407,10 @@ export async function getTrending(env: Bindings) {
   };
 }
 
-export async function getFilmingPlaces(env: Bindings, limit: number) {
-  const cacheKey = `catalog-places:${limit}`;
-  const cached = await readCachedValue<string[]>(cacheKey);
+export function getTrending(env: Bindings) {
+  return withKvCache(env, "catalog-trending", TRENDING_CACHE_SECONDS, () => buildTrending(env));
+}
 
-  if (cached) {
-    return cached;
-  }
-
-  const places = await readFilmingPlaces(env.DB, limit);
-
-  await writeCachedValue(cacheKey, places, FACET_CACHE_SECONDS);
-
-  return places;
+export function getFilmingPlaces(env: Bindings, limit: number) {
+  return readFacet(env, "catalog-places", limit);
 }

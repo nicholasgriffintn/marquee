@@ -19,6 +19,11 @@ import {
   readItems,
 } from "../repositories/catalog-reader.ts";
 import {
+  GENRE_LIMIT_MAX,
+  KEYWORD_LIMIT_MAX,
+  PLACE_LIMIT_MAX,
+} from "../repositories/catalog-search.ts";
+import {
   listPeople,
   readCreditSeasons,
   readPerson,
@@ -200,7 +205,7 @@ catalogRoutes.get("/search", async (context) => {
 });
 
 catalogRoutes.get("/genres", edgeCache(3_600), async (context) => {
-  const limit = queryInteger(context, "limit", GENRES_DEFAULT_LIMIT, 1, 200);
+  const limit = queryInteger(context, "limit", GENRES_DEFAULT_LIMIT, 1, GENRE_LIMIT_MAX);
 
   try {
     context.header("cache-control", "public, max-age=3600");
@@ -252,7 +257,7 @@ catalogRoutes.get("/trending", edgeCache(1_800), async (context) => {
 });
 
 catalogRoutes.get("/places", edgeCache(3_600), async (context) => {
-  const limit = queryInteger(context, "limit", PLACES_DEFAULT_LIMIT, 1, 300);
+  const limit = queryInteger(context, "limit", PLACES_DEFAULT_LIMIT, 1, PLACE_LIMIT_MAX);
 
   try {
     return context.json({ places: await getFilmingPlaces(context.env, limit) });
@@ -265,7 +270,7 @@ catalogRoutes.get("/places", edgeCache(3_600), async (context) => {
 });
 
 catalogRoutes.get("/keywords", edgeCache(3_600), async (context) => {
-  const limit = queryInteger(context, "limit", KEYWORDS_DEFAULT_LIMIT, 1, 400);
+  const limit = queryInteger(context, "limit", KEYWORDS_DEFAULT_LIMIT, 1, KEYWORD_LIMIT_MAX);
 
   try {
     return context.json({ keywords: await getKeywords(context.env, limit) });

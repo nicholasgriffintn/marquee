@@ -5,6 +5,7 @@ import { readCollectionTitleIds, readItems } from "../repositories/catalog-reade
 import { readPerson } from "../repositories/people.ts";
 import { readWork } from "../repositories/revival.ts";
 import type { Bindings } from "../types.ts";
+import { withKvCache } from "./cache.ts";
 import { isKnownTitle } from "./validation.ts";
 
 export type PageCard = {
@@ -17,6 +18,7 @@ export type PageCard = {
   index: boolean;
 };
 
+const CARD_CACHE_SECONDS = 3_600;
 const NAMED_SERVICES = 3;
 const FACET_PARAMS = new Set(["type", "genres", "providers"]);
 
@@ -432,36 +434,54 @@ function staticCard(path: string, origin: string): PageCard | null {
   };
 }
 
+function cachedCard(env: Bindings, key: string, build: () => Promise<PageCard | null>) {
+  return withKvCache(env, `share-card:${key}`, CARD_CACHE_SECONDS, build);
+}
+
 export async function cardFor(env: Bindings, url: URL, origin: string): Promise<PageCard | null> {
   const path = url.pathname;
   const routed = /^\/(movie|tv)\/([1-9][0-9]*)(?:\/|$)/u.exec(path);
 
   if (routed) {
-    return titleCard(env, `${routed[1]}:${routed[2]}`, origin);
+    const titleId = `${routed[1]}:${routed[2]}`;
+
+    return cachedCard(env, `${origin}:title:${titleId}`, () => titleCard(env, titleId, origin));
   }
 
   const legacy = /^\/title\/([^/?#]+)/u.exec(path);
 
   if (legacy) {
-    return titleCard(env, decodeURIComponent(legacy[1]), origin);
+    const titleId = decodeURIComponent(legacy[1]);
+
+    return cachedCard(env, `${origin}:title:${titleId}`, () => titleCard(env, titleId, origin));
   }
 
   const person = /^\/person\/([^/?#]+)/u.exec(path);
 
   if (person) {
-    return personCard(env, decodeURIComponent(person[1]), origin);
+    const personId = decodeURIComponent(person[1]);
+
+    return cachedCard(env, `${origin}:person:${personId}`, () => personCard(env, personId, origin));
   }
 
   const collection = /^\/collection\/([1-9][0-9]*)/u.exec(path);
 
   if (collection) {
-    return collectionCard(env, Number(collection[1]), origin);
+    const collectionId = Number(collection[1]);
+
+    return cachedCard(env, `${origin}:collection:${collectionId}`, () =>
+      collectionCard(env, collectionId, origin),
+    );
   }
 
   const revival = /^\/revival\/([^/?#]+)/u.exec(path);
 
   if (revival) {
-    return revivalWorkCard(env, decodeURIComponent(revival[1]), origin);
+    const workId = decodeURIComponent(revival[1]);
+
+    return cachedCard(env, `${origin}:revival:${workId}`, () =>
+      revivalWorkCard(env, workId, origin),
+    );
   }
 
   if (path === "/listings") {

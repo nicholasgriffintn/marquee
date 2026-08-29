@@ -1,7 +1,7 @@
 import type { MiddlewareHandler } from "hono";
 
 import type { Bindings } from "../types.ts";
-import { logRejection } from "./logging.ts";
+import { logError, logRejection } from "./logging.ts";
 
 const edgeCaches = caches as unknown as { default: Cache };
 
@@ -35,6 +35,60 @@ export async function writeCachedValue(key: string, value: unknown, seconds: num
       },
     }),
   );
+}
+
+const KV_VERSION = "1";
+const KV_MINIMUM_SECONDS = 60;
+const KV_KEY_LIMIT = 512;
+
+function kvKey(key: string) {
+  return `v${KV_VERSION}:${key}`;
+}
+
+function storable(key: string) {
+  return new TextEncoder().encode(key).byteLength <= KV_KEY_LIMIT;
+}
+
+export function readKvValue<T>(env: Bindings, key: string, seconds: number): Promise<T | null> {
+  return env.CACHE.get<T>(kvKey(key), {
+    type: "json",
+    cacheTtl: Math.max(seconds, KV_MINIMUM_SECONDS),
+  });
+}
+
+export async function writeKvValue(env: Bindings, key: string, value: unknown, seconds: number) {
+  await env.CACHE.put(kvKey(key), JSON.stringify(value), {
+    expirationTtl: Math.max(seconds, KV_MINIMUM_SECONDS),
+  });
+}
+
+export async function withKvCache<T>(
+  env: Bindings,
+  key: string,
+  seconds: number,
+  build: () => Promise<T>,
+): Promise<T> {
+  if (!storable(kvKey(key))) {
+    return build();
+  }
+
+  const cached = await readKvValue<T>(env, key, seconds).catch((error: unknown) => {
+    logError("kv_cache_read_failed", error, { key });
+
+    return null;
+  });
+
+  if (cached !== null) {
+    return cached;
+  }
+
+  const value = await build();
+
+  if (value !== null && value !== undefined) {
+    await logRejection(writeKvValue(env, key, value, seconds), "kv_cache_write_failed", { key });
+  }
+
+  return value;
 }
 
 export function edgeCache(seconds: number): MiddlewareHandler<{ Bindings: Bindings }> {

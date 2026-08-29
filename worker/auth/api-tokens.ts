@@ -10,6 +10,7 @@ import type { Bindings } from "../types.ts";
 import type { MarqueeUser } from "./model.ts";
 
 const TOKEN_PREFIX = "mq_";
+const LAST_USED_RESOLUTION_MINUTES = 15;
 
 export function mintToken() {
   return `${TOKEN_PREFIX}${randomHex()}`;
@@ -113,8 +114,10 @@ export async function bearerIdentity(
   }
 
   await env.DB.execute(
-    `UPDATE api_tokens SET last_used_at = CURRENT_TIMESTAMP WHERE token_hash = $1`,
-    [tokenHash],
+    `UPDATE api_tokens SET last_used_at = CURRENT_TIMESTAMP
+     WHERE token_hash = $1
+       AND (last_used_at IS NULL OR last_used_at < CURRENT_TIMESTAMP + CAST($2 AS INTERVAL))`,
+    [tokenHash, `-${LAST_USED_RESOLUTION_MINUTES} minutes`],
   );
 
   return {

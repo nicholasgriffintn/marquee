@@ -413,6 +413,8 @@ export async function readRanked(db: Database, ids: string[]) {
   });
 }
 
+export const GENRE_LIMIT_MAX = 200;
+
 export async function readGenres(db: Database, limit = 100) {
   const rows = await db.query<{ genre: string; titles: number }>(
     `SELECT genre, count(*) AS titles
@@ -421,13 +423,15 @@ export async function readGenres(db: Database, limit = 100) {
        HAVING count(*) >= 5
        ORDER BY titles DESC
        LIMIT $1`,
-    [clamp(limit, 1, 200)],
+    [clamp(limit, 1, GENRE_LIMIT_MAX)],
   );
 
   return rows.rows
     .filter((row) => typeof row.genre === "string" && row.genre.length > 0)
     .map((row) => row.genre);
 }
+
+export const KEYWORD_LIMIT_MAX = 400;
 
 export async function readKeywords(db: Database, limit = 120) {
   const rows = await db.query<{ keyword: string; titles: number }>(
@@ -437,13 +441,15 @@ export async function readKeywords(db: Database, limit = 120) {
        HAVING count(*) >= 8
        ORDER BY titles DESC
        LIMIT $1`,
-    [clamp(limit, 1, 400)],
+    [clamp(limit, 1, KEYWORD_LIMIT_MAX)],
   );
 
   return rows.rows
     .filter((row) => typeof row.keyword === "string" && row.keyword.length > 0)
     .map((row) => row.keyword);
 }
+
+export const PLACE_LIMIT_MAX = 300;
 
 export async function readFilmingPlaces(db: Database, limit = 80) {
   const rows = await db.query<{ label: string; titles: number }>(
@@ -455,7 +461,7 @@ export async function readFilmingPlaces(db: Database, limit = 80) {
        HAVING count(DISTINCT tp.title_id) >= 4
        ORDER BY titles DESC
        LIMIT $1`,
-    [clamp(limit, 1, 300)],
+    [clamp(limit, 1, PLACE_LIMIT_MAX)],
   );
 
   return rows.rows.map((row) => row.label);

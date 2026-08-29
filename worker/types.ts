@@ -48,6 +48,7 @@ export type WorkerBindings = DatabaseBinding & {
   DIGEST_WORKFLOW: Workflow;
   CURATOR_SESSION: DurableObjectNamespace;
   MEDIA: R2Bucket;
+  CACHE: KVNamespace;
   TRAKT_CLIENT_ID?: string;
   TRAKT_CLIENT_SECRET?: string;
   MAL_CLIENT_ID?: string;

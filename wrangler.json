@@ -18,6 +18,12 @@
     "not_found_handling": "single-page-application",
     "run_worker_first": ["/*", "!/assets/*"]
   },
+  "kv_namespaces": [
+    {
+      "binding": "CACHE",
+      "id": "2ab22ed32c6c4d16a3fa3f3ca5afd036"
+    }
+  ],
   "r2_buckets": [
     {
       "binding": "MEDIA",
