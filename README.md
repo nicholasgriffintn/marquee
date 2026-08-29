@@ -328,7 +328,8 @@ limits them like any public read, and responses carry `x-robots-tag: noindex`.
 is talking to. Listings are only pulled near somewhere a member has actually looked from, so the
 work grows with the audience rather than with the map.
 
-**Agents** — Marquee speaks MCP at `/mcp`. Mint a token on the Sources page:
+**Agents** — Marquee speaks MCP at `/mcp`, protocol revision `2025-11-25`. Mint a token on the
+Sources page:
 
 ```json
 {
@@ -345,6 +346,12 @@ It exposes `search_catalogue`, `find_similar`, `get_title`, `get_shelf`, `save_t
 `whats_on_tonight`, `whats_on_this_week`, `titles_by_person` and `follow_person`. The week tool
 answers from the same shelf-aware diary the calendar feed is built from, so an agent sees exactly
 what the subscription would show.
+
+**Scopes** narrow what a token may do, one per tool, from the vocabulary in
+`src/domain/scopes.ts`. `/mcp` is the whole of a scoped token's surface: the REST API answers with
+the account entire, so rather than carve it up route by route it takes `account:full`, which only
+the iOS app and pre-scope tokens hold. Mutations write nothing without `confirm: true`, returning
+the change they would make so it can be approved first.
 
 **Posters** are cached in R2 and served from the app's own hostname through Cloudflare Images. Keep
 the four widths in `src/lib/media.ts` and `worker/routes/media.ts` aligned, or the number of

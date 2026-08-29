@@ -8,10 +8,11 @@ import {
   withStoredPoster,
 } from "../lib/catalog-payload.ts";
 import { clamp } from "../lib/numbers.ts";
+import { providerFilterSql } from "../lib/providers.ts";
 import { isKnownTitle, validProviderIds } from "../lib/validation.ts";
 import { hydrateTitleRows } from "./catalog-arrays.ts";
 
-export type CatalogueSort = "trending" | "popularity" | "score" | "recent" | "relevance";
+export type CatalogueSort = "trending" | "popularity" | "score" | "recent" | "relevance" | "given";
 
 export type SearchScope = "title" | "everything";
 
@@ -38,6 +39,7 @@ export type CatalogueSearch = {
   maxRuntime?: number;
   excludeIds?: string[];
   includeIds?: string[];
+  certifications?: string[];
   sort?: CatalogueSort;
   scope?: SearchScope;
   matchAny?: boolean;
@@ -53,6 +55,7 @@ const ORDER_BY: Record<CatalogueSort, string> = {
   score: `${WEIGHTED_RATING} DESC, t.popularity DESC`,
   recent: "COALESCE(t.year, 0) DESC, t.popularity DESC",
   relevance: `${RELEVANCE}, t.popularity DESC`,
+  given: "t.popularity DESC",
 };
 
 function ftsMatchQuery(raw: string, scope: SearchScope = "everything", matchAny = false) {
@@ -151,12 +154,7 @@ export async function searchCatalogue(db: D1Database, search: CatalogueSearch) {
   }
 
   if (providerIds.length) {
-    conditions.push(
-      `EXISTS (
-         SELECT 1 FROM catalog_title_providers AS p
-         WHERE p.title_id = t.id AND p.provider_id IN (SELECT value FROM json_each(?))
-       )`,
-    );
+    conditions.push(providerFilterSql("t.id"));
     bindings.push(JSON.stringify(providerIds));
   }
 
@@ -177,8 +175,20 @@ export async function searchCatalogue(db: D1Database, search: CatalogueSearch) {
   }
 
   if (Number.isFinite(search.maxRuntime)) {
-    conditions.push(`(t.runtime_minutes IS NULL OR t.runtime_minutes <= ?)`);
+    conditions.push(`(t.runtime_minutes IS NOT NULL AND t.runtime_minutes <= ?)`);
     bindings.push(clamp(Math.trunc(search.maxRuntime ?? 600), 30, 600));
+  }
+
+  const certifications = (search.certifications ?? []).filter(Boolean).slice(0, 60);
+
+  if (certifications.length) {
+    conditions.push(
+      `NOT EXISTS (
+         SELECT 1 FROM json_each(?) AS rated
+         WHERE t.certification = rated.value OR t.certification LIKE '% ' || rated.value
+       )`,
+    );
+    bindings.push(JSON.stringify(certifications));
   }
 
   if (Number.isFinite(search.releasedAfter)) {
@@ -198,8 +208,15 @@ export async function searchCatalogue(db: D1Database, search: CatalogueSearch) {
       return [];
     }
 
+    const encoded = JSON.stringify(includedIds);
+
     conditions.push(`t.id IN (SELECT value FROM json_each(?))`);
-    bindings.push(JSON.stringify(includedIds));
+    bindings.push(encoded);
+
+    if (sort === "given") {
+      orderBy = `(SELECT key FROM json_each(?) WHERE value = t.id)`;
+      orderBindings.push(encoded);
+    }
   }
 
   const from = match

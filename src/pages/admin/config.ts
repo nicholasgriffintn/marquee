@@ -69,6 +69,7 @@ export const ACTION_GROUPS: {
     actions: [
       { id: "sections", label: "Rebuild homepage" },
       { id: "working-set", label: "Rebuild working set" },
+      { id: "search-index", label: "Reconcile search index" },
       { id: "schedule", label: "Refresh air dates" },
       { id: "buzz", label: "Refresh trending" },
       { id: "awards", label: "Read awards" },

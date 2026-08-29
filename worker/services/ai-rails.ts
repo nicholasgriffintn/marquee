@@ -236,6 +236,7 @@ async function seedCandidates(
           await searchCatalogue(env.DB, {
             ...base,
             includeIds: matches.map((match) => match.id),
+            sort: angle.search.sort ?? "given",
           }),
         );
       }
@@ -667,6 +668,7 @@ export async function prepareRails(
   };
   const exclude = [
     ...onHomepage,
+    ...refused,
     ...rejected,
     ...viewer.entries
       .filter((entry) => entry.status === "watched" || entry.status === "dropped")

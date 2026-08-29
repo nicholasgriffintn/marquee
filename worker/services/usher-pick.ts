@@ -51,6 +51,7 @@ export type ShortlistConstraints = {
   maxRuntime?: number | null;
   mediaType?: "movie" | "tv";
   genres?: string[];
+  certifications?: string[];
   text?: string;
   limit?: number;
 };
@@ -86,6 +87,7 @@ export async function shortlistFor(
     minVotes: 200,
     ...(constraints.maxRuntime ? { maxRuntime: constraints.maxRuntime } : {}),
     ...(constraints.mediaType ? { mediaType: constraints.mediaType } : {}),
+    ...(constraints.certifications?.length ? { certifications: constraints.certifications } : {}),
   };
   const base = {
     ...loose,
@@ -105,7 +107,11 @@ export async function shortlistFor(
       const ids = matches.matches.map((match) => match.id);
 
       if (ids.length) {
-        const titles = await searchCatalogue(env.DB, { ...base, includeIds: ids });
+        const titles = await searchCatalogue(env.DB, {
+          ...base,
+          includeIds: ids,
+          sort: "given",
+        });
 
         if (titles.length) {
           const scores = new Map(matches.matches.map((match) => [match.id, match.score]));

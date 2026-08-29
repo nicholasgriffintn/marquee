@@ -1,10 +1,11 @@
 import { parseCookies, serializeCookie } from "@ngriffin_uk/auth-cookie";
 import type { Context, MiddlewareHandler } from "hono";
 
+import { API_SCOPES, type ApiScope } from "../../src/domain/scopes.ts";
 import { jsonResponse } from "../lib/http.ts";
 import { canonicalOrigin } from "../lib/security.ts";
 import type { Bindings } from "../types.ts";
-import { bearerToken, bearerUser } from "./api-tokens.ts";
+import { bearerIdentity, bearerToken } from "./api-tokens.ts";
 import { createAuthentication } from "./authentication.ts";
 import type { MarqueeUser } from "./model.ts";
 
@@ -33,7 +34,12 @@ export function authenticationFor(env: Bindings, request: Request) {
   return createAuthentication(env.DB, env, origin);
 }
 
-export type Principal = { kind: "bearer" | "session"; token: string; user: MarqueeUser };
+export type Principal = {
+  kind: "bearer" | "session";
+  token: string;
+  user: MarqueeUser;
+  scopes: readonly ApiScope[];
+};
 
 const principals = new WeakMap<Request, Promise<Principal | null>>();
 
@@ -58,14 +64,16 @@ async function resolvePrincipal(env: Bindings, request: Request): Promise<Princi
     const user = await authenticationFor(env, request).currentUser(token);
 
     if (user) {
-      return { kind: "session", token, user };
+      return { kind: "session", token, user, scopes: API_SCOPES };
     }
   }
 
   const apiToken = bearerToken(request);
-  const user = apiToken ? await bearerUser(env, request) : null;
+  const identity = apiToken ? await bearerIdentity(env, request) : null;
 
-  return user && apiToken ? { kind: "bearer", token: apiToken, user } : null;
+  return identity && apiToken
+    ? { kind: "bearer", token: apiToken, user: identity.user, scopes: identity.scopes }
+    : null;
 }
 
 export function guestIdentity(env: Bindings, request: Request) {

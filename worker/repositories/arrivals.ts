@@ -1,7 +1,7 @@
 import type { ProviderAvailability } from "../../src/domain/catalog.ts";
+import { isStreamingOffer } from "../../src/domain/providers.ts";
 import { logError } from "../lib/logging.ts";
 
-const STREAMING_OFFERS = new Set(["Subscription", "Free", "Free with ads"]);
 const CONFIRMATIONS = 2;
 
 export type Arrival = {
@@ -12,7 +12,7 @@ export type Arrival = {
 };
 
 function streamingKind(provider: ProviderAvailability) {
-  return provider.offerTypes.some((offer) => STREAMING_OFFERS.has(offer)) ? "streaming" : "paid";
+  return provider.offerTypes.some(isStreamingOffer) ? "streaming" : "paid";
 }
 
 export async function recordProviderState(

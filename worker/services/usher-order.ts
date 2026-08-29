@@ -1,4 +1,5 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
+import { ADULT_CERTIFICATIONS } from "../../src/domain/certification.ts";
 import { showingFor, type TonightOrder } from "../../src/domain/usher.ts";
 import { runAiObject } from "../ai/run.ts";
 import { USHER_VOICE } from "../ai/usher-voice.ts";
@@ -18,7 +19,10 @@ import { factBrief, factsFor, serviceFor } from "./why.ts";
 
 const ORDER_SHORTLIST = 12;
 const BACKUPS = 2;
-const COMPANY: Record<string, { note: string; text: string; genres?: string[] }> = {
+const COMPANY: Record<
+  string,
+  { note: string; text: string; genres?: string[]; certifications?: string[] }
+> = {
   alone: {
     note: "watching on their own, answerable to nobody",
     text: "a film to watch alone without explaining yourself to anyone",
@@ -35,6 +39,7 @@ const COMPANY: Record<string, { note: string; text: string; genres?: string[] }>
     note: "children in the room, so nothing that will need explaining afterwards",
     text: "something the whole family can watch together",
     genres: ["family", "animation", "adventure", "comedy"],
+    certifications: ADULT_CERTIFICATIONS,
   },
 };
 
@@ -110,6 +115,7 @@ export function constraintsFor(order: TonightOrder, guests: Guest[] = []): Short
     limit: ORDER_SHORTLIST,
     ...(length?.maxRuntime ? { maxRuntime: length.maxRuntime } : {}),
     ...(length?.mediaType ? { mediaType: length.mediaType } : {}),
+    ...(company?.certifications ? { certifications: company.certifications } : {}),
     ...(genres.length ? { genres } : {}),
     text: [mood?.text, company?.text, length?.text].filter(Boolean).join(", "),
   };

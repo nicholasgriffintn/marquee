@@ -105,15 +105,16 @@ async function freshForViewer(
     return NO_FRESH;
   }
 
+  const encoded = JSON.stringify(ids);
   const rows = await env.DB.prepare(
     `SELECT id
      FROM catalog_titles
      WHERE id IN (SELECT value FROM json_each(?))
        AND COALESCE(year, 0) >= ?
-     ORDER BY popularity DESC
+     ORDER BY (SELECT key FROM json_each(?) WHERE value = catalog_titles.id)
      LIMIT ?`,
   )
-    .bind(JSON.stringify(ids), new Date().getUTCFullYear() - 1, FRESH_PICKS)
+    .bind(encoded, new Date().getUTCFullYear() - 1, encoded, FRESH_PICKS)
     .all<{ id: string }>();
   const scores = new Map(matches.matches.map((match) => [match.id, match.score]));
 
