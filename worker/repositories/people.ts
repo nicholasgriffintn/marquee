@@ -199,7 +199,7 @@ export async function readPersonTitleIds(db: Database, personId: number, limit =
            FROM catalog_credits AS p
            JOIN catalog_titles AS t ON t.id = p.title_id
           WHERE p.person_id = $1
-          GROUP BY p.title_id
+          GROUP BY p.title_id, t.year, t.popularity
           ORDER BY COALESCE(t.year, 0) DESC, t.popularity DESC
           LIMIT $2 OFFSET $3`,
       [personId, clamp(limit, 1, 96), Math.max(0, offset)],

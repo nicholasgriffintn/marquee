@@ -74,7 +74,7 @@ export async function readShelfDetail(db: Database, viewerId: string, limit = 20
     genres: string | null;
   }>(
     `SELECT t.title, t.year, v.status, v.rating, v.thoughts,
-              (SELECT json_group_array(genre) FROM
+              (SELECT json_agg(genre)::text FROM
                 (SELECT genre FROM catalog_title_genres
                   WHERE title_id = t.id ORDER BY position)) AS genres
        FROM viewing_entries AS v

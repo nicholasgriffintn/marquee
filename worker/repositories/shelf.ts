@@ -7,6 +7,7 @@ import {
   withStoredPoster,
 } from "../lib/catalog-payload.ts";
 import { hydrateTitleRows } from "./catalog-arrays.ts";
+import { furthestEpisodeColumns } from "./viewing-progress.ts";
 
 export type ShelfPageQuery = {
   status: EntryStatus | null;
@@ -45,13 +46,7 @@ const ORDER_BY: Record<ShelfSort, string> = {
   genre: `${FIRST_GENRE} IS NULL, lower(${FIRST_GENRE}), lower(t.title), e.id`,
 };
 
-const FURTHEST_EPISODE = `viewing_episode_entries
-       WHERE viewer_id = e.viewer_id AND title_id = e.title_id
-         AND scope = 'episode' AND watched = 1 AND season_number > 0
-       ORDER BY season_number DESC, episode_number DESC LIMIT 1`;
-
-const PROGRESS_COLUMNS = `(SELECT season_number FROM ${FURTHEST_EPISODE}) AS season,
-                (SELECT episode_number FROM ${FURTHEST_EPISODE}) AS episode`;
+const PROGRESS_COLUMNS = furthestEpisodeColumns("e.viewer_id", "e.title_id");
 
 function conditions(query: ShelfPageQuery) {
   const where = ["e.viewer_id = $1"];
@@ -137,10 +132,11 @@ export async function readShelfPage(db: Database, viewerId: string, query: Shelf
 
 export async function readShelfGenres(db: Database, viewerId: string) {
   const rows = await db.query<{ genre: string }>(
-    `SELECT DISTINCT g.genre AS genre
+    `SELECT g.genre AS genre
          FROM viewing_entries AS e
          JOIN catalog_title_genres AS g ON g.title_id = e.title_id
         WHERE e.viewer_id = $1
+        GROUP BY g.genre
         ORDER BY lower(g.genre), g.genre`,
     [viewerId],
   );

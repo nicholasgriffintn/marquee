@@ -19,7 +19,7 @@ CREATE TABLE title_enrichment (
   source TEXT NOT NULL,
   payload TEXT NOT NULL,
   fetched_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  miss SMALLINT NOT NULL DEFAULT 0 CHECK (miss IN (0, 1)),
+  miss SMALLINT NOT NULL DEFAULT 0 CHECK (miss IN (0, 1, 2)),
   attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
   next_check_at TIMESTAMPTZ,
   PRIMARY KEY (title_id, source)

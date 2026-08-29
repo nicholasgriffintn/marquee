@@ -33,7 +33,7 @@ CREATE FUNCTION queue_catalog_title_index() RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $$
 BEGIN
-  INSERT INTO catalog_index_pending (title_id, reason)
+  INSERT INTO public.catalog_index_pending (title_id, reason)
   VALUES (NEW.id, 'title')
   ON CONFLICT (title_id) DO NOTHING;
   RETURN NEW;

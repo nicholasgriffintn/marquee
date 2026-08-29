@@ -40,7 +40,7 @@ export async function readRecentNotes(
 
   try {
     const rows = await db.query<ViewerNote>(
-      `SELECT * FROM (${noteQuery(() => "1 = 1")}) ORDER BY notedAt DESC LIMIT $2`,
+      `SELECT * FROM (${noteQuery(() => "1 = 1")}) ORDER BY "notedAt" DESC LIMIT $2`,
       [viewerId, limit],
     );
 
@@ -66,7 +66,7 @@ export async function readNotesByIds(
   try {
     const rows = await db.query<ViewerNote>(
       `SELECT * FROM (${noteQuery((alias) => `${alias}.id IN (${placeholders})`)})
-          ORDER BY notedAt DESC`,
+          ORDER BY "notedAt" DESC`,
       [viewerId, ...ids],
     );
 

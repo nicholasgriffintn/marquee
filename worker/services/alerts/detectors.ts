@@ -94,7 +94,7 @@ const seasons: Detector = {
                   (SELECT max(p.season) FROM title_schedule AS p
                     WHERE p.title_id = s.title_id
                       AND (EXTRACT(EPOCH FROM p.airs_at) / 86400.0) < (EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - INTERVAL '30 day')) / 86400.0)), 0)
-          GROUP BY v.viewer_id, s.title_id, s.season
+          GROUP BY v.viewer_id, s.title_id, s.show_name, s.season, s.network
           LIMIT 400`,
         [`+${SEASON_HORIZON_DAYS} days`],
       );
@@ -147,8 +147,8 @@ const cinema: Detector = {
             AND v.status IN ('watchlist', 'watching')
             AND (EXTRACT(EPOCH FROM c.business_day) / 86400.0) BETWEEN (EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) / 86400.0)
                                              AND (EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP + CAST($1 AS INTERVAL))) / 86400.0)
-          GROUP BY v.viewer_id, c.title_id
-          ORDER BY businessDay
+          GROUP BY v.viewer_id, c.title_id, t.title, cin.name
+          ORDER BY "businessDay"
           LIMIT 200`,
         [`+${CINEMA_HORIZON_DAYS} days`],
       );

@@ -347,8 +347,8 @@ export async function readTrendingBuzz(env: Bindings, limit = 20) {
      FROM title_buzz AS b
      JOIN catalog_titles AS t ON t.id = b.title_id
      WHERE b.article <> '' AND b.views >= ${MIN_TRENDING_VIEWS}
-       AND max(b.world_score, b.score) > 0
-     ORDER BY max(b.world_score, b.score) DESC
+       AND GREATEST(b.world_score, b.score) > 0
+     ORDER BY GREATEST(b.world_score, b.score) DESC
      LIMIT $1`,
     [clamp(limit, 1, 60)],
   );

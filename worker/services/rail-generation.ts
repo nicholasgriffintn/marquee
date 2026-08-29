@@ -70,7 +70,7 @@ async function claimGeneration(db: Database, viewerId: string, revision: string)
          claim_revision = excluded.claim_revision,
          claimed_at = excluded.claimed_at
        WHERE ai_rails.claimed_at IS NULL
-          OR ai_rails.claim_revision IS NOT excluded.claim_revision
+          OR ai_rails.claim_revision IS DISTINCT FROM excluded.claim_revision
           OR ai_rails.claimed_at < (CURRENT_TIMESTAMP + CAST($3 AS INTERVAL))`,
     [viewerId, revision, `-${LEASE_MINUTES} minutes`],
   );

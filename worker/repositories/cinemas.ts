@@ -342,14 +342,15 @@ export async function readScreeningsForTitle(
     return [];
   }
 
-  const placeholders = cinemaIds.map((_, index) => `$${index + 1}`).join(", ");
+  const placeholders = cinemaIds.map((_, index) => `$${index + 2}`).join(", ");
+  const horizonParameter = cinemaIds.length + 2;
   const rows = await db.query<ScreeningRow>(
     `SELECT id, cinema_id AS "cinemaId", starts_at AS "startsAt", business_day AS "businessDay",
               precision, attributes, booking_url AS "bookingUrl"
        FROM cinema_screenings
        WHERE title_id = $1
          AND cinema_id IN (${placeholders})
-         AND business_day BETWEEN CURRENT_DATE AND (CURRENT_DATE + CAST($2 AS INTERVAL))
+         AND business_day BETWEEN CURRENT_DATE AND (CURRENT_DATE + CAST($${horizonParameter} AS INTERVAL))
        ORDER BY business_day, COALESCE(starts_at, business_day)
        LIMIT 400`,
     [titleId, ...cinemaIds, `+${Math.max(1, horizonDays)} days`],

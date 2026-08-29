@@ -868,13 +868,14 @@ export async function selectKnownSourceIds(
     return new Set<string>();
   }
 
-  const slots = sourceIds.map((_, index) => `$${index + 1}`).join(", ");
+  const slots = sourceIds.map((_, index) => `$${index + 2}`).join(", ");
+  const freshParameter = sourceIds.length + 2;
   const rows = await db.query<{ sourceId: string }>(
     `SELECT source_id AS "sourceId"
        FROM revival_works
        WHERE source = $1
          AND source_id IN (${slots})
-         AND updated_at > (CURRENT_TIMESTAMP + CAST($2 AS INTERVAL))`,
+         AND updated_at > (CURRENT_TIMESTAMP + CAST($${freshParameter} AS INTERVAL))`,
     [source, ...sourceIds, `-${Math.max(1, Math.trunc(freshDays))} days`],
   );
 
@@ -1023,7 +1024,7 @@ export async function saveProgress(
        VALUES ($1, $2, $3, $4)
        ON CONFLICT(viewer_id, work_id) DO UPDATE SET
          position_seconds = excluded.position_seconds,
-         finished = max(revival_progress.finished, excluded.finished),
+         finished = GREATEST(revival_progress.finished, excluded.finished),
          updated_at = CURRENT_TIMESTAMP`,
     [viewerId, workId, Math.max(0, Math.floor(positionSeconds)), finished ? 1 : 0],
   );

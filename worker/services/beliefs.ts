@@ -48,10 +48,10 @@ async function factsFor(db: Database, titleIds: string[]): Promise<TitleFacts[]>
 
   const rows = await db.query<FactRow>(
     `SELECT id,
-              (SELECT json_group_array(genre) FROM
+              (SELECT json_agg(genre)::text FROM
                 (SELECT genre FROM catalog_title_genres
                   WHERE title_id = catalog_titles.id ORDER BY position)) AS genres,
-              (SELECT json_group_array(person) FROM
+              (SELECT json_agg(person)::text FROM
                 (SELECT person FROM catalog_title_people
                   WHERE title_id = catalog_titles.id ORDER BY position)) AS people,
               runtime_minutes AS runtime

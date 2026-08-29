@@ -190,16 +190,16 @@ export async function storeAnimeIds(db: Database, mappings: AnimeMapping[]) {
       // oxlint-disable-next-line no-await-in-loop
       const titleUpdate = await transaction.execute(
         `UPDATE catalog_titles
-         SET mal_id = COALESCE($1, mal_id),
-             anilist_id = COALESCE($2, anilist_id),
-             wikidata_id = COALESCE($3, wikidata_id),
-             imdb_id = COALESCE($4, imdb_id),
+         SET mal_id = COALESCE($1::integer, mal_id),
+             anilist_id = COALESCE($2::integer, anilist_id),
+             wikidata_id = COALESCE($3::text, wikidata_id),
+             imdb_id = COALESCE($4::text, imdb_id),
              updated_at = CURRENT_TIMESTAMP
          WHERE id = $5
-           AND (($1 IS NOT NULL AND mal_id IS DISTINCT FROM $1)
-             OR ($2 IS NOT NULL AND anilist_id IS DISTINCT FROM $2)
-             OR ($3 IS NOT NULL AND wikidata_id IS DISTINCT FROM $3)
-             OR ($4 IS NOT NULL AND imdb_id IS DISTINCT FROM $4))`,
+           AND (($1::integer IS NOT NULL AND mal_id IS DISTINCT FROM $1::integer)
+             OR ($2::integer IS NOT NULL AND anilist_id IS DISTINCT FROM $2::integer)
+             OR ($3::text IS NOT NULL AND wikidata_id IS DISTINCT FROM $3::text)
+             OR ($4::text IS NOT NULL AND imdb_id IS DISTINCT FROM $4::text))`,
         [
           mapping.ids.malId ?? null,
           mapping.ids.anilistId ?? null,
@@ -235,7 +235,8 @@ export async function storeAnimeIds(db: Database, mappings: AnimeMapping[]) {
         `INSERT INTO catalog_title_external_ids
              (title_id, tvdb_id, facebook_id, instagram_id, twitter_id, anidb_id, kitsu_id,
               ani_search_id, anime_planet_id, livechart_id, animenewsnetwork_id, animecountdown_id)
-           SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
+           SELECT $1::text, $2::integer, $3::text, $4::text, $5::text, $6::integer,
+                  $7::integer, $8::integer, $9::text, $10::integer, $11::integer, $12::integer
              FROM catalog_titles WHERE id = $1
            ON CONFLICT (title_id) DO UPDATE SET
              tvdb_id = COALESCE(excluded.tvdb_id, catalog_title_external_ids.tvdb_id),

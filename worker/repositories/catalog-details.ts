@@ -1,5 +1,10 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
-import { deleteByTitleIds, insertRows, queryChunked } from "./catalog-array-utils.ts";
+import {
+  deleteByTitleIds,
+  insertRows,
+  queryChunked,
+  rowPlaceholders,
+} from "./catalog-array-utils.ts";
 
 type DetailsRow = {
   titleId: string;
@@ -79,7 +84,7 @@ export async function writeDetailsRows(db: Database, titles: MediaTitle[]) {
       `INSERT INTO catalog_title_details
          (title_id, homepage, trailer_key, tagline, budget, episode_count,
           last_air_date, next_air_date, pending)
-       VALUES ${chunk.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ")}
+       VALUES ${rowPlaceholders(chunk.length, 9)}
        ON CONFLICT (title_id) DO UPDATE SET
          homepage = excluded.homepage, trailer_key = excluded.trailer_key,
          tagline = excluded.tagline, budget = excluded.budget,

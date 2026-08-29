@@ -1,13 +1,11 @@
 import { isRecord } from "../lib/values.ts";
 import type { EntryStatus } from "../types.ts";
+import { furthestEpisodeColumns } from "./viewing-progress.ts";
 
-const FURTHEST_EPISODE = `viewing_episode_entries
-       WHERE viewer_id = viewing_entries.viewer_id AND title_id = viewing_entries.title_id
-         AND scope = 'episode' AND watched = 1 AND season_number > 0
-       ORDER BY season_number DESC, episode_number DESC LIMIT 1`;
-
-const PROGRESS_COLUMNS = `(SELECT season_number FROM ${FURTHEST_EPISODE}) AS season,
-         (SELECT episode_number FROM ${FURTHEST_EPISODE}) AS episode`;
+const PROGRESS_COLUMNS = furthestEpisodeColumns(
+  "viewing_entries.viewer_id",
+  "viewing_entries.title_id",
+);
 
 export async function readProfile(db: Database, viewerId: string) {
   const entriesResult = await db.query(
@@ -81,7 +79,7 @@ export async function readProfileSummary(db: Database, viewerId: string) {
   const row = await db.first<{ shelved: number; unrated: number | null; updatedAt: string }>(
     `SELECT count(*) AS shelved,
               sum(CASE WHEN rating IS NULL THEN 1 ELSE 0 END) AS unrated,
-              COALESCE(max(updated_at), '') AS "updatedAt"
+              COALESCE(max(updated_at)::text, '') AS "updatedAt"
          FROM viewing_entries
         WHERE viewer_id = $1`,
     [viewerId],

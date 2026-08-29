@@ -1,5 +1,11 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
-import { deleteByTitleIds, groupBy, insertRows, queryChunked } from "./catalog-array-utils.ts";
+import {
+  deleteByTitleIds,
+  groupBy,
+  insertRows,
+  queryChunked,
+  rowPlaceholders,
+} from "./catalog-array-utils.ts";
 
 export async function readAnimeSynonymMap(db: Database, ids: string[]) {
   const rows = await queryChunked(ids, (wave) =>
@@ -46,7 +52,7 @@ export async function writeAnimeSynonymRows(db: Database, titles: MediaTitle[]) 
     rows,
     (chunk) =>
       `INSERT INTO catalog_title_anime_synonyms (title_id, synonym, position)
-       VALUES ${chunk.map(() => "(?, ?, ?)").join(", ")}
+       VALUES ${rowPlaceholders(chunk.length, 3)}
        ON CONFLICT DO NOTHING`,
   );
 }
@@ -109,7 +115,7 @@ export async function writeAnimeCompanyRows(db: Database, titles: MediaTitle[]) 
     rows,
     (chunk) =>
       `INSERT INTO catalog_title_anime_companies (title_id, kind, name, position)
-       VALUES ${chunk.map(() => "(?, ?, ?, ?)").join(", ")}
+       VALUES ${rowPlaceholders(chunk.length, 4)}
        ON CONFLICT DO NOTHING`,
   );
 }

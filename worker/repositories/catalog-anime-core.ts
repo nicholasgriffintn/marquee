@@ -1,5 +1,10 @@
 import type { AnimeDetails, MediaTitle } from "../../src/domain/catalog.ts";
-import { deleteByTitleIds, insertRows, queryChunked } from "./catalog-array-utils.ts";
+import {
+  deleteByTitleIds,
+  insertRows,
+  queryChunked,
+  rowPlaceholders,
+} from "./catalog-array-utils.ts";
 
 export type AnimeCore = Omit<
   AnimeDetails,
@@ -159,6 +164,6 @@ export async function writeAnimeCoreRows(db: Database, titles: MediaTitle[]) {
           rank, popularity, members, favorites, key_visual_url,
           status_breakdown_watching, status_breakdown_completed, status_breakdown_on_hold,
           status_breakdown_dropped, status_breakdown_plan_to_watch)
-       VALUES ${chunk.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ")}`,
+       VALUES ${rowPlaceholders(chunk.length, 23)}`,
   );
 }

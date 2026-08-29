@@ -1,5 +1,11 @@
 import type { AnimeStream, AnimeTheme, AnimeVideo, MediaTitle } from "../../src/domain/catalog.ts";
-import { deleteByTitleIds, groupBy, insertRows, queryChunked } from "./catalog-array-utils.ts";
+import {
+  deleteByTitleIds,
+  groupBy,
+  insertRows,
+  queryChunked,
+  rowPlaceholders,
+} from "./catalog-array-utils.ts";
 
 export async function readAnimeStreamMap(db: Database, ids: string[]) {
   const rows = await queryChunked(ids, (wave) =>
@@ -47,7 +53,7 @@ export async function writeAnimeStreamRows(db: Database, titles: MediaTitle[]) {
     rows,
     (chunk) =>
       `INSERT INTO catalog_title_anime_streams (title_id, site, url, position)
-       VALUES ${chunk.map(() => "(?, ?, ?, ?)").join(", ")}
+       VALUES ${rowPlaceholders(chunk.length, 4)}
        ON CONFLICT DO NOTHING`,
   );
 }
@@ -115,7 +121,7 @@ export async function writeAnimeThemeRows(db: Database, titles: MediaTitle[]) {
     rows,
     (chunk) =>
       `INSERT INTO catalog_title_anime_themes (title_id, kind, title, artist, episodes, position)
-       VALUES ${chunk.map(() => "(?, ?, ?, ?, ?, ?)").join(", ")}
+       VALUES ${rowPlaceholders(chunk.length, 6)}
        ON CONFLICT DO NOTHING`,
   );
 }
@@ -166,7 +172,7 @@ export async function writeAnimeVideoRows(db: Database, titles: MediaTitle[]) {
     rows,
     (chunk) =>
       `INSERT INTO catalog_title_anime_videos (title_id, video_key, name, position)
-       VALUES ${chunk.map(() => "(?, ?, ?, ?)").join(", ")}
+       VALUES ${rowPlaceholders(chunk.length, 4)}
        ON CONFLICT DO NOTHING`,
   );
 }

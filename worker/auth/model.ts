@@ -19,7 +19,7 @@ export interface UserRow {
   email?: string | null;
   avatar_url: string | null;
   role: string | null;
-  created_at: string;
+  created_at: string | Date;
 }
 
 export function mapUser(row: UserRow): MarqueeUser {

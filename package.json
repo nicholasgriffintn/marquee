@@ -12,6 +12,7 @@
     "db:local:down": "docker compose down",
     "db:local:setup": "docker compose up -d --wait postgres && drizzle-kit migrate",
     "db:migrate": "drizzle-kit migrate",
+    "db:pull": "bash scripts/pull-planetscale-to-local.sh",
     "deploy": "pnpm check && pnpm build && wrangler deploy",
     "dev": "vite",
     "fix": "oxlint --fix && oxfmt",

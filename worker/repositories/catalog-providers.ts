@@ -1,5 +1,11 @@
 import type { MediaTitle, ProviderAvailability } from "../../src/domain/catalog.ts";
-import { deleteByTitleIds, groupBy, insertRows, queryChunked } from "./catalog-array-utils.ts";
+import {
+  deleteByTitleIds,
+  groupBy,
+  insertRows,
+  queryChunked,
+  rowPlaceholders,
+} from "./catalog-array-utils.ts";
 
 type ProviderRow = {
   titleId: string;
@@ -98,7 +104,7 @@ export async function writeProviderRows(db: Database, titles: MediaTitle[]) {
     providerRows,
     (chunk) =>
       `INSERT INTO catalog_title_providers (title_id, provider_id, name, web_url, source, position)
-       VALUES ${chunk.map(() => "(?, ?, ?, ?, ?, ?)").join(", ")}
+       VALUES ${rowPlaceholders(chunk.length, 6)}
        ON CONFLICT (title_id, provider_id) DO UPDATE SET
          name = excluded.name, web_url = excluded.web_url,
          source = excluded.source, position = excluded.position`,
@@ -123,7 +129,7 @@ export async function writeProviderRows(db: Database, titles: MediaTitle[]) {
     (chunk) =>
       `INSERT INTO catalog_title_provider_offers
          (title_id, provider_id, offer_type, position)
-       VALUES ${chunk.map(() => "(?, ?, ?, ?)").join(", ")}
+       VALUES ${rowPlaceholders(chunk.length, 4)}
        ON CONFLICT DO NOTHING`,
   );
 }

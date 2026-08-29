@@ -1,5 +1,11 @@
 import type { AnimeLink, AnimeRelation, MediaTitle } from "../../src/domain/catalog.ts";
-import { deleteByTitleIds, groupBy, insertRows, queryChunked } from "./catalog-array-utils.ts";
+import {
+  deleteByTitleIds,
+  groupBy,
+  insertRows,
+  queryChunked,
+  rowPlaceholders,
+} from "./catalog-array-utils.ts";
 
 export async function readAnimeRelationMap(db: Database, ids: string[]) {
   const rows = await queryChunked(ids, (wave) =>
@@ -51,7 +57,7 @@ export async function writeAnimeRelationRows(db: Database, titles: MediaTitle[])
     rows,
     (chunk) =>
       `INSERT INTO catalog_title_anime_relations (title_id, mal_id, relation, format, title, year, position)
-       VALUES ${chunk.map(() => "(?, ?, ?, ?, ?, ?, ?)").join(", ")}
+       VALUES ${rowPlaceholders(chunk.length, 7)}
        ON CONFLICT DO NOTHING`,
   );
 }
@@ -101,7 +107,7 @@ export async function writeAnimeRecommendationRows(db: Database, titles: MediaTi
     rows,
     (chunk) =>
       `INSERT INTO catalog_title_anime_recommendations (title_id, mal_id, position)
-       VALUES ${chunk.map(() => "(?, ?, ?)").join(", ")}
+       VALUES ${rowPlaceholders(chunk.length, 3)}
        ON CONFLICT DO NOTHING`,
   );
 }
@@ -152,7 +158,7 @@ export async function writeAnimeLinkRows(db: Database, titles: MediaTitle[]) {
     rows,
     (chunk) =>
       `INSERT INTO catalog_title_anime_links (title_id, name, url, position)
-       VALUES ${chunk.map(() => "(?, ?, ?, ?)").join(", ")}
+       VALUES ${rowPlaceholders(chunk.length, 4)}
        ON CONFLICT DO NOTHING`,
   );
 }

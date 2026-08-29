@@ -258,7 +258,7 @@ export async function exportTraktShelf(env: Bindings, viewerId: string, origin: 
     `SELECT title_id AS "titleId", status, rating, updated_at AS "updatedAt"
        FROM viewing_entries
       WHERE viewer_id = $1
-        AND ($2 IS NULL OR updated_at > $2)
+        AND ($2::timestamptz IS NULL OR updated_at > $2::timestamptz)
       ORDER BY updated_at, id
       LIMIT ${PUSH_LIMIT}`,
     [viewerId, pushedAt],
@@ -322,7 +322,8 @@ export async function traktPushPreview(env: Bindings, viewerId: string) {
        sum(CASE WHEN status IN ('watchlist', 'watching') THEN 1 ELSE 0 END) AS listed,
        sum(CASE WHEN rating IS NOT NULL THEN 1 ELSE 0 END) AS rated
      FROM viewing_entries
-     WHERE viewer_id = $1 AND ($2 IS NULL OR updated_at > $2)`,
+     WHERE viewer_id = $1
+       AND ($2::timestamptz IS NULL OR updated_at > $2::timestamptz)`,
     [viewerId, pushedAt],
   );
 

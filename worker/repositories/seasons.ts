@@ -1,5 +1,6 @@
 import type { Episode, SeasonSummary } from "../../src/domain/seasons.ts";
 import { isRecord, numberAt, parseJson, stringAt } from "../lib/values.ts";
+import { furthestEpisodeColumns } from "./viewing-progress.ts";
 
 type SeasonRow = {
   seasonNumber: number;
@@ -186,7 +187,7 @@ export async function readShelfEpisodes(db: Database, viewerId: string, limit = 
     progressEpisode: number | null;
   }>(
     `SELECT s.title_id AS "titleId", s.season_number AS "seasonNumber", s.payload AS payload,
-              v.season AS "progressSeason", v.episode AS "progressEpisode"
+              ${furthestEpisodeColumns("v.viewer_id", "v.title_id", "progressSeason", "progressEpisode")}
          FROM catalog_seasons AS s
          JOIN viewing_entries AS v ON v.title_id = s.title_id AND v.viewer_id = $1
         WHERE v.status IN ('watching', 'watchlist')

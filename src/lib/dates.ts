@@ -8,8 +8,22 @@ export function parseDate(value: string | null | undefined) {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-export function parseDatabaseDate(value: string | null | undefined) {
-  return parseDate(value && !value.includes("T") ? `${value.replace(" ", "T")}Z` : value);
+export function parseDatabaseDate(value: string | Date | null | undefined) {
+  if (value instanceof Date) {
+    return value;
+  }
+
+  if (!value) {
+    return null;
+  }
+
+  const timestamp = (value.includes("T") ? value : value.replace(" ", "T")).replace(
+    /([+-]\d{2})$/u,
+    "$1:00",
+  );
+  const timezone = /(?:Z|[+-]\d{2}(?::?\d{2})?)$/u;
+
+  return parseDate(timezone.test(timestamp) ? timestamp : `${timestamp}Z`);
 }
 
 export function formatDate(

@@ -1,5 +1,11 @@
 import type { AnimeCharacter, AnimeStaffMember, MediaTitle } from "../../src/domain/catalog.ts";
-import { deleteByTitleIds, groupBy, insertRows, queryChunked } from "./catalog-array-utils.ts";
+import {
+  deleteByTitleIds,
+  groupBy,
+  insertRows,
+  queryChunked,
+  rowPlaceholders,
+} from "./catalog-array-utils.ts";
 
 export async function readAnimeCharacterMap(db: Database, ids: string[]) {
   const rows = await queryChunked(ids, (wave) =>
@@ -49,7 +55,7 @@ export async function writeAnimeCharacterRows(db: Database, titles: MediaTitle[]
     rows,
     (chunk) =>
       `INSERT INTO catalog_title_anime_characters (title_id, name, role, voice_actor, position)
-       VALUES ${chunk.map(() => "(?, ?, ?, ?, ?)").join(", ")}
+       VALUES ${rowPlaceholders(chunk.length, 5)}
        ON CONFLICT DO NOTHING`,
   );
 }
@@ -100,7 +106,7 @@ export async function writeAnimeStaffRows(db: Database, titles: MediaTitle[]) {
     rows,
     (chunk) =>
       `INSERT INTO catalog_title_anime_staff (title_id, name, role, position)
-       VALUES ${chunk.map(() => "(?, ?, ?, ?)").join(", ")}
+       VALUES ${rowPlaceholders(chunk.length, 4)}
        ON CONFLICT DO NOTHING`,
   );
 }

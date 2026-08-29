@@ -47,19 +47,19 @@ async function catalogueStats(env: Bindings) {
   const [row, working] = await Promise.all([
     env.DB.first<CountRow>(
       `SELECT
-         tt.titles, tt.movies, tt.shows, tt.posters, tt.animeIds, tt.animeDetails,
+         tt.titles, tt.movies, tt.shows, tt.posters, tt."animeIds", tt."animeDetails",
          (SELECT count(*) FROM title_embeddings
            WHERE content_hash IS NOT NULL AND model = $1) AS embeddings,
          (SELECT count(*) FROM title_buzz WHERE article <> '') AS buzz,
          (SELECT count(*) FROM title_schedule WHERE airs_at >= CURRENT_TIMESTAMP) AS upcoming,
          (SELECT count(*) FROM catalog_sections) AS sections,
-         cc.cinemas, cc.cinemasPlaced,
+         cc.cinemas, cc."cinemasPlaced",
          (SELECT count(*) FROM cinema_films) AS "cinemaFilms",
          (SELECT count(*) FROM cinema_screenings WHERE business_day >= CURRENT_DATE) AS screenings,
          (SELECT count(*) FROM cinema_interest WHERE last_seen_at > (CURRENT_TIMESTAMP - INTERVAL '30 day')) AS "interestCells",
          (SELECT count(*) FROM viewing_entries) AS "shelfEntries",
-         uu.users, uu.alertReady,
-         va.alertsSent, va.alertsWeek,
+         uu.users, uu."alertReady",
+         va."alertsSent", va."alertsWeek",
          (SELECT count(*) FROM viewer_signals) AS signals,
          (SELECT count(*) FROM viewer_beliefs WHERE revoked_at IS NULL) AS beliefs,
          (SELECT count(*) FROM catalog_people) AS people,
@@ -73,7 +73,7 @@ async function catalogueStats(env: Bindings) {
          (SELECT count(DISTINCT title_id) FROM title_language_buzz) AS "worldBoards",
          (SELECT count(*) FROM catalog_title_external_ids WHERE letterboxd_id IS NOT NULL)
            AS "letterboxdIds",
-         rv.revivalWorks, rv.revivalApproved, rv.revivalMirrored, rv.revivalPending,
+         rv."revivalWorks", rv."revivalApproved", rv."revivalMirrored", rv."revivalPending",
          (SELECT count(*) FROM ai_rails) AS "railSets",
          (SELECT count(*) FROM pinned_shelves) AS "pinnedShelves"
        FROM
@@ -296,7 +296,7 @@ export async function readAdminPipeline(env: Bindings) {
          FROM ingestion_runs
          WHERE started_at > (CURRENT_TIMESTAMP + CAST($1 AS INTERVAL))
          GROUP BY job_type, status
-         ORDER BY lastRunAt DESC
+         ORDER BY "lastRunAt" DESC
          LIMIT 20`,
       [`-${RUN_WINDOW_HOURS} hours`],
     ),

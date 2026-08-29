@@ -149,10 +149,11 @@ export async function readTitleSourceWorks(db: Database, titleId: string) {
 
 export async function readAdaptationTitleIds(db: Database, workId: string, limit: number) {
   const rows = await db.query<{ titleId: string }>(
-    `SELECT DISTINCT link.title_id AS "titleId"
+    `SELECT link.title_id AS "titleId"
        FROM title_source_works AS link
        JOIN catalog_titles AS t ON t.id = link.title_id
        WHERE link.work_id = $1
+       GROUP BY link.title_id, t.release_date, t.popularity
        ORDER BY COALESCE(t.release_date, '9999-12-31'), t.popularity DESC
        LIMIT $2`,
     [workId, clamp(limit, 1, 48)],

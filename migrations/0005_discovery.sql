@@ -66,7 +66,6 @@ CREATE TABLE cinemas (
   UNIQUE (source, site_id)
 );
 
-CREATE INDEX cinemas_latitude_idx ON cinemas (latitude);
 CREATE INDEX cinemas_located_idx ON cinemas (latitude, longitude);
 CREATE INDEX cinemas_source_idx ON cinemas (source);
 
@@ -219,7 +218,6 @@ CREATE TABLE revival_tags (
 );
 
 CREATE INDEX revival_tags_lookup_idx ON revival_tags (kind, slug);
-CREATE INDEX revival_tags_work_idx ON revival_tags (work_id);
 
 CREATE TABLE catalogue_gap_lookups (
   query_key TEXT PRIMARY KEY,

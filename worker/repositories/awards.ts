@@ -10,8 +10,10 @@ export type PersonAwardWrite = { personId: number; entries: AwardStatement[] };
 
 type AwardRow = { awardId: string; label: string; ceremonyYear: number; outcome: string };
 
-const ENTRY_COLUMNS = `DISTINCT link.award_id AS "awardId", a.label,
+const ENTRY_COLUMNS = `link.award_id AS "awardId", a.label,
        link.ceremony_year AS "ceremonyYear", link.outcome`;
+
+const ENTRY_GROUP = `link.award_id, a.label, link.ceremony_year, link.outcome`;
 
 const ENTRY_ORDER = `CASE WHEN link.outcome = 'won' THEN 0 ELSE 1 END,
          link.ceremony_year DESC, a.label`;
@@ -186,6 +188,7 @@ export async function readTitleAwards(db: Database, titleId: string): Promise<Aw
          FROM title_awards AS link
          JOIN awards AS a ON a.award_id = link.award_id
          WHERE link.title_id = $1
+         GROUP BY ${ENTRY_GROUP}
          ORDER BY ${ENTRY_ORDER}
          LIMIT $2`,
         [titleId, ENTRY_LIMIT],
@@ -211,6 +214,7 @@ export async function readPersonAwards(db: Database, personId: number): Promise<
          FROM person_awards AS link
          JOIN awards AS a ON a.award_id = link.award_id
          WHERE link.person_id = $1
+         GROUP BY ${ENTRY_GROUP}
          ORDER BY ${ENTRY_ORDER}
          LIMIT $2`,
       [personId, ENTRY_LIMIT],

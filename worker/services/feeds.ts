@@ -7,6 +7,7 @@ import { recentAlerts } from "../repositories/alerts.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
 import { readWatchedEpisodeKeys } from "../repositories/episode-entries.ts";
 import { readShelfEpisodes, type UpcomingEpisode } from "../repositories/seasons.ts";
+import { furthestEpisodeColumns } from "../repositories/viewing-progress.ts";
 import type { Bindings } from "../types.ts";
 import { isAlertKind, KIND_LABELS } from "./alerts/types.ts";
 import type { Digest } from "./digest.ts";
@@ -81,7 +82,7 @@ async function readEpisodes(env: Bindings, viewerId: string) {
   const rows = await env.DB.query<EpisodeRow>(
     `SELECT s.title_id AS "titleId", s.show_name AS "showName", s.season, s.episode,
             s.episode_name AS "episodeName", s.airs_at AS "airsAt", s.network,
-            v.season AS "watchedSeason", v.episode AS "watchedEpisode"
+            ${furthestEpisodeColumns("v.viewer_id", "v.title_id", "watchedSeason", "watchedEpisode")}
        FROM title_schedule AS s
        JOIN viewing_entries AS v ON v.title_id = s.title_id AND v.viewer_id = $1
       WHERE v.status IN ('watching', 'watchlist')
@@ -104,14 +105,14 @@ async function readAnnouncedEpisodes(env: Bindings, viewerId: string) {
 async function readReleases(env: Bindings, viewerId: string) {
   const rows = await env.DB.query<ReleaseRow>(
     `SELECT v.title_id AS "titleId",
-            substr(t.release_date, 1, 10) AS "releaseDate"
+            t.release_date::text AS "releaseDate"
        FROM viewing_entries AS v
        JOIN catalog_titles AS t ON t.id = v.title_id
       WHERE v.viewer_id = $1
         AND v.status = 'watchlist'
         AND t.release_date IS NOT NULL
-        AND substr(t.release_date, 1, 10) >= CURRENT_DATE
-      ORDER BY releaseDate
+        AND t.release_date >= CURRENT_DATE
+      ORDER BY "releaseDate"
       LIMIT ${RELEASE_LIMIT}`,
     [viewerId],
   );

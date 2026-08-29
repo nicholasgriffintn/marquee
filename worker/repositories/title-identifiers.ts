@@ -1,5 +1,5 @@
 import type { IdentifierRef } from "../clients/wikidata-identifiers.ts";
-import { insertRows } from "./catalog-array-utils.ts";
+import { insertRows, rowPlaceholders } from "./catalog-array-utils.ts";
 
 const REFRESH_DAYS = 90;
 const RETRY_DAYS = 14;
@@ -33,7 +33,7 @@ export async function recordIdentifierSyncs(
     entries.map((entry): DatabaseValue[] => [entry.titleId, entry.matched ? 1 : 0]),
     (chunk) =>
       `INSERT INTO title_identifier_syncs (title_id, matched)
-       VALUES ${chunk.map(() => "(?, ?)").join(", ")}
+       VALUES ${rowPlaceholders(chunk.length, 2)}
        ON CONFLICT (title_id) DO UPDATE SET
          matched = excluded.matched,
          synced_at = CURRENT_TIMESTAMP`,

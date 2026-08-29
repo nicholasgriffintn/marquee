@@ -93,11 +93,12 @@ async function cinemaRail(
 
 async function broadcastRail(env: Bindings): Promise<DeliveredRail | null> {
   const rows = await env.DB.query<{ id: string }>(
-    `SELECT DISTINCT s.title_id AS id
+    `SELECT s.title_id AS id
        FROM title_schedule AS s
        JOIN catalog_titles AS t ON t.id = s.title_id
       WHERE s.airs_at BETWEEN CURRENT_TIMESTAMP AND (CURRENT_TIMESTAMP + CAST($1 AS INTERVAL))
         AND s.network IS NOT NULL
+      GROUP BY s.title_id, t.popularity
       ORDER BY t.popularity DESC
       LIMIT $2`,
     [`+${BROADCAST_HORIZON_DAYS} days`, RAIL_SIZE * 2],

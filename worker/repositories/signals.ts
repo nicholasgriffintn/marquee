@@ -94,7 +94,7 @@ export async function readSignals(
       `SELECT type, title_id, journey_id, decision_id, context, weight, created_at
            FROM viewer_signals
           WHERE viewer_id = $1
-            AND type IN (${types.map((_, index) => `$${index + 1}`).join(",")})
+            AND type IN (${types.map((_, index) => `$${index + 2}`).join(",")})
             AND (expires_at IS NULL OR (EXTRACT(EPOCH FROM expires_at) / 86400.0) > (EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) / 86400.0))
           ORDER BY created_at DESC
           LIMIT ${clamp(limit, 1, 500)}`,

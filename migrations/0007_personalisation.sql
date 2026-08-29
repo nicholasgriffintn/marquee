@@ -28,8 +28,6 @@ CREATE TABLE belief_evidence (
   PRIMARY KEY (belief_id, evidence_kind, evidence_id)
 );
 
-CREATE INDEX belief_evidence_belief_idx ON belief_evidence (belief_id);
-
 CREATE TABLE angle_scores (
   angle TEXT PRIMARY KEY,
   impressions INTEGER NOT NULL DEFAULT 0,

@@ -45,9 +45,10 @@ export async function syncCatalogHead(env: Bindings) {
   const catalogue = await getCatalog(env, "", []);
   const catalogueTitles = await storeCatalog(env.DB, catalogue);
   const savedTitles = await env.DB.query<{ titleId: string }>(
-    `SELECT DISTINCT title_id AS "titleId"
+    `SELECT title_id AS "titleId"
      FROM viewing_entries
-     ORDER BY updated_at DESC
+     GROUP BY title_id
+     ORDER BY max(updated_at) DESC
      LIMIT $1`,
     [SAVED_TITLE_SAMPLE],
   );

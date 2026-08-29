@@ -416,7 +416,7 @@ export async function readGenres(db: Database, limit = 100) {
     `SELECT genre, count(*) AS titles
        FROM catalog_title_genres
        GROUP BY genre
-       HAVING titles >= 5
+       HAVING count(*) >= 5
        ORDER BY titles DESC
        LIMIT $1`,
     [clamp(limit, 1, 200)],
@@ -432,7 +432,7 @@ export async function readKeywords(db: Database, limit = 120) {
     `SELECT keyword, count(*) AS titles
        FROM catalog_title_keywords
        GROUP BY keyword
-       HAVING titles >= 8
+       HAVING count(*) >= 8
        ORDER BY titles DESC
        LIMIT $1`,
     [clamp(limit, 1, 400)],
@@ -450,7 +450,7 @@ export async function readFilmingPlaces(db: Database, limit = 80) {
        JOIN catalog_places AS cp ON cp.entity_id = tp.place_id
        WHERE tp.kind = 'filming'
        GROUP BY cp.label
-       HAVING titles >= 4
+       HAVING count(DISTINCT tp.title_id) >= 4
        ORDER BY titles DESC
        LIMIT $1`,
     [clamp(limit, 1, 300)],

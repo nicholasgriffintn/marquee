@@ -1,5 +1,10 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
-import { deleteByTitleIds, insertRows, queryChunked } from "./catalog-array-utils.ts";
+import {
+  deleteByTitleIds,
+  insertRows,
+  queryChunked,
+  rowPlaceholders,
+} from "./catalog-array-utils.ts";
 
 type RatingsRow = NonNullable<MediaTitle["ratings"]> & { titleId: string };
 
@@ -57,7 +62,7 @@ export async function writeRatingsRows(db: Database, titles: MediaTitle[]) {
       `INSERT INTO catalog_title_ratings
          (title_id, imdb_score, imdb_votes, rotten_tomatoes, metascore, awards,
           award_wins, box_office, anime_score, anime_votes)
-       VALUES ${chunk.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ")}
+       VALUES ${rowPlaceholders(chunk.length, 10)}
        ON CONFLICT (title_id) DO UPDATE SET
          imdb_score = excluded.imdb_score, imdb_votes = excluded.imdb_votes,
          rotten_tomatoes = excluded.rotten_tomatoes, metascore = excluded.metascore,

@@ -15,10 +15,10 @@ export function anniversaryQuery(now: Date) {
   const to = monthDay(new Date(now.getTime() + (WINDOW_DAYS - 1) * DAY_MS));
   const wraps = from > to;
   const inWindow = wraps
-    ? "(substr(release_date, 6) >= $1 OR substr(release_date, 6) <= $2)"
-    : "substr(release_date, 6) BETWEEN $1 AND $2";
+    ? "(substr(release_date::text, 6) >= $1 OR substr(release_date::text, 6) <= $2)"
+    : "substr(release_date::text, 6) BETWEEN $1 AND $2";
   const age = wraps
-    ? "($3 + CASE WHEN substr(release_date, 6) < $1 THEN 1 ELSE 0 END - year)"
+    ? "($3 + CASE WHEN substr(release_date::text, 6) < $1 THEN 1 ELSE 0 END - year)"
     : "($3 - year)";
 
   return {

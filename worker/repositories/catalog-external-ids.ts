@@ -1,6 +1,11 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
 import type { TitleIdentifiers } from "../../src/domain/identifiers.ts";
-import { deleteByTitleIds, insertRows, queryChunked } from "./catalog-array-utils.ts";
+import {
+  deleteByTitleIds,
+  insertRows,
+  queryChunked,
+  rowPlaceholders,
+} from "./catalog-array-utils.ts";
 
 type ExternalIdsRow = TitleIdentifiers & {
   titleId: string;
@@ -82,7 +87,7 @@ export async function writeExternalIdsRows(db: Database, titles: MediaTitle[]) {
          (title_id, tvdb_id, facebook_id, instagram_id, twitter_id, anidb_id, kitsu_id,
           ani_search_id, anime_planet_id, livechart_id, animenewsnetwork_id, animecountdown_id,
           letterboxd_id, rotten_tomatoes_id, metacritic_id, trakt_id)
-       VALUES ${chunk.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ")}
+       VALUES ${rowPlaceholders(chunk.length, 16)}
        ON CONFLICT (title_id) DO UPDATE SET
          tvdb_id = excluded.tvdb_id, facebook_id = excluded.facebook_id,
          instagram_id = excluded.instagram_id, twitter_id = excluded.twitter_id,
@@ -113,7 +118,7 @@ export async function writeTitleIdentifierRows(
     (chunk) =>
       `INSERT INTO catalog_title_external_ids
          (title_id, letterboxd_id, rotten_tomatoes_id, metacritic_id, trakt_id)
-       VALUES ${chunk.map(() => "(?, ?, ?, ?, ?)").join(", ")}
+       VALUES ${rowPlaceholders(chunk.length, 5)}
        ON CONFLICT (title_id) DO UPDATE SET
          letterboxd_id = excluded.letterboxd_id,
          rotten_tomatoes_id = excluded.rotten_tomatoes_id,

@@ -36,7 +36,7 @@ const CERT = "COALESCE(certification, '')";
 const STATUS = "COALESCE(status, '')";
 const LANGUAGE = "COALESCE(original_language, '')";
 const REVENUE = "COALESCE(revenue, 0)";
-const AWARD_WINS = `max(
+const AWARD_WINS = `GREATEST(
   COALESCE((SELECT award_wins FROM catalog_title_ratings WHERE title_id = catalog_titles.id), 0),
   (SELECT count(DISTINCT award_id || '/' || ceremony_year) FROM title_awards
     WHERE title_id = catalog_titles.id AND outcome = 'won')
@@ -80,10 +80,11 @@ async function pick(
 }
 
 async function scheduled(env: Bindings, used: Set<string>) {
-  const rows = await env.DB.query<{ id: string }>(`SELECT DISTINCT s.title_id AS id
+  const rows = await env.DB.query<{ id: string }>(`SELECT s.title_id AS id
      FROM title_schedule AS s
      JOIN catalog_titles AS t ON t.id = s.title_id
      WHERE s.airs_at BETWEEN (CURRENT_TIMESTAMP - INTERVAL '6 hour') AND (CURRENT_TIMESTAMP + INTERVAL '7 day')
+     GROUP BY s.title_id, t.popularity
      ORDER BY t.popularity DESC
      LIMIT ${OVERFETCH}`);
 
@@ -124,7 +125,7 @@ async function topValues(
     `SELECT ${column} AS value, count(*) AS uses
      FROM ${table}
      GROUP BY ${column}
-     HAVING uses >= $1
+     HAVING count(*) >= $1
      ORDER BY uses DESC
      LIMIT $2`,
     [minimum, limit],
@@ -142,7 +143,7 @@ async function topStudios(env: Bindings, limit: number): Promise<string[]> {
      JOIN catalog_titles AS t ON t.id = s.title_id
      WHERE t.${SCORE} >= 6.5
      GROUP BY s.studio
-     HAVING uses BETWEEN 8 AND 400
+     HAVING count(*) BETWEEN 8 AND 400
      ORDER BY uses DESC
      LIMIT $1`,
     [limit],
@@ -189,7 +190,7 @@ async function topServices(env: Bindings, limit: number) {
      FROM catalog_title_provider_offers
      WHERE offer_type = 'Subscription'
      GROUP BY provider_id
-     HAVING uses >= 40
+     HAVING count(DISTINCT title_id) >= 40
      ORDER BY uses DESC
      LIMIT $1`,
     [limit],

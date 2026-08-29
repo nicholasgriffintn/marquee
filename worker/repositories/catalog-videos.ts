@@ -1,5 +1,11 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
-import { deleteByTitleIds, groupBy, insertRows, queryChunked } from "./catalog-array-utils.ts";
+import {
+  deleteByTitleIds,
+  groupBy,
+  insertRows,
+  queryChunked,
+  rowPlaceholders,
+} from "./catalog-array-utils.ts";
 
 type VideoRow = { titleId: string; key: string; name: string; type: string };
 
@@ -53,7 +59,7 @@ export async function writeVideoRows(db: Database, titles: MediaTitle[]) {
     rows,
     (chunk) =>
       `INSERT INTO catalog_title_videos (title_id, video_key, name, type, position)
-       VALUES ${chunk.map(() => "(?, ?, ?, ?, ?)").join(", ")}
+       VALUES ${rowPlaceholders(chunk.length, 5)}
        ON CONFLICT (title_id, video_key) DO UPDATE SET
          name = excluded.name, type = excluded.type, position = excluded.position`,
   );

@@ -1,3 +1,5 @@
+import { parseDatabaseDate } from "../../src/lib/dates.ts";
+
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -20,8 +22,8 @@ export function boundedString(value: unknown, maximumLength = 2_048) {
     : null;
 }
 
-export function databaseDate(value: string) {
-  return new Date(value.includes("T") ? value : `${value.replace(" ", "T")}Z`);
+export function databaseDate(value: string | Date) {
+  return parseDatabaseDate(value) ?? new Date(Number.NaN);
 }
 
 export function numberAt(value: Record<string, unknown>, key: string) {
