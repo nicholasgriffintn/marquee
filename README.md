@@ -280,16 +280,10 @@ Vectorize index of bge-m3 embeddings for meaning, the two interleaved and rerank
 taste vector is the mean of what they save, blended with what they have told the Usher, and the
 model only names a shelf and picks from a shortlist it can see.
 
-**Decisions** are the seam between a recommendation and what came of it. Every shelf, pick, order,
-digest and title brief opens a row in `decisions` — a random id, the feature, the candidates and
-their retrieval scores, what was chosen, the model that answered, which models it fell back from,
-latency and tokens. The prompt itself is never stored; `prompt_version` is a hash of it, so it moves
-on its own when the prompt is edited. The id travels out with the recommendation and back on every
-journey event, so an open, a walk to a provider, a save, a rejection or a watch can be counted
-against the set that produced it. Rows expire after ninety days and are swept nightly, and a deleted
-account takes its decisions with it. Cost is worked out from the per-model rates in
-`worker/lib/decisions.ts`, which track Cloudflare's published Workers AI prices — a model missing
-from that table records its tokens and leaves the cost null rather than guessing.
+**Decisions** tie a recommendation to what came of it. Every shelf, pick, order, digest and brief
+writes one `decisions` row — candidates and their scores, what was chosen, the model, the tokens —
+and a random id that rides out with it and comes back on every journey event. Prompts are never
+stored; `prompt_version` is a hash, so it moves when the prompt does. Rows expire after ninety days.
 
 **The sweeps** are a Workflow on two crons: a light one every three hours, a deep one nightly that
 fans TMDB's discover pages out over the ingestion queue. Sweeps merge rather than replace,
