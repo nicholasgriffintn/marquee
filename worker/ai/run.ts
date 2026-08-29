@@ -3,7 +3,7 @@ import type { ChatMessage } from "../lib/curator-payload.ts";
 import { randomHex } from "../lib/tokens.ts";
 import { parseJsonContent } from "../lib/values.ts";
 import type { Bindings } from "../types.ts";
-import { type AiFeature, cacheSecondsFor, collectLogFor, policyFor } from "./policy.ts";
+import { type AiFeature, policyFor } from "./policy.ts";
 
 const DECISION_ID_BYTES = 8;
 const ATTRIBUTE_LIMIT = 40;
@@ -33,8 +33,8 @@ function callFor(run: AiRun) {
     timeoutMs: policy.timeoutMs,
     maxTokens: policy.maxTokens,
     temperature: policy.temperature,
-    collectLog: collectLogFor(policy),
-    cacheSeconds: cacheSecondsFor(policy),
+    collectLog: policy.collectLog,
+    cache: policy.cache,
     metadata: Object.fromEntries([
       ["feature", run.feature],
       ["decision", run.decisionId],

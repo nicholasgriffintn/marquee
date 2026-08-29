@@ -19,19 +19,23 @@ export type AiFeature =
 
 export type ModelTier = "fast" | "primary";
 
-type Budget = {
+export type CachePolicy = { enabled: boolean; ttlSeconds?: number };
+
+export type AiPolicy = {
   tier: ModelTier;
   timeoutMs: number;
   maxTokens: number;
   temperature: number;
   schema: OutputSchema | null;
+  collectLog: boolean;
+  cache: CachePolicy;
 };
 
-export type AiPolicy = Budget & ({ personal: true } | { personal: false; cacheSeconds: number });
+const LOGGED_AND_CACHED = { collectLog: true, cache: { enabled: true } } as const;
 
 const POLICIES: Record<AiFeature, AiPolicy> = {
   curator: {
-    personal: true,
+    ...LOGGED_AND_CACHED,
     tier: "fast",
     timeoutMs: 25_000,
     maxTokens: 500,
@@ -39,7 +43,7 @@ const POLICIES: Record<AiFeature, AiPolicy> = {
     schema: CURATOR_SCHEMA,
   },
   curator_narration: {
-    personal: true,
+    ...LOGGED_AND_CACHED,
     tier: "primary",
     timeoutMs: 30_000,
     maxTokens: 400,
@@ -47,7 +51,7 @@ const POLICIES: Record<AiFeature, AiPolicy> = {
     schema: null,
   },
   rails: {
-    personal: true,
+    ...LOGGED_AND_CACHED,
     tier: "fast",
     timeoutMs: 25_000,
     maxTokens: 500,
@@ -55,8 +59,8 @@ const POLICIES: Record<AiFeature, AiPolicy> = {
     schema: RAIL_SCHEMA,
   },
   insight: {
-    personal: false,
-    cacheSeconds: 86_400,
+    collectLog: true,
+    cache: { enabled: true, ttlSeconds: 86_400 },
     tier: "fast",
     timeoutMs: 30_000,
     maxTokens: 500,
@@ -64,7 +68,7 @@ const POLICIES: Record<AiFeature, AiPolicy> = {
     schema: INSIGHT_SCHEMA,
   },
   note_hunches: {
-    personal: true,
+    ...LOGGED_AND_CACHED,
     tier: "fast",
     timeoutMs: 20_000,
     maxTokens: 260,
@@ -72,7 +76,7 @@ const POLICIES: Record<AiFeature, AiPolicy> = {
     schema: NOTE_HUNCHES_SCHEMA,
   },
   usher_order: {
-    personal: true,
+    ...LOGGED_AND_CACHED,
     tier: "fast",
     timeoutMs: 18_000,
     maxTokens: 320,
@@ -80,7 +84,7 @@ const POLICIES: Record<AiFeature, AiPolicy> = {
     schema: USHER_ORDER_SCHEMA,
   },
   usher_pick: {
-    personal: true,
+    ...LOGGED_AND_CACHED,
     tier: "fast",
     timeoutMs: 15_000,
     maxTokens: 160,
@@ -91,12 +95,4 @@ const POLICIES: Record<AiFeature, AiPolicy> = {
 
 export function policyFor(feature: AiFeature) {
   return POLICIES[feature];
-}
-
-export function cacheSecondsFor(policy: AiPolicy) {
-  return policy.personal ? 0 : policy.cacheSeconds;
-}
-
-export function collectLogFor(policy: AiPolicy) {
-  return !policy.personal;
 }

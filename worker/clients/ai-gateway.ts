@@ -1,4 +1,4 @@
-import type { ModelTier } from "../ai/policy.ts";
+import type { CachePolicy, ModelTier } from "../ai/policy.ts";
 import type { OutputSchema } from "../ai/schemas.ts";
 import { parseAssistantMessage, type ChatMessage } from "../lib/curator-payload.ts";
 import { logEvent } from "../lib/logging.ts";
@@ -20,7 +20,7 @@ export type AiCall = {
   maxTokens: number;
   temperature: number;
   collectLog: boolean;
-  cacheSeconds: number;
+  cache: CachePolicy;
   metadata: Record<string, string>;
   tools?: ChatCompletionTool[];
   toolChoice?: "auto" | "required" | "none";
@@ -66,11 +66,11 @@ function isSchemaRejection(error: unknown) {
   return error instanceof AiGatewayError && (error.status === 400 || error.status === 422);
 }
 
-function privacyHeaders(call: AiCall) {
+function gatewayHeaders(call: AiCall) {
   return {
     "cf-aig-collect-log": call.collectLog ? "true" : "false",
-    "cf-aig-skip-cache": call.cacheSeconds > 0 ? "false" : "true",
-    ...(call.cacheSeconds > 0 ? { "cf-aig-cache-ttl": String(call.cacheSeconds) } : {}),
+    "cf-aig-skip-cache": call.cache.enabled ? "false" : "true",
+    ...(call.cache.ttlSeconds ? { "cf-aig-cache-ttl": String(call.cache.ttlSeconds) } : {}),
     "cf-aig-metadata": JSON.stringify(call.metadata).slice(0, METADATA_LIMIT),
   };
 }
@@ -141,7 +141,7 @@ async function completeOnce(
       authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
       "cf-aig-gateway-id": env.AI_GATEWAY_ID,
       "cf-aig-request-timeout": String(call.timeoutMs - TIMEOUT_HEADROOM_MS),
-      ...privacyHeaders(call),
+      ...gatewayHeaders(call),
       "content-type": "application/json",
     },
     body: JSON.stringify({
@@ -202,7 +202,7 @@ export async function* streamAiCompletion(env: Bindings, call: AiCall) {
       authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
       "cf-aig-gateway-id": env.AI_GATEWAY_ID,
       "cf-aig-request-timeout": String(call.timeoutMs),
-      ...privacyHeaders(call),
+      ...gatewayHeaders(call),
       "content-type": "application/json",
     },
     body: JSON.stringify({

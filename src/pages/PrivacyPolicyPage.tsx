@@ -252,14 +252,13 @@ export function PrivacyPolicyPage() {
               processed for that purpose.
             </p>
             <p>
-              Requests travel through Cloudflare AI Gateway. Marquee turns off Gateway request
-              logging for every personalised feature, so the prompt and the model's reply are not
-              kept in the Gateway log for the curator, your shelves, the Usher or your notes. Each
-              of those requests carries only the name of the feature and a random reference that is
-              created for that one decision and cannot be traced back to your account. Personalised
-              requests also bypass the Gateway response cache. The one exception is the short brief
-              Marquee writes about a single title: it contains no information about you, so it is
-              logged and cached for a day and reused for everyone.
+              Requests travel through Cloudflare AI Gateway, which keeps a log of them. That log
+              holds a copy of the whole request, including anything about you the request carried,
+              together with the model's reply. Replies may also be held in the Gateway response
+              cache and reused for a later request that matches; the short brief Marquee writes
+              about a single title is cached for a day. Marquee does not attach your account
+              identifier to these requests. It sends the name of the feature and a random reference
+              created for that one decision, which cannot be traced back to you.
             </p>
             <p>
               Cloudflare states in its{" "}
@@ -273,8 +272,9 @@ export function PrivacyPolicyPage() {
               that customer content is not used to train AI models or improve Cloudflare or
               third-party services without explicit consent. Guest and member curator conversation
               turns are kept together for follow-ups and deleted after one hour of inactivity.
-              Marquee's own usage analytics record that you asked the curator and how long your
-              request was. They do not record what you typed.
+              Separately, Marquee's own usage analytics record the first 200 characters of what you
+              typed when you ask the curator, so that broken and unanswerable requests can be found
+              and fixed.
             </p>
             <p>
               Marquee also builds preference profiles from ratings, viewing activity and answers.
