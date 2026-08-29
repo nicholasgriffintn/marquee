@@ -7,18 +7,24 @@ import { logError } from "../lib/logging.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { isRecord } from "../lib/values.ts";
 import { readBeliefs } from "../repositories/beliefs.ts";
-import { searchCatalogue } from "../repositories/catalog-search.ts";
+import { searchCatalogue, type CatalogueSearch } from "../repositories/catalog-search.ts";
 import { neverTitleIds, rejectedTitleIds } from "../repositories/signals.ts";
 import { readShelfDetail, readViewerContext } from "../repositories/viewer-context.ts";
 import type { Bindings } from "../types.ts";
 import { viewerSummary } from "./beliefs.ts";
-import { retrieveTitles } from "./retrieval.ts";
+import { nearestTo } from "./embeddings.ts";
+import {
+  eligibleTitles,
+  poolFor,
+  rankTitles,
+  retrieveTitles,
+  type TitleSource,
+} from "./retrieval/index.ts";
 import { tasteVector } from "./taste.ts";
 import { preferenceSummary, readViewerPreferences } from "./usher.ts";
 import { factBrief, factsFor, serviceFor } from "./why.ts";
 
 const SHORTLIST = 8;
-const NEIGHBOUR_TOP_K = 80;
 
 const PICK_PROMPT = [
   USHER_VOICE,
@@ -76,7 +82,7 @@ export async function shortlistFor(
       .filter((entry) => entry.status === "watched" || entry.status === "dropped")
       .map((entry) => entry.titleId),
   ];
-  const loose = {
+  const loose: CatalogueSearch = {
     providerIds: services,
     excludeIds: exclude,
     limit: constraints.limit ?? SHORTLIST,
@@ -85,33 +91,30 @@ export async function shortlistFor(
     ...(constraints.mediaType ? { mediaType: constraints.mediaType } : {}),
     ...(constraints.certifications?.length ? { certifications: constraints.certifications } : {}),
   };
-  const base = {
+  const base: CatalogueSearch = {
     ...loose,
     ...(constraints.genres?.length ? { genres: constraints.genres.slice(0, 6) } : {}),
   };
+  const limit = constraints.limit ?? SHORTLIST;
+  const pool = poolFor(limit);
   const vector = await tasteVector(env, viewer, preferences, {
     never: refused,
     summary: await viewerSummary(env, viewerId, preferences),
   });
+  const sources: TitleSource[] = [];
 
   if (vector) {
     try {
-      const matches = await env.VECTORS.query(vector, {
-        topK: NEIGHBOUR_TOP_K,
-        returnMetadata: "none",
-      });
-      const ids = matches.matches.map((match) => match.id);
+      const matches = await nearestTo(env, vector, base);
+      const titles = await eligibleTitles(
+        env,
+        matches.map((match) => match.id),
+        base,
+        pool,
+      );
 
-      if (ids.length) {
-        const titles = await searchCatalogue(env.DB, {
-          ...base,
-          includeIds: ids,
-          sort: "given",
-        });
-
-        if (titles.length) {
-          return { titles, preferences };
-        }
+      if (titles.length) {
+        sources.push({ source: "semantic", titles });
       }
     } catch (error) {
       logError("usher_pick_neighbours_failed", error);
@@ -120,23 +123,31 @@ export async function shortlistFor(
 
   const wanted = constraints.genres?.length ? constraints.genres : preferences.genres.slice(0, 4);
 
-  if (wanted.length) {
+  if (sources.length === 0 && wanted.length) {
     const titles = await searchCatalogue(env.DB, {
       ...base,
       genres: wanted.slice(0, 6),
       sort: "score",
+      limit: pool,
     });
 
     if (titles.length) {
-      return { titles, preferences };
+      sources.push({ source: "genre", titles });
     }
   }
 
+  if (sources.length === 0) {
+    return {
+      titles: await retrieveTitles(env, {
+        ...loose,
+        text: constraints.text || "a film worth putting on tonight without thinking about it",
+      }),
+      preferences,
+    };
+  }
+
   return {
-    titles: await retrieveTitles(env, {
-      ...loose,
-      text: constraints.text || "a film worth putting on tonight without thinking about it",
-    }),
+    titles: rankTitles(sources, { limit }).map((candidate) => candidate.title),
     preferences,
   };
 }

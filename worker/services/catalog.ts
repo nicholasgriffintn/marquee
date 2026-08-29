@@ -20,7 +20,7 @@ import { readProviders } from "../repositories/providers.ts";
 import type { Bindings } from "../types.ts";
 import { applyBuzz, readBuzz, readTrendingBuzz } from "./buzz.ts";
 import { findGapTitles } from "./catalogue-gaps.ts";
-import { retrieveTitles } from "./retrieval.ts";
+import { retrieveTitles } from "./retrieval/index.ts";
 import { readNextEpisode, readTonight } from "./schedule.ts";
 import { traktUpcoming } from "./trakt.ts";
 

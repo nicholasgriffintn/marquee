@@ -3,8 +3,9 @@ import { logError, logEvent } from "../lib/logging.ts";
 import { clamp } from "../lib/numbers.ts";
 import { isRecord, vectorValues } from "../lib/values.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
+import type { CatalogueSearch } from "../repositories/catalog-search.ts";
 import type { Bindings } from "../types.ts";
-import { titleVectorMetadata } from "./vector-index.ts";
+import { queryTitleVectors, titleVectorMetadata } from "./vector-index.ts";
 
 export const EMBEDDING_MODEL = "@cf/baai/bge-m3";
 
@@ -234,14 +235,30 @@ export async function selectUnembedded(env: Bindings, limit: number) {
   return rows.results.map((row) => row.titleId);
 }
 
-export async function similarTo(env: Bindings, titleId: string, topK = 24) {
+export type Neighbour = { id: string; score: number };
+
+export async function nearestTo(env: Bindings, vector: number[], search: CatalogueSearch) {
+  const matches = await queryTitleVectors(env, vector, search);
+
+  return matches.matches.map((match): Neighbour => ({ id: match.id, score: match.score }));
+}
+
+export async function neighboursOf(env: Bindings, titleId: string, topK = 24) {
   try {
     const matches = await env.VECTORS.queryById(titleId, { topK, returnMetadata: "none" });
 
-    return matches.matches.filter((match) => match.id !== titleId).map((match) => match.id);
+    return matches.matches
+      .filter((match) => match.id !== titleId)
+      .map((match): Neighbour => ({ id: match.id, score: match.score }));
   } catch (error) {
     logError("vector_similar_failed", error, { titleId });
 
     return [];
   }
+}
+
+export async function similarTo(env: Bindings, titleId: string, topK = 24) {
+  const neighbours = await neighboursOf(env, titleId, topK);
+
+  return neighbours.map((neighbour) => neighbour.id);
 }

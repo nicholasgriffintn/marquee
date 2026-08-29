@@ -1,8 +1,6 @@
 import { isKnownTitle } from "../../lib/validation.ts";
 import { readItems } from "../../repositories/catalog-reader.ts";
-import { readRanked } from "../../repositories/catalog-search.ts";
-import { similarTo } from "../../services/embeddings.ts";
-import { retrieveTitles } from "../../services/retrieval.ts";
+import { retrieveSimilar, retrieveTitles } from "../../services/retrieval/index.ts";
 import { getTitleInsight } from "../../services/title-insight.ts";
 import { answer, type McpTool, READS, refuse } from "../registry.ts";
 import { summarise, TITLE_SUMMARY_SCHEMA, titleResultsSchema } from "../summaries.ts";
@@ -82,10 +80,11 @@ export const catalogueTools: readonly McpTool[] = [
         return refuse("titleId must look like movie:550");
       }
 
-      const limit = boundedLimit(input.limit);
-      const neighbours = (await similarTo(env, input.titleId, limit + 1)).slice(0, limit);
+      const similar = await retrieveSimilar(env, input.titleId, {
+        limit: boundedLimit(input.limit),
+      });
 
-      return answer({ results: summarise(await readRanked(env.DB, neighbours)) });
+      return answer({ results: summarise(similar.map((candidate) => candidate.title)) });
     },
   },
   {
