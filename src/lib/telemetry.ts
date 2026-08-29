@@ -5,9 +5,8 @@ type ClientEvent = "rail_impression" | "rail_click" | "title_view" | "provider_e
 type TrackPayload = {
   detail?: string;
   titleId?: string;
-  journeyId?: string;
-  source?: string;
-  position?: number;
+  journey?: string;
+  rank?: number;
   providerId?: string;
   monetization?: string;
 };
@@ -22,13 +21,13 @@ function queueBeacon(body: string) {
 
 export function track(name: ClientEvent, payload: TrackPayload = {}) {
   const journey = payload.titleId ? journeyFor(payload.titleId) : null;
-  const body = {
-    name,
-    ...payload,
-    journeyId: payload.journeyId ?? journey?.id,
-    source: payload.source ?? journey?.source,
-    position: payload.position ?? journey?.position,
-  };
 
-  queueBeacon(JSON.stringify(body));
+  queueBeacon(
+    JSON.stringify({
+      name,
+      ...payload,
+      journey: payload.journey ?? journey?.token,
+      rank: payload.rank ?? journey?.rank,
+    }),
+  );
 }

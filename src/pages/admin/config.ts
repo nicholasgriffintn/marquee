@@ -5,6 +5,7 @@ export const TABS = [
   { id: "actions", label: "Actions" },
   { id: "pipeline", label: "Pipeline" },
   { id: "listings", label: "Listings" },
+  { id: "quality", label: "Quality" },
   { id: "vault", label: "The vault" },
   { id: "people", label: "People" },
 ] as const;
@@ -15,6 +16,7 @@ export const READS_DATA = new Set<AdminTab>([
   "overview",
   "pipeline",
   "listings",
+  "quality",
   "vault",
   "people",
 ]);
@@ -47,6 +49,7 @@ export const ACTION_GROUPS: {
       { id: "availability", label: "Refresh availability" },
       { id: "enrichment", label: "Queue enrichment" },
       { id: "embeddings", label: "Queue embeddings" },
+      { id: "vector-metadata", label: "Reindex vector metadata" },
       { id: "discover", label: "Advance backfill" },
       { id: "anime-ids", label: "Import anime ids" },
       { id: "identifiers", label: "Sync identifier hub" },

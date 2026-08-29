@@ -1,7 +1,7 @@
 import type { CatalogSection, MediaTitle } from "../../src/domain/catalog.ts";
 import type { ViewerOrigin } from "../../src/domain/cinema.ts";
 import { hashString } from "../../src/lib/string.ts";
-import { includesProvider } from "../repositories/catalog-reader.ts";
+import { includesProvider } from "../lib/providers.ts";
 import { neverTitleIds } from "../repositories/signals.ts";
 import { readViewerContext } from "../repositories/viewer-context.ts";
 import type { Bindings } from "../types.ts";

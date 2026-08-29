@@ -15,6 +15,7 @@ import { ListingsTab } from "./admin/ListingsTab";
 import { OverviewTab } from "./admin/OverviewTab";
 import { PeopleTab } from "./admin/PeopleTab";
 import { PipelineTab } from "./admin/PipelineTab";
+import { QualityTab } from "./admin/QualityTab";
 
 import adminStyles from "./admin/admin.module.css";
 import styles from "./AdminPage.module.css";
@@ -26,6 +27,7 @@ export function AdminPage({ user }: { user: User }) {
   const [vaultRevision, setVaultRevision] = useState(0);
   const [pipelineRevision, setPipelineRevision] = useState(0);
   const [listingsRevision, setListingsRevision] = useState(0);
+  const [qualityRevision, setQualityRevision] = useState(0);
   const tab = TABS.find((entry) => entry.id === params.get("tab"))?.id ?? "overview";
 
   const { usersLoaded, loadUsers } = admin;
@@ -58,6 +60,12 @@ export function AdminPage({ user }: { user: User }) {
 
     if (tab === "listings") {
       setListingsRevision((current) => current + 1);
+
+      return;
+    }
+
+    if (tab === "quality") {
+      setQualityRevision((current) => current + 1);
 
       return;
     }
@@ -131,6 +139,8 @@ export function AdminPage({ user }: { user: User }) {
       {tab === "pipeline" && <PipelineTab overview={overview} revision={pipelineRevision} />}
 
       {tab === "listings" && <ListingsTab overview={overview} revision={listingsRevision} />}
+
+      {tab === "quality" && <QualityTab revision={qualityRevision} />}
 
       {tab === "vault" && (
         <ErrorBoundary label="The vault">

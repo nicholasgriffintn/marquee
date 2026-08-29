@@ -1,9 +1,7 @@
 import type { MediaTitle, ProviderAvailability } from "../../src/domain/catalog.ts";
-import type { Belief } from "../../src/domain/notebook.ts";
-import { activeBeliefs } from "../repositories/beliefs.ts";
+import { beliefSteersPicks, type Belief } from "../../src/domain/notebook.ts";
+import { isStreamingOffer } from "../../src/domain/providers.ts";
 import type { readShelfDetail } from "../repositories/viewer-context.ts";
-
-const STREAMING_OFFERS = new Set(["Subscription", "Free", "Free with ads"]);
 
 export type ShelfEntry = Awaited<ReturnType<typeof readShelfDetail>>[number];
 
@@ -54,9 +52,9 @@ function shelfAnchor(title: MediaTitle, shelf: ShelfEntry[]) {
 
 function beliefFact(title: MediaTitle, beliefs: Belief[]) {
   const genres = title.genres.map((genre) => genre.toLowerCase());
-  const match = activeBeliefs(beliefs).find((belief) =>
-    genres.some((genre) => belief.key.endsWith(`genre:${genre}`)),
-  );
+  const match = beliefs
+    .filter((belief) => beliefSteersPicks(belief))
+    .find((belief) => genres.some((genre) => belief.key.endsWith(`genre:${genre}`)));
 
   return match ? match.value.replace(/\.$/u, "").toLowerCase() : "";
 }
@@ -86,7 +84,7 @@ export function serviceFor(item: MediaTitle, providerIds: string[]) {
     : all;
   const pool = mine.length ? mine : all;
   const streaming = pool.find((provider: ProviderAvailability) =>
-    provider.offerTypes.some((offer) => STREAMING_OFFERS.has(offer)),
+    provider.offerTypes.some(isStreamingOffer),
   );
   const chosen = streaming ?? pool[0];
 

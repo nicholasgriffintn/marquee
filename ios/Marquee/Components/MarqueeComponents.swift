@@ -227,6 +227,7 @@ struct TitleCard: View {
   let item: MediaTitle
   var width: CGFloat = 142
   var rank: Int? = nil
+  var ticket: JourneyTicket? = nil
 
   private let providerLimit = 2
 
@@ -300,6 +301,15 @@ struct TitleCard: View {
       .frame(width: width, alignment: .leading)
     }
     .buttonStyle(.plain)
+    .simultaneousGesture(
+      TapGesture().onEnded {
+        guard let ticket else { return }
+
+        Telemetry.shared.remember(item.id, ticket: ticket)
+        Telemetry.shared.record(
+          .railClick, titleId: item.id, detail: ticket.detail, ticket: ticket)
+      }
+    )
   }
 
   private var ratingLine: some View {
@@ -318,6 +328,8 @@ struct TitleCard: View {
 struct TitleRail: View {
   let section: CatalogSection
   var ranked = false
+
+  @State private var seen = false
 
   var body: some View {
     VStack(alignment: .leading, spacing: 13) {
@@ -338,12 +350,28 @@ struct TitleRail: View {
       ScrollView(.horizontal, showsIndicators: false) {
         LazyHStack(alignment: .top, spacing: 13) {
           ForEach(Array(section.items.enumerated()), id: \.element.id) { index, item in
-            TitleCard(item: item, rank: ranked ? index + 1 : nil)
+            TitleCard(item: item, rank: ranked ? index + 1 : nil, ticket: ticket(at: index))
           }
         }
         .padding(.horizontal, 18)
       }
     }
+    .onAppear {
+      guard let token = section.journey, !seen else { return }
+
+      seen = true
+      Telemetry.shared.record(
+        .railImpression,
+        detail: section.id,
+        ticket: JourneyTicket(token: token, rank: 0, detail: section.id)
+      )
+    }
+  }
+
+  private func ticket(at index: Int) -> JourneyTicket? {
+    guard let token = section.journey else { return nil }
+
+    return JourneyTicket(token: token, rank: index, detail: section.id)
   }
 }
 

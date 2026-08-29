@@ -48,6 +48,12 @@ export function parseJson(value: string): unknown {
   }
 }
 
+const CODE_FENCE = /^```(?:json)?\s*|\s*```$/gu;
+
+export function parseJsonContent(value: string | null | undefined): unknown {
+  return value ? parseJson(value.trim().replaceAll(CODE_FENCE, "")) : null;
+}
+
 export function isNullableString(value: unknown): value is string | null {
   return value === null || typeof value === "string";
 }

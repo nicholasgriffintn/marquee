@@ -3,7 +3,9 @@ import { errorMessage, logError, logEvent } from "../lib/logging.ts";
 import { clamp } from "../lib/numbers.ts";
 import { isRecord, vectorValues } from "../lib/values.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
+import type { CatalogueSearch } from "../repositories/catalog-search.ts";
 import type { Bindings } from "../types.ts";
+import { queryTitleVectors, titleVectorMetadata } from "./vector-index.ts";
 
 export const EMBEDDING_MODEL = "@cf/baai/bge-m3";
 
@@ -157,11 +159,7 @@ export async function embedTitles(
         wave.map((title, position) => ({
           id: title.id,
           values: vectors[position],
-          metadata: {
-            mediaType: title.mediaType,
-            year: title.year ?? 0,
-            popularity: Math.round(title.popularity),
-          },
+          metadata: titleVectorMetadata(title),
         })),
       );
 
@@ -227,6 +225,47 @@ const OUTSTANDING = `(
 
 const OFF_BACKOFF = `(e.next_attempt_at IS NULL OR e.next_attempt_at <= datetime('now'))`;
 
+const REINDEX_BATCH = 25;
+
+async function selectEmbeddedAfter(env: Bindings, after: string, limit: number) {
+  const rows = await env.DB.prepare(
+    `SELECT title_id AS titleId
+     FROM title_embeddings
+     WHERE model = ? AND title_id > ?
+     ORDER BY title_id
+     LIMIT ?`,
+  )
+    .bind(EMBEDDING_MODEL, after, clamp(limit, 1, 100))
+    .all<{ titleId: string }>();
+
+  return rows.results.map((row) => row.titleId);
+}
+
+export async function reindexVectorMetadata(env: Bindings, after: string) {
+  const titleIds = await selectEmbeddedAfter(env, after, REINDEX_BATCH);
+  const cursor = titleIds.at(-1);
+
+  if (!cursor) {
+    return null;
+  }
+
+  const titles = await readItems(env.DB, titleIds, titleIds.length);
+  const stored = await readVectors(env, titleIds);
+  const pending = titles.flatMap((title) => {
+    const values = stored.get(title.id);
+
+    return values ? [{ id: title.id, values, metadata: titleVectorMetadata(title) }] : [];
+  });
+
+  if (pending.length > 0) {
+    await env.VECTORS.upsert(pending);
+  }
+
+  logEvent("vector_metadata_reindexed", { count: pending.length, cursor });
+
+  return cursor;
+}
+
 export async function selectUnembedded(env: Bindings, limit: number) {
   const rows = await env.DB.prepare(
     `SELECT t.id AS titleId
@@ -282,14 +321,30 @@ export async function readEmbeddingCoverage(env: Bindings): Promise<EmbeddingCov
   };
 }
 
-export async function similarTo(env: Bindings, titleId: string, topK = 24) {
+export type Neighbour = { id: string; score: number };
+
+export async function nearestTo(env: Bindings, vector: number[], search: CatalogueSearch) {
+  const matches = await queryTitleVectors(env, vector, search);
+
+  return matches.matches.map((match): Neighbour => ({ id: match.id, score: match.score }));
+}
+
+export async function neighboursOf(env: Bindings, titleId: string, topK = 24) {
   try {
     const matches = await env.VECTORS.queryById(titleId, { topK, returnMetadata: "none" });
 
-    return matches.matches.filter((match) => match.id !== titleId).map((match) => match.id);
+    return matches.matches
+      .filter((match) => match.id !== titleId)
+      .map((match): Neighbour => ({ id: match.id, score: match.score }));
   } catch (error) {
     logError("vector_similar_failed", error, { titleId });
 
     return [];
   }
+}
+
+export async function similarTo(env: Bindings, titleId: string, topK = 24) {
+  const neighbours = await neighboursOf(env, titleId, topK);
+
+  return neighbours.map((neighbour) => neighbour.id);
 }

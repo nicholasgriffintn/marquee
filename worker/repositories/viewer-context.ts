@@ -32,7 +32,7 @@ export async function readViewerContext(
 
 type AffinityRow = { value: string; weight: number };
 
-const AFFINITY_WEIGHT = `sum(CASE WHEN v.rating IS NULL THEN 1.0 ELSE v.rating / 2.5 END) AS weight`;
+const AFFINITY_WEIGHT = `sum(CASE WHEN v.rating IS NULL THEN 0.5 ELSE (v.rating - 3.0) / 2.0 END) AS weight`;
 
 function toAffinityValues(rows: AffinityRow[]) {
   return rows.filter((row) => typeof row.value === "string" && row.value).map((row) => row.value);
@@ -52,6 +52,7 @@ async function affinityForTable(
        JOIN ${table} AS f ON f.title_id = v.title_id
        WHERE v.viewer_id = ? AND v.status != 'dropped'
        GROUP BY f.${column}
+       HAVING weight > 0
        ORDER BY weight DESC
        LIMIT ?`,
     )

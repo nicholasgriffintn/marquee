@@ -134,6 +134,10 @@ final class TonightModel: ObservableObject {
         )
       )
       pick = response
+
+      if let picked = response.item {
+        Telemetry.shared.remember([picked.id], token: response.journey)
+      }
     } catch {
       usherError = error.localizedDescription
     }

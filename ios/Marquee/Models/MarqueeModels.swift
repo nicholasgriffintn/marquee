@@ -117,6 +117,7 @@ struct CatalogSection: Codable, Identifiable {
   let items: [MediaTitle]
   let angle: String?
   let reason: String?
+  var journey: String? = nil
 }
 
 struct CatalogResponse: Codable {
@@ -173,6 +174,7 @@ struct FilmingPlacesResponse: Codable { let places: [String] }
 
 struct SearchResponse: Codable {
   let items: [MediaTitle]
+  var journey: String? = nil
 }
 
 enum EntryStatus: String, Codable, CaseIterable, Identifiable {
@@ -513,4 +515,5 @@ struct UsherPickResponse: Decodable {
   let item: MediaTitle?
   let line: String
   let facts: [String]
+  var journey: String? = nil
 }

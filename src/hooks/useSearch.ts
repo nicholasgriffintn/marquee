@@ -1,16 +1,18 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { MediaTitle } from "../domain/catalog";
+import { shouldRefineSearch } from "../domain/search-query";
+import { startJourneys } from "../lib/journey";
 import { queryJson, QueryError } from "../lib/query-client";
 
 type SearchResponse = {
   items: MediaTitle[];
   query: string;
+  journey?: string;
 };
 
 const KEYWORD_DEBOUNCE_MS = 250;
 const HYBRID_SETTLE_MS = 400;
-const HYBRID_TRIGGER_MAX_ITEMS = 6;
 
 function searchUrl(trimmed: string, providerKey: string, hybrid: boolean) {
   const parameters = new URLSearchParams({ query: trimmed });
@@ -37,8 +39,15 @@ export function useSearch(query: string, providerIds: string[]) {
   const [error, setError] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [isRefining, setIsRefining] = useState(false);
+  const served = useRef<MediaTitle[]>([]);
   const trimmed = query.trim();
   const providerKey = providerIds.join(",");
+
+  const serve = useCallback((next: MediaTitle[], journey: string | undefined) => {
+    served.current = next;
+    setItems(next);
+    startJourneys(next, journey);
+  }, []);
 
   const isShort = trimmed.length < 2;
 
@@ -55,7 +64,7 @@ export function useSearch(query: string, providerIds: string[]) {
         const response = await queryJson<SearchResponse>(searchUrl(trimmed, providerKey, true));
 
         if (active) {
-          setItems((current) => mergeRefined(current, response.items));
+          serve(mergeRefined(served.current, response.items), response.journey);
         }
       } catch {
       } finally {
@@ -74,17 +83,17 @@ export function useSearch(query: string, providerIds: string[]) {
           const response = await queryJson<SearchResponse>(searchUrl(trimmed, providerKey, false));
 
           if (active) {
-            setItems(response.items);
+            serve(response.items, response.journey);
             setError("");
 
-            if (response.items.length < HYBRID_TRIGGER_MAX_ITEMS) {
+            if (shouldRefineSearch(trimmed, response.items)) {
               setIsRefining(true);
               hybridTimer = window.setTimeout(() => void refine(), HYBRID_SETTLE_MS);
             }
           }
         } catch (caught) {
           if (active) {
-            setItems([]);
+            serve([], undefined);
             setError(caught instanceof QueryError ? caught.message : "Search is unavailable");
           }
         } finally {
@@ -105,7 +114,7 @@ export function useSearch(query: string, providerIds: string[]) {
         window.clearTimeout(hybridTimer);
       }
     };
-  }, [isShort, providerKey, trimmed]);
+  }, [isShort, providerKey, serve, trimmed]);
 
   return {
     items: isShort ? [] : items,

@@ -2,6 +2,7 @@ import { parseCookies, serializeCookie, serializeExpiredCookie } from "@ngriffin
 import { AuthError } from "@ngriffin_uk/auth-core";
 import { Hono } from "hono";
 
+import { DEFAULT_SCOPES, parseAgentScopes } from "../../src/domain/scopes.ts";
 import { emailConfigured } from "../clients/email.ts";
 import { jsonResponse, readJsonObject, withCookies } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
@@ -313,11 +314,13 @@ async function createToken(context: AppContext) {
 
   const body = await readJsonObject(context.req.raw);
   const label = typeof body?.label === "string" ? body.label.trim().slice(0, 60) : "";
+  const requested = parseAgentScopes(body?.scopes);
+  const scopes = requested.length > 0 ? requested : DEFAULT_SCOPES;
   const token = mintToken();
 
-  await storeApiToken(context.env, principal.user.id, token, label || "MCP client");
+  await storeApiToken(context.env, principal.user.id, token, label || "MCP client", scopes);
 
-  return jsonResponse({ token, label: label || "MCP client" });
+  return jsonResponse({ token, label: label || "MCP client", scopes });
 }
 
 async function revokeToken(context: AppContext) {

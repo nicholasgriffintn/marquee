@@ -29,6 +29,7 @@ export type AdminOverview = {
 };
 
 export type AdminPipeline = {
+  searchDrift: number;
   enrichment: {
     source: string;
     titles: number;
@@ -82,6 +83,21 @@ export type AdminListings = {
     films: number;
   }[];
   sections: { id: string; title: string; titles: number; builtAt: string }[];
+  fetchedAt: string;
+};
+
+export type AdminQuality = {
+  angles: {
+    angle: string;
+    impressions: number;
+    clicks: number;
+    views: number;
+    exits: number;
+    watched: number;
+    attrition: number;
+    dwellMs: number;
+    score: number;
+  }[];
   fetchedAt: string;
 };
 
