@@ -1,4 +1,8 @@
-import type { MediaTitle, MediaType, TitleBuzz } from "../../src/domain/catalog.ts";
+import type {
+  MediaTitle,
+  MediaType,
+  TitleBuzz,
+} from "../../src/domain/catalog.ts";
 import { resolveEntities, type TitleEntity } from "../clients/wikidata.ts";
 import {
   articleMatchesTitle,
@@ -14,7 +18,7 @@ import type { Bindings } from "../types.ts";
 import { syncWorldBoard } from "./world-board.ts";
 
 const SAMPLE_SIZE = 250;
-const CONCURRENCY = 6;
+const CONCURRENCY = 16;
 const MAX_BOOST = 1.5;
 const REFRESH_DAYS = 2;
 const RETRY_DAYS = 21;
@@ -103,7 +107,11 @@ async function candidates(env: Bindings) {
     mediaType: row.mediaType,
     tmdbId: row.tmdbId,
     article: row.article || null,
-    match: row.article ? (row.source === "wikidata" ? "wikidata" : "search") : null,
+    match: row.article
+      ? row.source === "wikidata"
+        ? "wikidata"
+        : "search"
+      : null,
   }));
 }
 
@@ -134,9 +142,15 @@ async function resolveArticle(
   budget.remaining -= 1;
 
   try {
-    const found = await findArticle(names, candidate.year, candidate.mediaType === "movie");
+    const found = await findArticle(
+      names,
+      candidate.year,
+      candidate.mediaType === "movie",
+    );
 
-    return found ? { kind: "found", article: found, match: "search" } : { kind: "absent" };
+    return found
+      ? { kind: "found", article: found, match: "search" }
+      : { kind: "absent" };
   } catch (error) {
     if (error instanceof WikimediaError && error.status === 429) {
       budget.blocked = true;
@@ -160,23 +174,44 @@ async function measure(
   }
 
   if (resolved.kind === "absent") {
-    return { titleId: candidate.titleId, article: "", match: "search", views: 0, previousViews: 0 };
+    return {
+      titleId: candidate.titleId,
+      article: "",
+      match: "search",
+      views: 0,
+      previousViews: 0,
+    };
   }
 
   const { article, match } = resolved;
   const views = await getPageviews(article, 14);
 
   if (views.length < 8) {
-    return { titleId: candidate.titleId, article, match, views: 0, previousViews: 0 };
+    return {
+      titleId: candidate.titleId,
+      article,
+      match,
+      views: 0,
+      previousViews: 0,
+    };
   }
 
   const recent = sum(views.slice(-7));
   const previous = sum(views.slice(-14, -7));
 
-  return { titleId: candidate.titleId, article, match, views: recent, previousViews: previous };
+  return {
+    titleId: candidate.titleId,
+    article,
+    match,
+    views: recent,
+    previousViews: previous,
+  };
 }
 
-async function storeEntityIds(env: Bindings, entities: Map<string, TitleEntity>) {
+async function storeEntityIds(
+  env: Bindings,
+  entities: Map<string, TitleEntity>,
+) {
   const updates = [...entities];
   let written = 0;
 
@@ -204,7 +239,9 @@ async function storeEntityIds(env: Bindings, entities: Map<string, TitleEntity>)
 
 export async function syncBuzz(env: Bindings) {
   const pending = await candidates(env);
-  const unmatched = pending.filter((candidate) => candidate.match !== "wikidata");
+  const unmatched = pending.filter(
+    (candidate) => candidate.match !== "wikidata",
+  );
   const entities = await resolveEntities(unmatched).catch(
     (error: unknown): Map<string, TitleEntity> => {
       logError("wikidata_lookup_failed", error);
@@ -226,7 +263,9 @@ export async function syncBuzz(env: Bindings) {
   for (let index = 0; index < pending.length; index += CONCURRENCY) {
     const wave = pending.slice(index, index + CONCURRENCY);
     // oxlint-disable-next-line no-await-in-loop
-    const settled = await Promise.allSettled(wave.map((entry) => measure(entry, entities, budget)));
+    const settled = await Promise.allSettled(
+      wave.map((entry) => measure(entry, entities, budget)),
+    );
 
     for (const result of settled) {
       if (result.status === "rejected") {
@@ -313,7 +352,12 @@ export async function buzzBoosts(env: Bindings, titleIds: string[]) {
     [JSON.stringify(unique)],
   );
 
-  return new Map(rows.rows.map((row) => [row.titleId, clamp(row.delta, 0, MAX_BOOST) * 0.15]));
+  return new Map(
+    rows.rows.map((row) => [
+      row.titleId,
+      clamp(row.delta, 0, MAX_BOOST) * 0.15,
+    ]),
+  );
 }
 
 export async function readBuzz(db: Database, titleIds: string[]) {
@@ -334,7 +378,10 @@ export async function readBuzz(db: Database, titleIds: string[]) {
   return new Map(rows.rows.map((row) => [row.titleId, toBuzz(row)]));
 }
 
-export function applyBuzz<Item extends MediaTitle>(items: Item[], buzz: Map<string, TitleBuzz>) {
+export function applyBuzz<Item extends MediaTitle>(
+  items: Item[],
+  buzz: Map<string, TitleBuzz>,
+) {
   return items.map((item) => {
     const measured = buzz.get(item.id);
 
