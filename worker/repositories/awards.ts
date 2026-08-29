@@ -1,4 +1,8 @@
-import { NO_AWARDS, type AwardEntry, type AwardSummary } from "../../src/domain/awards.ts";
+import {
+  NO_AWARDS,
+  type AwardEntry,
+  type AwardSummary,
+} from "../../src/domain/awards.ts";
 import type { AwardStatement } from "../clients/wikidata-awards.ts";
 import { logError } from "../lib/logging.ts";
 
@@ -8,7 +12,12 @@ export type TitleAwardWrite = { titleId: string; entries: AwardStatement[] };
 
 export type PersonAwardWrite = { personId: number; entries: AwardStatement[] };
 
-type AwardRow = { awardId: string; label: string; ceremonyYear: number; outcome: string };
+type AwardRow = {
+  awardId: string;
+  label: string;
+  ceremonyYear: number;
+  outcome: string;
+};
 
 const ENTRY_COLUMNS = `link.award_id AS "awardId", a.label,
        link.ceremony_year AS "ceremonyYear", link.outcome`;
@@ -18,7 +27,10 @@ const ENTRY_GROUP = `link.award_id, a.label, link.ceremony_year, link.outcome`;
 const ENTRY_ORDER = `CASE WHEN link.outcome = 'won' THEN 0 ELSE 1 END,
          link.ceremony_year DESC, a.label`;
 
-function toSummary(rows: AwardRow[], summary: string | null = null): AwardSummary {
+function toSummary(
+  rows: AwardRow[],
+  summary: string | null = null,
+): AwardSummary {
   const entries = rows.map((row): AwardEntry => ({
     awardId: row.awardId,
     label: row.label,
@@ -85,8 +97,8 @@ export async function personAwardCandidates(
   limit: number,
   staleDays: number,
 ) {
-  const rows = await db.query<{ personId: number }>(
-    `SELECT p.person_id AS "personId"
+  const rows = await db.query<{ personId: number; gender: number | null }>(
+    `SELECT p.person_id AS "personId", p.gender AS "gender"
        FROM catalog_people AS p
        LEFT JOIN person_award_sync AS s ON s.person_id = p.person_id AND s.source = $3
        WHERE p.titles > 0
@@ -96,10 +108,13 @@ export async function personAwardCandidates(
     [`-${staleDays} days`, limit, source],
   );
 
-  return rows.rows.map((row) => row.personId);
+  return rows.rows;
 }
 
-async function upsertAwards(transaction: DatabaseTransaction, entries: AwardStatement[]) {
+async function upsertAwards(
+  transaction: DatabaseTransaction,
+  entries: AwardStatement[],
+) {
   for (const entry of entries) {
     // oxlint-disable-next-line no-await-in-loop
     await transaction.execute(
@@ -114,14 +129,18 @@ async function upsertAwards(transaction: DatabaseTransaction, entries: AwardStat
   }
 }
 
-export async function storeTitleAwards(db: Database, source: string, writes: TitleAwardWrite[]) {
+export async function storeTitleAwards(
+  db: Database,
+  source: string,
+  writes: TitleAwardWrite[],
+) {
   for (const write of writes) {
     // oxlint-disable-next-line no-await-in-loop
     await db.transaction(async (transaction) => {
-      await transaction.execute(`DELETE FROM title_awards WHERE title_id = $1 AND source = $2`, [
-        write.titleId,
-        source,
-      ]);
+      await transaction.execute(
+        `DELETE FROM title_awards WHERE title_id = $1 AND source = $2`,
+        [write.titleId, source],
+      );
       await upsertAwards(transaction, write.entries);
 
       for (const entry of write.entries) {
@@ -131,7 +150,13 @@ export async function storeTitleAwards(db: Database, source: string, writes: Tit
                (title_id, award_id, ceremony_year, outcome, source)
              VALUES ($1, $2, $3, $4, $5)
              ON CONFLICT DO NOTHING`,
-          [write.titleId, entry.awardId, entry.ceremonyYear ?? 0, entry.outcome, source],
+          [
+            write.titleId,
+            entry.awardId,
+            entry.ceremonyYear ?? 0,
+            entry.outcome,
+            source,
+          ],
         );
       }
 
@@ -147,14 +172,18 @@ export async function storeTitleAwards(db: Database, source: string, writes: Tit
   }
 }
 
-export async function storePersonAwards(db: Database, source: string, writes: PersonAwardWrite[]) {
+export async function storePersonAwards(
+  db: Database,
+  source: string,
+  writes: PersonAwardWrite[],
+) {
   for (const write of writes) {
     // oxlint-disable-next-line no-await-in-loop
     await db.transaction(async (transaction) => {
-      await transaction.execute(`DELETE FROM person_awards WHERE person_id = $1 AND source = $2`, [
-        write.personId,
-        source,
-      ]);
+      await transaction.execute(
+        `DELETE FROM person_awards WHERE person_id = $1 AND source = $2`,
+        [write.personId, source],
+      );
       await upsertAwards(transaction, write.entries);
 
       for (const entry of write.entries) {
@@ -164,7 +193,13 @@ export async function storePersonAwards(db: Database, source: string, writes: Pe
                (person_id, award_id, ceremony_year, outcome, source)
              VALUES ($1, $2, $3, $4, $5)
              ON CONFLICT DO NOTHING`,
-          [write.personId, entry.awardId, entry.ceremonyYear ?? 0, entry.outcome, source],
+          [
+            write.personId,
+            entry.awardId,
+            entry.ceremonyYear ?? 0,
+            entry.outcome,
+            source,
+          ],
         );
       }
 
@@ -180,7 +215,10 @@ export async function storePersonAwards(db: Database, source: string, writes: Pe
   }
 }
 
-export async function readTitleAwards(db: Database, titleId: string): Promise<AwardSummary> {
+export async function readTitleAwards(
+  db: Database,
+  titleId: string,
+): Promise<AwardSummary> {
   try {
     const [entries, tally] = await Promise.all([
       db.query<AwardRow>(
@@ -207,7 +245,10 @@ export async function readTitleAwards(db: Database, titleId: string): Promise<Aw
   }
 }
 
-export async function readPersonAwards(db: Database, personId: number): Promise<AwardSummary> {
+export async function readPersonAwards(
+  db: Database,
+  personId: number,
+): Promise<AwardSummary> {
   try {
     const rows = await db.query<AwardRow>(
       `SELECT ${ENTRY_COLUMNS}
