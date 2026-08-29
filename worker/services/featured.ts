@@ -2,8 +2,10 @@ import type { CatalogSection, MediaTitle } from "../../src/domain/catalog.ts";
 import type { ViewerOrigin } from "../../src/domain/cinema.ts";
 import { personalFrom } from "../../src/domain/rails.ts";
 import { hashString } from "../../src/lib/string.ts";
+import { readCachedValue, writeCachedValue } from "../lib/cache.ts";
+import { readSectionFronts } from "../repositories/catalog-reader.ts";
 import type { Bindings } from "../types.ts";
-import { getCatalogue, getTrending } from "./catalog.ts";
+import { getTrending } from "./catalog.ts";
 import { deliverRails } from "./rail-delivery.ts";
 import { eligibilityGate, type Eligibility } from "./viewer/eligibility.ts";
 import { eligibilityFor, readViewerState, type ViewerState } from "./viewer/state.ts";
@@ -11,9 +13,15 @@ import { eligibilityFor, readViewerState, type ViewerState } from "./viewer/stat
 const ITEMS_PER_SOURCE = 6;
 const ITEMS_PER_SECTION = 2;
 const DAY_MS = 86_400_000;
+const FEATURED_CACHE_SECONDS = 300;
 
 type FeaturedSource = "personal" | "trending" | "catalogue";
 type FeaturedCandidate = { item: MediaTitle; source: FeaturedSource };
+type FeaturedTitle = {
+  item: MediaTitle | null;
+  source: FeaturedSource | null;
+  fetchedAt: string;
+};
 
 function dayKey(now: Date) {
   return now.toISOString().slice(0, 10);
@@ -103,6 +111,10 @@ function chooseFeatured(candidates: FeaturedCandidate[], identity: string, now: 
     : first;
 }
 
+function featuredCacheKey(viewerId: string | null, providerIds: string[], day: string) {
+  return `featured:${day}:${viewerId ?? "front-of-house"}:${providerIds.toSorted().join(",")}`;
+}
+
 async function personalSections(env: Bindings, viewer: ViewerState, origin: ViewerOrigin | null) {
   const delivery = await deliverRails(env, {
     viewerId: viewer.viewerId,
@@ -123,9 +135,16 @@ export async function getFeaturedTitle(
   },
 ) {
   const { viewerId, providerIds, origin, now = new Date() } = options;
+  const cacheKey = featuredCacheKey(viewerId, providerIds, dayKey(now));
+  const cached = await readCachedValue<FeaturedTitle>(cacheKey);
+
+  if (cached) {
+    return cached;
+  }
+
   const viewer = await readViewerState(env, viewerId ?? "", { providerIds });
   const [catalogue, trending, personal] = await Promise.all([
-    getCatalogue(env, viewer.providerIds),
+    readSectionFronts(env.DB, viewer.providerIds, ITEMS_PER_SECTION),
     getTrending(env).catch(() => ({ items: [] })),
     viewerId ? personalSections(env, viewer, origin) : Promise.resolve([]),
   ]);
@@ -133,15 +152,20 @@ export async function getFeaturedTitle(
     [
       ...(personal.length ? [{ source: "personal" as const, items: sectionFronts(personal) }] : []),
       { source: "trending", items: trending.items },
-      { source: "catalogue", items: sectionFronts(catalogue?.sections ?? []) },
+      { source: "catalogue", items: sectionFronts(catalogue) },
     ],
     eligibilityFor(viewer, { availability: "confirmed-or-unknown" }),
   );
   const featured = chooseFeatured(candidates, viewerId ?? "front-of-house", now);
-
-  return {
+  const result: FeaturedTitle = {
     item: featured?.item ?? null,
     source: featured?.source ?? null,
     fetchedAt: now.toISOString(),
   };
+
+  if (result.item) {
+    await writeCachedValue(cacheKey, result, FEATURED_CACHE_SECONDS);
+  }
+
+  return result;
 }

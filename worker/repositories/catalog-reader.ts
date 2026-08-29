@@ -137,11 +137,15 @@ export async function readTitlesByMalId(db: Database, malIds: number[]) {
   return found;
 }
 
-export async function readCatalog(db: Database, query: string, providerIds: string[]) {
-  if (query) {
-    return readSearchResults(db, query, providerIds);
-  }
+type SectionShortlist = {
+  rows: SectionRow[];
+  sections: { row: SectionRow; ids: string[] }[];
+};
 
+async function sectionShortlist(
+  db: Database,
+  providerIds: string[],
+): Promise<SectionShortlist | null> {
   const rows = await db.query<SectionRow>(`SELECT
          id,
          title,
@@ -164,26 +168,75 @@ export async function readCatalog(db: Database, query: string, providerIds: stri
     providerIds,
   );
 
-  const shortlist = eligible
-    .map((section) => ({
-      row: section,
-      ids: parseStoredTitleIds(section.titleIds)
-        .filter((id) => watchable.has(id))
-        .slice(0, SECTION_ITEMS),
-    }))
-    .filter((section) => section.ids.length >= MIN_VISIBLE_ITEMS)
-    .slice(0, MAX_VISIBLE_SECTIONS);
+  return {
+    rows: rows.rows,
+    sections: eligible
+      .map((section) => ({
+        row: section,
+        ids: parseStoredTitleIds(section.titleIds)
+          .filter((id) => watchable.has(id))
+          .slice(0, SECTION_ITEMS),
+      }))
+      .filter((section) => section.ids.length >= MIN_VISIBLE_ITEMS)
+      .slice(0, MAX_VISIBLE_SECTIONS),
+  };
+}
 
+async function readShortlistedTitles(db: Database, shortlist: { ids: string[] }[]) {
   const wanted = shortlist.flatMap((section) => section.ids);
   const titles = await readItems(db, wanted, wanted.length);
-  const titlesById = new Map(titles.map((title) => [title.id, title]));
-  const sections: CatalogSection[] = shortlist
-    .map(({ row, ids }) => {
-      const items = ids.flatMap((id) => {
-        const title = titlesById.get(id);
 
-        return title ? [title] : [];
-      });
+  return new Map(titles.map((title) => [title.id, title]));
+}
+
+function sectionItems(ids: string[], titlesById: Map<string, MediaTitle>) {
+  return ids.flatMap((id) => {
+    const title = titlesById.get(id);
+
+    return title ? [title] : [];
+  });
+}
+
+export async function readSectionFronts(
+  db: Database,
+  providerIds: string[],
+  perSection: number,
+): Promise<CatalogSection[]> {
+  const shortlist = await sectionShortlist(db, providerIds);
+
+  if (!shortlist) {
+    return [];
+  }
+
+  const fronts = shortlist.sections.map(({ row, ids }) => ({
+    row,
+    ids: ids.slice(0, perSection),
+  }));
+  const titlesById = await readShortlistedTitles(db, fronts);
+
+  return fronts.map(({ row, ids }) => ({
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    items: sectionItems(ids, titlesById),
+  }));
+}
+
+export async function readCatalog(db: Database, query: string, providerIds: string[]) {
+  if (query) {
+    return readSearchResults(db, query, providerIds);
+  }
+
+  const shortlist = await sectionShortlist(db, providerIds);
+
+  if (!shortlist) {
+    return null;
+  }
+
+  const titlesById = await readShortlistedTitles(db, shortlist.sections);
+  const sections: CatalogSection[] = shortlist.sections
+    .map(({ row, ids }) => {
+      const items = sectionItems(ids, titlesById);
 
       if (items.length === 0) {
         logError("section_titles_unreadable", new Error(`${row.id} lost every stored title`), {
@@ -199,7 +252,7 @@ export async function readCatalog(db: Database, query: string, providerIds: stri
       };
     })
     .filter((section) => section.items.length >= MIN_VISIBLE_ITEMS);
-  const fetchedAt = rows.rows.reduce(
+  const fetchedAt = shortlist.rows.reduce(
     (latest, section) => (section.sourceUpdatedAt > latest ? section.sourceUpdatedAt : latest),
     "",
   );
