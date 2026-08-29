@@ -113,7 +113,7 @@ async function semanticIds(
     return null;
   }
 
-  const matches = await nearestTo(env, vector, POOL.vectorTopK);
+  const matches = await nearestTo(env, vector, eligibilityOf(query));
   const best = matches.reduce((top, match) => Math.max(top, match.score), 0);
 
   if (best < POOL.vectorMinScore) {

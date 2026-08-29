@@ -20,6 +20,5 @@ export const POOL = {
   semantic: 60,
   rerank: 48,
   maximum: 96,
-  vectorTopK: 60,
   vectorMinScore: 0.4,
 };

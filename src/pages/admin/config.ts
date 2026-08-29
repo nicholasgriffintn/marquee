@@ -47,6 +47,7 @@ export const ACTION_GROUPS: {
       { id: "availability", label: "Refresh availability" },
       { id: "enrichment", label: "Queue enrichment" },
       { id: "embeddings", label: "Queue embeddings" },
+      { id: "vector-metadata", label: "Reindex vector metadata" },
       { id: "discover", label: "Advance backfill" },
       { id: "anime-ids", label: "Import anime ids" },
       { id: "identifiers", label: "Sync identifier hub" },

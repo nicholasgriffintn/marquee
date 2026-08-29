@@ -28,6 +28,7 @@ import { reelRoutes } from "./routes/reel.ts";
 import { revivalRoutes } from "./routes/revival.ts";
 import { sitemapRoutes } from "./routes/sitemap.ts";
 import { usherRoutes } from "./routes/usher.ts";
+import { bearerScopeGuard } from "./security/bearer-scopes.ts";
 import { apiGuard } from "./security/guard.ts";
 import type { Bindings, IngestionJob } from "./types.ts";
 import { CatalogSweep } from "./workflows/catalog-sweep.ts";
@@ -58,6 +59,8 @@ app.use("/api/*", async (context, next) => {
 });
 
 app.use("*", apiGuard);
+
+app.use("/api/*", bearerScopeGuard);
 
 app.get("/health", (context) => context.json({ ok: true, service: "marquee" }));
 

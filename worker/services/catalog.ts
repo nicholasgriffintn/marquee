@@ -19,7 +19,7 @@ import {
 import { readProviders } from "../repositories/providers.ts";
 import type { Bindings } from "../types.ts";
 import { applyBuzz, readBuzz, readTrendingBuzz } from "./buzz.ts";
-import { findPendingTitles } from "./discovery.ts";
+import { findGapTitles } from "./catalogue-gaps.ts";
 import { retrieveTitles } from "./retrieval/index.ts";
 import { readNextEpisode, readTonight } from "./schedule.ts";
 import { traktUpcoming } from "./trakt.ts";
@@ -74,7 +74,7 @@ export async function searchCatalogue(env: Bindings, query: string, providerIds:
   let pending: MediaTitle[] = [];
 
   try {
-    pending = await findPendingTitles(env, query, items);
+    pending = await findGapTitles(env, query, items);
   } catch (error) {
     logError("pending_lookup_failed", error, { area: "search" });
   }
@@ -249,7 +249,7 @@ async function pendingForBrowse(
   }
 
   try {
-    const pending = await findPendingTitles(env, browse.query, found);
+    const pending = await findGapTitles(env, browse.query, found);
 
     return browse.mediaType
       ? pending.filter((title) => title.mediaType === browse.mediaType)

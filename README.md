@@ -216,6 +216,8 @@ to the list is silently absent at runtime. Add the name in both places.
 cp .dev.vars.example .dev.vars
 pnpm install
 pnpm exec wrangler vectorize create marquee-titles --dimensions=1024 --metric=cosine
+pnpm exec wrangler vectorize create-metadata-index marquee-titles --property-name=mediaType --type=string
+pnpm exec wrangler vectorize create-metadata-index marquee-titles --property-name=year --type=number
 pnpm exec wrangler queues create marquee-revival
 pnpm exec wrangler queues create marquee-anime
 pnpm db:migrate:local
@@ -270,15 +272,23 @@ pnpm exec wrangler d1 execute DB --remote --command "UPDATE users SET role = 'ad
 Keep this out-of-band promotion step in the deployment runbook. The application will reject any
 later change that would leave the database without an administrator.
 
+Run the two `create-metadata-index` commands against the deployed index as well. Vectorize only
+filters on metadata written after an index exists, so a populated deployment also needs "Reindex
+vector metadata" on `/admin` once. Search falls back to unfiltered neighbours until it finishes.
+
 A fresh deployment fills in over the first few sweeps rather than all at once. Watch it on `/admin`.
 
 ## Notes for the curious
 
 **Search** is hybrid: an FTS5 index over titles, synopses, keywords and credits for precision, a
 Vectorize index of bge-m3 embeddings for meaning, the two interleaved and reranked by
-`@cf/baai/bge-reranker-base`. The AI shelves sit on top of that rather than driving it — a viewer's
-taste vector is the mean of what they save, blended with what they have told the Usher, and the
-model only names a shelf and picks from a shortlist it can see.
+`@cf/baai/bge-reranker-base`. Media type and year are Vectorize metadata indexes, so those
+constraints narrow the neighbour search rather than thinning its results afterwards; everything
+else is left to the database, and the neighbour count grows to make room for it.
+
+The AI shelves sit on top of that rather than driving it — a viewer's taste vector is the mean of
+what they save, blended with what they have told the Usher, and the model only names a shelf and
+picks from a shortlist it can see.
 
 **The sweeps** are a Workflow on two crons: a light one every three hours, a deep one nightly that
 fans TMDB's discover pages out over the ingestion queue. Sweeps merge rather than replace,
@@ -313,7 +323,8 @@ limits them like any public read, and responses carry `x-robots-tag: noindex`.
 is talking to. Listings are only pulled near somewhere a member has actually looked from, so the
 work grows with the audience rather than with the map.
 
-**Agents** — Marquee speaks MCP at `/mcp`. Mint a token on the Sources page:
+**Agents** — Marquee speaks MCP at `/mcp`, protocol revision `2025-11-25`. Mint a token on the
+Sources page:
 
 ```json
 {
@@ -330,6 +341,12 @@ It exposes `search_catalogue`, `find_similar`, `get_title`, `get_shelf`, `save_t
 `whats_on_tonight`, `whats_on_this_week`, `titles_by_person` and `follow_person`. The week tool
 answers from the same shelf-aware diary the calendar feed is built from, so an agent sees exactly
 what the subscription would show.
+
+**Scopes** narrow what a token may do, one per tool, from the vocabulary in
+`src/domain/scopes.ts`. `/mcp` is the whole of a scoped token's surface: the REST API answers with
+the account entire, so rather than carve it up route by route it takes `account:full`, which only
+the iOS app and pre-scope tokens hold. Mutations write nothing without `confirm: true`, returning
+the change they would make so it can be approved first.
 
 **Posters** are cached in R2 and served from the app's own hostname through Cloudflare Images. Keep
 the four widths in `src/lib/media.ts` and `worker/routes/media.ts` aligned, or the number of

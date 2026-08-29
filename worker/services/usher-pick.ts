@@ -1,7 +1,7 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
 import { showingFor, type Showing } from "../../src/domain/usher.ts";
+import { newDecisionId, runAiObject } from "../ai/run.ts";
 import { USHER_VOICE } from "../ai/usher-voice.ts";
-import { fastModel, requestAiCompletion } from "../clients/ai-gateway.ts";
 import type { ChatMessage } from "../lib/curator-payload.ts";
 import { logError } from "../lib/logging.ts";
 import { isKnownTitle } from "../lib/validation.ts";
@@ -25,7 +25,6 @@ import { preferenceSummary, readViewerPreferences } from "./usher.ts";
 import { factBrief, factsFor, serviceFor } from "./why.ts";
 
 const SHORTLIST = 8;
-const NEIGHBOUR_TOP_K = 80;
 
 const PICK_PROMPT = [
   USHER_VOICE,
@@ -104,7 +103,7 @@ export async function shortlistFor(
 
   if (vector) {
     try {
-      const matches = await nearestTo(env, vector, NEIGHBOUR_TOP_K);
+      const matches = await nearestTo(env, vector, base);
       const titles = await eligibleTitles(
         env,
         matches.map((match) => match.id),
@@ -209,15 +208,11 @@ export async function pickOne(
   ];
 
   try {
-    const response = await requestAiCompletion(env, messages, [], false, {
-      model: fastModel(env),
-      timeoutMs: 15_000,
-      maxTokens: 160,
-      json: true,
-      metadata: { feature: "usher_pick", viewer: viewerId },
+    const parsed = await runAiObject(env, {
+      feature: "usher_pick",
+      decisionId: newDecisionId(),
+      messages,
     });
-    const json = response.content?.match(/\{[\s\S]*\}/u)?.[0];
-    const parsed: unknown = json ? JSON.parse(json) : null;
 
     if (isRecord(parsed) && isKnownTitle(parsed.titleId)) {
       const chosen = titles.find((title) => title.id === parsed.titleId);
