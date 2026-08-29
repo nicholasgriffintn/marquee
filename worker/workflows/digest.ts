@@ -29,7 +29,7 @@ export class DigestWorkflow extends WorkflowEntrypoint<Bindings, unknown> {
         .do(`beliefs ${viewerId}`, { retries: RETRIES }, async () => {
           const entries = await readViewerEntries(this.env.DB, viewerId);
 
-          return refreshBeliefs(this.env, viewerId, entries, { includeHunches: true });
+          return refreshBeliefs(this.env, viewerId, entries, { includeFacets: true });
         })
         .catch(() => 0);
     }

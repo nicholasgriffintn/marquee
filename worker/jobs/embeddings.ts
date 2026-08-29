@@ -24,6 +24,12 @@ export async function queueEmbeddings(env: Bindings) {
   await enqueue(env.EMBEDDING_QUEUE, embedJobs(titleIds));
 }
 
+export async function queueVectorReindex(env: Bindings) {
+  logEvent("vector_reindex_queued", {});
+
+  await enqueue(env.EMBEDDING_QUEUE, [{ type: "reindex-vectors" }]);
+}
+
 export async function queueTitleEmbeddings(env: Bindings, titleIds: string[]) {
   const unique = [...new Set(titleIds)];
 

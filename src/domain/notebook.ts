@@ -3,6 +3,8 @@ import type { MediaType } from "./catalog";
 
 export type BeliefScope = "always" | "tonight" | "week";
 
+export type BeliefPolarity = "seeks" | "avoids";
+
 export type Belief = {
   id: string;
   key: string;
@@ -11,9 +13,18 @@ export type Belief = {
   confidence: number;
   scope: BeliefScope;
   sourceRule: string;
+  trait: string | null;
+  polarity: BeliefPolarity | null;
   edited: boolean;
   suspendedUntil: string | null;
   evidence: number;
+};
+
+export type BeliefEvidenceNote = {
+  id: string;
+  title: string;
+  excerpt: string;
+  notedAt: string;
 };
 
 export type Notebook = {
@@ -25,6 +36,56 @@ export const BELIEF_SCOPES: BeliefScope[] = ["always", "tonight", "week"];
 
 export function isBeliefScope(value: unknown): value is BeliefScope {
   return typeof value === "string" && BELIEF_SCOPES.includes(value as BeliefScope);
+}
+
+export const BELIEF_POLARITIES: BeliefPolarity[] = ["seeks", "avoids"];
+
+export function isBeliefPolarity(value: unknown): value is BeliefPolarity {
+  return typeof value === "string" && BELIEF_POLARITIES.includes(value as BeliefPolarity);
+}
+
+export const NOTE_FACET_RULE = "ai:note-facet";
+
+const HUNCH_PREFIX = "hunch:";
+
+const FACET_EVIDENCE_FLOOR = 2;
+const FACET_TRAIT_LENGTH = 40;
+const FACET_TRAIT_WORDS = 5;
+const CONFIDENCE_FLOOR = 0.25;
+const CONFIDENCE_STEP = 0.12;
+const CONFIDENCE_CEILING = 0.8;
+
+export function evidenceConfidence(count: number) {
+  return Math.min(CONFIDENCE_CEILING, CONFIDENCE_FLOOR + count * CONFIDENCE_STEP);
+}
+
+export function facetTrait(value: string) {
+  const cleaned = value
+    .toLowerCase()
+    .normalize("NFKD")
+    .replaceAll(/[^a-z0-9 -]+/gu, " ")
+    .replaceAll(/\s+/gu, " ")
+    .trim()
+    .slice(0, FACET_TRAIT_LENGTH)
+    .trim();
+
+  return cleaned.split(" ").length > FACET_TRAIT_WORDS || cleaned.length < 3 ? "" : cleaned;
+}
+
+export function facetSentence(trait: string, polarity: BeliefPolarity) {
+  return polarity === "seeks"
+    ? `In your own notes, ${trait} keeps winning you over.`
+    : `In your own notes, ${trait} keeps putting you off.`;
+}
+
+export function requiredEvidence(belief: Pick<Belief, "key" | "sourceRule">) {
+  return belief.sourceRule === NOTE_FACET_RULE || belief.key.startsWith(HUNCH_PREFIX)
+    ? FACET_EVIDENCE_FLOOR
+    : 0;
+}
+
+export function missingEvidence(belief: Pick<Belief, "key" | "sourceRule" | "evidence">) {
+  return Math.max(0, requiredEvidence(belief) - belief.evidence);
 }
 
 export function confidenceLabel(confidence: number) {
@@ -72,6 +133,10 @@ export const GROUP_TITLES: Record<string, string> = {
 
 export function isSuspended(belief: Belief, now = Date.now()) {
   return Boolean(belief.suspendedUntil && Date.parse(belief.suspendedUntil) > now);
+}
+
+export function beliefSteersPicks(belief: Belief, now = Date.now()) {
+  return !isSuspended(belief, now) && missingEvidence(belief) === 0;
 }
 
 export type Guest = {

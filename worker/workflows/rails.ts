@@ -1,5 +1,6 @@
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from "cloudflare:workers";
 
+import { newDecisionId } from "../ai/run.ts";
 import { recordEvent } from "../lib/events.ts";
 import {
   buildOneRail,
@@ -19,6 +20,7 @@ export type RailsParameters = { viewerId: string };
 export class RailsWorkflow extends WorkflowEntrypoint<Bindings, RailsParameters> {
   async run(event: Readonly<WorkflowEvent<RailsParameters>>, step: WorkflowStep) {
     const { viewerId } = event.payload;
+    const decisionId = newDecisionId();
     const viewer = await readViewerState(this.env, viewerId);
     const { signature } = await getAiRails(this.env, viewer);
     const prepared = await step.do("read taste", { retries: RETRIES }, async () =>
@@ -33,6 +35,7 @@ export class RailsWorkflow extends WorkflowEntrypoint<Bindings, RailsParameters>
               viewer,
               prepared.eligibility,
               angle,
+              decisionId,
               prepared.seeds[angle.id] ?? [],
               prepared.shelf,
               prepared.summary,

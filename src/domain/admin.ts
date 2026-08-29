@@ -10,6 +10,7 @@ export const ADMIN_ACTIONS = [
   "enrichment-mal",
   "enrichment-anilist",
   "embeddings",
+  "vector-metadata",
   "discover",
   "schedule",
   "buzz",

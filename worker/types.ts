@@ -97,6 +97,7 @@ export type IngestionJob =
       watchedAt: string;
     }
   | { type: "embed-titles"; titleIds: string[] }
+  | { type: "reindex-vectors"; after?: string }
   | { type: "import-trakt-history"; viewerId: string; origin: string }
   | { type: "push-trakt-shelf"; viewerId: string; origin: string }
   | { type: "sync-schedule" }
