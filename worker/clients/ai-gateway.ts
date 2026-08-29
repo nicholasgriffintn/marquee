@@ -1,6 +1,7 @@
 import type { CachePolicy, ModelTier } from "../ai/policy.ts";
 import type { OutputSchema } from "../ai/schemas.ts";
-import { parseAssistantMessage, type ChatMessage } from "../lib/curator-payload.ts";
+import { parseAssistantMessage, parseUsage, type ChatMessage } from "../lib/curator-payload.ts";
+import type { ModelCallSink } from "../lib/decisions.ts";
 import { logEvent } from "../lib/logging.ts";
 import { isRecord } from "../lib/values.ts";
 import type { Bindings } from "../types.ts";
@@ -25,6 +26,7 @@ export type AiCall = {
   tools?: ChatCompletionTool[];
   toolChoice?: "auto" | "required" | "none";
   schema?: OutputSchema | null;
+  record?: ModelCallSink;
 };
 
 function assertConfiguration(env: Bindings) {
@@ -134,30 +136,46 @@ async function completeOnce(
   schema: OutputSchema | null,
 ) {
   const tools = call.tools ?? [];
-  const response = await fetch(completionsUrl(env), {
-    method: "POST",
-    headers: {
-      accept: "application/json",
-      authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
-      "cf-aig-gateway-id": env.AI_GATEWAY_ID,
-      "cf-aig-request-timeout": String(call.timeoutMs - TIMEOUT_HEADROOM_MS),
-      ...gatewayHeaders(call),
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
+  const startedAt = Date.now();
+  const report = (usage: { inputTokens: number; outputTokens: number } | null) => {
+    call.record?.modelCall({
       model,
-      messages: call.messages,
-      temperature: call.temperature,
-      max_completion_tokens: call.maxTokens,
-      ...(tools.length
-        ? { tools, tool_choice: call.toolChoice ?? "auto", parallel_tool_calls: false }
-        : {}),
-      ...responseFormat(schema, Boolean(call.schema)),
-    }),
-    signal: AbortSignal.timeout(call.timeoutMs),
-  });
+      latencyMs: Date.now() - startedAt,
+      ...usage,
+      ...(usage ? {} : { failed: true }),
+    });
+  };
+
+  const response = await fetchCompletion(
+    completionsUrl(env),
+    {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
+        "cf-aig-gateway-id": env.AI_GATEWAY_ID,
+        "cf-aig-request-timeout": String(call.timeoutMs - TIMEOUT_HEADROOM_MS),
+        ...gatewayHeaders(call),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        messages: call.messages,
+        temperature: call.temperature,
+        max_completion_tokens: call.maxTokens,
+        ...(tools.length
+          ? { tools, tool_choice: call.toolChoice ?? "auto", parallel_tool_calls: false }
+          : {}),
+        ...responseFormat(schema, Boolean(call.schema)),
+      }),
+      signal: AbortSignal.timeout(call.timeoutMs),
+    },
+    report,
+  );
 
   if (!response.ok) {
+    report(null);
+
     throw new AiGatewayError(
       `Cloudflare AI Gateway request failed with status ${response.status}`,
       response.status,
@@ -169,6 +187,8 @@ async function completeOnce(
   try {
     payload = await response.json();
   } catch (error) {
+    report(null);
+
     throw new AiGatewayError(
       `Cloudflare AI returned a body that is not JSON (model: ${model}, ${String(error)})`,
       502,
@@ -178,17 +198,33 @@ async function completeOnce(
   const message = parseAssistantMessage(payload);
 
   if (!message) {
+    report(null);
+
     throw new AiGatewayError(`Cloudflare AI returned an invalid response (model: ${model})`, 502);
   }
 
   if (!message.content && !message.tool_calls?.length) {
+    report(null);
+
     throw new AiGatewayError(
       `Cloudflare AI returned no content (finish_reason: ${finishReason(payload) ?? "unknown"}, model: ${model})`,
       502,
     );
   }
 
+  report(parseUsage(payload));
+
   return message;
+}
+
+async function fetchCompletion(url: string, init: RequestInit, report: (usage: null) => void) {
+  try {
+    return await fetch(url, init);
+  } catch (error) {
+    report(null);
+
+    throw error;
+  }
 }
 
 export async function* streamAiCompletion(env: Bindings, call: AiCall) {

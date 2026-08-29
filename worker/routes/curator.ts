@@ -10,7 +10,7 @@ import {
 } from "../auth/session.ts";
 import { recordEvent } from "../lib/events.ts";
 import { jsonResponse, readJsonObject } from "../lib/http.ts";
-import { ticketSections } from "../lib/journeys.ts";
+import { mintJourney, ticketSections } from "../lib/journeys.ts";
 import { logError } from "../lib/logging.ts";
 import { isKnownTitle, validProviderIds } from "../lib/validation.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
@@ -181,14 +181,23 @@ curatorRoutes.get("/insight/:titleId", async (context) => {
       insight.pairs.map((pair) => pair.titleId),
     );
     const byId = new Map(paired.map((item) => [item.id, item]));
+    const pairs = insight.pairs.flatMap((pair) => {
+      const item = byId.get(pair.titleId);
+
+      return item ? [{ item, reason: pair.reason }] : [];
+    });
+    const journey = await mintJourney(context.env, {
+      mode: "insight",
+      angle: "insight_pair",
+      size: pairs.length,
+      decisionId: insight.decisionId,
+    });
+    const { decisionId: _decisionId, ...publicInsight } = insight;
 
     return jsonResponse({
-      insight,
-      pairs: insight.pairs.flatMap((pair) => {
-        const item = byId.get(pair.titleId);
-
-        return item ? [{ item, reason: pair.reason }] : [];
-      }),
+      insight: publicInsight,
+      pairs,
+      journey: journey.token,
     });
   } catch (error) {
     logError("title_insight_failed", error);

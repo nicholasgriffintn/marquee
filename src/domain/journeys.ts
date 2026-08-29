@@ -3,6 +3,9 @@ export const JOURNEY_MODES = [
   "catalogue",
   "ai-rail",
   "search",
+  "curator",
+  "digest",
+  "insight",
   "usher-pick",
   "usher-order",
 ] as const;

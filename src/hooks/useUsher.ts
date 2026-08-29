@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MediaTitle } from "../domain/catalog";
 import type { Guest } from "../domain/notebook";
 import type { TonightOrder, UsherMoment, UsherSurface } from "../domain/usher";
-import { startJourney } from "../lib/journey";
+import { journeyFor, startJourney } from "../lib/journey";
 import { jsonMutation, mutateJson, queryJson } from "../lib/query-client";
 
 type StateResponse = { status: string; answered: string[]; awayDays?: number };
@@ -294,9 +294,16 @@ export function useUsher(isSignedIn: boolean) {
 
   const remember = useCallback(
     async (titleId: string, source: string, context: Record<string, unknown>) => {
+      const journey = journeyFor(titleId);
+
       await mutateJson(
         "/api/usher/reject",
-        jsonMutation("POST", { titleId, source, ...context }),
+        jsonMutation("POST", {
+          titleId,
+          source,
+          ...(journey ? { journey: journey.token, rank: journey.rank } : {}),
+          ...context,
+        }),
       ).catch(() => undefined);
     },
     [],

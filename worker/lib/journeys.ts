@@ -10,18 +10,24 @@ import {
   type JourneyMode,
 } from "../../src/domain/journeys.ts";
 import type { Bindings } from "../types.ts";
+import { isDecisionId } from "./decisions.ts";
 import { logEvent } from "./logging.ts";
 import { clamp } from "./numbers.ts";
 import { randomHex } from "./tokens.ts";
 import { isRecord } from "./values.ts";
 
-export type JourneyGrant = { mode: JourneyMode; angle: string; size: number };
+export type JourneyGrant = {
+  mode: JourneyMode;
+  angle: string;
+  size: number;
+  decisionId?: string;
+};
 
 export type Journey = JourneyGrant & { id: string; issuedAt: number };
 
 export type MintedJourney = { id: string; token: string };
 
-type Payload = { i: string; m: string; a: string; s: number; t: number };
+type Payload = { i: string; m: string; a: string; s: number; t: number; d?: string };
 
 const VERSION = "j1";
 const KEY_INFO = "marquee.journeys.hmac";
@@ -77,12 +83,20 @@ function readPayload(value: string): Payload | null {
     typeof parsed.m !== "string" ||
     typeof parsed.a !== "string" ||
     typeof parsed.s !== "number" ||
-    typeof parsed.t !== "number"
+    typeof parsed.t !== "number" ||
+    (parsed.d !== undefined && !isDecisionId(parsed.d))
   ) {
     return null;
   }
 
-  return { i: parsed.i, m: parsed.m, a: parsed.a, s: parsed.s, t: parsed.t };
+  return {
+    i: parsed.i,
+    m: parsed.m,
+    a: parsed.a,
+    s: parsed.s,
+    t: parsed.t,
+    ...(isDecisionId(parsed.d) ? { d: parsed.d } : {}),
+  };
 }
 
 export async function mintJourney(env: Bindings, grant: JourneyGrant): Promise<MintedJourney> {
@@ -93,6 +107,7 @@ export async function mintJourney(env: Bindings, grant: JourneyGrant): Promise<M
     a: grant.angle.slice(0, JOURNEY_ANGLE_LIMIT),
     s: clamp(Math.trunc(grant.size) || 0, 0, JOURNEY_SIZE_LIMIT),
     t: Date.now(),
+    ...(isDecisionId(grant.decisionId) ? { d: grant.decisionId } : {}),
   };
   const encoded = encodeBase64Url(encoder.encode(JSON.stringify(payload)), false);
   const signature = encodeBase64Url(await sign(env, encoded), false);
@@ -125,7 +140,14 @@ export async function verifyJourney(env: Bindings, token: unknown): Promise<Jour
     return null;
   }
 
-  return { id: payload.i, mode: payload.m, angle: payload.a, size: payload.s, issuedAt: payload.t };
+  return {
+    id: payload.i,
+    mode: payload.m,
+    angle: payload.a,
+    size: payload.s,
+    issuedAt: payload.t,
+    ...(payload.d ? { decisionId: payload.d } : {}),
+  };
 }
 
 export function journeyLatency(journey: Journey) {
@@ -140,13 +162,14 @@ export function journeyRank(value: unknown, journey: Journey) {
 
 export function ticketSections(env: Bindings, sections: CatalogSection[], mode: JourneyMode) {
   return Promise.all(
-    sections.map(async (section) => ({
+    sections.map(async ({ decisionId, ...section }) => ({
       ...section,
       journey: (
         await mintJourney(env, {
           mode,
           angle: section.angle ?? section.id,
           size: section.items.length,
+          ...(decisionId ? { decisionId } : {}),
         })
       ).token,
     })),

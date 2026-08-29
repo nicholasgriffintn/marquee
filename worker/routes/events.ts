@@ -46,6 +46,7 @@ eventRoutes.post("/", async (context) => {
     ...(journey
       ? {
           journeyId: journey.id,
+          ...(journey.decisionId ? { decisionId: journey.decisionId } : {}),
           source: journey.angle,
           mode: journey.mode,
           latencyMs: journeyLatency(journey),
@@ -65,6 +66,7 @@ eventRoutes.post("/", async (context) => {
           type: "provider_exit",
           titleId,
           ...(journey ? { journeyId: journey.id } : {}),
+          ...(journey?.decisionId ? { decisionId: journey.decisionId } : {}),
           context: {
             source: journey?.angle ?? "",
             mode: journey?.mode ?? "",

@@ -1,9 +1,11 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
-import { newDecisionId, runAiObject } from "../ai/run.ts";
+import { runAiObject } from "../ai/run.ts";
+import { candidatesFrom, promptVersion } from "../lib/decisions.ts";
 import { isRecord } from "../lib/values.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
 import { readRanked, searchCatalogue } from "../repositories/catalog-search.ts";
 import type { Bindings } from "../types.ts";
+import { beginDecision } from "./decisions.ts";
 import { similarTo } from "./embeddings.ts";
 
 const MAX_AGE_DAYS = 30;
@@ -18,9 +20,12 @@ const SYSTEM_PROMPT = [
   'Reply with JSON only: {"hook":"","moods":["",""],"pairs":[{"pick":1,"reason":""}]}.',
 ].join(" ");
 
+const INSIGHT_PROMPT_VERSION = promptVersion(SYSTEM_PROMPT);
+
 export type TitleInsight = {
   hook: string;
   moods: string[];
+  decisionId?: string;
   pairs: { titleId: string; reason: string }[];
 };
 
@@ -69,11 +74,11 @@ async function pairCandidates(env: Bindings, title: MediaTitle) {
     const ranked = (await readRanked(env.DB, neighbours)).slice(0, PAIR_CANDIDATES);
 
     if (ranked.length >= 2) {
-      return ranked;
+      return { candidates: ranked, origin: "vector" };
     }
   }
 
-  return (
+  const byGenre = (
     await searchCatalogue(env.DB, {
       genres: title.genres.slice(0, 2),
       mediaType: title.mediaType,
@@ -81,6 +86,8 @@ async function pairCandidates(env: Bindings, title: MediaTitle) {
       limit: PAIR_CANDIDATES,
     })
   ).filter((item) => item.id !== title.id);
+
+  return { candidates: byGenre, origin: "genre" };
 }
 
 export async function getTitleInsight(
@@ -110,13 +117,22 @@ export async function getTitleInsight(
     return null;
   }
 
-  const candidates = await pairCandidates(env, title);
+  const decision = beginDecision(env, {
+    feature: "insight",
+    promptVersion: INSIGHT_PROMPT_VERSION,
+    surface: titleId,
+  });
+  const { candidates, origin } = await pairCandidates(env, title);
+
+  decision.candidates(candidatesFrom(candidates, { origin }));
+
   const candidateList = candidates
     .map((item, index) => `${index + 1}. ${item.title}${item.year ? ` (${item.year})` : ""}`)
     .join("\n");
   const parsed = await runAiObject(env, {
     feature: "insight",
-    decisionId: newDecisionId(),
+    decisionId: decision.id,
+    record: decision,
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
       {
@@ -132,11 +148,18 @@ export async function getTitleInsight(
       },
     ],
   });
-  const insight = parseInsight(parsed, candidates);
+  const brief = parseInsight(parsed, candidates);
 
-  if (!insight) {
+  if (!brief) {
+    await decision.settle("failed");
+
     return null;
   }
+
+  const insight: TitleInsight = { ...brief, decisionId: decision.id };
+
+  decision.select(insight.pairs.map((pair) => pair.titleId));
+  await decision.settle(insight.pairs.length ? "served" : "empty");
 
   await env.DB.prepare(
     `INSERT INTO title_insights (title_id, payload)

@@ -32,6 +32,7 @@ export type MarqueeEvent = {
   detail?: string;
   value?: number;
   journeyId?: string;
+  decisionId?: string;
   source?: string;
   mode?: JourneyMode;
   rank?: number;
@@ -58,6 +59,7 @@ export function recordEvent(env: Bindings, event: MarqueeEvent) {
         event.providerId ?? "",
         event.monetization ?? "",
         event.mode ?? "",
+        event.decisionId ?? "",
       ],
       doubles: [event.value ?? 1, event.rank ?? -1, event.latencyMs ?? -1],
     });

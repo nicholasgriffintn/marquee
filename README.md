@@ -290,6 +290,11 @@ The AI shelves sit on top of that rather than driving it — a viewer's taste ve
 what they save, blended with what they have told the Usher, and the model only names a shelf and
 picks from a shortlist it can see.
 
+**Decisions** tie a recommendation to what came of it. Every shelf, pick, order, digest and brief
+writes one `decisions` row — candidates and their scores, what was chosen, the model, the tokens —
+and a random id that rides out with it and comes back on every journey event. Prompts are never
+stored; `prompt_version` is a hash, so it moves when the prompt does. Rows expire after ninety days.
+
 **The sweeps** are a Workflow on two crons: a light one every three hours, a deep one nightly that
 fans TMDB's discover pages out over the ingestion queue. Sweeps merge rather than replace,
 embeddings are keyed on a hash of their source text so nothing is re-embedded for the sake of it,

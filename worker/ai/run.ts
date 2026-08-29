@@ -1,11 +1,10 @@
 import { requestAiCompletion, streamAiCompletion } from "../clients/ai-gateway.ts";
 import type { ChatMessage } from "../lib/curator-payload.ts";
-import { randomHex } from "../lib/tokens.ts";
+import type { ModelCallSink } from "../lib/decisions.ts";
 import { parseJsonContent } from "../lib/values.ts";
 import type { Bindings } from "../types.ts";
 import { type AiFeature, policyFor } from "./policy.ts";
 
-const DECISION_ID_BYTES = 8;
 const ATTRIBUTE_LIMIT = 40;
 
 export type AiRun = {
@@ -15,11 +14,8 @@ export type AiRun = {
   tools?: ChatCompletionTool[];
   toolChoice?: "auto" | "required" | "none";
   attributes?: Record<string, string | number>;
+  record?: ModelCallSink;
 };
-
-export function newDecisionId() {
-  return randomHex(DECISION_ID_BYTES);
-}
 
 function callFor(run: AiRun) {
   const policy = policyFor(run.feature);
@@ -41,6 +37,7 @@ function callFor(run: AiRun) {
       ...attributes,
     ]),
     schema: policy.schema,
+    ...(run.record ? { record: run.record } : {}),
   };
 }
 

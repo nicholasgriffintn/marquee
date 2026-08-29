@@ -160,6 +160,7 @@ async function creditJourney(env: Bindings, viewerId: string, titleId: string) {
     viewerId,
     titleId,
     ...(exit.journeyId ? { journeyId: exit.journeyId } : {}),
+    ...(exit.decisionId ? { decisionId: exit.decisionId } : {}),
     ...(exit.source ? { source: exit.source } : {}),
     ...(isJourneyMode(exit.mode) ? { mode: exit.mode } : {}),
   });
@@ -168,6 +169,7 @@ async function creditJourney(env: Bindings, viewerId: string, titleId: string) {
     type: "watched",
     titleId,
     ...(exit.journeyId ? { journeyId: exit.journeyId } : {}),
+    ...(exit.decisionId ? { decisionId: exit.decisionId } : {}),
     context: { source: exit.source, mode: exit.mode },
     expiresInDays: 365,
   });

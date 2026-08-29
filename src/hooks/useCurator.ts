@@ -2,11 +2,12 @@ import { useCallback, useRef, useState } from "react";
 
 import type { MediaTitle } from "../domain/catalog";
 import { isAbortError } from "../lib/errors";
+import { startJourneys } from "../lib/journey";
 import { jsonMutation, mutateJson, mutateResponse } from "../lib/query-client";
 
 type CuratorEvent =
   | { type: "status"; label: string }
-  | { type: "result"; titleIds: string[]; items: MediaTitle[] }
+  | { type: "result"; titleIds: string[]; journey?: string; items: MediaTitle[] }
   | { type: "delta"; text: string }
   | { type: "done"; summary: string; reasons: Record<string, string> }
   | { type: "error"; message: string };
@@ -110,6 +111,10 @@ export function useCurator() {
 
             const event = JSON.parse(line.slice(5).trim()) as CuratorEvent;
 
+            if (event.type === "result") {
+              startJourneys(event.items, event.journey);
+            }
+
             setState((current) => applyEvent(current, event));
 
             if (event.type === "error") {
@@ -158,7 +163,11 @@ function applyEvent(current: CuratorState, event: CuratorEvent): CuratorState {
   }
 
   if (event.type === "result") {
-    return { ...current, items: event.items, status: "" };
+    return {
+      ...current,
+      items: event.items,
+      status: "",
+    };
   }
 
   if (event.type === "delta") {

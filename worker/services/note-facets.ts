@@ -7,9 +7,10 @@ import {
   type BeliefPolarity,
 } from "../../src/domain/notebook.ts";
 import { slugify } from "../../src/domain/slug.ts";
-import { newDecisionId, runAiObject } from "../ai/run.ts";
+import { runAiObject } from "../ai/run.ts";
 import { USHER_VOICE } from "../ai/usher-voice.ts";
 import type { ChatMessage } from "../lib/curator-payload.ts";
+import { newDecisionId } from "../lib/decisions.ts";
 import { logError, logEvent } from "../lib/logging.ts";
 import { clamp } from "../lib/numbers.ts";
 import { isRecord } from "../lib/values.ts";

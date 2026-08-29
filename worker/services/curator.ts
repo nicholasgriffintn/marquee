@@ -1,12 +1,15 @@
 import { showingFor } from "../../src/domain/usher.ts";
 import { CURATOR_TOOLS, executeCuratorTool } from "../ai/curator-tools.ts";
-import { newDecisionId, runAiMessage, runAiObject, runAiStream } from "../ai/run.ts";
+import { runAiMessage, runAiObject, runAiStream } from "../ai/run.ts";
 import { USHER_VOICE } from "../ai/usher-voice.ts";
 import { parseCuratorResult, type ChatMessage } from "../lib/curator-payload.ts";
+import { candidatesFrom, promptVersion } from "../lib/decisions.ts";
+import { mintJourney } from "../lib/journeys.ts";
 import { logError } from "../lib/logging.ts";
 import { parseJsonContent } from "../lib/values.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
 import type { Bindings } from "../types.ts";
+import { beginDecision, type Decision } from "./decisions.ts";
 import { preferenceSummary } from "./usher.ts";
 import type { Eligibility } from "./viewer/eligibility.ts";
 import { eligibilityFor, readViewerState, type ViewerState } from "./viewer/state.ts";
@@ -34,11 +37,18 @@ const NARRATION_PROMPT = [
   "Never invent titles beyond the ones listed. No lists, no JSON, no headings.",
 ].join(" ");
 
+const PROMPT_VERSION = promptVersion(SYSTEM_PROMPT);
+
 export type CuratorTurn = { prompt: string; titleIds: string[]; summary: string };
 
 export type CuratorEvent =
   | { type: "status"; label: string }
-  | { type: "result"; titleIds: string[]; items: Awaited<ReturnType<typeof readItems>> }
+  | {
+      type: "result";
+      titleIds: string[];
+      journey: string;
+      items: Awaited<ReturnType<typeof readItems>>;
+    }
   | { type: "delta"; text: string }
   | { type: "done"; summary: string; reasons: Record<string, string> }
   | { type: "turn"; turn: CuratorTurn };
@@ -61,7 +71,7 @@ async function runCurator(
   viewer: ViewerState,
   eligibility: Eligibility,
   turns: CuratorTurn[],
-  decisionId: string,
+  decision: Decision,
   summary = "",
   showingBrief = "",
 ) {
@@ -80,22 +90,33 @@ async function runCurator(
     { role: "user", content: prompt },
   ];
   const availableIds = new Set<string>();
+  const recordCandidates = () => {
+    decision.candidates(
+      candidatesFrom(
+        [...availableIds].map((id) => ({ id })),
+        { origin: "curator_tool" },
+      ),
+    );
+  };
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
     // oxlint-disable-next-line no-await-in-loop
     const response = await runAiMessage(env, {
       feature: "curator",
-      decisionId,
+      decisionId: decision.id,
       messages,
       tools: CURATOR_TOOLS,
       toolChoice: availableIds.size === 0 ? "required" : "auto",
       attributes: { round },
+      record: decision,
     });
 
     if (!response.tool_calls?.length) {
       const result = parseCuratorResult(parseJsonContent(response.content), availableIds);
 
       if (result) {
+        recordCandidates();
+
         return result;
       }
 
@@ -129,6 +150,8 @@ async function runCurator(
     throw new Error("The curator retrieved no catalogue titles");
   }
 
+  recordCandidates();
+
   messages.push({
     role: "user",
     content: `Choose only from these IDs returned by your tool calls: ${[...availableIds].join(", ")}. Reply with the required JSON only.`,
@@ -137,9 +160,10 @@ async function runCurator(
   const result = parseCuratorResult(
     await runAiObject(env, {
       feature: "curator",
-      decisionId,
+      decisionId: decision.id,
       messages,
       attributes: { round: "final" },
+      record: decision,
     }),
     availableIds,
   );
@@ -158,7 +182,12 @@ export async function* curateStream(
   turns: CuratorTurn[] = [],
   options: { providerIds?: string[]; hour?: number; isWeekend?: boolean } = {},
 ): AsyncGenerator<CuratorEvent> {
-  const decisionId = newDecisionId();
+  const decision = beginDecision(env, {
+    feature: "curator",
+    promptVersion: PROMPT_VERSION,
+    viewerId,
+    surface: turns.length ? "refinement" : "ask",
+  });
 
   yield { type: "status", label: viewerId ? "Reading your shelf" : "Reading your services" };
 
@@ -172,21 +201,40 @@ export async function* curateStream(
     label: turns.length ? "Refining your selection" : "Searching your catalogue",
   };
 
-  const result = await runCurator(
-    env,
-    turns.length
-      ? `${prompt}\n\nRefine the selection you just gave me. Keep what still fits and replace what does not.`
-      : prompt,
-    viewer,
-    eligibility,
-    turns,
-    decisionId,
-    tasteLine,
-    showing.brief,
-  );
-  const items = await readItems(env.DB, result.titleIds);
+  let result;
+  let items;
 
-  yield { type: "result", titleIds: result.titleIds, items };
+  try {
+    result = await runCurator(
+      env,
+      turns.length
+        ? `${prompt}\n\nRefine the selection you just gave me. Keep what still fits and replace what does not.`
+        : prompt,
+      viewer,
+      eligibility,
+      turns,
+      decision,
+      tasteLine,
+      showing.brief,
+    );
+    decision.select(result.titleIds);
+    items = await readItems(env.DB, result.titleIds);
+  } catch (error) {
+    await decision.settle("failed");
+
+    throw error;
+  }
+
+  await decision.settle(items.length ? "served" : "empty");
+
+  const journey = await mintJourney(env, {
+    mode: "curator",
+    angle: "curator",
+    size: items.length,
+    decisionId: decision.id,
+  });
+
+  yield { type: "result", titleIds: result.titleIds, journey: journey.token, items };
   yield { type: "status", label: "Writing it up" };
 
   const selection = items
@@ -197,7 +245,7 @@ export async function* curateStream(
   try {
     for await (const delta of runAiStream(env, {
       feature: "curator_narration",
-      decisionId,
+      decisionId: decision.id,
       messages: [
         { role: "system", content: NARRATION_PROMPT },
         { role: "user", content: `Request: ${prompt}\nSelection: ${selection}` },
@@ -207,7 +255,7 @@ export async function* curateStream(
       yield { type: "delta", text: delta };
     }
   } catch (error) {
-    logError("curator_narration_failed", error, { decisionId });
+    logError("curator_narration_failed", error, { decisionId: decision.id });
     summary = "";
   }
 
