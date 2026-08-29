@@ -6,7 +6,7 @@ import { logError, logEvent } from "../lib/logging.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { isRecord, parseJson } from "../lib/values.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
-import { searchCatalogue } from "../repositories/catalog-search.ts";
+import { searchCatalogue, type CatalogueSearch } from "../repositories/catalog-search.ts";
 import { neverTitleIds } from "../repositories/signals.ts";
 import { readRailFeedback } from "../repositories/usher.ts";
 import {
@@ -18,6 +18,13 @@ import type { Bindings, ViewerContext } from "../types.ts";
 import { readAngleScores } from "./angle-scores.ts";
 import { viewerSummary } from "./beliefs.ts";
 import { getGenres } from "./catalog.ts";
+import { nearestTo } from "./embeddings.ts";
+import {
+  eligibleTitles,
+  rankTitles,
+  type RetrievalSource,
+  type TitleSource,
+} from "./retrieval/index.ts";
 import { tasteVector } from "./taste.ts";
 import { preferenceSummary, readViewerPreferences, type ViewerPreferences } from "./usher.ts";
 
@@ -173,11 +180,8 @@ function viewerSignature(viewer: ViewerContext, preferences: ViewerPreferences) 
 }
 
 async function neighbourIds(env: Bindings, vector: number[], slice: Angle["slice"]) {
-  const matches = await env.VECTORS.query(vector, {
-    topK: NEIGHBOUR_TOP_K,
-    returnMetadata: "none",
-  });
-  const ids = matches.matches.map((match) => match.id);
+  const matches = await nearestTo(env, vector, NEIGHBOUR_TOP_K);
+  const ids = matches.map((match) => match.id);
 
   return slice === "near" ? ids.slice(0, 60) : ids.slice(40);
 }
@@ -192,18 +196,23 @@ async function seedCandidates(
   wideGenres: string[],
   claimed: Set<string>,
 ) {
-  const base = {
+  const base: CatalogueSearch = {
     providerIds: viewer.selectedProviderIds,
     excludeIds: [...exclude, ...claimed],
     limit: SEED_POOL,
     ...angle.search,
   };
-  const merged = new Map<string, MediaTitle>();
-  const take = (titles: MediaTitle[]) => {
-    for (const title of titles) {
-      if (!merged.has(title.id) && !claimed.has(title.id)) {
-        merged.set(title.id, title);
-      }
+  const sources: TitleSource[] = [];
+  const gathered = new Set<string>();
+  const take = (source: RetrievalSource, titles: MediaTitle[]) => {
+    const fresh = titles.filter((title) => !claimed.has(title.id));
+
+    for (const title of fresh) {
+      gathered.add(title.id);
+    }
+
+    if (fresh.length) {
+      sources.push({ source, titles: fresh });
     }
   };
 
@@ -212,16 +221,19 @@ async function seedCandidates(
       const ids = await neighbourIds(env, vector, angle.slice);
 
       if (ids.length) {
-        take(await searchCatalogue(env.DB, { ...base, includeIds: ids }));
+        take("semantic", await eligibleTitles(env, ids, base, SEED_POOL));
       }
     } catch (error) {
       logError("rail_neighbours_failed", error, { angle: angle.id });
     }
   }
 
-  if (merged.size < SHORTLIST && angle.query) {
+  if (gathered.size < SHORTLIST && angle.query) {
     try {
-      take(await searchCatalogue(env.DB, { ...base, query: angle.query, sort: "relevance" }));
+      take(
+        "lexical",
+        await searchCatalogue(env.DB, { ...base, query: angle.query, sort: "relevance" }),
+      );
     } catch (error) {
       logError("rail_query_seed_failed", error, { angle: angle.id });
     }
@@ -230,31 +242,31 @@ async function seedCandidates(
   const genres = angle.id === "widen" ? wideGenres.slice(0, 5) : affinity.genres.slice(0, 3);
   const keywords = angleKeywords(affinity, angle);
 
-  if (merged.size < SHORTLIST && keywords.length) {
+  if (gathered.size < SHORTLIST && keywords.length) {
     try {
-      take(await searchCatalogue(env.DB, { ...base, keywords }));
+      take("keyword", await searchCatalogue(env.DB, { ...base, keywords }));
     } catch (error) {
       logError("rail_keyword_seed_failed", error, { angle: angle.id });
     }
   }
 
-  if (merged.size < SHORTLIST && genres.length) {
+  if (gathered.size < SHORTLIST && genres.length) {
     try {
-      take(await searchCatalogue(env.DB, { ...base, genres }));
+      take("genre", await searchCatalogue(env.DB, { ...base, genres }));
     } catch (error) {
       logError("rail_genre_seed_failed", error, { angle: angle.id });
     }
   }
 
-  if (merged.size < RAIL_MIN) {
+  if (gathered.size < RAIL_MIN) {
     try {
-      take(await searchCatalogue(env.DB, base));
+      take("popularity", await searchCatalogue(env.DB, base));
     } catch (error) {
       logError("rail_fallback_failed", error, { angle: angle.id });
     }
   }
 
-  const seeds = [...merged.values()].slice(0, SEED_POOL);
+  const seeds = rankTitles(sources, { limit: SEED_POOL }).map((candidate) => candidate.title);
 
   for (const title of seeds) {
     claimed.add(title.id);
@@ -263,6 +275,7 @@ async function seedCandidates(
   logEvent("rail_seeds", {
     angle: angle.id,
     seeds: seeds.length,
+    sources: sources.length,
     claimed: claimed.size,
   });
 

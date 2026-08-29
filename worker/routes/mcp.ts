@@ -10,14 +10,12 @@ import { isKnownTitle } from "../lib/validation.ts";
 import { isRecord } from "../lib/values.ts";
 import { readFollowedPeople, setPersonFollow } from "../repositories/beliefs.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
-import { readRanked } from "../repositories/catalog-search.ts";
 import { readPerson, readPersonTitleIds } from "../repositories/people.ts";
 import { readViewerContext } from "../repositories/viewer-context.ts";
 import { getTonight } from "../services/catalog.ts";
-import { similarTo } from "../services/embeddings.ts";
 import { readWeekAhead } from "../services/feeds.ts";
 import { updateProfile } from "../services/profile.ts";
-import { retrieveTitles } from "../services/retrieval.ts";
+import { retrieveSimilar, retrieveTitles } from "../services/retrieval/index.ts";
 import { getTitleInsight } from "../services/title-insight.ts";
 import type { Bindings } from "../types.ts";
 
@@ -208,10 +206,10 @@ async function callTool(
     }
 
     const limit = typeof input.limit === "number" ? Math.min(25, input.limit) : 10;
-    const neighbours = (await similarTo(env, input.titleId, limit + 1)).slice(0, limit);
+    const similar = await retrieveSimilar(env, input.titleId, { limit });
 
     return textResult({
-      results: compact(await readRanked(env.DB, neighbours)),
+      results: compact(similar.map((candidate) => candidate.title)),
     });
   }
 
