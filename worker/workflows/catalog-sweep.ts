@@ -9,7 +9,9 @@ import {
   syncCatalogHead,
 } from "../jobs/ingestion.ts";
 import { getProviderLedger } from "../jobs/provider-ledger.ts";
+import { GAP_DISCOVERY } from "../lib/catalogue-gaps.ts";
 import { ensureBudgets } from "../repositories/budgets.ts";
+import { pruneCatalogueGaps } from "../repositories/catalogue-gaps.ts";
 import { pruneScreenings } from "../repositories/cinemas.ts";
 import { storeProviders } from "../repositories/providers.ts";
 import { rebuildPeopleIndex } from "../repositories/usher.ts";
@@ -166,6 +168,10 @@ export class CatalogSweep extends WorkflowEntrypoint<Bindings, CatalogSweepParam
     );
 
     await step.do("prune run log", { retries: RETRIES }, async () => pruneIngestionRuns(this.env));
+
+    await step.do("prune catalogue gaps", { retries: RETRIES }, async () =>
+      pruneCatalogueGaps(this.env.DB, GAP_DISCOVERY.retentionDays),
+    );
 
     return { titles: titleIds.length, deep };
   }
