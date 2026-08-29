@@ -1,16 +1,17 @@
-import type { MediaTitle } from "../../src/domain/catalog.ts";
 import type { ToolCall } from "../lib/curator-payload.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { isRecord, parseJson } from "../lib/values.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
-import { readRanked, type CatalogueSearch } from "../repositories/catalog-search.ts";
-import { similarTo } from "../services/embeddings.ts";
-import { retrieveTitles } from "../services/retrieval.ts";
+import type { CatalogueSearch } from "../repositories/catalog-search.ts";
+import {
+  explainCandidate,
+  retrieveCandidates,
+  retrieveSimilar,
+  type Candidate,
+} from "../services/retrieval/index.ts";
 import type { Eligibility } from "../services/viewer/eligibility.ts";
 import type { ViewerState } from "../services/viewer/state.ts";
 import type { Bindings } from "../types.ts";
-
-const SIMILAR_CANDIDATES = 60;
 
 export const CURATOR_TOOLS: ChatCompletionTool[] = [
   {
@@ -143,9 +144,9 @@ export async function executeCuratorTool(
 
   if (call.function.name === "search_catalogue") {
     const search = buildSearch(argumentsValue, viewer, eligibility);
-    const results = await retrieveTitles(env, { ...search, text: search.query });
+    const candidates = await retrieveCandidates(env, { ...search, text: search.query });
 
-    return summarise(results, availableIds);
+    return summarise(candidates, availableIds);
   }
 
   if (call.function.name === "find_similar") {
@@ -156,12 +157,8 @@ export async function executeCuratorTool(
     }
 
     const search = buildSearch(argumentsValue, viewer, eligibility, [titleId]);
-    const neighbours = (await similarTo(env, titleId, SIMILAR_CANDIDATES))
-      .filter((id) => !search.excludeIds?.includes(id))
-      .slice(0, search.limit ?? 12);
-    const results = neighbours.length ? await readRanked(env.DB, neighbours) : [];
 
-    return summarise(results, availableIds);
+    return summarise(await retrieveSimilar(env, titleId, search), availableIds);
   }
 
   if (call.function.name === "get_title_details") {
@@ -190,22 +187,23 @@ export async function executeCuratorTool(
   return { error: "Unknown tool" };
 }
 
-function summarise(results: MediaTitle[], availableIds: Set<string>) {
-  for (const item of results) {
-    availableIds.add(item.id);
+function summarise(candidates: Candidate[], availableIds: Set<string>) {
+  for (const candidate of candidates) {
+    availableIds.add(candidate.title.id);
   }
 
   return {
-    results: results.map((item) => ({
-      id: item.id,
-      title: item.title,
-      year: item.year,
-      mediaType: item.mediaType,
-      genres: item.genres.slice(0, 3),
-      keywords: (item.keywords ?? []).slice(0, 6),
-      tmdbScore: item.tmdbScore,
-      tmdbVoteCount: item.tmdbVoteCount,
-      overview: item.overview.slice(0, 160),
+    results: candidates.map((candidate) => ({
+      id: candidate.title.id,
+      title: candidate.title.title,
+      year: candidate.title.year,
+      mediaType: candidate.title.mediaType,
+      genres: candidate.title.genres.slice(0, 3),
+      keywords: (candidate.title.keywords ?? []).slice(0, 6),
+      tmdbScore: candidate.title.tmdbScore,
+      tmdbVoteCount: candidate.title.tmdbVoteCount,
+      overview: candidate.title.overview.slice(0, 160),
+      matchedOn: explainCandidate(candidate),
     })),
   };
 }

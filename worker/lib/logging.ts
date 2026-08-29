@@ -1,3 +1,7 @@
+export function errorMessage(error: unknown, limit = 300) {
+  return (error instanceof Error ? error.message : String(error)).slice(0, limit);
+}
+
 export function logEvent(event: string, detail: Record<string, unknown> = {}) {
   console.log(JSON.stringify({ event, ...detail }));
 }
@@ -8,7 +12,7 @@ export function logError(event: string, error: unknown, detail: Record<string, u
       event,
       ...detail,
       kind: error instanceof Error ? error.name : "UnknownError",
-      detail: error instanceof Error ? error.message.slice(0, 300) : String(error).slice(0, 300),
+      detail: errorMessage(error),
     }),
   );
 }

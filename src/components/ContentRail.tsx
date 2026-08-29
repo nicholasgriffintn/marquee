@@ -150,7 +150,7 @@ export function ContentRail({
   const openHandlers = useMemo(
     () =>
       section.items.map((_item, index) => (title: MediaTitle) => {
-        startJourney(title.id, section.angle ?? section.id, index);
+        startJourney(title.id, section.journey, index);
         track("rail_click", { detail: section.id, titleId: title.id });
         onOpen(title);
       }),
@@ -187,7 +187,7 @@ export function ContentRail({
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting) && seenRef.current !== section.id) {
           seenRef.current = section.id;
-          track("rail_impression", { detail: section.id, source: section.angle ?? section.id });
+          track("rail_impression", { detail: section.id, journey: section.journey });
           seenCallback.current?.(section);
           observer.disconnect();
         }
