@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
+import type { AgentScope, ApiScope } from "../domain/scopes";
 import { jsonMutation, mutateJson, queryJson } from "../lib/query-client";
 
 export type AccountLink = {
@@ -14,6 +15,8 @@ export type AccountLink = {
 export type ApiToken = {
   id: string;
   label: string;
+  scopes: ApiScope[];
+  fullAccess: boolean;
   createdAt: string;
   lastUsedAt: string | null;
 };
@@ -160,13 +163,13 @@ export function useLinks(isSignedIn: boolean) {
   }, [reload]);
 
   const createToken = useCallback(
-    async (label: string) => {
+    async (label: string, scopes: readonly AgentScope[]) => {
       setError("");
 
       try {
         const created = await mutateJson<{ token: string }>(
           "/api/auth/tokens",
-          jsonMutation("POST", { label }),
+          jsonMutation("POST", { label, scopes }),
         );
 
         setFreshToken(created.token);

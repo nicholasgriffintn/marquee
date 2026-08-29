@@ -3,27 +3,17 @@ import { useState } from "react";
 import { useLinks } from "../../hooks/useLinks";
 import { classNames } from "../../lib/class-names";
 import { formatDate } from "../../lib/dates";
+import { ApiTokensPanel } from "./ApiTokensPanel";
 
 import styles from "./ConnectionsPanel.module.css";
 
 export function ConnectionsPanel({ isSignedIn }: { isSignedIn: boolean }) {
   const connections = useLinks(isSignedIn);
-  const [tokenLabel, setTokenLabel] = useState("");
   const [confirmPush, setConfirmPush] = useState(false);
-  const [tokenCopied, setTokenCopied] = useState(false);
   const trakt = connections.links.find((link) => link.provider === "trakt");
 
   if (!isSignedIn) {
     return null;
-  }
-
-  async function copyToken(value: string) {
-    try {
-      await navigator.clipboard.writeText(value);
-      setTokenCopied(true);
-    } catch {
-      setTokenCopied(false);
-    }
   }
 
   return (
@@ -130,67 +120,14 @@ export function ConnectionsPanel({ isSignedIn }: { isSignedIn: boolean }) {
         </div>
       )}
 
-      <div className={styles.row}>
-        <strong>API tokens</strong>
-        <small>Connect Marquee to an agent over MCP at /mcp.</small>
-        <span className={styles.spacer} />
-        <input
-          className={styles.field}
-          value={tokenLabel}
-          maxLength={60}
-          placeholder="Token name, e.g. Claude"
-          aria-label="Token name"
-          onChange={(event) => setTokenLabel(event.target.value)}
-        />
-        <button
-          type="button"
-          className={classNames(styles.button, styles.primary)}
-          onClick={() => {
-            void connections.createToken(tokenLabel);
-            setTokenLabel("");
-            setTokenCopied(false);
-          }}
-        >
-          Create
-        </button>
-      </div>
-      {connections.freshToken && (
-        <div className={styles.row}>
-          <strong>Copy it now</strong>
-          <code className={styles.token}>{connections.freshToken}</code>
-          <span className={styles.spacer} />
-          <button
-            type="button"
-            className={styles.button}
-            onClick={() => void copyToken(connections.freshToken ?? "")}
-          >
-            {tokenCopied ? "Copied" : "Copy"}
-          </button>
-          <button type="button" className={styles.button} onClick={connections.dismissToken}>
-            Done
-          </button>
-        </div>
-      )}
-      {connections.tokens.length > 0 && (
-        <ul className={styles.tokens}>
-          {connections.tokens.map((token) => (
-            <li key={token.id}>
-              <strong>{token.label}</strong>
-              <small>
-                {token.lastUsedAt ? `used ${formatDate(token.lastUsedAt, {})}` : "never used"}
-              </small>
-              <span className={styles.spacer} />
-              <button
-                type="button"
-                className={styles.button}
-                onClick={() => void connections.revokeToken(token.id)}
-              >
-                Revoke
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      <ApiTokensPanel
+        tokens={connections.tokens}
+        freshToken={connections.freshToken}
+        onCreate={(label, scopes) => void connections.createToken(label, scopes)}
+        onRevoke={(id) => void connections.revokeToken(id)}
+        onDismiss={connections.dismissToken}
+      />
+
       {connections.error && (
         <div className={styles.row}>
           <p role="alert">{connections.error}</p>
