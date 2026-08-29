@@ -1,3 +1,5 @@
+import type { ModelTier } from "../ai/policy.ts";
+import type { OutputSchema } from "../ai/schemas.ts";
 import { parseAssistantMessage, type ChatMessage } from "../lib/curator-payload.ts";
 import { logEvent } from "../lib/logging.ts";
 import { isRecord } from "../lib/values.ts";
@@ -5,6 +7,25 @@ import type { Bindings } from "../types.ts";
 import { upstreamError } from "./upstream.ts";
 
 export const AiGatewayError = upstreamError("AiGatewayError");
+
+const MODEL_PATTERN = /^@cf\/[a-z0-9._/-]{1,120}$/u;
+const LAST_RESORT_MODEL = "@cf/openai/gpt-oss-120b";
+const METADATA_LIMIT = 1_000;
+const TIMEOUT_HEADROOM_MS = 1_000;
+
+export type AiCall = {
+  messages: ChatMessage[];
+  tier: ModelTier;
+  timeoutMs: number;
+  maxTokens: number;
+  temperature: number;
+  collectLog: boolean;
+  cacheSeconds: number;
+  metadata: Record<string, string>;
+  tools?: ChatCompletionTool[];
+  toolChoice?: "auto" | "required" | "none";
+  schema?: OutputSchema | null;
+};
 
 function assertConfiguration(env: Bindings) {
   if (!env.CLOUDFLARE_API_TOKEN) {
@@ -19,21 +40,19 @@ function assertConfiguration(env: Bindings) {
     throw new Error("Cloudflare AI Gateway ID is invalid");
   }
 
-  if (!/^@cf\/[a-z0-9._/-]{1,120}$/u.test(env.AI_MODEL)) {
+  if (!MODEL_PATTERN.test(env.AI_MODEL)) {
     throw new Error("Cloudflare AI model is invalid");
   }
 }
 
-export function fastModel(env: Bindings) {
-  return /^@cf\/[a-z0-9._/-]{1,120}$/u.test(env.AI_FAST_MODEL ?? "")
-    ? (env.AI_FAST_MODEL as string)
-    : env.AI_MODEL;
+function fastModel(env: Bindings) {
+  return MODEL_PATTERN.test(env.AI_FAST_MODEL ?? "") ? (env.AI_FAST_MODEL as string) : env.AI_MODEL;
 }
 
-const LAST_RESORT_MODEL = "@cf/openai/gpt-oss-120b";
+export function modelChain(env: Bindings, tier: ModelTier) {
+  const preferred = tier === "fast" ? fastModel(env) : env.AI_MODEL;
 
-function fallbackChain(env: Bindings, model: string) {
-  return [...new Set([model, fastModel(env), env.AI_MODEL, LAST_RESORT_MODEL])];
+  return [...new Set([preferred, fastModel(env), env.AI_MODEL, LAST_RESORT_MODEL])];
 }
 
 function isRetryable(error: unknown) {
@@ -43,100 +62,100 @@ function isRetryable(error: unknown) {
   );
 }
 
-export async function requestAiCompletion(
-  env: Bindings,
-  messages: ChatMessage[],
-  tools: ChatCompletionTool[],
-  allowTools: boolean,
-  options: {
-    model?: string;
-    timeoutMs?: number;
-    maxTokens?: number;
-    json?: boolean;
-    toolChoice?: "auto" | "required" | "none";
-    metadata?: Record<string, string>;
-    cacheSeconds?: number;
-  } = {},
-) {
+function isSchemaRejection(error: unknown) {
+  return error instanceof AiGatewayError && (error.status === 400 || error.status === 422);
+}
+
+function privacyHeaders(call: AiCall) {
+  return {
+    "cf-aig-collect-log": call.collectLog ? "true" : "false",
+    "cf-aig-skip-cache": call.cacheSeconds > 0 ? "false" : "true",
+    ...(call.cacheSeconds > 0 ? { "cf-aig-cache-ttl": String(call.cacheSeconds) } : {}),
+    "cf-aig-metadata": JSON.stringify(call.metadata).slice(0, METADATA_LIMIT),
+  };
+}
+
+function completionsUrl(env: Bindings) {
+  return `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/ai/v1/chat/completions`;
+}
+
+export async function requestAiCompletion(env: Bindings, call: AiCall) {
   assertConfiguration(env);
 
-  const chain = fallbackChain(env, options.model ?? env.AI_MODEL);
+  let schema = call.schema ?? null;
   let lastError: unknown = new Error("Cloudflare AI produced no response");
 
-  for (const candidate of chain) {
-    try {
-      // oxlint-disable-next-line no-await-in-loop
-      return await completeOnce(env, messages, tools, allowTools, options, candidate);
-    } catch (error) {
-      lastError = error;
+  for (const model of modelChain(env, call.tier)) {
+    let attempt = true;
 
-      if (!isRetryable(error)) {
-        throw error;
+    while (attempt) {
+      attempt = false;
+
+      try {
+        // oxlint-disable-next-line no-await-in-loop
+        return await completeOnce(env, call, model, schema);
+      } catch (error) {
+        lastError = error;
+
+        if (schema && isSchemaRejection(error)) {
+          logEvent("ai_schema_unsupported", { model, schema: schema.name });
+          schema = null;
+          attempt = true;
+          continue;
+        }
+
+        if (!isRetryable(error)) {
+          throw error;
+        }
+
+        logEvent("ai_model_fallback", {
+          from: model,
+          status: error instanceof AiGatewayError ? error.status : null,
+        });
       }
-
-      logEvent("ai_model_fallback", {
-        from: candidate,
-        status: error instanceof AiGatewayError ? error.status : null,
-      });
     }
   }
 
   throw lastError;
 }
 
+function responseFormat(schema: OutputSchema | null, hasSchemaPolicy: boolean) {
+  if (schema) {
+    return { response_format: { type: "json_schema", json_schema: schema.schema } };
+  }
+
+  return hasSchemaPolicy ? { response_format: { type: "json_object" } } : {};
+}
+
 async function completeOnce(
   env: Bindings,
-  messages: ChatMessage[],
-  tools: ChatCompletionTool[],
-  allowTools: boolean,
-  options: {
-    timeoutMs?: number;
-    maxTokens?: number;
-    json?: boolean;
-    toolChoice?: "auto" | "required" | "none";
-    metadata?: Record<string, string>;
-    cacheSeconds?: number;
-  },
+  call: AiCall,
   model: string,
+  schema: OutputSchema | null,
 ) {
-  const timeoutMs = options.timeoutMs ?? 16_000;
-
-  const response = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/ai/v1/chat/completions`,
-    {
-      method: "POST",
-      headers: {
-        accept: "application/json",
-        authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
-        "cf-aig-collect-log": "true",
-        "cf-aig-gateway-id": env.AI_GATEWAY_ID,
-        "cf-aig-request-timeout": String(timeoutMs - 1_000),
-        "cf-aig-skip-cache": "false",
-        ...(options.cacheSeconds ? { "cf-aig-cache-ttl": String(options.cacheSeconds) } : {}),
-        ...(options.metadata
-          ? {
-              "cf-aig-metadata": JSON.stringify(options.metadata).slice(0, 1_000),
-            }
-          : {}),
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        temperature: 0.2,
-        max_completion_tokens: options.maxTokens ?? 500,
-        ...(tools.length
-          ? {
-              tools,
-              tool_choice: allowTools ? (options.toolChoice ?? "auto") : "none",
-              parallel_tool_calls: false,
-            }
-          : {}),
-        ...(options.json ? { response_format: { type: "json_object" } } : {}),
-      }),
-      signal: AbortSignal.timeout(timeoutMs),
+  const tools = call.tools ?? [];
+  const response = await fetch(completionsUrl(env), {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
+      "cf-aig-gateway-id": env.AI_GATEWAY_ID,
+      "cf-aig-request-timeout": String(call.timeoutMs - TIMEOUT_HEADROOM_MS),
+      ...privacyHeaders(call),
+      "content-type": "application/json",
     },
-  );
+    body: JSON.stringify({
+      model,
+      messages: call.messages,
+      temperature: call.temperature,
+      max_completion_tokens: call.maxTokens,
+      ...(tools.length
+        ? { tools, tool_choice: call.toolChoice ?? "auto", parallel_tool_calls: false }
+        : {}),
+      ...responseFormat(schema, Boolean(call.schema)),
+    }),
+    signal: AbortSignal.timeout(call.timeoutMs),
+  });
 
   if (!response.ok) {
     throw new AiGatewayError(
@@ -172,31 +191,29 @@ async function completeOnce(
   return message;
 }
 
-export async function* streamAiCompletion(env: Bindings, messages: ChatMessage[]) {
+export async function* streamAiCompletion(env: Bindings, call: AiCall) {
   assertConfiguration(env);
 
-  const response = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/ai/v1/chat/completions`,
-    {
-      method: "POST",
-      headers: {
-        accept: "text/event-stream",
-        authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
-        "cf-aig-collect-log": "false",
-        "cf-aig-gateway-id": env.AI_GATEWAY_ID,
-        "cf-aig-request-timeout": "30000",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model: env.AI_MODEL,
-        messages,
-        temperature: 0.4,
-        max_completion_tokens: 400,
-        stream: true,
-      }),
-      signal: AbortSignal.timeout(30_000),
+  const [model] = modelChain(env, call.tier);
+  const response = await fetch(completionsUrl(env), {
+    method: "POST",
+    headers: {
+      accept: "text/event-stream",
+      authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
+      "cf-aig-gateway-id": env.AI_GATEWAY_ID,
+      "cf-aig-request-timeout": String(call.timeoutMs),
+      ...privacyHeaders(call),
+      "content-type": "application/json",
     },
-  );
+    body: JSON.stringify({
+      model,
+      messages: call.messages,
+      temperature: call.temperature,
+      max_completion_tokens: call.maxTokens,
+      stream: true,
+    }),
+    signal: AbortSignal.timeout(call.timeoutMs),
+  });
 
   if (!response.ok || !response.body) {
     throw new AiGatewayError(

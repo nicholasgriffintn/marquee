@@ -63,7 +63,7 @@ curatorRoutes.post("/", async (context) => {
   recordEvent(context.env, {
     name: "curator_ask",
     viewerId: identity.viewerId || undefined,
-    detail: prompt,
+    value: prompt.length,
   });
 
   const session = context.env.CURATOR_SESSION.get(

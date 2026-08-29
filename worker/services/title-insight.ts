@@ -1,5 +1,5 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
-import { fastModel, requestAiCompletion } from "../clients/ai-gateway.ts";
+import { newDecisionId, runAiObject } from "../ai/run.ts";
 import { isRecord } from "../lib/values.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
 import { readRanked, searchCatalogue } from "../repositories/catalog-search.ts";
@@ -26,52 +26,40 @@ export type TitleInsight = {
 
 type InsightRow = { payload: string; ageDays: number };
 
-function parseInsight(content: string, candidates: MediaTitle[]): TitleInsight | null {
-  const json = content.match(/\{[\s\S]*\}/u)?.[0];
-
-  if (!json) {
+function parseInsight(parsed: unknown, candidates: MediaTitle[]): TitleInsight | null {
+  if (!isRecord(parsed) || typeof parsed.hook !== "string" || !parsed.hook.trim()) {
     return null;
   }
 
-  try {
-    const parsed: unknown = JSON.parse(json);
+  const moods = Array.isArray(parsed.moods)
+    ? parsed.moods
+        .filter((mood): mood is string => typeof mood === "string" && Boolean(mood.trim()))
+        .map((mood) => mood.trim().slice(0, 24))
+        .slice(0, 3)
+    : [];
+  const pairs = Array.isArray(parsed.pairs)
+    ? parsed.pairs
+        .flatMap((pair): TitleInsight["pairs"] => {
+          if (!isRecord(pair)) {
+            return [];
+          }
 
-    if (!isRecord(parsed) || typeof parsed.hook !== "string" || !parsed.hook.trim()) {
-      return null;
-    }
+          const index = typeof pair.pick === "number" ? Math.trunc(pair.pick) - 1 : -1;
+          const candidate = candidates[index];
 
-    const moods = Array.isArray(parsed.moods)
-      ? parsed.moods
-          .filter((mood): mood is string => typeof mood === "string" && Boolean(mood.trim()))
-          .map((mood) => mood.trim().slice(0, 24))
-          .slice(0, 3)
-      : [];
-    const pairs = Array.isArray(parsed.pairs)
-      ? parsed.pairs
-          .flatMap((pair): TitleInsight["pairs"] => {
-            if (!isRecord(pair)) {
-              return [];
-            }
+          return candidate
+            ? [
+                {
+                  titleId: candidate.id,
+                  reason: typeof pair.reason === "string" ? pair.reason.trim().slice(0, 120) : "",
+                },
+              ]
+            : [];
+        })
+        .slice(0, 3)
+    : [];
 
-            const index = typeof pair.pick === "number" ? Math.trunc(pair.pick) - 1 : -1;
-            const candidate = candidates[index];
-
-            return candidate
-              ? [
-                  {
-                    titleId: candidate.id,
-                    reason: typeof pair.reason === "string" ? pair.reason.trim().slice(0, 120) : "",
-                  },
-                ]
-              : [];
-          })
-          .slice(0, 3)
-      : [];
-
-    return { hook: parsed.hook.trim().slice(0, 200), moods, pairs };
-  } catch {
-    return null;
-  }
+  return { hook: parsed.hook.trim().slice(0, 200), moods, pairs };
 }
 
 async function pairCandidates(env: Bindings, title: MediaTitle) {
@@ -126,9 +114,10 @@ export async function getTitleInsight(
   const candidateList = candidates
     .map((item, index) => `${index + 1}. ${item.title}${item.year ? ` (${item.year})` : ""}`)
     .join("\n");
-  const response = await requestAiCompletion(
-    env,
-    [
+  const parsed = await runAiObject(env, {
+    feature: "insight",
+    decisionId: newDecisionId(),
+    messages: [
       { role: "system", content: SYSTEM_PROMPT },
       {
         role: "user",
@@ -142,18 +131,8 @@ export async function getTitleInsight(
         ].join("\n"),
       },
     ],
-    [],
-    false,
-    {
-      model: fastModel(env),
-      timeoutMs: 30_000,
-      maxTokens: 500,
-      json: true,
-      cacheSeconds: 86_400,
-      metadata: { feature: "insight" },
-    },
-  );
-  const insight = response.content ? parseInsight(response.content, candidates) : null;
+  });
+  const insight = parseInsight(parsed, candidates);
 
   if (!insight) {
     return null;
