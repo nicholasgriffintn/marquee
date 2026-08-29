@@ -1,12 +1,11 @@
 import { getOmdbTitle, type OmdbRecord } from "../clients/omdb.ts";
 import { findByImdbId, findByTitle, getItems } from "../clients/tmdb.ts";
 import { logEvent } from "../lib/logging.ts";
-import { claimBudget } from "../repositories/budgets.ts";
 import { storeItems } from "../repositories/catalog-writer.ts";
 import type { Bindings } from "../types.ts";
 import { queueAvailability } from "./availability.ts";
 import { queueTitleEmbeddings } from "./embeddings.ts";
-import { withRateLimitPause } from "./sources.ts";
+import { withSourceBudget } from "./sources.ts";
 
 async function ingestTitle(env: Bindings, titleId: string) {
   const [title] = await getItems(env, [titleId]);
@@ -23,13 +22,7 @@ async function ingestTitle(env: Bindings, titleId: string) {
 }
 
 async function askOmdb(env: Bindings, run: () => Promise<OmdbRecord | null>) {
-  if (!env.OMDB_API_KEY || !(await claimBudget(env, "omdb"))) {
-    return null;
-  }
-
-  const attempt = await withRateLimitPause(env, "omdb", run);
-
-  return attempt.limited ? null : attempt.value;
+  return env.OMDB_API_KEY ? withSourceBudget(env, "omdb", run) : null;
 }
 
 async function matchThroughOmdb(env: Bindings, imdbId: string) {

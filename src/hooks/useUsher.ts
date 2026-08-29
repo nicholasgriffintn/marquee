@@ -3,14 +3,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MediaTitle } from "../domain/catalog";
 import type { Guest } from "../domain/notebook";
 import type { TonightOrder, UsherMoment, UsherSurface } from "../domain/usher";
-import { startJourney } from "../lib/journey";
+import { journeyFor, startJourney } from "../lib/journey";
 import { jsonMutation, mutateJson, queryJson } from "../lib/query-client";
 
 type StateResponse = { status: string; answered: string[]; awayDays?: number };
 
 type MomentResponse = { moment: UsherMoment | null };
 
-type PickResponse = { item: MediaTitle | null; line: string; facts?: string[] };
+type PickResponse = { item: MediaTitle | null; line: string; facts?: string[]; journey?: string };
 
 export type UsherPickState = {
   item: MediaTitle | null;
@@ -32,7 +32,12 @@ export type UsherOrderState = {
   error: string;
 };
 
-type OrderResponse = { pick: OrderResult | null; backups: OrderResult[]; line: string };
+type OrderResponse = {
+  pick: OrderResult | null;
+  backups: OrderResult[];
+  line: string;
+  journey?: string;
+};
 
 const NO_PICK: UsherPickState = { item: null, line: "", facts: [], isPicking: false, error: "" };
 
@@ -260,7 +265,7 @@ export function useUsher(isSignedIn: boolean) {
         }
 
         if (response.item) {
-          startJourney(response.item.id, "usher_pick");
+          startJourney(response.item.id, response.journey, 0);
         }
 
         setPick({
@@ -289,9 +294,16 @@ export function useUsher(isSignedIn: boolean) {
 
   const remember = useCallback(
     async (titleId: string, source: string, context: Record<string, unknown>) => {
+      const journey = journeyFor(titleId);
+
       await mutateJson(
         "/api/usher/reject",
-        jsonMutation("POST", { titleId, source, ...context }),
+        jsonMutation("POST", {
+          titleId,
+          source,
+          ...(journey ? { journey: journey.token, rank: journey.rank } : {}),
+          ...context,
+        }),
       ).catch(() => undefined);
     },
     [],
@@ -338,12 +350,12 @@ export function useUsher(isSignedIn: boolean) {
         );
 
         if (response.pick) {
-          startJourney(response.pick.item.id, "usher_order");
+          startJourney(response.pick.item.id, response.journey, 0);
         }
 
-        for (const backup of response.backups ?? []) {
-          startJourney(backup.item.id, "usher_order_backup");
-        }
+        (response.backups ?? []).forEach((backup, index) => {
+          startJourney(backup.item.id, response.journey, index + 1);
+        });
 
         setOrder({
           isOpen: true,

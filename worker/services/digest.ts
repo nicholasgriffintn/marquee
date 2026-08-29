@@ -1,16 +1,22 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
+import { candidatesFrom, type DecisionCandidate } from "../lib/decisions.ts";
+import { mintJourney } from "../lib/journeys.ts";
 import { logError, logEvent } from "../lib/logging.ts";
 import { readRanked } from "../repositories/catalog-search.ts";
 import type { Bindings } from "../types.ts";
-import { prepareRails, readRailViewer } from "./ai-rails.ts";
+import { prepareRails } from "./ai-rails.ts";
 import { readTrending } from "./buzz.ts";
+import { beginDecision } from "./decisions.ts";
+import { nearestTo } from "./embeddings.ts";
+import { eligibleTitles } from "./retrieval/index.ts";
 import { readTonight } from "./schedule.ts";
 import { pickOne } from "./usher-pick.ts";
+import type { Eligibility } from "./viewer/eligibility.ts";
+import { readViewerState } from "./viewer/state.ts";
 
 const FRESH_PICKS = 12;
 const DIGEST_TRENDING = 12;
 const DIGEST_EPISODES = 16;
-const NEIGHBOUR_TOP_K = 100;
 
 export type DigestNumbers = {
   added: number;
@@ -21,7 +27,8 @@ export type DigestNumbers = {
 
 export type Digest = {
   createdAt: string;
-  lead: { titleId: string; line: string; facts: string[] } | null;
+  decisionId?: string;
+  lead: { titleId: string; line: string; facts: string[]; decisionId?: string } | null;
   numbers: DigestNumbers;
   fresh: string[];
   trending: string[];
@@ -63,7 +70,14 @@ async function leadForViewer(env: Bindings, viewerId: string, providerIds: strin
   try {
     const pick = await pickOne(env, viewerId, { providerIds, hour: 20 });
 
-    return pick ? { titleId: pick.item.id, line: pick.line, facts: pick.facts } : null;
+    return pick
+      ? {
+          titleId: pick.item.id,
+          line: pick.line,
+          facts: pick.facts,
+          decisionId: pick.decisionId,
+        }
+      : null;
   } catch (error) {
     logError("digest_lead_failed", error, { viewerId });
 
@@ -71,63 +85,82 @@ async function leadForViewer(env: Bindings, viewerId: string, providerIds: strin
   }
 }
 
-async function freshForViewer(env: Bindings, vector: number[] | null, exclude: string[]) {
+type FreshTitles = { titleIds: string[]; candidates: DecisionCandidate[] };
+
+const NO_FRESH: FreshTitles = { titleIds: [], candidates: [] };
+
+async function freshForViewer(
+  env: Bindings,
+  vector: number[] | null,
+  eligibility: Eligibility,
+): Promise<FreshTitles> {
   if (!vector) {
-    return [];
+    return NO_FRESH;
   }
 
-  const matches = await env.VECTORS.query(vector, {
-    topK: NEIGHBOUR_TOP_K,
-    returnMetadata: "none",
-  });
-  const excluded = new Set(exclude);
-  const ids = matches.matches.map((match) => match.id).filter((id) => !excluded.has(id));
+  const releasedAfter = new Date().getUTCFullYear() - 1;
+  const matches = await nearestTo(env, vector, { ...eligibility, releasedAfter });
 
-  if (ids.length === 0) {
-    return [];
+  if (matches.length === 0) {
+    return NO_FRESH;
   }
 
-  const rows = await env.DB.prepare(
-    `SELECT id
-     FROM catalog_titles
-     WHERE id IN (SELECT value FROM json_each(?))
-       AND COALESCE(year, 0) >= ?
-     ORDER BY popularity DESC
-     LIMIT ?`,
-  )
-    .bind(JSON.stringify(ids), new Date().getUTCFullYear() - 1, FRESH_PICKS)
-    .all<{ id: string }>();
+  const titles = await eligibleTitles(
+    env,
+    matches.map((match) => match.id),
+    { ...eligibility, releasedAfter, sort: "given" },
+    FRESH_PICKS,
+  );
+  const scores = new Map(matches.map((match) => [match.id, match.score]));
 
-  return rows.results.map((row) => row.id);
+  return {
+    titleIds: titles.map((title) => title.id),
+    candidates: candidatesFrom(titles, { scores, origin: "digest_vector" }),
+  };
 }
 
 export async function buildDigest(env: Bindings, viewerId: string) {
-  const { viewer, preferences } = await readRailViewer(env, viewerId);
+  const viewer = await readViewerState(env, viewerId);
 
   if (viewer.entries.length === 0) {
     return null;
   }
 
-  const { vector, exclude } = await prepareRails(env, viewer, viewerId, preferences);
+  const decision = beginDecision(env, { feature: "digest", viewerId });
+  const { vector, eligibility } = await prepareRails(env, viewer);
+  const digestEligibility: Eligibility = {
+    ...eligibility,
+    excludeIds: [
+      ...new Set([...eligibility.excludeIds, ...viewer.entries.map((entry) => entry.titleId)]),
+    ],
+  };
   const [fresh, trending, episodes, numbers, lead] = await Promise.all([
-    freshForViewer(env, vector, [
-      ...exclude,
-      ...viewer.entries.map((entry) => entry.titleId),
-    ]).catch((error: unknown): string[] => {
+    freshForViewer(env, vector, digestEligibility).catch((error: unknown): FreshTitles => {
       logError("digest_fresh_failed", error, { viewerId });
 
-      return [];
+      return NO_FRESH;
     }),
     readTrending(env, DIGEST_TRENDING),
     readTonight(env, viewerId, DIGEST_EPISODES, 168),
     weekNumbers(env, viewerId),
-    leadForViewer(env, viewerId, preferences.providerIds),
+    leadForViewer(env, viewerId, viewer.providerIds),
   ]);
+
+  decision.candidates([
+    ...fresh.candidates,
+    ...candidatesFrom(
+      trending.map((id) => ({ id })),
+      { origin: "digest_trending" },
+    ),
+  ]);
+  decision.select([...fresh.titleIds, ...trending]);
+
   const digest: Digest = {
     createdAt: new Date().toISOString(),
+    decisionId: decision.id,
     lead,
     numbers,
-    fresh,
+    fresh: fresh.titleIds,
     trending,
     episodes: episodes.map((episode) => ({
       titleId: episode.titleId,
@@ -139,8 +172,12 @@ export async function buildDigest(env: Bindings, viewerId: string) {
   };
 
   if (digest.fresh.length === 0 && digest.episodes.length === 0) {
+    await decision.settle("empty");
+
     return null;
   }
+
+  await decision.settle("served");
 
   await env.DB.prepare(
     `INSERT INTO viewer_digests (viewer_id, payload)
@@ -153,7 +190,7 @@ export async function buildDigest(env: Bindings, viewerId: string) {
     .run();
 
   logEvent("digest_built", {
-    fresh: fresh.length,
+    fresh: fresh.titleIds.length,
     episodes: digest.episodes.length,
   });
 
@@ -182,14 +219,39 @@ export async function readDigest(env: Bindings, viewerId: string) {
 
       return item ? [item] : [];
     });
+  const [freshJourney, trendingJourney, leadJourney] = await Promise.all([
+    mintJourney(env, {
+      mode: "digest",
+      angle: "digest_fresh",
+      size: digest.fresh.length,
+      decisionId: digest.decisionId,
+    }),
+    mintJourney(env, {
+      mode: "digest",
+      angle: "digest_trending",
+      size: digest.trending.length,
+      decisionId: digest.decisionId,
+    }),
+    digest.lead
+      ? mintJourney(env, {
+          mode: "usher-pick",
+          angle: "digest_lead",
+          size: 1,
+          decisionId: digest.lead.decisionId,
+        })
+      : Promise.resolve(null),
+  ]);
 
   return {
     createdAt: digest.createdAt,
+    freshJourney: freshJourney.token,
+    trendingJourney: trendingJourney.token,
     lead: digest.lead
       ? {
           item: byId.get(digest.lead.titleId) ?? null,
           line: digest.lead.line,
           facts: digest.lead.facts ?? [],
+          ...(leadJourney ? { journey: leadJourney.token } : {}),
         }
       : null,
     numbers: digest.numbers ?? { added: 0, finished: 0, shelved: 0, catalogue: 0 },

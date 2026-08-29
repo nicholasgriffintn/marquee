@@ -1,6 +1,5 @@
 import type { ViewerOrigin } from "../../src/domain/cinema.ts";
 import type { DeliveredRail, RailsDelivery, RailStatus } from "../../src/domain/rails.ts";
-import { recordEvent } from "../lib/events.ts";
 import { logError } from "../lib/logging.ts";
 import type { Bindings } from "../types.ts";
 import { hydrateRails } from "./ai-rails.ts";
@@ -65,15 +64,6 @@ export async function deliverRails(
     viewerId ? curatedDelivery(env, viewerId, generate) : NO_CURATED,
     getPersonalRails(env, viewerId, origin),
   ]);
-
-  if (viewerId && curated.rails.length > 0) {
-    recordEvent(env, {
-      name: "rails_served",
-      viewerId,
-      value: curated.rails.length,
-      detail: `${curated.generationId}:${curated.status}`,
-    });
-  }
 
   return {
     status: curated.status,

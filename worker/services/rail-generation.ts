@@ -93,15 +93,17 @@ export async function releaseGeneration(db: D1Database, viewerId: string, revisi
 }
 
 async function markAttempt(db: D1Database, viewerId: string, revision: string) {
-  await db
+  const result = await db
     .prepare(
       `UPDATE ai_rails
           SET attempted_revision = ?2, attempted_at = datetime('now'),
               claim_revision = NULL, claimed_at = NULL
-        WHERE viewer_id = ?1`,
+        WHERE viewer_id = ?1 AND claim_revision = ?2`,
     )
     .bind(viewerId, revision)
     .run();
+
+  return (result.meta.changes ?? 0) > 0;
 }
 
 export async function persistRails(
@@ -112,13 +114,17 @@ export async function persistRails(
   rails: StoredRail[],
 ) {
   if (rails.length === 0) {
-    await markAttempt(db, viewerId, revision);
-    logEvent("ai_rails_barren", { generationId, revision });
+    const persisted = await markAttempt(db, viewerId, revision);
 
-    return;
+    logEvent(persisted ? "ai_rails_barren" : "ai_rails_superseded", {
+      generationId,
+      revision,
+    });
+
+    return persisted;
   }
 
-  await db
+  const result = await db
     .prepare(
       `INSERT INTO ai_rails (viewer_id, revision, generation_id, payload, created_at,
                              attempted_revision, attempted_at)
@@ -131,12 +137,20 @@ export async function persistRails(
          attempted_revision = excluded.attempted_revision,
          attempted_at = excluded.attempted_at,
          claim_revision = NULL,
-         claimed_at = NULL`,
+         claimed_at = NULL
+       WHERE ai_rails.claim_revision = excluded.revision`,
     )
     .bind(viewerId, revision, generationId, JSON.stringify(rails))
     .run();
+  const persisted = (result.meta.changes ?? 0) > 0;
 
-  logEvent("ai_rails_generated", { rails: rails.length, generationId });
+  logEvent(persisted ? "ai_rails_generated" : "ai_rails_superseded", {
+    rails: rails.length,
+    generationId,
+    revision,
+  });
+
+  return persisted;
 }
 
 export async function startGeneration(env: Bindings, viewerId: string, revision: string) {

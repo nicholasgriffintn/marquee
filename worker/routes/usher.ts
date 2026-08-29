@@ -4,6 +4,7 @@ import { isTonightOrder, isUsherSurface } from "../../src/domain/usher.ts";
 import { requireAuthentication, type AuthVariables } from "../auth/session.ts";
 import { recordEvent } from "../lib/events.ts";
 import { jsonResponse, readJsonObject } from "../lib/http.ts";
+import { mintJourney, verifyJourney } from "../lib/journeys.ts";
 import { logError } from "../lib/logging.ts";
 import { retryTransient } from "../lib/retry.ts";
 import { isKnownTitle, validProviderIds } from "../lib/validation.ts";
@@ -256,13 +257,29 @@ usherRoutes.post("/pick", async (context) => {
       });
     }
 
+    const journey = await mintJourney(context.env, {
+      mode: "usher-pick",
+      angle: "usher_pick",
+      size: 1,
+      decisionId: pick.decisionId,
+    });
+
     recordEvent(context.env, {
       name: "usher_pick",
       viewerId: user.id,
       titleId: pick.item.id,
+      decisionId: pick.decisionId,
+      journeyId: journey.id,
+      mode: "usher-pick",
+      source: "usher_pick",
     });
 
-    return jsonResponse({ item: pick.item, line: pick.line, facts: pick.facts });
+    return jsonResponse({
+      item: pick.item,
+      line: pick.line,
+      facts: pick.facts,
+      journey: journey.token,
+    });
   } catch (error) {
     logError("usher_pick_route_failed", error);
 
@@ -297,14 +314,30 @@ usherRoutes.post("/order", async (context) => {
       });
     }
 
+    const journey = await mintJourney(context.env, {
+      mode: "usher-order",
+      angle: "usher_order",
+      size: 1 + result.backups.length,
+      decisionId: result.decisionId,
+    });
+
     recordEvent(context.env, {
       name: "usher_order",
       viewerId: user.id,
       titleId: result.pick.item.id,
       detail: `${body.order.company}:${body.order.length}:${body.order.mood}`,
+      decisionId: result.decisionId,
+      journeyId: journey.id,
+      mode: "usher-order",
+      source: "usher_order",
     });
 
-    return jsonResponse({ pick: result.pick, backups: result.backups, line: "" });
+    return jsonResponse({
+      pick: result.pick,
+      backups: result.backups,
+      line: "",
+      journey: journey.token,
+    });
   } catch (error) {
     logError("usher_order_route_failed", error);
 
@@ -325,12 +358,17 @@ usherRoutes.post("/reject", async (context) => {
   const forever = body?.scope === "never";
 
   try {
+    const journey = await verifyJourney(context.env, body?.journey);
+
     await recordSignal(context.env.DB, user.id, {
       type: forever ? "never" : "rejection",
       titleId: body.titleId,
-      ...(typeof body?.journeyId === "string" ? { journeyId: body.journeyId } : {}),
+      ...(journey ? { journeyId: journey.id } : {}),
+      ...(journey?.decisionId ? { decisionId: journey.decisionId } : {}),
       context: {
-        source: typeof body?.source === "string" ? body.source.slice(0, 40) : "",
+        source:
+          journey?.angle ?? (typeof body?.source === "string" ? body.source.slice(0, 40) : ""),
+        mode: journey?.mode ?? "",
         reason: typeof body?.reason === "string" ? body.reason.slice(0, 80) : "",
         order: isRecord(body?.order) ? body.order : undefined,
         providerIds: validProviderIds(body?.providerIds),

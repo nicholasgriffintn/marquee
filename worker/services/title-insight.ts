@@ -1,9 +1,11 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
-import { fastModel, requestAiCompletion } from "../clients/ai-gateway.ts";
+import { runAiObject } from "../ai/run.ts";
+import { candidatesFrom, promptVersion } from "../lib/decisions.ts";
 import { isRecord } from "../lib/values.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
 import { readRanked, searchCatalogue } from "../repositories/catalog-search.ts";
 import type { Bindings } from "../types.ts";
+import { beginDecision } from "./decisions.ts";
 import { similarTo } from "./embeddings.ts";
 
 const MAX_AGE_DAYS = 30;
@@ -18,60 +20,51 @@ const SYSTEM_PROMPT = [
   'Reply with JSON only: {"hook":"","moods":["",""],"pairs":[{"pick":1,"reason":""}]}.',
 ].join(" ");
 
+const INSIGHT_PROMPT_VERSION = promptVersion(SYSTEM_PROMPT);
+
 export type TitleInsight = {
   hook: string;
   moods: string[];
+  decisionId?: string;
   pairs: { titleId: string; reason: string }[];
 };
 
 type InsightRow = { payload: string; ageDays: number };
 
-function parseInsight(content: string, candidates: MediaTitle[]): TitleInsight | null {
-  const json = content.match(/\{[\s\S]*\}/u)?.[0];
-
-  if (!json) {
+function parseInsight(parsed: unknown, candidates: MediaTitle[]): TitleInsight | null {
+  if (!isRecord(parsed) || typeof parsed.hook !== "string" || !parsed.hook.trim()) {
     return null;
   }
 
-  try {
-    const parsed: unknown = JSON.parse(json);
+  const moods = Array.isArray(parsed.moods)
+    ? parsed.moods
+        .filter((mood): mood is string => typeof mood === "string" && Boolean(mood.trim()))
+        .map((mood) => mood.trim().slice(0, 24))
+        .slice(0, 3)
+    : [];
+  const pairs = Array.isArray(parsed.pairs)
+    ? parsed.pairs
+        .flatMap((pair): TitleInsight["pairs"] => {
+          if (!isRecord(pair)) {
+            return [];
+          }
 
-    if (!isRecord(parsed) || typeof parsed.hook !== "string" || !parsed.hook.trim()) {
-      return null;
-    }
+          const index = typeof pair.pick === "number" ? Math.trunc(pair.pick) - 1 : -1;
+          const candidate = candidates[index];
 
-    const moods = Array.isArray(parsed.moods)
-      ? parsed.moods
-          .filter((mood): mood is string => typeof mood === "string" && Boolean(mood.trim()))
-          .map((mood) => mood.trim().slice(0, 24))
-          .slice(0, 3)
-      : [];
-    const pairs = Array.isArray(parsed.pairs)
-      ? parsed.pairs
-          .flatMap((pair): TitleInsight["pairs"] => {
-            if (!isRecord(pair)) {
-              return [];
-            }
+          return candidate
+            ? [
+                {
+                  titleId: candidate.id,
+                  reason: typeof pair.reason === "string" ? pair.reason.trim().slice(0, 120) : "",
+                },
+              ]
+            : [];
+        })
+        .slice(0, 3)
+    : [];
 
-            const index = typeof pair.pick === "number" ? Math.trunc(pair.pick) - 1 : -1;
-            const candidate = candidates[index];
-
-            return candidate
-              ? [
-                  {
-                    titleId: candidate.id,
-                    reason: typeof pair.reason === "string" ? pair.reason.trim().slice(0, 120) : "",
-                  },
-                ]
-              : [];
-          })
-          .slice(0, 3)
-      : [];
-
-    return { hook: parsed.hook.trim().slice(0, 200), moods, pairs };
-  } catch {
-    return null;
-  }
+  return { hook: parsed.hook.trim().slice(0, 200), moods, pairs };
 }
 
 async function pairCandidates(env: Bindings, title: MediaTitle) {
@@ -81,11 +74,11 @@ async function pairCandidates(env: Bindings, title: MediaTitle) {
     const ranked = (await readRanked(env.DB, neighbours)).slice(0, PAIR_CANDIDATES);
 
     if (ranked.length >= 2) {
-      return ranked;
+      return { candidates: ranked, origin: "vector" };
     }
   }
 
-  return (
+  const byGenre = (
     await searchCatalogue(env.DB, {
       genres: title.genres.slice(0, 2),
       mediaType: title.mediaType,
@@ -93,6 +86,8 @@ async function pairCandidates(env: Bindings, title: MediaTitle) {
       limit: PAIR_CANDIDATES,
     })
   ).filter((item) => item.id !== title.id);
+
+  return { candidates: byGenre, origin: "genre" };
 }
 
 export async function getTitleInsight(
@@ -122,13 +117,23 @@ export async function getTitleInsight(
     return null;
   }
 
-  const candidates = await pairCandidates(env, title);
+  const decision = beginDecision(env, {
+    feature: "insight",
+    promptVersion: INSIGHT_PROMPT_VERSION,
+    surface: titleId,
+  });
+  const { candidates, origin } = await pairCandidates(env, title);
+
+  decision.candidates(candidatesFrom(candidates, { origin }));
+
   const candidateList = candidates
     .map((item, index) => `${index + 1}. ${item.title}${item.year ? ` (${item.year})` : ""}`)
     .join("\n");
-  const response = await requestAiCompletion(
-    env,
-    [
+  const parsed = await runAiObject(env, {
+    feature: "insight",
+    decisionId: decision.id,
+    record: decision,
+    messages: [
       { role: "system", content: SYSTEM_PROMPT },
       {
         role: "user",
@@ -142,22 +147,19 @@ export async function getTitleInsight(
         ].join("\n"),
       },
     ],
-    [],
-    false,
-    {
-      model: fastModel(env),
-      timeoutMs: 30_000,
-      maxTokens: 500,
-      json: true,
-      cacheSeconds: 86_400,
-      metadata: { feature: "insight" },
-    },
-  );
-  const insight = response.content ? parseInsight(response.content, candidates) : null;
+  });
+  const brief = parseInsight(parsed, candidates);
 
-  if (!insight) {
+  if (!brief) {
+    await decision.settle("failed");
+
     return null;
   }
+
+  const insight: TitleInsight = { ...brief, decisionId: decision.id };
+
+  decision.select(insight.pairs.map((pair) => pair.titleId));
+  await decision.settle(insight.pairs.length ? "served" : "empty");
 
   await env.DB.prepare(
     `INSERT INTO title_insights (title_id, payload)

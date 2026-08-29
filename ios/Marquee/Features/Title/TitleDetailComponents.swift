@@ -97,11 +97,13 @@ struct TitleWatchOptions: View {
       } else {
         if let primary = options.primary {
           WatchOptionLink(
-            option: primary, primary: true, pendingDestination: $pendingDestination)
+            option: primary, titleId: item.id, primary: true,
+            pendingDestination: $pendingDestination)
         }
 
         ForEach(shownStreaming) { option in
-          WatchOptionLink(option: option, pendingDestination: $pendingDestination)
+          WatchOptionLink(
+            option: option, titleId: item.id, pendingDestination: $pendingDestination)
         }
 
         if !heldStreaming.isEmpty && !showAll {
@@ -129,7 +131,8 @@ struct TitleWatchOptions: View {
 
           if showPaid || options.primary == nil {
             ForEach(options.paid) { option in
-              WatchOptionLink(option: option, pendingDestination: $pendingDestination)
+              WatchOptionLink(
+                option: option, titleId: item.id, pendingDestination: $pendingDestination)
             }
           }
         }
@@ -162,6 +165,7 @@ struct TitleWatchOptions: View {
 
 private struct WatchOptionLink: View {
   let option: WatchOption
+  let titleId: String
   var primary = false
   @Binding var pendingDestination: ExternalDestination?
 
@@ -169,7 +173,13 @@ private struct WatchOptionLink: View {
     ExternalLinkButton(
       pendingDestination: $pendingDestination,
       destination: ExternalDestination(
-        url: option.destination, label: option.provider.name, kind: .provider)
+        url: option.destination,
+        label: option.provider.name,
+        kind: .provider,
+        titleId: titleId,
+        providerId: option.provider.id,
+        monetization: option.provider.offerTypes.first
+      )
     ) {
       HStack(spacing: 12) {
         ProviderBadge(

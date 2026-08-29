@@ -29,6 +29,7 @@ export type AdminOverview = {
 };
 
 export type AdminPipeline = {
+  searchDrift: number;
   enrichment: {
     source: string;
     titles: number;
@@ -38,6 +39,23 @@ export type AdminPipeline = {
     attempted: number;
     silentFailures: number;
   }[];
+  readiness: {
+    search: {
+      titles: number;
+      indexed: number;
+      pending: number;
+      oldestPendingAt: string | null;
+    };
+    embeddings: {
+      model: string;
+      titles: number;
+      embedded: number;
+      outstanding: number;
+      retrying: number;
+      otherModels: number;
+      newest: string | null;
+    };
+  };
   failures: {
     jobType: string;
     subjectId: string | null;
@@ -65,6 +83,21 @@ export type AdminListings = {
     films: number;
   }[];
   sections: { id: string; title: string; titles: number; builtAt: string }[];
+  fetchedAt: string;
+};
+
+export type AdminQuality = {
+  angles: {
+    angle: string;
+    impressions: number;
+    clicks: number;
+    views: number;
+    exits: number;
+    watched: number;
+    attrition: number;
+    dwellMs: number;
+    score: number;
+  }[];
   fetchedAt: string;
 };
 

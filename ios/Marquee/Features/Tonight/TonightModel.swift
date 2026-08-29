@@ -66,7 +66,12 @@ final class TonightModel: ObservableObject {
     isLoading = false
   }
 
-  func loadRails(api: APIClient, isSignedIn: Bool, retrying: Bool = true) async {
+  func loadRails(
+    api: APIClient,
+    isSignedIn: Bool,
+    clientRevision: String,
+    retrying: Bool = true
+  ) async {
     guard isSignedIn else {
       rails = []
       isBuildingRails = false
@@ -79,7 +84,10 @@ final class TonightModel: ObservableObject {
       guard
         let delivery: RailsDelivery = try? await api.get(
           "/api/catalog/rails",
-          query: [URLQueryItem(name: "generate", value: "1")]
+          query: [
+            URLQueryItem(name: "generate", value: "1"),
+            URLQueryItem(name: "clientRevision", value: clientRevision),
+          ]
         )
       else {
         isBuildingRails = false
@@ -174,6 +182,10 @@ final class TonightModel: ObservableObject {
         )
       )
       pick = response
+
+      if let picked = response.item {
+        Telemetry.shared.remember([picked.id], token: response.journey)
+      }
     } catch {
       usherError = error.localizedDescription
     }

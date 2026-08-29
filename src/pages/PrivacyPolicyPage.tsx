@@ -252,6 +252,15 @@ export function PrivacyPolicyPage() {
               processed for that purpose.
             </p>
             <p>
+              Requests travel through Cloudflare AI Gateway, which keeps a log of them. That log
+              holds a copy of the whole request, including anything about you the request carried,
+              together with the model's reply. Replies may also be held in the Gateway response
+              cache and reused for a later request that matches; the short brief Marquee writes
+              about a single title is cached for a day. Marquee does not attach your account
+              identifier to these requests. It sends the name of the feature and a random reference
+              created for that one decision, which cannot be traced back to you.
+            </p>
+            <p>
               Cloudflare states in its{" "}
               <a
                 href="https://developers.cloudflare.com/workers-ai/platform/data-usage/"
@@ -263,6 +272,9 @@ export function PrivacyPolicyPage() {
               that customer content is not used to train AI models or improve Cloudflare or
               third-party services without explicit consent. Guest and member curator conversation
               turns are kept together for follow-ups and deleted after one hour of inactivity.
+              Separately, Marquee's own usage analytics record the first 200 characters of what you
+              typed when you ask the curator, so that broken and unanswerable requests can be found
+              and fixed.
             </p>
             <p>
               Marquee also builds preference profiles from ratings, viewing activity and answers.
@@ -380,6 +392,11 @@ export function PrivacyPolicyPage() {
               <li>
                 AI curator conversations expire after one hour of inactivity. Temporary sign-in and
                 connection records expire after their short security window.
+              </li>
+              <li>
+                Records of how a recommendation was made — the titles considered, the model that
+                answered and what you did next, never the prompt itself — expire ninety days after
+                the recommendation, and go with the account when it is erased.
               </li>
               <li>
                 Usage and security records are kept only for as long as reasonably needed to analyse

@@ -7,6 +7,7 @@ import { jsonResponse, readJsonObject } from "../lib/http.ts";
 import { logError, logRejection } from "../lib/logging.ts";
 import { retryTransient } from "../lib/retry.ts";
 import { canonicalOrigin } from "../lib/security.ts";
+import { excerpt } from "../lib/text.ts";
 import { stringList } from "../lib/values.ts";
 import {
   readAlertEmail,
@@ -16,6 +17,7 @@ import {
 } from "../repositories/alerts.ts";
 import {
   editBelief,
+  readBeliefEvidenceIds,
   readBeliefs,
   readFollowedPeople,
   setPersonFollow,
@@ -36,7 +38,8 @@ import {
   saveGuest,
 } from "../repositories/guests.ts";
 import { hashState } from "../repositories/links.ts";
-import { readViewerContext } from "../repositories/viewer-context.ts";
+import { readNotesByIds } from "../repositories/notes.ts";
+import { readViewerEntries } from "../repositories/viewer-context.ts";
 import { ALERT_KINDS, isAlertKind } from "../services/alerts/types.ts";
 import { refreshBeliefs } from "../services/beliefs.ts";
 import { buildTasteMap } from "../services/taste-map.ts";
@@ -62,9 +65,9 @@ notebookRoutes.get("/", async (context) => {
   const user = context.get("authenticatedUser");
 
   try {
-    const viewer = await readViewerContext(context.env.DB, user.id);
+    const entries = await readViewerEntries(context.env.DB, user.id);
 
-    await refreshBeliefs(context.env, user.id, viewer);
+    await refreshBeliefs(context.env, user.id, entries);
 
     const beliefs = await retryTransient(() => readBeliefs(context.env.DB, user.id));
 
@@ -290,6 +293,35 @@ notebookRoutes.delete("/guests/:id", async (context) => {
     logError("guest_remove_failed", error);
 
     return jsonResponse({ error: "Could not remove them" }, 500);
+  }
+});
+
+const EVIDENCE_EXCERPT = 220;
+
+notebookRoutes.get("/:id/evidence", async (context) => {
+  const user = context.get("authenticatedUser");
+
+  try {
+    const ids = await readBeliefEvidenceIds(
+      context.env.DB,
+      user.id,
+      context.req.param("id"),
+      "note",
+    );
+    const notes = await readNotesByIds(context.env.DB, user.id, ids);
+
+    return jsonResponse({
+      notes: notes.map((note) => ({
+        id: note.id,
+        title: note.title,
+        excerpt: excerpt(note.thoughts, EVIDENCE_EXCERPT),
+        notedAt: note.notedAt,
+      })),
+    });
+  } catch (error) {
+    logError("belief_evidence_failed", error);
+
+    return jsonResponse({ error: "I cannot lay hands on those notes just now." }, 503);
   }
 });
 

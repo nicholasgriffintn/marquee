@@ -129,7 +129,11 @@ export function App() {
   const curator = useCurator();
   const usher = useUsher(isSignedIn);
   const pinned = usePinned(isSignedIn);
-  const rails = useRails(isSignedIn && isViewerReady && isHome, profile.shelfKey);
+  const rails = useRails(
+    session.user?.id ?? "",
+    isSignedIn && isViewerReady && isHome,
+    profile.shelfKey,
+  );
   const episodes = useTonight(isViewerReady && isHome, TONIGHT_EPISODES);
   const trending = useTrending(isViewerReady && isHome);
   const movieMatch = useMatch("/movie/:tmdbId/*");

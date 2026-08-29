@@ -99,6 +99,7 @@ export type IngestionJob =
       watchedAt: string;
     }
   | { type: "embed-titles"; titleIds: string[] }
+  | { type: "reindex-vectors"; after?: string }
   | { type: "import-trakt-history"; viewerId: string; origin: string }
   | { type: "push-trakt-shelf"; viewerId: string; origin: string }
   | { type: "sync-schedule" }
@@ -128,11 +129,6 @@ export type ViewingContext = {
   rating: number | null;
   thoughts: string;
   updatedAt: string;
-};
-
-export type ViewerContext = {
-  entries: ViewingContext[];
-  selectedProviderIds: string[];
 };
 
 export type CuratorResult = {

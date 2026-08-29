@@ -271,6 +271,8 @@ export type CatalogSection = {
   items: MediaTitle[];
   angle?: string;
   reason?: string;
+  decisionId?: string;
+  journey?: string;
 };
 
 export type CatalogResponse = {

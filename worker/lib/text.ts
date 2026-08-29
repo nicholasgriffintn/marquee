@@ -17,6 +17,14 @@ export function stripMarkup(value: string) {
     .trim();
 }
 
+export function excerpt(value: string, maximumLength: number) {
+  const collapsed = value.replaceAll(/\s+/gu, " ").trim();
+
+  return collapsed.length > maximumLength
+    ? `${collapsed.slice(0, maximumLength).trimEnd()}…`
+    : collapsed;
+}
+
 export function yearFrom(value: string) {
   const match = YEAR_PATTERN.exec(value);
 

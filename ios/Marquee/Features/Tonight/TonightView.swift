@@ -137,7 +137,11 @@ struct TonightView: View {
       await model.load(api: appState.api, providerIDs: appState.selectedProviderIDs.sorted())
     }
     .task(id: loadKey) {
-      await model.loadRails(api: appState.api, isSignedIn: appState.isSignedIn)
+      await model.loadRails(
+        api: appState.api,
+        isSignedIn: appState.isSignedIn,
+        clientRevision: loadKey
+      )
     }
     .refreshable {
       async let catalogue: Void = model.load(
@@ -147,6 +151,7 @@ struct TonightView: View {
       async let rails: Void = model.loadRails(
         api: appState.api,
         isSignedIn: appState.isSignedIn,
+        clientRevision: loadKey,
         retrying: false
       )
       _ = await (catalogue, rails)

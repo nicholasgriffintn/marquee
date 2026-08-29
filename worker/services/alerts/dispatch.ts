@@ -7,6 +7,7 @@ import {
   sentThisWeek,
   viewerContacts,
 } from "../../repositories/alerts.ts";
+import { pruneDecisions } from "../../repositories/decisions.ts";
 import { subscribedViewers } from "../../repositories/feeds.ts";
 import { pruneSignals } from "../../repositories/signals.ts";
 import type { Bindings } from "../../types.ts";
@@ -91,6 +92,7 @@ async function runAlerts(env: Bindings, origin: string, options: { send: boolean
 
   if (options.send) {
     await pruneSignals(env.DB);
+    await pruneDecisions(env.DB);
   }
 
   logEvent("alerts_dispatched", { candidates: flat.length, emails, feeds });

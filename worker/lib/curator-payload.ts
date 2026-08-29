@@ -1,6 +1,6 @@
 import type { CuratorResult } from "../types.ts";
 import { isKnownTitle } from "./validation.ts";
-import { isRecord } from "./values.ts";
+import { isRecord, records } from "./values.ts";
 
 export type ToolCall = {
   id: string;
@@ -49,15 +49,17 @@ function parseSummary(value: unknown) {
 }
 
 function parseReasons(value: unknown, titleIds: string[]) {
-  if (!isRecord(value)) {
-    return {};
-  }
+  const allowed = new Set(titleIds);
 
   return Object.fromEntries(
-    titleIds.flatMap((titleId): Array<[string, string]> => {
-      const reason = value[titleId];
+    records(value).flatMap((entry): Array<[string, string]> => {
+      const titleId = entry.titleId;
+      const reason = entry.reason;
 
-      return typeof reason === "string" && reason.trim()
+      return typeof titleId === "string" &&
+        allowed.has(titleId) &&
+        typeof reason === "string" &&
+        reason.trim()
         ? [[titleId, reason.trim().slice(0, 240)]]
         : [];
     }),
@@ -90,41 +92,38 @@ export function parseAssistantMessage(payload: unknown): AssistantMessage | null
   };
 }
 
+export function parseUsage(payload: unknown) {
+  const usage = isRecord(payload) && isRecord(payload.usage) ? payload.usage : null;
+
+  return {
+    inputTokens: typeof usage?.prompt_tokens === "number" ? usage.prompt_tokens : 0,
+    outputTokens: typeof usage?.completion_tokens === "number" ? usage.completion_tokens : 0,
+  };
+}
+
 export function parseCuratorResult(
-  content: string,
+  parsed: unknown,
   availableIds: Set<string>,
 ): CuratorResult | null {
-  try {
-    const json = content.match(/\{[\s\S]*\}/u)?.[0];
-
-    if (!json) {
-      return null;
-    }
-
-    const parsed: unknown = JSON.parse(json);
-
-    if (!isRecord(parsed) || !Array.isArray(parsed.titleIds)) {
-      return null;
-    }
-
-    const titleIds = [
-      ...new Set(
-        parsed.titleIds.filter(
-          (id): id is string => typeof id === "string" && isKnownTitle(id) && availableIds.has(id),
-        ),
-      ),
-    ].slice(0, 8);
-
-    if (titleIds.length === 0) {
-      return null;
-    }
-
-    return {
-      titleIds,
-      summary: parseSummary(parsed.summary),
-      reasons: parseReasons(parsed.reasons, titleIds),
-    };
-  } catch {
+  if (!isRecord(parsed) || !Array.isArray(parsed.titleIds)) {
     return null;
   }
+
+  const titleIds = [
+    ...new Set(
+      parsed.titleIds.filter(
+        (id): id is string => typeof id === "string" && isKnownTitle(id) && availableIds.has(id),
+      ),
+    ),
+  ].slice(0, 8);
+
+  if (titleIds.length === 0) {
+    return null;
+  }
+
+  return {
+    titleIds,
+    summary: parseSummary(parsed.summary),
+    reasons: parseReasons(parsed.reasons, titleIds),
+  };
 }

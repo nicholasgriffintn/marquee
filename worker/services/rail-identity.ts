@@ -1,4 +1,5 @@
 import { curatedRailId } from "../../src/domain/rails.ts";
+import { isDecisionId } from "../lib/decisions.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { isRecord, stringAt } from "../lib/values.ts";
 
@@ -8,6 +9,7 @@ export type StoredRail = {
   name: string;
   reason: string;
   titleIds: string[];
+  decisionId?: string;
 };
 
 function legacyRailId(name: string) {
@@ -41,6 +43,7 @@ export function toStoredRail(value: unknown): StoredRail | null {
     name,
     reason: stringAt(value, "reason") ?? "",
     titleIds,
+    ...(isDecisionId(value.decisionId) ? { decisionId: value.decisionId } : {}),
   };
 }
 

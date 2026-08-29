@@ -1,3 +1,4 @@
+-- Applied after recommendation decisions; prefix 0037 preserves global migration order.
 CREATE TABLE ai_rails_next (
   viewer_id TEXT PRIMARY KEY,
   revision TEXT NOT NULL DEFAULT '',

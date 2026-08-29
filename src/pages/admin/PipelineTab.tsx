@@ -7,6 +7,7 @@ import { classNames } from "../../lib/class-names";
 import { parseDatabaseDate } from "../../lib/dates";
 import { Callout, Chip, Panel, TabPanel } from "../../ui";
 import { RUN_STATUSES, type RunStatus } from "./config";
+import { ReadinessPanel } from "./ReadinessPanel";
 
 import styles from "./admin.module.css";
 
@@ -34,6 +35,7 @@ export function PipelineTab({
     <ErrorBoundary label="The pipeline">
       <TabPanel id="pipeline" idPrefix="admin">
         {error && <Callout>{error}</Callout>}
+        {pipeline?.readiness && <ReadinessPanel readiness={pipeline.readiness} />}
         {pipeline && pipeline.lastRuns.length > 0 && (
           <Panel heading="Recent jobs">
             <p className={styles.note}>Last {pipeline.runWindowHours} hours</p>
@@ -84,6 +86,12 @@ export function PipelineTab({
               ))}
             </ul>
           </Panel>
+        )}
+        {pipeline && pipeline.searchDrift > 0 && (
+          <Callout>
+            {pipeline.searchDrift.toLocaleString()} titles are indexed for search without their
+            current genres, keywords or cast. Run “Reconcile search index” under Rebuilds.
+          </Callout>
         )}
         {pipeline && pipeline.enrichment.length > 0 && (
           <Panel heading="Enrichment coverage">

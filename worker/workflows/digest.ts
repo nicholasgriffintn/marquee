@@ -1,6 +1,6 @@
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from "cloudflare:workers";
 
-import { readViewerContext } from "../repositories/viewer-context.ts";
+import { readViewerEntries } from "../repositories/viewer-context.ts";
 import { refreshBeliefs } from "../services/beliefs.ts";
 import { buildDigest, viewersWithShelves } from "../services/digest.ts";
 import type { Bindings } from "../types.ts";
@@ -27,9 +27,9 @@ export class DigestWorkflow extends WorkflowEntrypoint<Bindings, unknown> {
       // oxlint-disable-next-line no-await-in-loop
       await step
         .do(`beliefs ${viewerId}`, { retries: RETRIES }, async () => {
-          const viewer = await readViewerContext(this.env.DB, viewerId);
+          const entries = await readViewerEntries(this.env.DB, viewerId);
 
-          return refreshBeliefs(this.env, viewerId, viewer, { includeHunches: true });
+          return refreshBeliefs(this.env, viewerId, entries, { includeFacets: true });
         })
         .catch(() => 0);
     }

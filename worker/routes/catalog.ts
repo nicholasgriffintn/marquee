@@ -7,6 +7,7 @@ import { refreshTitleAvailability } from "../jobs/availability.ts";
 import { edgeCache } from "../lib/cache.ts";
 import { recordEvent } from "../lib/events.ts";
 import { edgeOrigin } from "../lib/geo.ts";
+import { mintJourney, ticketSection, ticketSections } from "../lib/journeys.ts";
 import { logError } from "../lib/logging.ts";
 import { pathInteger, queryInteger, queryList, queryText } from "../lib/params.ts";
 import { canonicalOrigin } from "../lib/security.ts";
@@ -78,7 +79,10 @@ catalogRoutes.get("/", edgeCache(900), async (context) => {
 
     context.header("cache-control", "public, max-age=900");
 
-    return context.json(catalogue);
+    return context.json({
+      ...catalogue,
+      sections: await ticketSections(context.env, catalogue.sections, "catalogue"),
+    });
   } catch (error) {
     logError("catalogue_read_failed", error, { area: "catalogue" });
 
@@ -90,18 +94,33 @@ catalogRoutes.get("/rails", requireAuthentication, async (context) => {
   const user = context.get("authenticatedUser");
 
   try {
+    const startedAt = Date.now();
     const delivery = await deliverRails(context.env, {
       viewerId: user.id,
       origin: edgeOrigin(context.req.raw),
       generate: context.req.query("generate") === "1",
     });
+    const rails = await Promise.all(
+      delivery.rails.map((rail) =>
+        ticketSection(context.env, rail, rail.source === "ai" ? "ai-rail" : "rail"),
+      ),
+    );
 
     context.header(
       "cache-control",
       delivery.status === "ready" ? `private, max-age=${RAILS_CACHE_SECONDS}` : "no-store",
     );
 
-    return context.json(delivery);
+    recordEvent(context.env, {
+      name: "rails_served",
+      viewerId: user.id,
+      mode: "rail",
+      value: rails.length,
+      latencyMs: Date.now() - startedAt,
+      detail: `${delivery.generationId}:${delivery.status}`,
+    });
+
+    return context.json({ ...delivery, rails });
   } catch (error) {
     logError("rails_delivery_failed", error, { area: "catalogue" });
     context.header("cache-control", "no-store");
@@ -151,18 +170,28 @@ catalogRoutes.get("/search", async (context) => {
   try {
     context.header("cache-control", "no-store");
 
+    const startedAt = Date.now();
     const results = hybrid
       ? await searchCatalogueHybrid(context.env, query, providerIds)
       : await searchCatalogue(context.env, query, providerIds);
+    const journey = await mintJourney(context.env, {
+      mode: "search",
+      angle: hybrid ? "search_hybrid" : "search_keyword",
+      size: results.items.length,
+    });
 
     recordEvent(context.env, {
       name: "search",
       viewerId: principal?.user.id,
       detail: query,
       value: results.items.length,
+      journeyId: journey.id,
+      mode: "search",
+      source: hybrid ? "search_hybrid" : "search_keyword",
+      latencyMs: Date.now() - startedAt,
     });
 
-    return context.json(results);
+    return context.json({ ...results, journey: journey.token });
   } catch (error) {
     logError("catalogue_search_failed", error, { area: "search" });
 
