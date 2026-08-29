@@ -1,5 +1,4 @@
 import { validProviderIds } from "../../lib/validation.ts";
-import { readProviderPreferences } from "../../repositories/profile.ts";
 import { readRefusals } from "../../repositories/signals.ts";
 import { readViewerEntries } from "../../repositories/viewer-context.ts";
 import type { Bindings, ViewingContext } from "../../types.ts";
@@ -50,17 +49,16 @@ export async function readViewerState(
     return { ...NO_STATE, viewerId, providerIds: requested };
   }
 
-  const [entries, preferences, saved, refusals] = await Promise.all([
+  const [entries, preferences, refusals] = await Promise.all([
     readViewerEntries(env.DB, viewerId),
     readViewerPreferences(env.DB, viewerId),
-    readProviderPreferences(env.DB, viewerId),
     readRefusals(env.DB, viewerId),
   ]);
 
   return {
     viewerId,
     entries,
-    providerIds: validProviderIds([...requested, ...(saved ?? preferences.providerIds)]),
+    providerIds: validProviderIds([...requested, ...preferences.providerIds]),
     preferences,
     never: refusals.never,
     rejected: refusals.rejected,

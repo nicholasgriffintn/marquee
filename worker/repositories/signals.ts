@@ -95,7 +95,7 @@ export async function readSignals(
            FROM viewer_signals
           WHERE viewer_id = $1
             AND type IN (${types.map((_, index) => `$${index + 2}`).join(",")})
-            AND (expires_at IS NULL OR (EXTRACT(EPOCH FROM expires_at) / 86400.0) > (EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) / 86400.0))
+            AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)
           ORDER BY created_at DESC
           LIMIT ${clamp(limit, 1, 500)}`,
       [viewerId, ...types],
@@ -159,7 +159,7 @@ export async function recentExitFor(db: Database, viewerId: string, titleId: str
       `SELECT journey_id AS "journeyId", decision_id AS "decisionId", context
            FROM viewer_signals
           WHERE viewer_id = $1 AND title_id = $2 AND type = 'provider_exit'
-            AND (EXTRACT(EPOCH FROM created_at) / 86400.0) > (EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP + CAST($3 AS INTERVAL))) / 86400.0)
+            AND created_at > (CURRENT_TIMESTAMP + CAST($3 AS INTERVAL))
           ORDER BY created_at DESC LIMIT 1`,
       [viewerId, titleId, `-${days} days`],
     );
@@ -186,7 +186,7 @@ export async function recentExitFor(db: Database, viewerId: string, titleId: str
 export async function pruneSignals(db: Database) {
   try {
     await db.execute(`DELETE FROM viewer_signals
-          WHERE expires_at IS NOT NULL AND (EXTRACT(EPOCH FROM expires_at) / 86400.0) <= (EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) / 86400.0)`);
+          WHERE expires_at IS NOT NULL AND expires_at <= CURRENT_TIMESTAMP`);
   } catch (error) {
     logError("signal_prune_failed", error);
   }

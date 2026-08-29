@@ -79,8 +79,57 @@ export async function writeDecision(db: Database, record: DecisionRecord) {
 
 export async function pruneDecisions(db: Database) {
   try {
-    await db.execute(`DELETE FROM decisions WHERE (EXTRACT(EPOCH FROM expires_at) / 86400.0) <= (EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) / 86400.0)`);
+    await db.execute(`DELETE FROM decisions WHERE expires_at <= CURRENT_TIMESTAMP`);
   } catch (error) {
     logError("decision_prune_failed", error);
+  }
+}
+
+export type DecisionBoardRow = {
+  feature: DecisionFeature;
+  decisions: number;
+  served: number;
+  barren: number;
+  failed: number;
+  fellBack: number;
+  candidates: number;
+  latencyMs: number;
+  costUsd: number;
+  followed: number;
+  refused: number;
+};
+
+export async function readDecisionBoard(db: Database, days = 28): Promise<DecisionBoardRow[]> {
+  try {
+    const rows = await db.query<DecisionBoardRow>(
+      `SELECT d.feature,
+                count(*) AS decisions,
+                count(*) FILTER (WHERE d.outcome = 'served') AS served,
+                count(*) FILTER (WHERE d.outcome = 'empty') AS barren,
+                count(*) FILTER (WHERE d.outcome = 'failed') AS failed,
+                count(*) FILTER (WHERE d.fallback_from <> '[]') AS "fellBack",
+                COALESCE(avg(d.candidate_count), 0)::double precision AS candidates,
+                COALESCE(avg(d.latency_ms), 0)::double precision AS "latencyMs",
+                COALESCE(sum(d.cost_usd), 0) AS "costUsd",
+                count(*) FILTER (WHERE outcomes.followed) AS followed,
+                count(*) FILTER (WHERE outcomes.refused) AS refused
+           FROM decisions AS d
+           LEFT JOIN LATERAL (
+             SELECT bool_or(s.type IN ('provider_exit', 'watched')) AS followed,
+                    bool_or(s.type IN ('rejection', 'never')) AS refused
+               FROM viewer_signals AS s
+              WHERE s.decision_id = d.id
+           ) AS outcomes ON true
+          WHERE d.created_at > (CURRENT_TIMESTAMP - CAST($1 AS INTERVAL))
+          GROUP BY d.feature
+          ORDER BY decisions DESC`,
+      [`${Math.max(1, Math.trunc(days))} days`],
+    );
+
+    return rows.rows;
+  } catch (error) {
+    logError("decision_board_read_failed", error);
+
+    return [];
   }
 }

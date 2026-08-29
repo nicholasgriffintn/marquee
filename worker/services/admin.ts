@@ -95,7 +95,7 @@ async function catalogueStats(env: Bindings) {
           FROM users) AS uu,
          (SELECT
             count(*) AS "alertsSent",
-            sum(CASE WHEN (EXTRACT(EPOCH FROM sent_at) / 86400.0) > (EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - INTERVAL '7 day')) / 86400.0) THEN 1 ELSE 0 END) AS "alertsWeek"
+            sum(CASE WHEN sent_at > (CURRENT_TIMESTAMP - INTERVAL '7 day') THEN 1 ELSE 0 END) AS "alertsWeek"
           FROM viewer_alerts) AS va,
          (SELECT
             count(*) AS "revivalWorks",

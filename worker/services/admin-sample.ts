@@ -256,7 +256,7 @@ async function viewerAlertsSample(db: Database, weekOnly: boolean): Promise<Samp
   const rows =
     await db.query<SampleRow>(`SELECT viewer_id AS "viewerId", title_id AS "titleId", kind, sent_at AS "sentAt"
        FROM viewer_alerts
-       ${weekOnly ? "WHERE (EXTRACT(EPOCH FROM sent_at) / 86400.0) > (EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - INTERVAL '7 day')) / 86400.0)" : ""}
+       ${weekOnly ? "WHERE sent_at > (CURRENT_TIMESTAMP - INTERVAL '7 day')" : ""}
        ORDER BY sent_at DESC
        LIMIT ${SAMPLE_LIMIT}`);
 

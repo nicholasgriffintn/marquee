@@ -97,7 +97,7 @@ export async function getTitleInsight(
 ) {
   const generate = options.generate ?? true;
   const cached = await env.DB.first<InsightRow>(
-    `SELECT payload, (EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) / 86400.0) - (EXTRACT(EPOCH FROM created_at) / 86400.0) AS "ageDays"
+    `SELECT payload, EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - created_at)) / 86400.0 AS "ageDays"
      FROM title_insights WHERE title_id = $1`,
     [titleId],
   );

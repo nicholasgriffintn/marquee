@@ -147,7 +147,7 @@ export async function readAngleScores(db: Database) {
       angle: string;
       score: number;
     }>(`SELECT angle, score FROM angle_scores
-          WHERE (EXTRACT(EPOCH FROM computed_at) / 86400.0) > (EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - INTERVAL '45 day')) / 86400.0)`);
+          WHERE computed_at > (CURRENT_TIMESTAMP - INTERVAL '45 day')`);
 
     return new Map(rows.rows.map((row) => [row.angle, row.score]));
   } catch {
@@ -160,7 +160,7 @@ export async function readAngleBoard(db: Database, limit = 40): Promise<AngleSco
     const rows =
       await db.query<AngleScore>(`SELECT angle, impressions, clicks, views, exits, watched, attrition, dwell_ms AS "dwellMs", score
            FROM angle_scores
-          WHERE (EXTRACT(EPOCH FROM computed_at) / 86400.0) > (EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - INTERVAL '45 day')) / 86400.0)
+          WHERE computed_at > (CURRENT_TIMESTAMP - INTERVAL '45 day')
           ORDER BY impressions DESC
           LIMIT ${clamp(limit, 1, 200)}`);
 

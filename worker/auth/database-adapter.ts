@@ -292,7 +292,7 @@ async function consumeOAuthState(
     expires_at: string;
   }>(
     `DELETE FROM oauth_states
-       WHERE state_hash = $1 AND (EXTRACT(EPOCH FROM expires_at) / 86400.0) > (EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) / 86400.0)
+       WHERE state_hash = $1 AND expires_at > CURRENT_TIMESTAMP
        RETURNING *`,
     [stateHash],
   );

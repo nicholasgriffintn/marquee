@@ -38,8 +38,8 @@ export async function readRailRecord(
   const row = await db.first<RailRow>(
     `SELECT payload, revision, generation_id AS "generationId",
               attempted_revision AS "attemptedRevision",
-              ((EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) / 86400.0) - (EXTRACT(EPOCH FROM created_at) / 86400.0)) * 24 AS "ageHours",
-              ((EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) / 86400.0) - (EXTRACT(EPOCH FROM attempted_at) / 86400.0)) * 24 AS "attemptAgeHours"
+              EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - created_at)) / 3600.0 AS "ageHours",
+              EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - attempted_at)) / 3600.0 AS "attemptAgeHours"
          FROM ai_rails WHERE viewer_id = $1`,
     [viewerId],
   );

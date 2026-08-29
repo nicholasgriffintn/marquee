@@ -451,7 +451,7 @@ export async function buildSections(env: Bindings) {
           WHERE state.title_id = catalog_titles.id
             AND state.provider_id = $1
             AND state.offer_kind = 'streaming'
-            AND (EXTRACT(EPOCH FROM state.first_seen_at) / 86400.0) > (EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - INTERVAL '45 day')) / 86400.0)
+            AND state.first_seen_at > (CURRENT_TIMESTAMP - INTERVAL '45 day')
        )`,
       "popularity DESC",
       [service.id],

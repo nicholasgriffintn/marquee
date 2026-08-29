@@ -248,7 +248,7 @@ async function staleWatchlistMoment(
   titleId: string,
 ): Promise<UsherMoment | null> {
   const row = await env.DB.first<{ age: number }>(
-    `SELECT ((EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) / 86400.0) - (EXTRACT(EPOCH FROM updated_at) / 86400.0)) AS age
+    `SELECT EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - updated_at)) / 86400.0 AS age
      FROM viewing_entries
      WHERE viewer_id = $1 AND title_id = $2 AND status = 'watchlist'`,
     [viewerId, titleId],
