@@ -10,15 +10,13 @@ import {
 } from "../auth/session.ts";
 import { recordEvent } from "../lib/events.ts";
 import { jsonResponse, readJsonObject } from "../lib/http.ts";
-import { mintJourney, ticketSections } from "../lib/journeys.ts";
+import { mintJourney } from "../lib/journeys.ts";
 import { logError } from "../lib/logging.ts";
 import { isKnownTitle, validProviderIds } from "../lib/validation.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
 import { pinShelf, readPinnedShelves, unpinShelf } from "../repositories/shelves.ts";
-import { getAiRails } from "../services/ai-rails.ts";
 import { readDigest } from "../services/digest.ts";
 import { getTitleInsight } from "../services/title-insight.ts";
-import { readViewerState } from "../services/viewer/state.ts";
 import type { Bindings } from "../types.ts";
 import { viewerHour } from "./usher.ts";
 
@@ -108,42 +106,6 @@ curatorRoutes.delete("/", async (context) => {
   await session.fetch("https://curator/reset", { method: "POST" });
 
   return jsonResponse({ cleared: true });
-});
-
-curatorRoutes.get("/rails", requireViewer, async (context) => {
-  const user = context.get("authenticatedUser");
-
-  try {
-    context.header("cache-control", "no-store");
-
-    const startedAt = Date.now();
-    const viewer = await readViewerState(context.env, user.id);
-    const { sections, isFresh } = await getAiRails(context.env, viewer);
-
-    if (isFresh) {
-      const ticketed = await ticketSections(context.env, sections, "ai-rail");
-
-      recordEvent(context.env, {
-        name: "rails_served",
-        viewerId: user.id,
-        mode: "ai-rail",
-        value: ticketed.length,
-        latencyMs: Date.now() - startedAt,
-      });
-
-      return jsonResponse({ sections: ticketed, status: "ready" });
-    }
-
-    if (context.req.query("generate") === "1") {
-      await context.env.RAILS_WORKFLOW.create({ params: { viewerId: user.id } });
-    }
-
-    return jsonResponse({ sections, status: "generating" });
-  } catch (error) {
-    logError("ai_rails_failed", error);
-
-    return jsonResponse({ sections: [], status: "error" });
-  }
 });
 
 curatorRoutes.get("/digest", requireViewer, async (context) => {

@@ -37,7 +37,9 @@ struct TonightView: View {
               }
             }
           )
-        } else if let hero = model.featured ?? model.sections.first?.items.first {
+        } else if let hero = model.featured ?? model.rails.first?.items.first
+          ?? model.sections.first?.items.first
+        {
           TonightHero(item: hero)
         } else {
           MarqueePageHeader(
@@ -92,7 +94,9 @@ struct TonightView: View {
               description: "Wikipedia readers this week against last",
               items: model.trending,
               angle: nil,
-              reason: nil
+              reason: nil,
+              source: nil,
+              generationId: nil
             ),
             ranked: true
           )
@@ -103,23 +107,54 @@ struct TonightView: View {
             .padding(.horizontal, 18)
         }
 
+        if model.isBuildingRails {
+          LoadingHouse(label: "Building your shelves…")
+        }
+
+        ForEach(model.rails) { rail in
+          VStack(alignment: .leading, spacing: 13) {
+            TitleRail(section: rail)
+            if rail.isCurated {
+              RailVerdictRow(
+                name: rail.title,
+                verdict: model.railVerdicts[rail.id],
+                onVerdict: { verdict in
+                  Task {
+                    await model.recordRailVerdict(rail.id, verdict: verdict, api: appState.api)
+                  }
+                }
+              )
+              .padding(.horizontal, 18)
+            }
+          }
+        }
+
         ForEach(model.sections) { TitleRail(section: $0) }
       }
       .padding(.bottom, 30)
     }
     .task(id: loadKey) {
-      await model.load(
+      await model.load(api: appState.api, providerIDs: appState.selectedProviderIDs.sorted())
+    }
+    .task(id: loadKey) {
+      await model.loadRails(
         api: appState.api,
-        providerIDs: appState.selectedProviderIDs.sorted(),
-        isSignedIn: appState.isSignedIn
+        isSignedIn: appState.isSignedIn,
+        clientRevision: loadKey
       )
     }
     .refreshable {
-      await model.load(
+      async let catalogue: Void = model.load(
         api: appState.api,
-        providerIDs: appState.selectedProviderIDs.sorted(),
-        isSignedIn: appState.isSignedIn
+        providerIDs: appState.selectedProviderIDs.sorted()
       )
+      async let rails: Void = model.loadRails(
+        api: appState.api,
+        isSignedIn: appState.isSignedIn,
+        clientRevision: loadKey,
+        retrying: false
+      )
+      _ = await (catalogue, rails)
     }
     .marqueeRootPage()
   }

@@ -1,5 +1,5 @@
-import type { CatalogSection } from "../../src/domain/catalog.ts";
 import type { ViewerOrigin } from "../../src/domain/cinema.ts";
+import type { DeliveredRail } from "../../src/domain/rails.ts";
 import { logError } from "../lib/logging.ts";
 import { titleCase } from "../lib/text.ts";
 import { readFollowedPeople } from "../repositories/beliefs.ts";
@@ -19,7 +19,7 @@ function placeName(origin: ViewerOrigin | null) {
   return origin?.label?.trim() || null;
 }
 
-async function peopleRails(env: Bindings, viewerId: string): Promise<CatalogSection[]> {
+async function peopleRails(env: Bindings, viewerId: string): Promise<DeliveredRail[]> {
   const names = (await readFollowedPeople(env.DB, viewerId)).slice(0, PEOPLE_RAILS);
 
   if (names.length === 0) {
@@ -39,7 +39,8 @@ async function peopleRails(env: Bindings, viewerId: string): Promise<CatalogSect
         description: `Everything of ${label}'s in the catalogue, newest first`,
         reason: `You follow ${label}`,
         items,
-      } satisfies CatalogSection;
+        source: "person",
+      } satisfies DeliveredRail;
     }),
   );
 
@@ -49,7 +50,7 @@ async function peopleRails(env: Bindings, viewerId: string): Promise<CatalogSect
 async function cinemaRail(
   env: Bindings,
   origin: ViewerOrigin | null,
-): Promise<CatalogSection | null> {
+): Promise<DeliveredRail | null> {
   if (!origin) {
     return null;
   }
@@ -86,10 +87,11 @@ async function cinemaRail(
     description: `Playing within ${CINEMA_RADIUS_KM}km over the next week`,
     reason: place ? `Cinemas around ${place}` : "Cinemas near you",
     items,
+    source: "cinema",
   };
 }
 
-async function broadcastRail(env: Bindings): Promise<CatalogSection | null> {
+async function broadcastRail(env: Bindings): Promise<DeliveredRail | null> {
   const rows = await env.DB.prepare(
     `SELECT DISTINCT s.title_id AS id
        FROM title_schedule AS s
@@ -119,6 +121,7 @@ async function broadcastRail(env: Bindings): Promise<CatalogSection | null> {
     description: "On a channel over the next seven days",
     reason: "Broadcast schedule",
     items,
+    source: "broadcast",
   };
 }
 
@@ -126,7 +129,7 @@ export async function getPersonalRails(
   env: Bindings,
   viewerId: string | null,
   origin: ViewerOrigin | null,
-): Promise<CatalogSection[]> {
+): Promise<DeliveredRail[]> {
   try {
     const [people, cinema, broadcast] = await Promise.all([
       viewerId ? peopleRails(env, viewerId) : Promise.resolve([]),
@@ -134,7 +137,7 @@ export async function getPersonalRails(
       broadcastRail(env),
     ]);
 
-    return [...people, cinema, broadcast].filter((rail): rail is CatalogSection => rail !== null);
+    return [...people, cinema, broadcast].filter((rail): rail is DeliveredRail => rail !== null);
   } catch (error) {
     logError("personal_rails_failed", error, { area: "catalogue" });
 

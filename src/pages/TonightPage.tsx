@@ -23,6 +23,7 @@ import { UsherOnboarding } from "../components/usher/UsherOnboarding";
 import { UsherOrder } from "../components/usher/UsherOrder";
 import type { CatalogSection, MediaTitle, Provider } from "../domain/catalog";
 import type { Guest } from "../domain/notebook";
+import { isCuratedRailId, isViewerShelfId } from "../domain/rails";
 import type { TonightOrder, UsherMoment } from "../domain/usher";
 import type { CuratorState } from "../hooks/useCurator";
 import type { ScheduledEpisode } from "../hooks/useTonight";
@@ -399,9 +400,9 @@ export function TonightPage({
             <ErrorBoundary key={section.id} label={`The ${section.title} shelf`}>
               <ContentRail
                 section={section}
-                byUsher={section.id.startsWith("ai-") || section.id.startsWith("pinned-")}
+                byUsher={isViewerShelfId(section.id)}
                 onOpen={onOpen}
-                onSeen={section.id.startsWith("ai-") ? onRailSeen : undefined}
+                onSeen={isCuratedRailId(section.id) ? onRailSeen : undefined}
                 trailing={
                   usherMoment?.id === `rail-feedback:${section.id}` ? (
                     <UsherCard

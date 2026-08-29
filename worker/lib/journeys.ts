@@ -160,18 +160,24 @@ export function journeyRank(value: unknown, journey: Journey) {
   return Number.isInteger(parsed) && parsed >= 0 && parsed < journey.size ? parsed : undefined;
 }
 
+export async function ticketSection(
+  env: Bindings,
+  { decisionId, ...section }: CatalogSection,
+  mode: JourneyMode,
+) {
+  return {
+    ...section,
+    journey: (
+      await mintJourney(env, {
+        mode,
+        angle: section.angle ?? section.id,
+        size: section.items.length,
+        ...(decisionId ? { decisionId } : {}),
+      })
+    ).token,
+  };
+}
+
 export function ticketSections(env: Bindings, sections: CatalogSection[], mode: JourneyMode) {
-  return Promise.all(
-    sections.map(async ({ decisionId, ...section }) => ({
-      ...section,
-      journey: (
-        await mintJourney(env, {
-          mode,
-          angle: section.angle ?? section.id,
-          size: section.items.length,
-          ...(decisionId ? { decisionId } : {}),
-        })
-      ).token,
-    })),
-  );
+  return Promise.all(sections.map((section) => ticketSection(env, section, mode)));
 }

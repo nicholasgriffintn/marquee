@@ -44,7 +44,7 @@ export type Bindings = {
   EMBEDDING_QUEUE: Queue<IngestionJob>;
   REVIVAL_QUEUE: Queue<IngestionJob>;
   CATALOG_SWEEP: Workflow<CatalogSweepParameters>;
-  RAILS_WORKFLOW: Workflow<{ viewerId: string }>;
+  RAILS_WORKFLOW: Workflow<RailsParameters>;
   DIGEST_WORKFLOW: Workflow;
   CURATOR_SESSION: DurableObjectNamespace;
   MEDIA: R2Bucket;
@@ -55,6 +55,8 @@ export type Bindings = {
 };
 
 export type CatalogSweepParameters = { deep?: boolean };
+
+export type RailsParameters = { viewerId: string; revision: string; generationId: string };
 
 export type EnrichmentSource = "tmdb" | "justwatch" | "omdb" | "poster" | "mal" | "anilist";
 

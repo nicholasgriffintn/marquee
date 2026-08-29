@@ -1,4 +1,5 @@
-import type { CatalogSection, MediaTitle } from "../../src/domain/catalog.ts";
+import type { MediaTitle } from "../../src/domain/catalog.ts";
+import type { DeliveredRail } from "../../src/domain/rails.ts";
 import { CURATOR_TOOLS, executeCuratorTool } from "../ai/curator-tools.ts";
 import { runAiMessage, runAiObject } from "../ai/run.ts";
 import type { ChatMessage } from "../lib/curator-payload.ts";
@@ -21,6 +22,7 @@ import { viewerSummary } from "./beliefs.ts";
 import { getGenres } from "./catalog.ts";
 import { beginDecision } from "./decisions.ts";
 import { nearestTo } from "./embeddings.ts";
+import { feedbackIdsFor, storedRail, type StoredRail } from "./rail-identity.ts";
 import {
   eligibleTitles,
   rankTitles,
@@ -32,7 +34,6 @@ import { preferenceSummary, type ViewerPreferences } from "./usher.ts";
 import type { Eligibility } from "./viewer/eligibility.ts";
 import { eligibilityFor, type ViewerState } from "./viewer/state.ts";
 
-const MAX_AGE_HOURS = 12;
 const RAIL_LIMIT = 3;
 const SHORTLIST = 12;
 const SEED_POOL = 30;
@@ -105,15 +106,7 @@ const BASE_ANGLES: Angle[] = [
   },
 ];
 
-export type StoredRail = {
-  name: string;
-  reason: string;
-  titleIds: string[];
-  angle?: string;
-  decisionId?: string;
-};
-
-type RailRow = { signature: string; payload: string; ageHours: number };
+type RailDraft = { name: string; reason: string; titleIds: string[] };
 
 export function rankAngles(angles: Angle[], scores: Map<string, number>) {
   if (scores.size === 0) {
@@ -170,28 +163,6 @@ export function anglesFor(preferences: ViewerPreferences): Angle[] {
   }
 
   return angles;
-}
-
-function preferenceSignature(preferences: ViewerPreferences) {
-  return [
-    preferences.genres.join("/"),
-    preferences.motivation.join("/"),
-    preferences.actors.join("/"),
-    preferences.directors.join("/"),
-    preferences.frequency,
-    preferences.runtime,
-    preferences.novelty,
-  ].join("|");
-}
-
-function viewerSignature(viewer: ViewerState) {
-  return [
-    viewer.entries
-      .map((entry) => `${entry.titleId}:${entry.status}:${entry.rating ?? ""}`)
-      .join(","),
-    viewer.providerIds.join(","),
-    preferenceSignature(viewer.preferences),
-  ].join("|");
 }
 
 async function neighbours(
@@ -384,7 +355,7 @@ function usableIds(candidates: Iterable<string>, availableIds: Set<string>) {
     .slice(0, RAIL_MAX);
 }
 
-function parseRail(parsed: unknown, availableIds: Set<string>): StoredRail | null {
+function parseRail(parsed: unknown, availableIds: Set<string>): RailDraft | null {
   if (!isRecord(parsed) || typeof parsed.name !== "string" || !Array.isArray(parsed.titleIds)) {
     return null;
   }
@@ -408,7 +379,6 @@ export type RailBuild = {
   shelf?: ShelfDetail[];
   summary?: string;
 };
-
 export type BuiltRail = { rail: StoredRail | null; decision: DecisionDraft };
 
 export async function buildOneRail(
@@ -430,8 +400,10 @@ export async function buildOneRail(
 
   decision.candidates(build.candidates ?? candidatesFrom(seeds, { origin: `rail_${angle.id}` }));
 
-  const built = (rail: StoredRail | null): BuiltRail => ({
-    rail: rail ? { ...rail, angle: angle.id, decisionId: decision.id } : null,
+  const built = (rail: RailDraft | null): BuiltRail => ({
+    rail: rail
+      ? { ...storedRail(angle.id, rail.name, rail.reason, rail.titleIds), decisionId: decision.id }
+      : null,
     decision: decision.draft(),
   });
 
@@ -536,33 +508,12 @@ export async function buildOneRail(
   return built(rail);
 }
 
-export function railSectionId(name: string) {
-  return `ai-${name.toLowerCase().replaceAll(/\W+/gu, "-")}`;
-}
-
-async function readStoredRails(env: Bindings, viewerId: string): Promise<StoredRail[]> {
-  const cached = await env.DB.prepare(`SELECT payload FROM ai_rails WHERE viewer_id = ?`)
-    .bind(viewerId)
-    .first<{ payload: string }>();
-
-  if (!cached) {
-    return [];
-  }
-
-  const parsed = parseJson(cached.payload);
-
-  return Array.isArray(parsed) ? (parsed as StoredRail[]) : [];
-}
-
-async function titlesInDislikedRails(env: Bindings, viewerId: string) {
+async function titlesInDislikedRails(env: Bindings, viewerId: string, rails: StoredRail[]) {
   try {
-    const [rails, feedback] = await Promise.all([
-      readStoredRails(env, viewerId),
-      readRailFeedback(env.DB, viewerId),
-    ]);
+    const feedback = await readRailFeedback(env.DB, viewerId);
 
     return rails
-      .filter((rail) => feedback.get(railSectionId(rail.name)) === "bad")
+      .filter((rail) => feedbackIdsFor(rail).some((railId) => feedback.get(railId) === "bad"))
       .flatMap((rail) => rail.titleIds);
   } catch (error) {
     logError("rail_feedback_read_failed", error);
@@ -587,7 +538,11 @@ async function homepageTitleIds(env: Bindings) {
   });
 }
 
-async function hydrate(env: Bindings, rails: StoredRail[]): Promise<CatalogSection[]> {
+export async function hydrateRails(
+  env: Bindings,
+  rails: StoredRail[],
+  generationId: string,
+): Promise<DeliveredRail[]> {
   const titles = await readItems(
     env.DB,
     rails.flatMap((rail) => rail.titleIds),
@@ -595,7 +550,7 @@ async function hydrate(env: Bindings, rails: StoredRail[]): Promise<CatalogSecti
   );
   const byId = new Map(titles.map((title) => [title.id, title]));
 
-  return rails.flatMap((rail): CatalogSection[] => {
+  return rails.flatMap((rail): DeliveredRail[] => {
     const items = rail.titleIds.flatMap((titleId) => {
       const title = byId.get(titleId);
 
@@ -605,10 +560,12 @@ async function hydrate(env: Bindings, rails: StoredRail[]): Promise<CatalogSecti
     return items.length >= RAIL_MIN
       ? [
           {
-            id: railSectionId(rail.name),
+            id: rail.railId,
             title: rail.name,
             description: rail.reason,
             items,
+            source: "ai",
+            ...(generationId ? { generationId } : {}),
             ...(rail.angle ? { angle: rail.angle } : {}),
             ...(rail.decisionId ? { decisionId: rail.decisionId } : {}),
           },
@@ -617,47 +574,7 @@ async function hydrate(env: Bindings, rails: StoredRail[]): Promise<CatalogSecti
   });
 }
 
-export async function persistRails(
-  env: Bindings,
-  viewerId: string,
-  signature: string,
-  rails: StoredRail[],
-) {
-  await env.DB.prepare(
-    `INSERT INTO ai_rails (viewer_id, signature, payload)
-     VALUES (?, ?, ?)
-     ON CONFLICT(viewer_id) DO UPDATE SET
-       signature = excluded.signature,
-       payload = excluded.payload,
-       created_at = CURRENT_TIMESTAMP`,
-  )
-    .bind(viewerId, signature, JSON.stringify(rails))
-    .run();
-
-  logEvent("ai_rails_generated", { rails: rails.length });
-}
-
-export async function getAiRails(env: Bindings, viewer: ViewerState) {
-  const signature = viewerSignature(viewer);
-  const cached = await env.DB.prepare(
-    `SELECT signature, payload,
-            (julianday('now') - julianday(created_at)) * 24 AS ageHours
-     FROM ai_rails WHERE viewer_id = ?`,
-  )
-    .bind(viewer.viewerId)
-    .first<RailRow>();
-  const isFresh = Boolean(
-    cached && cached.signature === signature && cached.ageHours < MAX_AGE_HOURS,
-  );
-
-  return {
-    sections: cached ? await hydrate(env, JSON.parse(cached.payload) as StoredRail[]) : [],
-    isFresh,
-    signature,
-  };
-}
-
-export async function prepareRails(env: Bindings, viewer: ViewerState) {
+export async function prepareRails(env: Bindings, viewer: ViewerState, stored: StoredRail[] = []) {
   const { viewerId, preferences } = viewer;
   const scores = await readAngleScores(env.DB);
   const angles = rankAngles(anglesFor(preferences), scores);
@@ -671,7 +588,7 @@ export async function prepareRails(env: Bindings, viewer: ViewerState) {
     readViewerAffinity(env.DB, viewerId),
     readShelfDetail(env.DB, viewerId),
     getGenres(env, 100).catch((): string[] => []),
-    titlesInDislikedRails(env, viewerId),
+    titlesInDislikedRails(env, viewerId, stored),
   ]);
   const affinity: ViewerAffinity = {
     ...behaviour,
