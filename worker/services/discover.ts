@@ -1,13 +1,12 @@
 import type { MediaType } from "../../src/domain/catalog.ts";
 import { measureDiscoverWindow, TMDB_MAX_PAGES, TMDB_PAGE_SIZE } from "../clients/tmdb.ts";
+import { addDays, daysBetween } from "../lib/dates.ts";
 import { logEvent } from "../lib/logging.ts";
 import { enqueue } from "../lib/queue.ts";
 import {
-  addDays,
   advancePartitionCursors,
   claimPendingPartitions,
   countPartitions,
-  daysBetween,
   insertPartitions,
   markPartitionMeasured,
   markPartitionSplit,

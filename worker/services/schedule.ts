@@ -1,4 +1,5 @@
 import { getTvmazeSchedule, type ScheduledEpisode } from "../clients/tvmaze.ts";
+import { hoursFrom, startOfHour, utcDay } from "../lib/dates.ts";
 import { logError, logEvent } from "../lib/logging.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
 import type { Bindings } from "../types.ts";
@@ -6,12 +7,14 @@ import type { Bindings } from "../types.ts";
 const COUNTRIES: (string | null)[] = ["GB", "US", null];
 const DAYS_AHEAD = 8;
 const RETENTION_DAYS = 3;
+const GRACE_HOURS = 6;
+const NEXT_EPISODE_GRACE_HOURS = 3;
 
 function upcomingDates() {
   const today = Date.now();
 
   return Array.from({ length: DAYS_AHEAD }, (_, index) =>
-    new Date(today + index * 86_400_000).toISOString().slice(0, 10),
+    utcDay(new Date(today + index * 86_400_000)),
   );
 }
 
@@ -142,9 +145,9 @@ const POPULAR_QUERY = `SELECT s.title_id AS "titleId", s.show_name AS "showName"
                 s.episode_name AS "episodeName", s.airs_at AS "airsAt", s.network
          FROM title_schedule AS s
          JOIN catalog_titles AS t ON t.id = s.title_id
-         WHERE s.airs_at BETWEEN (CURRENT_TIMESTAMP - INTERVAL '6 hour') AND (CURRENT_TIMESTAMP + CAST($1 AS INTERVAL))
+         WHERE s.airs_at BETWEEN CAST($1 AS timestamptz) AND CAST($2 AS timestamptz)
          ORDER BY t.popularity DESC, s.airs_at
-         LIMIT $2`;
+         LIMIT $3`;
 
 export async function readTonight(
   env: Bindings,
@@ -158,7 +161,15 @@ export async function readTonight(
     : [];
 
   if (rows.length === 0) {
-    rows = (await env.DB.query<ScheduleRow>(POPULAR_QUERY, [window, limit])).rows;
+    const anchor = startOfHour();
+
+    rows = (
+      await env.DB.query<ScheduleRow>(POPULAR_QUERY, [
+        hoursFrom(anchor, -GRACE_HOURS),
+        hoursFrom(anchor, hours),
+        limit,
+      ])
+    ).rows;
   }
 
   const titles = await readItems(
@@ -185,9 +196,9 @@ export async function readNextEpisode(env: Bindings, titleId: string) {
   }>(
     `SELECT season, episode, episode_name AS "episodeName", airs_at AS "airsAt", network
      FROM title_schedule
-     WHERE title_id = $1 AND airs_at >= (CURRENT_TIMESTAMP - INTERVAL '3 hour')
+     WHERE title_id = $1 AND airs_at >= CAST($2 AS timestamptz)
      ORDER BY airs_at
      LIMIT 1`,
-    [titleId],
+    [titleId, hoursFrom(startOfHour(), -NEXT_EPISODE_GRACE_HOURS)],
   );
 }

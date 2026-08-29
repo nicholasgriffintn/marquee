@@ -1,5 +1,6 @@
 import type { Cinema, ScreeningPrecision } from "../../src/domain/cinema.ts";
 import type { SourceCinema, SourceFilm, SourceScreening } from "../clients/cinema/types.ts";
+import { addDays, utcDay } from "../lib/dates.ts";
 import { boundingBox, haversineKm, interestCell } from "../lib/geo.ts";
 import { parseJson } from "../lib/values.ts";
 import { hashState } from "./links.ts";
@@ -343,17 +344,18 @@ export async function readScreeningsForTitle(
   }
 
   const placeholders = cinemaIds.map((_, index) => `$${index + 2}`).join(", ");
-  const horizonParameter = cinemaIds.length + 2;
+  const fromParameter = cinemaIds.length + 2;
+  const firstDay = utcDay();
   const rows = await db.query<ScreeningRow>(
     `SELECT id, cinema_id AS "cinemaId", starts_at AS "startsAt", business_day AS "businessDay",
               precision, attributes, booking_url AS "bookingUrl"
        FROM cinema_screenings
        WHERE title_id = $1
          AND cinema_id IN (${placeholders})
-         AND business_day BETWEEN CURRENT_DATE AND (CURRENT_DATE + CAST($${horizonParameter} AS INTERVAL))
+         AND business_day BETWEEN CAST($${fromParameter} AS date) AND CAST($${fromParameter + 1} AS date)
        ORDER BY business_day, COALESCE(starts_at, business_day)
        LIMIT 400`,
-    [titleId, ...cinemaIds, `+${Math.max(1, horizonDays)} days`],
+    [titleId, ...cinemaIds, firstDay, addDays(firstDay, Math.max(1, horizonDays))],
   );
 
   return rows.rows.map((row) => ({
@@ -391,8 +393,9 @@ export async function readShowingTitles(
   }
 
   const placeholders = cinemaIds.map((_, index) => `$${index + 1}`).join(", ");
-  const horizonParameter = cinemaIds.length + 1;
-  const limitParameter = horizonParameter + 1;
+  const fromParameter = cinemaIds.length + 1;
+  const limitParameter = fromParameter + 2;
+  const firstDay = utcDay();
   const rows = await db.query<LocalShowingRow>(
     `SELECT title_id AS "titleId",
               COUNT(DISTINCT cinema_id) AS "cinemaCount",
@@ -401,11 +404,11 @@ export async function readShowingTitles(
        FROM cinema_screenings
        WHERE title_id IS NOT NULL
          AND cinema_id IN (${placeholders})
-         AND business_day BETWEEN CURRENT_DATE AND (CURRENT_DATE + CAST($${horizonParameter} AS INTERVAL))
+         AND business_day BETWEEN CAST($${fromParameter} AS date) AND CAST($${fromParameter + 1} AS date)
        GROUP BY title_id
        ORDER BY COUNT(DISTINCT cinema_id) DESC, MIN(starts_at) IS NULL, MIN(starts_at), title_id
        LIMIT $${limitParameter}`,
-    [...cinemaIds, `+${Math.max(1, horizonDays)} days`, limit],
+    [...cinemaIds, firstDay, addDays(firstDay, Math.max(1, horizonDays)), limit],
   );
 
   return rows.rows.map((row) => ({

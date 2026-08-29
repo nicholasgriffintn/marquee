@@ -1,5 +1,6 @@
 import type { ViewerOrigin } from "../../src/domain/cinema.ts";
 import type { DeliveredRail } from "../../src/domain/rails.ts";
+import { hoursFrom, startOfHour } from "../lib/dates.ts";
 import { logError } from "../lib/logging.ts";
 import { titleCase } from "../lib/text.ts";
 import { readFollowedPeople } from "../repositories/beliefs.ts";
@@ -92,16 +93,17 @@ async function cinemaRail(
 }
 
 async function broadcastRail(env: Bindings): Promise<DeliveredRail | null> {
+  const anchor = startOfHour();
   const rows = await env.DB.query<{ id: string }>(
     `SELECT s.title_id AS id
        FROM title_schedule AS s
        JOIN catalog_titles AS t ON t.id = s.title_id
-      WHERE s.airs_at BETWEEN CURRENT_TIMESTAMP AND (CURRENT_TIMESTAMP + CAST($1 AS INTERVAL))
+      WHERE s.airs_at BETWEEN CAST($1 AS timestamptz) AND CAST($2 AS timestamptz)
         AND s.network IS NOT NULL
       GROUP BY s.title_id, t.popularity
       ORDER BY t.popularity DESC
-      LIMIT $2`,
-    [`+${BROADCAST_HORIZON_DAYS} days`, RAIL_SIZE * 2],
+      LIMIT $3`,
+    [anchor, hoursFrom(anchor, BROADCAST_HORIZON_DAYS * 24), RAIL_SIZE * 2],
   );
   const items = (
     await readItems(

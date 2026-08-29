@@ -32,16 +32,6 @@ export function isPartitionId(value: unknown): value is string {
   );
 }
 
-export function addDays(date: string, days: number) {
-  return new Date(Date.parse(`${date}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
-}
-
-export function daysBetween(startDate: string, endDate: string) {
-  return Math.round(
-    (Date.parse(`${endDate}T00:00:00Z`) - Date.parse(`${startDate}T00:00:00Z`)) / 86_400_000,
-  );
-}
-
 export async function countPartitions(db: Database) {
   const row = await db.first<{ partitions: number }>(
     `SELECT count(*) AS partitions FROM discover_partitions`,
