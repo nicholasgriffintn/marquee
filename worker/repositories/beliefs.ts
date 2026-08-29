@@ -1,5 +1,7 @@
-import type { Belief } from "../../src/domain/notebook.ts";
+import { isBeliefPolarity, type Belief, type BeliefPolarity } from "../../src/domain/notebook.ts";
 import { logError } from "../lib/logging.ts";
+
+export type BeliefEvidenceKind = "signal" | "answer" | "entry" | "note";
 
 export type BeliefDraft = {
   key: string;
@@ -7,8 +9,10 @@ export type BeliefDraft = {
   strength: number;
   confidence: number;
   sourceRule: string;
+  trait?: string;
+  polarity?: BeliefPolarity;
   expiresInDays?: number;
-  evidence: { kind: "signal" | "answer" | "entry"; id: string }[];
+  evidence: { kind: BeliefEvidenceKind; id: string }[];
 };
 
 type BeliefRow = {
@@ -19,6 +23,8 @@ type BeliefRow = {
   confidence: number;
   scope: string;
   source_rule: string;
+  trait: string | null;
+  polarity: string | null;
   edited: number;
   suspended_until: string | null;
   evidence: number;
@@ -33,6 +39,8 @@ function mapBelief(row: BeliefRow): Belief {
     confidence: row.confidence,
     scope: row.scope === "tonight" || row.scope === "week" ? row.scope : "always",
     sourceRule: row.source_rule,
+    trait: row.trait,
+    polarity: isBeliefPolarity(row.polarity) ? row.polarity : null,
     edited: row.edited === 1,
     suspendedUntil: row.suspended_until,
     evidence: row.evidence,
@@ -48,7 +56,7 @@ export async function readBeliefs(db: D1Database, viewerId: string): Promise<Bel
     const rows = await db
       .prepare(
         `SELECT b.id, b.key, b.value, b.strength, b.confidence, b.scope, b.source_rule,
-                b.edited, b.suspended_until,
+                b.trait, b.polarity, b.edited, b.suspended_until,
                 (SELECT count(*) FROM belief_evidence AS e WHERE e.belief_id = b.id) AS evidence
            FROM viewer_beliefs AS b
           WHERE b.viewer_id = ?1
@@ -67,10 +75,65 @@ export async function readBeliefs(db: D1Database, viewerId: string): Promise<Bel
   }
 }
 
-export function activeBeliefs(beliefs: Belief[], now = Date.now()) {
-  return beliefs.filter(
-    (belief) => !(belief.suspendedUntil && Date.parse(belief.suspendedUntil) > now),
-  );
+export async function readEvidenceIds(
+  db: D1Database,
+  viewerId: string,
+  keys: string[],
+  kind: BeliefEvidenceKind,
+): Promise<Map<string, string[]>> {
+  const found = new Map<string, string[]>();
+
+  if (!viewerId || keys.length === 0) {
+    return found;
+  }
+
+  const placeholders = keys.map((_, index) => `?${index + 3}`).join(",");
+
+  try {
+    const rows = await db
+      .prepare(
+        `SELECT b.key AS key, e.evidence_id AS evidenceId
+           FROM viewer_beliefs AS b
+           JOIN belief_evidence AS e ON e.belief_id = b.id
+          WHERE b.viewer_id = ?1 AND e.evidence_kind = ?2 AND b.key IN (${placeholders})`,
+      )
+      .bind(viewerId, kind, ...keys)
+      .all<{ key: string; evidenceId: string }>();
+
+    for (const row of rows.results) {
+      found.set(row.key, [...(found.get(row.key) ?? []), row.evidenceId]);
+    }
+
+    return found;
+  } catch (error) {
+    logError("belief_evidence_read_failed", error);
+
+    return found;
+  }
+}
+
+export async function readBeliefEvidenceIds(
+  db: D1Database,
+  viewerId: string,
+  beliefId: string,
+  kind: BeliefEvidenceKind,
+) {
+  if (!viewerId || !beliefId) {
+    return [];
+  }
+
+  const rows = await db
+    .prepare(
+      `SELECT e.evidence_id AS evidenceId
+         FROM belief_evidence AS e
+         JOIN viewer_beliefs AS b ON b.id = e.belief_id
+        WHERE b.id = ?1 AND b.viewer_id = ?2 AND e.evidence_kind = ?3
+        ORDER BY e.noted_at DESC`,
+    )
+    .bind(beliefId, viewerId, kind)
+    .all<{ evidenceId: string }>();
+
+  return rows.results.map((row) => row.evidenceId);
 }
 
 export async function writeDerivedBeliefs(db: D1Database, viewerId: string, drafts: BeliefDraft[]) {
@@ -95,25 +158,34 @@ export async function writeDerivedBeliefs(db: D1Database, viewerId: string, draf
         statements.push(
           db
             .prepare(
-              `UPDATE viewer_beliefs SET strength = ?2, confidence = ?3, revoked_at = NULL,
+              `UPDATE viewer_beliefs SET strength = ?2, confidence = ?3, trait = ?4, polarity = ?5,
                       updated_at = CURRENT_TIMESTAMP
                  WHERE id = ?1`,
             )
-            .bind(id, draft.strength, draft.confidence),
+            .bind(
+              id,
+              draft.strength,
+              draft.confidence,
+              draft.trait ?? null,
+              draft.polarity ?? null,
+            ),
         );
       } else {
         statements.push(
           db
             .prepare(
               `INSERT INTO viewer_beliefs
-                 (id, viewer_id, key, value, strength, confidence, source_rule, expires_at, revoked_at, updated_at)
-               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, NULL, CURRENT_TIMESTAMP)
+                 (id, viewer_id, key, value, strength, confidence, source_rule, expires_at,
+                  trait, polarity, revoked_at, updated_at)
+               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, NULL, CURRENT_TIMESTAMP)
                ON CONFLICT (viewer_id, key) DO UPDATE SET
                  value = excluded.value,
                  strength = excluded.strength,
                  confidence = excluded.confidence,
                  source_rule = excluded.source_rule,
                  expires_at = excluded.expires_at,
+                 trait = excluded.trait,
+                 polarity = excluded.polarity,
                  revoked_at = NULL,
                  updated_at = CURRENT_TIMESTAMP`,
             )
@@ -128,6 +200,8 @@ export async function writeDerivedBeliefs(db: D1Database, viewerId: string, draf
               draft.expiresInDays
                 ? new Date(Date.now() + draft.expiresInDays * 86_400_000).toISOString()
                 : null,
+              draft.trait ?? null,
+              draft.polarity ?? null,
             ),
         );
       }
