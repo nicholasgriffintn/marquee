@@ -1,8 +1,8 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
 import { ADULT_CERTIFICATIONS } from "../../src/domain/certification.ts";
 import { showingFor, type TonightOrder } from "../../src/domain/usher.ts";
+import { newDecisionId, runAiObject } from "../ai/run.ts";
 import { USHER_VOICE } from "../ai/usher-voice.ts";
-import { fastModel, requestAiCompletion } from "../clients/ai-gateway.ts";
 import type { ChatMessage } from "../lib/curator-payload.ts";
 import { logError } from "../lib/logging.ts";
 import { isKnownTitle } from "../lib/validation.ts";
@@ -230,15 +230,11 @@ export async function pickToOrder(
   });
 
   try {
-    const response = await requestAiCompletion(env, messages, [], false, {
-      model: fastModel(env),
-      timeoutMs: 18_000,
-      maxTokens: 320,
-      json: true,
-      metadata: { feature: "usher_order", viewer: viewerId },
+    const parsed = await runAiObject(env, {
+      feature: "usher_order",
+      decisionId: newDecisionId(),
+      messages,
     });
-    const json = response.content?.match(/\{[\s\S]*\}/u)?.[0];
-    const parsed: unknown = json ? JSON.parse(json) : null;
 
     const proposed = isRecord(parsed) && isRecord(parsed.pick) ? parsed.pick : null;
 

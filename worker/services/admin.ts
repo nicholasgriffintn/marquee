@@ -1,6 +1,11 @@
 import type { AdminAction } from "../../src/domain/admin.ts";
 import type { UserRole } from "../auth/model.ts";
-import { queueEmbeddings, queueEnrichment, queueStaleAvailability } from "../jobs/ingestion.ts";
+import {
+  queueEmbeddings,
+  queueEnrichment,
+  queueStaleAvailability,
+  queueVectorReindex,
+} from "../jobs/ingestion.ts";
 import { readBudgets, resumeSource } from "../repositories/budgets.ts";
 import { countSearchDrift, reconcileSearchIndex } from "../repositories/catalog-index.ts";
 import { readCinemaCoverage } from "../repositories/cinemas.ts";
@@ -407,6 +412,12 @@ export async function runAdminAction(env: Bindings, action: AdminAction) {
     await queueEmbeddings(env);
 
     return { detail: "Queued the next batch of embeddings" };
+  }
+
+  if (action === "vector-metadata") {
+    await queueVectorReindex(env);
+
+    return { detail: "Rewriting Vectorize metadata from the start of the catalogue" };
   }
 
   if (action === "working-set") {

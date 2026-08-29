@@ -6,6 +6,7 @@ import { searchCatalogue, type CatalogueSearch } from "../repositories/catalog-s
 import type { Bindings } from "../types.ts";
 import { buzzBoosts } from "./buzz.ts";
 import { embedQuery } from "./embeddings.ts";
+import { queryTitleVectors } from "./vector-index.ts";
 
 const RERANK_MODEL = "@cf/baai/bge-reranker-base";
 
@@ -17,8 +18,8 @@ function reranker(env: Bindings) {
   };
 }
 
-const VECTOR_TOP_K = 60;
 const VECTOR_MIN_SCORE = 0.4;
+const VECTOR_CANDIDATES = 60;
 const KEYWORD_CANDIDATES = 30;
 const RERANK_CANDIDATES = 48;
 const RERANK_TEXT_LENGTH = 400;
@@ -61,10 +62,7 @@ async function vectorCandidates(env: Bindings, query: RetrievalQuery, text: stri
     return [];
   }
 
-  const matches = await env.VECTORS.query(vector, {
-    topK: VECTOR_TOP_K,
-    returnMetadata: "none",
-  });
+  const matches = await queryTitleVectors(env, vector, query);
   const best = matches.matches.reduce((top, match) => Math.max(top, match.score), 0);
 
   if (best < VECTOR_MIN_SCORE) {
@@ -82,7 +80,7 @@ async function vectorCandidates(env: Bindings, query: RetrievalQuery, text: stri
     query: undefined,
     sort: "given",
     includeIds: ids,
-    limit: VECTOR_TOP_K,
+    limit: VECTOR_CANDIDATES,
   });
 }
 

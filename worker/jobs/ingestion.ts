@@ -8,7 +8,7 @@ import { storeProviders } from "../repositories/providers.ts";
 import { syncBuzz } from "../services/buzz.ts";
 import { syncCinemaDirectory, syncCinemaScreenings } from "../services/cinema-sync.ts";
 import { advanceDiscoverFrontier, measureDiscoverPartition } from "../services/discover.ts";
-import { embedTitles } from "../services/embeddings.ts";
+import { embedTitles, reindexVectorMetadata } from "../services/embeddings.ts";
 import { syncTitleIdentifiers } from "../services/identifiers.ts";
 import { describeRevivalWorks } from "../services/revival-descriptions.ts";
 import { groupRevivalPrints } from "../services/revival-groups.ts";
@@ -36,7 +36,7 @@ import { getProviderLedger } from "./provider-ledger.ts";
 import { withRateLimitPause } from "./sources.ts";
 
 export { queueAvailability, queueStaleAvailability } from "./availability.ts";
-export { queueEmbeddings } from "./embeddings.ts";
+export { queueEmbeddings, queueVectorReindex } from "./embeddings.ts";
 export { queueEnrichment } from "./enrichment.ts";
 
 const SAVED_TITLE_SAMPLE = 100;
@@ -341,6 +341,16 @@ export async function executeIngestionJob(env: Bindings, job: IngestionJob) {
 
     case "embed-titles": {
       await embedTitles(env, job.titleIds);
+
+      return;
+    }
+
+    case "reindex-vectors": {
+      const cursor = await reindexVectorMetadata(env, job.after ?? "");
+
+      if (cursor) {
+        await env.EMBEDDING_QUEUE.send({ type: "reindex-vectors", after: cursor });
+      }
     }
   }
 }
