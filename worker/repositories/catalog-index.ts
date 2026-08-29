@@ -10,7 +10,22 @@ export type SearchIndexState = {
   oldestPendingAt: string | null;
 };
 
+export type SearchIndexDrift = {
+  sampled: number;
+  stale: number;
+};
+
 const PROJECT_CHUNK = 100;
+const DRIFT_SAMPLE = 1_500;
+const DRIFT_SAMPLE_PERCENT = 0.4;
+
+const DRIFT_TAGS = `trim(
+  COALESCE((SELECT string_agg(genre, ' ' ORDER BY position) FROM catalog_title_genres WHERE title_id = sample.title_id), '')
+  || ' ' ||
+  COALESCE((SELECT string_agg(keyword, ' ' ORDER BY position) FROM catalog_title_keywords WHERE title_id = sample.title_id), '')
+)`;
+
+const DRIFT_PEOPLE = `COALESCE((SELECT string_agg(person, ' ' ORDER BY position) FROM catalog_title_people WHERE title_id = sample.title_id), '')`;
 
 const TAGS = `trim(
   COALESCE((SELECT string_agg(genre, ' ' ORDER BY position) FROM catalog_title_genres WHERE title_id = t.id), '')
@@ -119,6 +134,26 @@ export async function queueSearchRebuild(db: Database) {
   );
 
   return row?.pending ?? 0;
+}
+
+export async function sampleSearchDrift(db: Database, sampleSize = DRIFT_SAMPLE) {
+  const size = clamp(Math.trunc(sampleSize), 100, 20_000);
+  const row = await db.first<SearchIndexDrift>(
+    `WITH sample AS (
+         SELECT s.title_id, s.tags, s.people
+           FROM catalog_search AS s TABLESAMPLE SYSTEM (${DRIFT_SAMPLE_PERCENT})
+          LIMIT $1
+       )
+       SELECT count(*) AS sampled,
+              count(*) FILTER (
+                WHERE trim(sample.tags) IS DISTINCT FROM ${DRIFT_TAGS}
+                   OR sample.people IS DISTINCT FROM ${DRIFT_PEOPLE}
+              ) AS stale
+         FROM sample`,
+    [size],
+  );
+
+  return { sampled: row?.sampled ?? 0, stale: row?.stale ?? 0 };
 }
 
 export async function readSearchIndexState(db: Database): Promise<SearchIndexState> {
