@@ -34,7 +34,7 @@ import { exportTraktShelf, importTraktHistory } from "../services/trakt.ts";
 import type { Bindings, IngestionJob } from "../types.ts";
 import { refreshPeople } from "../services/people.ts";
 import { importAnimeIds } from "./anime-ids.ts";
-import { enrichTitleAvailability, queueAvailability } from "./availability.ts";
+import { enrichQueuedAvailability, queueAvailability } from "./availability.ts";
 import { queueEmbeddings } from "./embeddings.ts";
 import {
   enrichAniListMedia,
@@ -231,7 +231,7 @@ export async function executeIngestionJob(env: Bindings, job: IngestionJob) {
     }
 
     case "enrich-availability": {
-      await enrichTitleAvailability(env, job.titleId);
+      await enrichQueuedAvailability(env, job.titleId);
 
       return;
     }

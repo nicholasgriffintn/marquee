@@ -21,7 +21,10 @@ import { titleParts, withRateLimitPause } from "./sources.ts";
 const AVAILABILITY_PER_RUN = 600;
 const INTERACTIVE_BUDGET_RESERVE = 5_000;
 
-export async function queueStaleAvailability(env: Bindings, alreadyQueued: string[] = []) {
+export async function queueStaleAvailability(
+  env: Bindings,
+  alreadyQueued: string[] = [],
+) {
   const room = await readBudgetRoom(env, "justwatch");
 
   if (room <= 0) {
@@ -45,7 +48,10 @@ export async function queueStaleAvailability(env: Bindings, alreadyQueued: strin
 
   await enqueue(
     env.AVAILABILITY_QUEUE,
-    queued.map((titleId): IngestionJob => ({ type: "enrich-availability", titleId })),
+    queued.map((titleId): IngestionJob => ({
+      type: "enrich-availability",
+      titleId,
+    })),
   );
 
   return queued.length;
@@ -71,11 +77,33 @@ export async function queueAvailability(env: Bindings, titleIds: string[]) {
     env.AVAILABILITY_QUEUE,
     unique
       .filter((titleId) => !skip.has(titleId))
-      .map((titleId): IngestionJob => ({ type: "enrich-availability", titleId })),
+      .map((titleId): IngestionJob => ({
+        type: "enrich-availability",
+        titleId,
+      })),
   );
 }
 
-export async function enrichTitleAvailability(env: Bindings, titleId: string, budgetReserve = 0) {
+export async function enrichQueuedAvailability(env: Bindings, titleId: string) {
+  const fresh = await env.DB.first<{ ok: number }>(
+    `SELECT 1 AS ok FROM catalog_titles
+      WHERE id = $1 AND enriched_at IS NOT NULL
+        AND enriched_at > (CURRENT_TIMESTAMP + CAST($2 AS INTERVAL))`,
+    [titleId, `-${DEMAND_MAX_AGE_DAYS} days`],
+  );
+
+  if (fresh) {
+    return;
+  }
+
+  await enrichTitleAvailability(env, titleId);
+}
+
+export async function enrichTitleAvailability(
+  env: Bindings,
+  titleId: string,
+  budgetReserve = 0,
+) {
   const parts = titleParts(titleId);
 
   if (!parts) {
