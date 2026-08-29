@@ -16,7 +16,10 @@ export async function queryChunked<T>(
   return out;
 }
 
-export function groupBy<T>(rows: T[], key: (row: T) => string): Map<string, T[]> {
+export function groupBy<T>(
+  rows: T[],
+  key: (row: T) => string,
+): Map<string, T[]> {
   const map = new Map<string, T[]>();
 
   for (const row of rows) {
@@ -44,7 +47,11 @@ export function rowPlaceholders(rows: number, columns: number) {
   }).join(", ");
 }
 
-export async function deleteByTitleIds(db: Database, table: string, titleIds: string[]) {
+export async function deleteByTitleIds(
+  db: Database,
+  table: string,
+  titleIds: string[],
+) {
   for (let index = 0; index < titleIds.length; index += READ_CHUNK) {
     const wave = titleIds.slice(index, index + READ_CHUNK);
 
@@ -64,7 +71,9 @@ export async function insertRows(
   statement: (chunk: DatabaseValue[][]) => string,
 ) {
   if (rows.some((row) => row.length !== columns)) {
-    throw new Error(`insertRows: expected every row to have ${columns} columns`);
+    throw new Error(
+      `insertRows: expected every row to have ${columns} columns`,
+    );
   }
 
   const STATEMENTS_PER_BATCH = 10;
@@ -75,7 +84,11 @@ export async function insertRows(
 
     // oxlint-disable-next-line no-await-in-loop
     await db.transaction(async (transaction) => {
-      for (let offset = 0; offset < batchRows.length; offset += rowsPerStatement) {
+      for (
+        let offset = 0;
+        offset < batchRows.length;
+        offset += rowsPerStatement
+      ) {
         const chunk = batchRows.slice(offset, offset + rowsPerStatement);
 
         // oxlint-disable-next-line no-await-in-loop
@@ -85,9 +98,17 @@ export async function insertRows(
   }
 }
 
+function sameOrder(a: string[], b: string[]) {
+  return a.length === b.length && a.every((value, index) => value === b[index]);
+}
+
 export type SimpleArrayField = { table: string; column: string };
 
-export async function readSimpleArray(db: Database, entry: SimpleArrayField, ids: string[]) {
+export async function readSimpleArray(
+  db: Database,
+  entry: SimpleArrayField,
+  ids: string[],
+) {
   const rows = await queryChunked(ids, (wave) =>
     db
       .query<{ titleId: string; value: string }>(
@@ -118,14 +139,37 @@ export async function writeSimpleArray(
   entry: SimpleArrayField,
   titles: { titleId: string; values: string[] }[],
 ) {
-  await deleteByTitleIds(
+  const current = await readSimpleArray(
     db,
-    entry.table,
+    entry,
     titles.map((title) => title.titleId),
   );
 
-  const rows = titles.flatMap(({ titleId, values }) =>
-    [...new Set(values)].map((value, position): DatabaseValue[] => [titleId, value, position]),
+  const changed = titles
+    .map((title) => ({
+      titleId: title.titleId,
+      values: [...new Set(title.values)],
+    }))
+    .filter(
+      (title) => !sameOrder(current.get(title.titleId) ?? [], title.values),
+    );
+
+  if (changed.length === 0) {
+    return;
+  }
+
+  await deleteByTitleIds(
+    db,
+    entry.table,
+    changed.map((title) => title.titleId),
+  );
+
+  const rows = changed.flatMap(({ titleId, values }) =>
+    values.map((value, position): DatabaseValue[] => [
+      titleId,
+      value,
+      position,
+    ]),
   );
 
   await insertRows(
@@ -146,7 +190,11 @@ export type KindArrayField = {
   kinds: { kind: string; field: string }[];
 };
 
-export async function readKindArray(db: Database, entry: KindArrayField, ids: string[]) {
+export async function readKindArray(
+  db: Database,
+  entry: KindArrayField,
+  ids: string[],
+) {
   const rows = await queryChunked(ids, (wave) =>
     db
       .query<{ titleId: string; kind: string; value: string }>(
@@ -194,15 +242,45 @@ export async function writeKindArray(
   entry: KindArrayField,
   titles: { titleId: string; values: Record<string, string[]> }[],
 ) {
-  await deleteByTitleIds(
+  const current = await readKindArray(
     db,
-    entry.table,
+    entry,
     titles.map((title) => title.titleId),
   );
 
-  const rows = titles.flatMap(({ titleId, values }) =>
+  const changed = titles
+    .map((title) => ({
+      titleId: title.titleId,
+      values: Object.fromEntries(
+        entry.kinds.map(({ field }) => [
+          field,
+          [...new Set(title.values[field] ?? [])],
+        ]),
+      ) as Record<string, string[]>,
+    }))
+    .filter((title) =>
+      entry.kinds.some(
+        ({ field }) =>
+          !sameOrder(
+            current.get(field)?.get(title.titleId) ?? [],
+            title.values[field],
+          ),
+      ),
+    );
+
+  if (changed.length === 0) {
+    return;
+  }
+
+  await deleteByTitleIds(
+    db,
+    entry.table,
+    changed.map((title) => title.titleId),
+  );
+
+  const rows = changed.flatMap(({ titleId, values }) =>
     entry.kinds.flatMap(({ kind, field }) =>
-      [...new Set(values[field] ?? [])].map((value, position): DatabaseValue[] => [
+      values[field].map((value, position): DatabaseValue[] => [
         titleId,
         kind,
         value,

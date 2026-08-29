@@ -3,9 +3,17 @@ import { queryChunked } from "./catalog-array-utils.ts";
 
 type FormatRow = { titleId: string; kind: string; value: string };
 
-export type FormatCandidate = { titleId: string; mediaType: MediaType; tmdbId: number };
+export type FormatCandidate = {
+  titleId: string;
+  mediaType: MediaType;
+  tmdbId: number;
+};
 
-export type FormatWrite = { titleId: string; colours: string[]; aspectRatios: string[] };
+export type FormatWrite = {
+  titleId: string;
+  colours: string[];
+  aspectRatios: string[];
+};
 
 export async function readVisualFormatMap(db: Database, ids: string[]) {
   const rows = await queryChunked(ids, (wave) =>
@@ -22,7 +30,10 @@ export async function readVisualFormatMap(db: Database, ids: string[]) {
   const formats = new Map<string, TitleVisualFormat>();
 
   for (const row of rows) {
-    const format = formats.get(row.titleId) ?? { colours: [], aspectRatios: [] };
+    const format = formats.get(row.titleId) ?? {
+      colours: [],
+      aspectRatios: [],
+    };
     const bucket = row.kind === "colour" ? format.colours : format.aspectRatios;
 
     if (!bucket.includes(row.value)) {
@@ -35,7 +46,11 @@ export async function readVisualFormatMap(db: Database, ids: string[]) {
   return formats;
 }
 
-export async function selectFormatCandidates(db: Database, limit: number, retryDays: number) {
+export async function selectFormatCandidates(
+  db: Database,
+  limit: number,
+  retryDays: number,
+) {
   const rows = await db.query<FormatCandidate>(
     `SELECT t.id AS "titleId", t.media_type AS "mediaType", t.tmdb_id AS "tmdbId"
        FROM title_working_set AS w
@@ -52,28 +67,51 @@ export async function selectFormatCandidates(db: Database, limit: number, retryD
   return rows.rows;
 }
 
-export async function writeVisualFormats(db: Database, source: string, writes: FormatWrite[]) {
+function sameSet(a: string[], b: string[]) {
+  const setA = new Set(a);
+  const setB = new Set(b);
+
+  return setA.size === setB.size && [...setA].every((value) => setB.has(value));
+}
+
+export async function writeVisualFormats(
+  db: Database,
+  source: string,
+  writes: FormatWrite[],
+) {
+  const current = await readVisualFormatMap(
+    db,
+    writes.map((write) => write.titleId),
+  );
+
   for (const write of writes) {
     const values = [
       ...write.colours.map((value) => ["colour", value]),
       ...write.aspectRatios.map((value) => ["aspect_ratio", value]),
     ];
+    const existing = current.get(write.titleId);
+    const unchanged =
+      existing != null &&
+      sameSet(existing.colours, write.colours) &&
+      sameSet(existing.aspectRatios, write.aspectRatios);
 
     // oxlint-disable-next-line no-await-in-loop
     await db.transaction(async (transaction) => {
-      await transaction.execute(
-        `DELETE FROM title_visual_format WHERE title_id = $1 AND source = $2`,
-        [write.titleId, source],
-      );
-
-      for (const [kind, value] of values) {
-        // oxlint-disable-next-line no-await-in-loop
+      if (!unchanged) {
         await transaction.execute(
-          `INSERT INTO title_visual_format (title_id, kind, value, source)
-             VALUES ($1, $2, $3, $4)
-             ON CONFLICT (title_id, kind, value, source) DO NOTHING`,
-          [write.titleId, kind, value, source],
+          `DELETE FROM title_visual_format WHERE title_id = $1 AND source = $2`,
+          [write.titleId, source],
         );
+
+        for (const [kind, value] of values) {
+          // oxlint-disable-next-line no-await-in-loop
+          await transaction.execute(
+            `INSERT INTO title_visual_format (title_id, kind, value, source)
+               VALUES ($1, $2, $3, $4)
+               ON CONFLICT (title_id, kind, value, source) DO NOTHING`,
+            [write.titleId, kind, value, source],
+          );
+        }
       }
 
       await transaction.execute(
