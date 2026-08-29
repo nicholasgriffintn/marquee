@@ -53,6 +53,7 @@ export type ShortlistConstraints = {
   maxRuntime?: number | null;
   mediaType?: "movie" | "tv";
   genres?: string[];
+  certifications?: string[];
   text?: string;
   limit?: number;
 };
@@ -88,6 +89,7 @@ export async function shortlistFor(
     minVotes: 200,
     ...(constraints.maxRuntime ? { maxRuntime: constraints.maxRuntime } : {}),
     ...(constraints.mediaType ? { mediaType: constraints.mediaType } : {}),
+    ...(constraints.certifications?.length ? { certifications: constraints.certifications } : {}),
   };
   const base: CatalogueSearch = {
     ...loose,

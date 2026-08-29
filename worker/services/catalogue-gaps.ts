@@ -1,6 +1,6 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
 import { searchOmdb, type OmdbSearchResult } from "../clients/omdb.ts";
-import { withRateLimitPause } from "../jobs/sources.ts";
+import { withSourceBudget } from "../jobs/sources.ts";
 import { readCachedValue, writeCachedValue } from "../lib/cache.ts";
 import {
   GAP_DISCOVERY,
@@ -11,7 +11,7 @@ import {
 import { logEvent } from "../lib/logging.ts";
 import { enqueue } from "../lib/queue.ts";
 import { imdbIdFrom } from "../lib/text.ts";
-import { claimBudget, readBudgetRoom } from "../repositories/budgets.ts";
+import { readBudgetRoom } from "../repositories/budgets.ts";
 import {
   claimGapLookup,
   claimGapTitles,
@@ -54,22 +54,22 @@ async function searchUpstream(env: Bindings, query: string) {
 
   for (let page = 1; page <= GAP_DISCOVERY.searchPages; page += 1) {
     // oxlint-disable-next-line no-await-in-loop
-    if (!(await claimBudget(env, "omdb", GAP_DISCOVERY.budgetReserve))) {
+    const results = await withSourceBudget(
+      env,
+      "omdb",
+      () => searchOmdb(env, query, { page }),
+      GAP_DISCOVERY.budgetReserve,
+    );
+
+    if (!results) {
       break;
     }
 
-    // oxlint-disable-next-line no-await-in-loop
-    const attempt = await withRateLimitPause(env, "omdb", () => searchOmdb(env, query, { page }));
-
-    if (attempt.limited) {
-      break;
-    }
-
-    for (const result of attempt.value) {
+    for (const result of results) {
       found.set(result.imdbId, result);
     }
 
-    if (attempt.value.length < GAP_DISCOVERY.searchPageSize || found.size >= CANDIDATE_TARGET) {
+    if (results.length < GAP_DISCOVERY.searchPageSize || found.size >= CANDIDATE_TARGET) {
       break;
     }
   }

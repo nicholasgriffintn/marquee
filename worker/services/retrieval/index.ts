@@ -1,14 +1,10 @@
+import type { MediaTitle } from "../../../src/domain/catalog.ts";
 import { logError, logEvent } from "../../lib/logging.ts";
 import { clamp } from "../../lib/numbers.ts";
-import {
-  filterEligibleIds,
-  readRanked,
-  searchCatalogue,
-  type CatalogueSearch,
-} from "../../repositories/catalog-search.ts";
+import { searchCatalogue, type CatalogueSearch } from "../../repositories/catalog-search.ts";
 import type { Bindings } from "../../types.ts";
 import { buzzBoosts } from "../buzz.ts";
-import { embedQuery, nearestTo, neighboursOf, type Neighbour } from "../embeddings.ts";
+import { embedQuery, nearestTo, neighboursOf } from "../embeddings.ts";
 import { fuseTitles, rankCandidates, titlesById } from "./candidates.ts";
 import { rerankTitles } from "./rerank.ts";
 import type { BoostSet, Candidate, RetrievalQuery, ScoredSource } from "./types.ts";
@@ -27,7 +23,6 @@ export function eligibilityOf(query: RetrievalQuery): CatalogueSearch {
     keywords: query.keywords,
     places: query.places,
     providerIds: query.providerIds,
-    allowUnknownProviders: query.allowUnknownProviders,
     minScore: query.minScore,
     minVotes: query.minVotes,
     maxRuntime: query.maxRuntime,
@@ -40,40 +35,22 @@ export function poolFor(limit: number) {
   return Math.min(POOL.semantic, limit * POOL.candidateFactor);
 }
 
-async function eligibleNeighbours(
-  env: Bindings,
-  matches: Neighbour[],
-  query: RetrievalQuery,
-  limit: number,
-) {
-  const eligible = await filterEligibleIds(
-    env.DB,
-    matches.map((match) => match.id),
-    eligibilityOf(query),
-  );
-
-  return matches.filter((match) => eligible.has(match.id)).slice(0, limit);
-}
-
 export async function eligibleTitles(
   env: Bindings,
   ids: string[],
   query: RetrievalQuery,
   limit = POOL.semantic,
 ) {
-  const ordered = await eligibleNeighbours(
-    env,
-    ids.map((id) => ({ id, score: 0 })),
-    query,
-    limit,
-  );
+  if (ids.length === 0) {
+    return [];
+  }
 
-  return ordered.length
-    ? readRanked(
-        env.DB,
-        ordered.map((entry) => entry.id),
-      )
-    : [];
+  return searchCatalogue(env.DB, {
+    ...eligibilityOf(query),
+    includeIds: ids,
+    sort: query.sort ?? "given",
+    limit,
+  });
 }
 
 async function boostsFor(env: Bindings, ids: string[], query: RetrievalQuery) {
@@ -102,11 +79,13 @@ async function lexicalTitles(env: Bindings, query: RetrievalQuery, text: string)
   return titles.length ? titles : searchCatalogue(env.DB, { ...search, matchAny: true });
 }
 
-async function semanticIds(
+type SemanticResult = { titles: MediaTitle[]; scores: Map<string, number> };
+
+async function semanticTitles(
   env: Bindings,
   query: RetrievalQuery,
   text: string,
-): Promise<ScoredSource | null> {
+): Promise<SemanticResult | null> {
   const vector = await embedQuery(env, text);
 
   if (!vector) {
@@ -120,13 +99,14 @@ async function semanticIds(
     return null;
   }
 
-  const ordered = await eligibleNeighbours(env, matches, query, POOL.semantic);
+  const titles = await eligibleTitles(
+    env,
+    matches.map((match) => match.id),
+    { ...query, sort: "given" },
+    POOL.semantic,
+  );
 
-  return {
-    source: "semantic",
-    ids: ordered.map((match) => match.id),
-    scores: new Map(ordered.map((match) => [match.id, match.score])),
-  };
+  return { titles, scores: new Map(matches.map((match) => [match.id, match.score])) };
 }
 
 async function browseCandidates(env: Bindings, query: RetrievalQuery, limit: number) {
@@ -157,7 +137,7 @@ export async function retrieveCandidates(
 
   const [lexicalResult, semanticResult] = await Promise.allSettled([
     lexicalTitles(env, query, text),
-    semanticIds(env, query, text),
+    semanticTitles(env, query, text),
   ]);
 
   if (lexicalResult.status === "rejected") {
@@ -170,18 +150,21 @@ export async function retrieveCandidates(
 
   const lexical = lexicalResult.status === "fulfilled" ? lexicalResult.value : [];
   const semantic = semanticResult.status === "fulfilled" ? semanticResult.value : null;
-  const pool = titlesById([{ source: "lexical", titles: lexical }]);
-  const unhydrated = (semantic?.ids ?? [])
-    .filter((id) => !pool.has(id))
-    .slice(0, Math.max(0, POOL.maximum - pool.size));
-
-  for (const title of unhydrated.length ? await readRanked(env.DB, unhydrated) : []) {
-    pool.set(title.id, title);
-  }
-
+  const pool = titlesById([
+    { source: "lexical", titles: lexical },
+    ...(semantic ? [{ source: "semantic" as const, titles: semantic.titles }] : []),
+  ]);
   const sources: ScoredSource[] = [
     { source: "lexical", ids: lexical.map((title) => title.id) },
-    ...(semantic ? [semantic] : []),
+    ...(semantic
+      ? [
+          {
+            source: "semantic" as const,
+            ids: semantic.titles.map((title) => title.id),
+            scores: semantic.scores,
+          },
+        ]
+      : []),
   ];
   const shortlist = fuseTitles(sources, pool).slice(0, POOL.rerank);
   const reranked =
@@ -202,7 +185,7 @@ export async function retrieveCandidates(
 
   logEvent("retrieval_ranked", {
     lexical: lexical.length,
-    semantic: semantic?.ids.length ?? 0,
+    semantic: semantic?.titles.length ?? 0,
     pool: pool.size,
     reranked: reranked.ids.length,
     returned: ranked.length,
@@ -229,26 +212,25 @@ export async function retrieveSimilar(
     return [];
   }
 
-  const ordered = await eligibleNeighbours(
+  const titles = await eligibleTitles(
     env,
-    neighbours,
-    { ...query, excludeIds: [...(query.excludeIds ?? []), titleId] },
+    neighbours.map((neighbour) => neighbour.id),
+    { ...query, sort: "given", excludeIds: [...(query.excludeIds ?? []), titleId] },
     poolFor(limit),
   );
 
-  if (ordered.length === 0) {
+  if (titles.length === 0) {
     return [];
   }
 
-  const ids = ordered.map((neighbour) => neighbour.id);
-  const pool = titlesById([{ source: "similar", titles: await readRanked(env.DB, ids) }]);
+  const pool = titlesById([{ source: "similar", titles }]);
 
   return rankCandidates({
     sources: [
       {
         source: "similar",
-        ids,
-        scores: new Map(ordered.map((neighbour) => [neighbour.id, neighbour.score])),
+        ids: titles.map((title) => title.id),
+        scores: new Map(neighbours.map((neighbour) => [neighbour.id, neighbour.score])),
       },
     ],
     titles: pool,

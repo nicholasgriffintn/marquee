@@ -8,10 +8,11 @@ import {
   withStoredPoster,
 } from "../lib/catalog-payload.ts";
 import { clamp } from "../lib/numbers.ts";
+import { providerFilterSql } from "../lib/providers.ts";
 import { isKnownTitle, validProviderIds } from "../lib/validation.ts";
 import { hydrateTitleRows } from "./catalog-arrays.ts";
 
-export type CatalogueSort = "trending" | "popularity" | "score" | "recent" | "relevance";
+export type CatalogueSort = "trending" | "popularity" | "score" | "recent" | "relevance" | "given";
 
 export type SearchScope = "title" | "everything";
 
@@ -35,12 +36,12 @@ export type CatalogueSearch = {
   places?: string[];
   mediaType?: "movie" | "tv";
   providerIds?: string[];
-  allowUnknownProviders?: boolean;
   minScore?: number;
   releasedAfter?: number;
   maxRuntime?: number;
   excludeIds?: string[];
   includeIds?: string[];
+  certifications?: string[];
   sort?: CatalogueSort;
   scope?: SearchScope;
   matchAny?: boolean;
@@ -48,7 +49,12 @@ export type CatalogueSearch = {
   offset?: number;
 };
 
-export type Eligibility = { conditions: string[]; bindings: unknown[]; impossible: boolean };
+type Eligibility = {
+  conditions: string[];
+  bindings: unknown[];
+  includedIds: string[] | null;
+  impossible: boolean;
+};
 
 const TITLE_EXACTNESS = `(CASE WHEN lower(t.title) = ? OR lower(t.original_title) = ? THEN 0 ELSE 1 END)`;
 
@@ -58,6 +64,7 @@ const ORDER_BY: Record<CatalogueSort, string> = {
   score: `${WEIGHTED_RATING} DESC, t.popularity DESC`,
   recent: "COALESCE(t.year, 0) DESC, t.popularity DESC",
   relevance: `${RELEVANCE}, t.popularity DESC`,
+  given: "t.popularity DESC",
 };
 
 function ftsMatchQuery(raw: string, scope: SearchScope = "everything", matchAny = false) {
@@ -95,20 +102,7 @@ function placeCondition(places: string[]) {
        )`;
 }
 
-function providerCondition(allowUnknown: boolean) {
-  const offered = `EXISTS (
-         SELECT 1 FROM catalog_title_providers AS p
-         WHERE p.title_id = t.id AND p.provider_id IN (SELECT value FROM json_each(?))
-       )`;
-
-  return allowUnknown
-    ? `(${offered} OR NOT EXISTS (
-         SELECT 1 FROM catalog_title_providers AS q WHERE q.title_id = t.id
-       ))`
-    : offered;
-}
-
-export function eligibilityClause(search: CatalogueSearch): Eligibility {
+function eligibilityClause(search: CatalogueSearch): Eligibility {
   const conditions: string[] = [];
   const bindings: unknown[] = [];
   const genres = lowered(search.genres, 10);
@@ -141,7 +135,7 @@ export function eligibilityClause(search: CatalogueSearch): Eligibility {
   }
 
   if (providerIds.length) {
-    conditions.push(providerCondition(search.allowUnknownProviders === true));
+    conditions.push(providerFilterSql("t.id"));
     bindings.push(JSON.stringify(providerIds));
   }
 
@@ -156,8 +150,20 @@ export function eligibilityClause(search: CatalogueSearch): Eligibility {
   }
 
   if (Number.isFinite(search.maxRuntime)) {
-    conditions.push(`(t.runtime_minutes IS NULL OR t.runtime_minutes <= ?)`);
+    conditions.push(`(t.runtime_minutes IS NOT NULL AND t.runtime_minutes <= ?)`);
     bindings.push(clamp(Math.trunc(search.maxRuntime ?? 600), 30, 600));
+  }
+
+  const certifications = (search.certifications ?? []).filter(Boolean).slice(0, 60);
+
+  if (certifications.length) {
+    conditions.push(
+      `NOT EXISTS (
+         SELECT 1 FROM json_each(?) AS rated
+         WHERE t.certification = rated.value OR t.certification LIKE '% ' || rated.value
+       )`,
+    );
+    bindings.push(JSON.stringify(certifications));
   }
 
   if (Number.isFinite(search.releasedAfter)) {
@@ -171,7 +177,7 @@ export function eligibilityClause(search: CatalogueSearch): Eligibility {
   }
 
   if (!search.includeIds) {
-    return { conditions, bindings, impossible: false };
+    return { conditions, bindings, includedIds: null, impossible: false };
   }
 
   const includedIds = [...new Set(search.includeIds.filter(isKnownTitle))].slice(
@@ -182,7 +188,7 @@ export function eligibilityClause(search: CatalogueSearch): Eligibility {
   conditions.push(`t.id IN (SELECT value FROM json_each(?))`);
   bindings.push(JSON.stringify(includedIds));
 
-  return { conditions, bindings, impossible: includedIds.length === 0 };
+  return { conditions, bindings, includedIds, impossible: includedIds.length === 0 };
 }
 
 function requiredVotes(search: CatalogueSearch, sort: CatalogueSort) {
@@ -197,26 +203,6 @@ async function hydrate(db: D1Database, rows: CatalogTitleRow[]): Promise<MediaTi
   const hydrated = await hydrateTitleRows(db, rows);
 
   return hydrated.map((title, index) => withStoredPoster(title, rows[index]?.poster_key));
-}
-
-export async function filterEligibleIds(
-  db: D1Database,
-  ids: string[],
-  search: CatalogueSearch = {},
-) {
-  const candidateIds = [...new Set(ids.filter(isKnownTitle))].slice(0, INCLUDE_ID_LIMIT);
-  const eligibility = eligibilityClause({ ...search, includeIds: candidateIds });
-
-  if (eligibility.impossible) {
-    return new Set<string>();
-  }
-
-  const rows = await db
-    .prepare(`SELECT t.id FROM catalog_titles AS t WHERE ${eligibility.conditions.join(" AND ")}`)
-    .bind(...eligibility.bindings)
-    .all<{ id: string }>();
-
-  return new Set(rows.results.map((row) => row.id));
 }
 
 export async function searchCatalogue(db: D1Database, search: CatalogueSearch) {
@@ -234,6 +220,11 @@ export async function searchCatalogue(db: D1Database, search: CatalogueSearch) {
 
   const orderBindings: unknown[] = [];
   let orderBy = ORDER_BY[match ? sort : sort === "relevance" ? "popularity" : sort];
+
+  if (sort === "given" && eligibility.includedIds) {
+    orderBy = `(SELECT key FROM json_each(?) WHERE value = t.id)`;
+    orderBindings.push(JSON.stringify(eligibility.includedIds));
+  }
 
   if (match && search.scope === "title" && sort === "relevance") {
     const needle = (search.query ?? "").trim().toLowerCase().slice(0, 120);

@@ -629,6 +629,7 @@ export async function prepareRails(
   };
   const exclude = [
     ...onHomepage,
+    ...refused,
     ...rejected,
     ...viewer.entries
       .filter((entry) => entry.status === "watched" || entry.status === "dropped")

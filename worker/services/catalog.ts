@@ -91,7 +91,6 @@ export async function searchCatalogueHybrid(env: Bindings, query: string, provid
   const items = await retrieveTitles(env, {
     text: query,
     providerIds,
-    allowUnknownProviders: true,
     limit: HYBRID_SEARCH_LIMIT,
   });
 

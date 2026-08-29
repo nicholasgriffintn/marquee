@@ -13,6 +13,7 @@ import {
 import { logError } from "../lib/logging.ts";
 import { isKnownTitle, validProviderIds } from "../lib/validation.ts";
 import { stringList } from "../lib/values.ts";
+import { readProviderPreferences } from "../repositories/profile.ts";
 import {
   readAnswers,
   readUsherRecord,
@@ -614,7 +615,10 @@ export async function readViewerPreferences(
   }
 
   try {
-    const answers = await readAnswers(db, viewerId);
+    const [answers, chosenProviderIds] = await Promise.all([
+      readAnswers(db, viewerId),
+      readProviderPreferences(db, viewerId),
+    ]);
     const single = (id: string) => {
       const value = answers.get(id);
 
@@ -622,7 +626,7 @@ export async function readViewerPreferences(
     };
 
     return {
-      providerIds: validProviderIds(answers.get("providers")),
+      providerIds: validProviderIds(chosenProviderIds ?? answers.get("providers")),
       genres: stringList(answers.get("genres"), { limit: 8 }),
       frequency: single("frequency"),
       motivation: stringList(answers.get("motivation"), { limit: 4 }),

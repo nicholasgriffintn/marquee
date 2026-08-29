@@ -1,8 +1,7 @@
 import type { MediaTitle, ProviderAvailability } from "../../src/domain/catalog.ts";
 import { beliefSteersPicks, type Belief } from "../../src/domain/notebook.ts";
+import { isStreamingOffer } from "../../src/domain/providers.ts";
 import type { readShelfDetail } from "../repositories/viewer-context.ts";
-
-const STREAMING_OFFERS = new Set(["Subscription", "Free", "Free with ads"]);
 
 export type ShelfEntry = Awaited<ReturnType<typeof readShelfDetail>>[number];
 
@@ -85,7 +84,7 @@ export function serviceFor(item: MediaTitle, providerIds: string[]) {
     : all;
   const pool = mine.length ? mine : all;
   const streaming = pool.find((provider: ProviderAvailability) =>
-    provider.offerTypes.some((offer) => STREAMING_OFFERS.has(offer)),
+    provider.offerTypes.some(isStreamingOffer),
   );
   const chosen = streaming ?? pool[0];
 

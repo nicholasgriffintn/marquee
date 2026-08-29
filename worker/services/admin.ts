@@ -7,6 +7,7 @@ import {
   queueVectorReindex,
 } from "../jobs/ingestion.ts";
 import { readBudgets, resumeSource } from "../repositories/budgets.ts";
+import { countSearchDrift, reconcileSearchIndex } from "../repositories/catalog-index.ts";
 import { readCinemaCoverage } from "../repositories/cinemas.ts";
 import { readBackfillProgress } from "../repositories/discover.ts";
 import { rebuildPeopleIndex } from "../repositories/usher.ts";
@@ -274,8 +275,9 @@ export async function readAdminOverview(env: Bindings) {
 }
 
 export async function readAdminPipeline(env: Bindings) {
-  const [enrichment, failures, lastRuns] = await Promise.all([
+  const [enrichment, searchDrift, failures, lastRuns] = await Promise.all([
     enrichmentStats(env),
+    countSearchDrift(env.DB).catch(() => 0),
     env.DB.prepare(
       `SELECT job_type AS jobType, subject_id AS subjectId, error, started_at AS startedAt
          FROM ingestion_runs
@@ -309,6 +311,7 @@ export async function readAdminPipeline(env: Bindings) {
 
   return {
     enrichment,
+    searchDrift,
     failures: failures.results,
     lastRuns: lastRuns.results,
     runWindowHours: RUN_WINDOW_HOURS,
@@ -423,6 +426,17 @@ export async function runAdminAction(env: Bindings, action: AdminAction) {
     return {
       queued: titles,
       detail: `Working set now tracks ${titles} titles`,
+    };
+  }
+
+  if (action === "search-index") {
+    const { repaired, remaining } = await reconcileSearchIndex(env.DB);
+
+    return {
+      queued: repaired,
+      detail: remaining
+        ? `Reprojected ${repaired.toLocaleString()} titles, ${remaining.toLocaleString()} still to go`
+        : `Reprojected ${repaired.toLocaleString()} titles, the index now matches`,
     };
   }
 

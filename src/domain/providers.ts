@@ -314,3 +314,15 @@ export function findRegistryProviderForOffer(name: string, offerKind: ProviderOf
 
   return findRegistryProvider(name);
 }
+
+export const STREAMING_OFFER_TYPES = ["Subscription", "Free", "Free with ads"];
+
+const STREAMING_OFFERS = new Set(STREAMING_OFFER_TYPES);
+
+export function isStreamingOffer(offerType: string) {
+  return STREAMING_OFFERS.has(offerType);
+}
+
+export function isStreamingAvailability(offerTypes: readonly string[]) {
+  return offerTypes.length === 0 || offerTypes.some(isStreamingOffer);
+}
