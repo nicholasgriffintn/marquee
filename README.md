@@ -287,9 +287,9 @@ latency and tokens. The prompt itself is never stored; `prompt_version` is a has
 on its own when the prompt is edited. The id travels out with the recommendation and back on every
 journey event, so an open, a walk to a provider, a save, a rejection or a watch can be counted
 against the set that produced it. Rows expire after ninety days and are swept nightly, and a deleted
-account takes its decisions with it. Cost is left null until per-model rates are set in
-`AI_MODEL_RATES` (`{"@cf/model": {"input": 0.35, "output": 0.75}}`, USD per million tokens); the
-token counts are recorded either way.
+account takes its decisions with it. Cost is worked out from the per-model rates in
+`worker/lib/decisions.ts`, which track Cloudflare's published Workers AI prices — a model missing
+from that table records its tokens and leaves the cost null rather than guessing.
 
 **The sweeps** are a Workflow on two crons: a light one every three hours, a deep one nightly that
 fans TMDB's discover pages out over the ingestion queue. Sweeps merge rather than replace,

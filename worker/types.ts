@@ -24,7 +24,6 @@ export type Bindings = {
   AI_GATEWAY_ID: string;
   AI_MODEL: string;
   AI_FAST_MODEL?: string;
-  AI_MODEL_RATES?: string;
   GITHUB_CLIENT_ID?: string;
   GITHUB_CLIENT_SECRET?: string;
   EMAIL?: SendEmail;

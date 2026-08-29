@@ -2,7 +2,12 @@ import type { CatalogSection, MediaTitle } from "../../src/domain/catalog.ts";
 import { CURATOR_TOOLS, executeCuratorTool } from "../ai/curator-tools.ts";
 import { fastModel, requestAiCompletion } from "../clients/ai-gateway.ts";
 import type { ChatMessage } from "../lib/curator-payload.ts";
-import { candidatesFrom, promptVersion, type DecisionCandidate } from "../lib/decisions.ts";
+import {
+  candidatesFrom,
+  promptVersion,
+  type DecisionCandidate,
+  type DecisionDraft,
+} from "../lib/decisions.ts";
 import { logError, logEvent } from "../lib/logging.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { isRecord, parseJson } from "../lib/values.ts";
@@ -19,7 +24,7 @@ import type { Bindings, ViewerContext } from "../types.ts";
 import { readAngleScores } from "./angle-scores.ts";
 import { viewerSummary } from "./beliefs.ts";
 import { getGenres } from "./catalog.ts";
-import type { Decision } from "./decisions.ts";
+import { beginDecision } from "./decisions.ts";
 import { tasteVector } from "./taste.ts";
 import { preferenceSummary, readViewerPreferences, type ViewerPreferences } from "./usher.ts";
 
@@ -422,8 +427,9 @@ export type RailBuild = {
   candidates?: DecisionCandidate[];
   shelf?: ShelfDetail[];
   summary?: string;
-  decision?: Decision;
 };
+
+export type BuiltRail = { rail: StoredRail | null; decision: DecisionDraft };
 
 export async function buildOneRail(
   env: Bindings,
@@ -431,19 +437,29 @@ export async function buildOneRail(
   angle: Angle,
   exclude: string[],
   build: RailBuild = {},
-): Promise<StoredRail | null> {
+): Promise<BuiltRail> {
   const viewerId = build.viewerId || "unknown";
   const seeds = build.seeds ?? [];
   const shelf = build.shelf ?? [];
   const summary = build.summary ?? "";
-  const decision = build.decision;
+  const decision = beginDecision(env, {
+    feature: "rails",
+    promptVersion: RAILS_PROMPT_VERSION,
+    viewerId: build.viewerId ?? "",
+    surface: angle.id,
+  });
 
-  decision?.candidates(build.candidates ?? candidatesFrom(seeds, { origin: `rail_${angle.id}` }));
+  decision.candidates(build.candidates ?? candidatesFrom(seeds, { origin: `rail_${angle.id}` }));
+
+  const built = (rail: StoredRail | null): BuiltRail => ({
+    rail: rail ? { ...rail, angle: angle.id, decisionId: decision.id } : null,
+    decision: decision.draft(),
+  });
 
   if (seeds.length < RAIL_MIN) {
     logEvent("rail_skipped", { angle: angle.id, seeds: seeds.length });
 
-    return null;
+    return built(null);
   }
 
   const availableIds = new Set(seeds.map((title) => title.id));
@@ -484,7 +500,7 @@ export async function buildOneRail(
       maxTokens: 500,
       toolChoice: "auto",
       metadata: { feature: "rails", angle: angle.id, viewer: viewerId },
-      ...(decision ? { record: decision } : {}),
+      record: decision,
     });
 
     if (response.tool_calls?.length) {
@@ -509,7 +525,7 @@ export async function buildOneRail(
     const rail = parseRail(response.content, availableIds);
 
     if (rail) {
-      return { ...rail, angle: angle.id, ...(decision ? { decisionId: decision.id } : {}) };
+      return built(rail);
     }
 
     logEvent("rail_retry", {
@@ -527,7 +543,7 @@ export async function buildOneRail(
     maxTokens: 300,
     json: true,
     metadata: { feature: "rails", angle: angle.id, viewer: viewerId },
-    ...(decision ? { record: decision } : {}),
+    record: decision,
   });
   const rail = parseRail(response.content, availableIds);
 
@@ -538,9 +554,7 @@ export async function buildOneRail(
     raw: rail ? undefined : response.content?.slice(0, 200),
   });
 
-  return rail
-    ? { ...rail, angle: angle.id, ...(decision ? { decisionId: decision.id } : {}) }
-    : null;
+  return built(rail);
 }
 
 export function railSectionId(name: string) {

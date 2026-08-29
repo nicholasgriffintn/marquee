@@ -1,6 +1,3 @@
-import type { Bindings } from "../types.ts";
-import { isRecord, numberAt, parseJson } from "./values.ts";
-
 export type DecisionFeature =
   | "curator"
   | "rails"
@@ -23,11 +20,26 @@ export type ModelCall = {
 
 export type ModelCallSink = { modelCall(call: ModelCall): void };
 
-export type ModelRate = { input: number; output: number };
-
-export type ModelRates = Record<string, ModelRate>;
+export type DecisionDraft = {
+  id: string;
+  feature: DecisionFeature;
+  surface: string;
+  promptVersion: string;
+  viewerId: string;
+  candidates: DecisionCandidate[];
+  selected: string[];
+  calls: ModelCall[];
+};
 
 export const DECISION_RETENTION_DAYS = 90;
+
+const RATES_PER_MILLION_TOKENS: Record<string, { input: number; output: number }> = {
+  "@cf/meta/llama-4-scout-17b-16e-instruct": { input: 0.27, output: 0.85 },
+  "@cf/moonshotai/kimi-k2.5": { input: 0.6, output: 3 },
+  "@cf/moonshotai/kimi-k2.6": { input: 0.95, output: 4 },
+  "@cf/moonshotai/kimi-k2.7-code": { input: 0.95, output: 4 },
+  "@cf/openai/gpt-oss-120b": { input: 0.35, output: 0.75 },
+};
 
 const CANDIDATE_LIMIT = 60;
 const SELECTED_LIMIT = 24;
@@ -93,28 +105,7 @@ export function packSelected(titleIds: string[]) {
   return [...new Set(titleIds)].slice(0, SELECTED_LIMIT);
 }
 
-export function modelRates(env: Bindings): ModelRates {
-  const parsed = parseJson(env.AI_MODEL_RATES ?? "");
-
-  if (!isRecord(parsed)) {
-    return {};
-  }
-
-  return Object.fromEntries(
-    Object.entries(parsed).flatMap(([model, rate]): Array<[string, ModelRate]> => {
-      if (!isRecord(rate)) {
-        return [];
-      }
-
-      const input = numberAt(rate, "input");
-      const output = numberAt(rate, "output");
-
-      return input === null || output === null ? [] : [[model, { input, output }]];
-    }),
-  );
-}
-
-export function estimatedCost(calls: ModelCall[], rates: ModelRates) {
+export function estimatedCost(calls: ModelCall[]) {
   if (calls.length === 0) {
     return null;
   }
@@ -122,7 +113,7 @@ export function estimatedCost(calls: ModelCall[], rates: ModelRates) {
   let total = 0;
 
   for (const call of calls) {
-    const rate = rates[call.model];
+    const rate = RATES_PER_MILLION_TOKENS[call.model];
 
     if (!rate) {
       return null;

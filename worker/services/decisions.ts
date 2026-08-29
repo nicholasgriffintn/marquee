@@ -1,10 +1,9 @@
 import {
   estimatedCost,
-  modelRates,
   type DecisionCandidate,
+  type DecisionDraft,
   type DecisionFeature,
   type DecisionOutcome,
-  type ModelCall,
   type ModelCallSink,
 } from "../lib/decisions.ts";
 import { logEvent } from "../lib/logging.ts";
@@ -15,6 +14,7 @@ export type Decision = ModelCallSink & {
   id: string;
   candidates(candidates: DecisionCandidate[]): void;
   select(titleIds: string[]): void;
+  draft(): DecisionDraft;
   settle(outcome: DecisionOutcome): Promise<void>;
 };
 
@@ -27,22 +27,31 @@ export function beginDecision(
     surface?: string;
   },
 ): Decision {
-  const id = crypto.randomUUID();
-  const candidates: DecisionCandidate[] = [];
-  const calls: ModelCall[] = [];
-  let selected: string[] = [];
+  const draft: DecisionDraft = {
+    id: crypto.randomUUID(),
+    feature: input.feature,
+    surface: input.surface ?? "",
+    promptVersion: input.promptVersion ?? "",
+    viewerId: input.viewerId ?? "",
+    candidates: [],
+    selected: [],
+    calls: [],
+  };
   let settled = false;
 
   return {
-    id,
+    id: draft.id,
     candidates(next) {
-      candidates.push(...next);
+      draft.candidates.push(...next);
     },
     select(titleIds) {
-      selected = titleIds;
+      draft.selected = titleIds;
     },
     modelCall(call) {
-      calls.push(call);
+      draft.calls.push(call);
+    },
+    draft() {
+      return { ...draft };
     },
     async settle(outcome) {
       if (settled) {
@@ -51,34 +60,42 @@ export function beginDecision(
 
       settled = true;
 
-      const served = calls.filter((call) => !call.failed);
-      const chosen = served.at(-1);
-
-      await writeDecision(env.DB, {
-        id,
-        viewerId: input.viewerId ?? "",
-        feature: input.feature,
-        surface: input.surface ?? "",
-        promptVersion: input.promptVersion ?? "",
-        model: chosen?.model ?? "",
-        fallbackFrom: [...new Set(calls.filter((call) => call.failed).map((call) => call.model))],
-        candidates,
-        selected,
-        latencyMs: calls.reduce((total, call) => total + call.latencyMs, 0),
-        inputTokens: served.reduce((total, call) => total + (call.inputTokens ?? 0), 0),
-        outputTokens: served.reduce((total, call) => total + (call.outputTokens ?? 0), 0),
-        costUsd: estimatedCost(served, modelRates(env)),
-        outcome,
-      });
-
-      logEvent("decision_settled", {
-        decisionId: id,
-        feature: input.feature,
-        outcome,
-        candidates: candidates.length,
-        selected: selected.length,
-        model: chosen?.model ?? "",
-      });
+      await settleDecision(env, draft, outcome);
     },
   };
+}
+
+export async function settleDecision(
+  env: Bindings,
+  draft: DecisionDraft,
+  outcome: DecisionOutcome,
+) {
+  const served = draft.calls.filter((call) => !call.failed);
+  const chosen = served.at(-1);
+
+  await writeDecision(env.DB, {
+    id: draft.id,
+    viewerId: draft.viewerId,
+    feature: draft.feature,
+    surface: draft.surface,
+    promptVersion: draft.promptVersion,
+    model: chosen?.model ?? "",
+    fallbackFrom: [...new Set(draft.calls.filter((call) => call.failed).map((call) => call.model))],
+    candidates: draft.candidates,
+    selected: draft.selected,
+    latencyMs: draft.calls.reduce((total, call) => total + call.latencyMs, 0),
+    inputTokens: served.reduce((total, call) => total + (call.inputTokens ?? 0), 0),
+    outputTokens: served.reduce((total, call) => total + (call.outputTokens ?? 0), 0),
+    costUsd: estimatedCost(served),
+    outcome,
+  });
+
+  logEvent("decision_settled", {
+    decisionId: draft.id,
+    feature: draft.feature,
+    outcome,
+    candidates: draft.candidates.length,
+    selected: draft.selected.length,
+    model: chosen?.model ?? "",
+  });
 }

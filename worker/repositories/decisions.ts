@@ -42,7 +42,18 @@ export async function writeDecision(db: D1Database, record: DecisionRecord) {
            candidates, candidate_count, selected, latency_ms, input_tokens, output_tokens,
            cost_usd, outcome, expires_at
          )
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)`,
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
+         ON CONFLICT(id) DO UPDATE SET
+           model = excluded.model,
+           fallback_from = excluded.fallback_from,
+           candidates = excluded.candidates,
+           candidate_count = excluded.candidate_count,
+           selected = excluded.selected,
+           latency_ms = excluded.latency_ms,
+           input_tokens = excluded.input_tokens,
+           output_tokens = excluded.output_tokens,
+           cost_usd = excluded.cost_usd,
+           outcome = excluded.outcome`,
       )
       .bind(
         record.id,
