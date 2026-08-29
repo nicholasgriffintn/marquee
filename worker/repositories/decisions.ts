@@ -79,9 +79,7 @@ export async function writeDecision(db: Database, record: DecisionRecord) {
 
 export async function pruneDecisions(db: Database) {
   try {
-    await db.execute(
-      `DELETE FROM decisions WHERE (EXTRACT(EPOCH FROM expires_at) / 86400.0) <= (EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) / 86400.0)`,
-    );
+    await db.execute(`DELETE FROM decisions WHERE expires_at <= CURRENT_TIMESTAMP`);
   } catch (error) {
     logError("decision_prune_failed", error);
   }

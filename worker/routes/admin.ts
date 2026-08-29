@@ -117,7 +117,10 @@ adminRoutes.post("/actions/:action", async (context) => {
   } catch (error) {
     logError("admin_action_failed", error, { area: "admin", action });
 
-    return context.json({ error: "That action could not be started" }, 500);
+    return context.json(
+      { error: error instanceof Error ? error.message : "That action could not be started" },
+      500,
+    );
   }
 });
 
