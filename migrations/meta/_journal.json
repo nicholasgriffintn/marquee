@@ -85,6 +85,13 @@
       "when": 1787972400011,
       "tag": "0012_drop_people_name_idx",
       "breakpoints": false
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1787972400012,
+      "tag": "0013_catalog_people_hot_updates",
+      "breakpoints": false
     }
   ]
 }
