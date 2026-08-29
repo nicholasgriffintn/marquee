@@ -1,3 +1,4 @@
+-- Retain recommendation lineage long enough to measure delayed outcomes.
 CREATE TABLE decisions (
   id TEXT PRIMARY KEY,
   viewer_id TEXT REFERENCES users(id) ON DELETE CASCADE,

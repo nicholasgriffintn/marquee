@@ -1,16 +1,16 @@
-export type JourneyStart = { source: string; position?: number; decisionId?: string };
+import { JOURNEY_TTL_MS } from "../domain/journeys";
 
-type Journey = JourneyStart & { id: string };
+type Journey = { token: string; rank?: number; startedAt: number };
 
 const journeys = new Map<string, Journey>();
 const LIMIT = 40;
 
-function mint() {
-  return crypto.randomUUID();
-}
+export function startJourney(titleId: string, token: string | null | undefined, rank?: number) {
+  if (!token) {
+    journeys.delete(titleId);
 
-export function startJourney(titleId: string, start: JourneyStart) {
-  const journey: Journey = { ...start, id: mint() };
+    return;
+  }
 
   if (journeys.size >= LIMIT) {
     const oldest = journeys.keys().next().value;
@@ -20,11 +20,25 @@ export function startJourney(titleId: string, start: JourneyStart) {
     }
   }
 
-  journeys.set(titleId, journey);
+  journeys.set(titleId, { token, startedAt: Date.now(), ...(rank === undefined ? {} : { rank }) });
+}
+
+export function journeyFor(titleId: string): Journey | null {
+  const journey = journeys.get(titleId);
+
+  if (!journey) {
+    return null;
+  }
+
+  if (Date.now() - journey.startedAt >= JOURNEY_TTL_MS) {
+    journeys.delete(titleId);
+
+    return null;
+  }
 
   return journey;
 }
 
-export function journeyFor(titleId: string): Journey | null {
-  return journeys.get(titleId) ?? null;
+export function startJourneys(items: { id: string }[], token: string | null | undefined) {
+  items.forEach((item, index) => startJourney(item.id, token, index));
 }

@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 
+import { isJourneyMode } from "../../src/domain/journeys.ts";
 import { isShelfSort, shelfStatus, SHELF_PAGE_SIZE } from "../../src/domain/shelf.ts";
 import type { DiaryRow } from "../../src/lib/letterboxd.ts";
 import { requireAuthentication, type AuthVariables } from "../auth/session.ts";
@@ -161,6 +162,7 @@ async function creditJourney(env: Bindings, viewerId: string, titleId: string) {
     ...(exit.journeyId ? { journeyId: exit.journeyId } : {}),
     ...(exit.decisionId ? { decisionId: exit.decisionId } : {}),
     ...(exit.source ? { source: exit.source } : {}),
+    ...(isJourneyMode(exit.mode) ? { mode: exit.mode } : {}),
   });
 
   await recordSignal(env.DB, viewerId, {
@@ -168,7 +170,7 @@ async function creditJourney(env: Bindings, viewerId: string, titleId: string) {
     titleId,
     ...(exit.journeyId ? { journeyId: exit.journeyId } : {}),
     ...(exit.decisionId ? { decisionId: exit.decisionId } : {}),
-    context: { source: exit.source },
+    context: { source: exit.source, mode: exit.mode },
     expiresInDays: 365,
   });
 }

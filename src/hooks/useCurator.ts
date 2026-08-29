@@ -2,12 +2,12 @@ import { useCallback, useRef, useState } from "react";
 
 import type { MediaTitle } from "../domain/catalog";
 import { isAbortError } from "../lib/errors";
-import { startJourney } from "../lib/journey";
+import { startJourneys } from "../lib/journey";
 import { jsonMutation, mutateJson, mutateResponse } from "../lib/query-client";
 
 type CuratorEvent =
   | { type: "status"; label: string }
-  | { type: "result"; titleIds: string[]; decisionId?: string; items: MediaTitle[] }
+  | { type: "result"; titleIds: string[]; journey?: string; items: MediaTitle[] }
   | { type: "delta"; text: string }
   | { type: "done"; summary: string; reasons: Record<string, string> }
   | { type: "error"; message: string };
@@ -19,7 +19,6 @@ export type CuratorState = {
   items: MediaTitle[];
   reasons: Record<string, string>;
   isStreaming: boolean;
-  decisionId: string;
 };
 
 const EMPTY: CuratorState = {
@@ -29,7 +28,6 @@ const EMPTY: CuratorState = {
   items: [],
   reasons: {},
   isStreaming: false,
-  decisionId: "",
 };
 
 export function useCurator() {
@@ -114,7 +112,7 @@ export function useCurator() {
             const event = JSON.parse(line.slice(5).trim()) as CuratorEvent;
 
             if (event.type === "result") {
-              openCuratorJourneys(event.items, event.decisionId);
+              startJourneys(event.items, event.journey);
             }
 
             setState((current) => applyEvent(current, event));
@@ -143,16 +141,6 @@ export function useCurator() {
   return { state, error, clear, isAsking, ask };
 }
 
-function openCuratorJourneys(items: MediaTitle[], decisionId: string | undefined) {
-  items.forEach((item, index) => {
-    startJourney(item.id, {
-      source: "curator",
-      position: index,
-      ...(decisionId ? { decisionId } : {}),
-    });
-  });
-}
-
 async function failureMessage(response: Response) {
   const fallback = "The AI curator is unavailable";
 
@@ -178,7 +166,6 @@ function applyEvent(current: CuratorState, event: CuratorEvent): CuratorState {
     return {
       ...current,
       items: event.items,
-      decisionId: event.decisionId ?? "",
       status: "",
     };
   }

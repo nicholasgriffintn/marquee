@@ -10,6 +10,7 @@ import {
 import { clamp } from "../lib/numbers.ts";
 import { providerFilterSql } from "../lib/providers.ts";
 import { isKnownTitle, validProviderIds } from "../lib/validation.ts";
+import type { AvailabilityRule } from "../services/viewer/eligibility.ts";
 import { hydrateTitleRows } from "./catalog-arrays.ts";
 
 export type CatalogueSort = "trending" | "popularity" | "score" | "recent" | "relevance" | "given";
@@ -18,6 +19,8 @@ export type SearchScope = "title" | "everything";
 
 const SCORE_SORT_MIN_VOTES = 50;
 const MAX_QUERY_TOKENS = 8;
+const INCLUDE_ID_LIMIT = 500;
+const EXCLUDE_ID_LIMIT = 2_000;
 
 const WEIGHTED_RATING = "t.weighted_rating";
 const BLENDED_RATING = "t.blended_rating";
@@ -34,10 +37,12 @@ export type CatalogueSearch = {
   places?: string[];
   mediaType?: "movie" | "tv";
   providerIds?: string[];
+  availability?: AvailabilityRule;
   minScore?: number;
   releasedAfter?: number;
   maxRuntime?: number;
   excludeIds?: string[];
+  excludeGenres?: string[];
   includeIds?: string[];
   certifications?: string[];
   sort?: CatalogueSort;
@@ -46,6 +51,25 @@ export type CatalogueSearch = {
   limit?: number;
   offset?: number;
 };
+
+type Eligibility = {
+  conditions: string[];
+  bindings: unknown[];
+  includedIds: string[] | null;
+  impossible: boolean;
+};
+
+function hasProviders(alias: string) {
+  return `EXISTS (SELECT 1 FROM catalog_title_providers AS p WHERE p.title_id = ${alias}.id)`;
+}
+
+export function availabilityCondition(alias: string, availability: AvailabilityRule = "confirmed") {
+  const confirmedOrUnknown = providerFilterSql(`${alias}.id`);
+
+  return availability === "confirmed-or-unknown"
+    ? confirmedOrUnknown
+    : `(${hasProviders(alias)} AND ${confirmedOrUnknown})`;
+}
 
 const TITLE_EXACTNESS = `(CASE WHEN lower(t.title) = ? OR lower(t.original_title) = ? THEN 0 ELSE 1 END)`;
 
@@ -70,41 +94,41 @@ function ftsMatchQuery(raw: string, scope: SearchScope = "everything", matchAny 
   return scope === "title" ? `{title original_title} : (${expression})` : expression;
 }
 
-async function hydrate(db: D1Database, rows: CatalogTitleRow[]): Promise<MediaTitle[]> {
-  const hydrated = await hydrateTitleRows(db, rows);
-
-  return hydrated.map((title, index) => withStoredPoster(title, rows[index]?.poster_key));
+function lowered(values: string[] | undefined, limit: number) {
+  return (values ?? [])
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean)
+    .slice(0, limit);
 }
 
-export async function searchCatalogue(db: D1Database, search: CatalogueSearch) {
+function tagCondition(table: string, column: string, values: string[]) {
+  return `EXISTS (
+         SELECT 1 FROM ${table} AS x
+         WHERE x.title_id = t.id AND lower(x.${column}) IN (${values.map(() => "?").join(", ")})
+       )`;
+}
+
+function placeCondition(places: string[]) {
+  return `EXISTS (
+         SELECT 1 FROM catalog_title_places AS tp
+         JOIN catalog_places AS cp ON cp.entity_id = tp.place_id
+         WHERE tp.title_id = t.id AND tp.kind = 'filming'
+           AND lower(cp.label) IN (${places.map(() => "?").join(", ")})
+       )`;
+}
+
+function eligibilityClause(search: CatalogueSearch): Eligibility {
   const conditions: string[] = [];
   const bindings: unknown[] = [];
-  const match = search.query?.trim()
-    ? ftsMatchQuery(search.query.trim().slice(0, 120), search.scope, search.matchAny)
-    : null;
-  const genres = (search.genres ?? [])
-    .map((genre) => genre.trim().toLowerCase())
-    .filter(Boolean)
-    .slice(0, 10);
+  const genres = lowered(search.genres, 10);
+  const places = lowered(search.places, 6);
+  const keywords = lowered(search.keywords, 6);
   const providerIds = validProviderIds(search.providerIds);
-  const excludedIds = [...new Set((search.excludeIds ?? []).filter(isKnownTitle))].slice(0, 2_000);
-  const limit = clamp(Math.floor(search.limit ?? 12), 1, 60);
-  const offset = clamp(Math.floor(search.offset ?? 0), 0, 2_000);
-  const sort = search.sort ?? (match ? "relevance" : "popularity");
-  const orderBindings: unknown[] = [];
-  let orderBy = ORDER_BY[match ? sort : sort === "relevance" ? "popularity" : sort];
-
-  if (match && search.scope === "title" && sort === "relevance") {
-    const needle = (search.query ?? "").trim().toLowerCase().slice(0, 120);
-
-    orderBy = `${TITLE_EXACTNESS}, t.popularity DESC`;
-    orderBindings.push(needle, needle);
-  }
-
-  if (match) {
-    conditions.push("catalog_search MATCH ?");
-    bindings.push(match);
-  }
+  const excludeGenres = lowered(search.excludeGenres, 20);
+  const excludedIds = [...new Set((search.excludeIds ?? []).filter(isKnownTitle))].slice(
+    0,
+    EXCLUDE_ID_LIMIT,
+  );
 
   if (search.mediaType === "movie" || search.mediaType === "tv") {
     conditions.push("t.media_type = ?");
@@ -112,50 +136,33 @@ export async function searchCatalogue(db: D1Database, search: CatalogueSearch) {
   }
 
   if (genres.length) {
-    conditions.push(
-      `EXISTS (
-         SELECT 1 FROM catalog_title_genres AS g
-         WHERE g.title_id = t.id AND lower(g.genre) IN (${genres.map(() => "?").join(", ")})
-       )`,
-    );
+    conditions.push(tagCondition("catalog_title_genres", "genre", genres));
     bindings.push(...genres);
   }
 
-  const places = (search.places ?? [])
-    .map((place) => place.trim().toLowerCase())
-    .filter(Boolean)
-    .slice(0, 6);
-
   if (places.length) {
-    conditions.push(
-      `EXISTS (
-         SELECT 1 FROM catalog_title_places AS tp
-         JOIN catalog_places AS cp ON cp.entity_id = tp.place_id
-         WHERE tp.title_id = t.id AND tp.kind = 'filming'
-           AND lower(cp.label) IN (${places.map(() => "?").join(", ")})
-       )`,
-    );
+    conditions.push(placeCondition(places));
     bindings.push(...places);
   }
 
-  const keywords = (search.keywords ?? [])
-    .map((keyword) => keyword.trim().toLowerCase())
-    .filter(Boolean)
-    .slice(0, 6);
-
   if (keywords.length) {
-    conditions.push(
-      `EXISTS (
-         SELECT 1 FROM catalog_title_keywords AS k
-         WHERE k.title_id = t.id AND lower(k.keyword) IN (${keywords.map(() => "?").join(", ")})
-       )`,
-    );
+    conditions.push(tagCondition("catalog_title_keywords", "keyword", keywords));
     bindings.push(...keywords);
   }
 
   if (providerIds.length) {
-    conditions.push(providerFilterSql("t.id"));
+    conditions.push(availabilityCondition("t", search.availability));
     bindings.push(JSON.stringify(providerIds));
+  }
+
+  if (excludeGenres.length) {
+    conditions.push(
+      `NOT EXISTS (
+         SELECT 1 FROM catalog_title_genres AS bg
+         WHERE bg.title_id = t.id AND lower(bg.genre) IN (${excludeGenres.map(() => "?").join(", ")})
+       )`,
+    );
+    bindings.push(...excludeGenres);
   }
 
   if (Number.isFinite(search.minScore)) {
@@ -163,15 +170,9 @@ export async function searchCatalogue(db: D1Database, search: CatalogueSearch) {
     bindings.push(clamp(search.minScore ?? 0, 0, 10));
   }
 
-  const minVotes = Number.isFinite(search.minVotes)
-    ? Math.max(0, Math.trunc(search.minVotes ?? 0))
-    : sort === "score" || Number.isFinite(search.minScore)
-      ? SCORE_SORT_MIN_VOTES
-      : 0;
-
-  if (minVotes > 0) {
+  if (Number.isFinite(search.minVotes) && (search.minVotes ?? 0) > 0) {
     conditions.push("t.vote_count >= ?");
-    bindings.push(minVotes);
+    bindings.push(Math.trunc(search.minVotes ?? 0));
   }
 
   if (Number.isFinite(search.maxRuntime)) {
@@ -201,24 +202,67 @@ export async function searchCatalogue(db: D1Database, search: CatalogueSearch) {
     bindings.push(JSON.stringify(excludedIds));
   }
 
-  if (search.includeIds) {
-    const includedIds = [...new Set(search.includeIds.filter(isKnownTitle))].slice(0, 200);
-
-    if (includedIds.length === 0) {
-      return [];
-    }
-
-    const encoded = JSON.stringify(includedIds);
-
-    conditions.push(`t.id IN (SELECT value FROM json_each(?))`);
-    bindings.push(encoded);
-
-    if (sort === "given") {
-      orderBy = `(SELECT key FROM json_each(?) WHERE value = t.id)`;
-      orderBindings.push(encoded);
-    }
+  if (!search.includeIds) {
+    return { conditions, bindings, includedIds: null, impossible: false };
   }
 
+  const includedIds = [...new Set(search.includeIds.filter(isKnownTitle))].slice(
+    0,
+    INCLUDE_ID_LIMIT,
+  );
+
+  conditions.push(`t.id IN (SELECT value FROM json_each(?))`);
+  bindings.push(JSON.stringify(includedIds));
+
+  return { conditions, bindings, includedIds, impossible: includedIds.length === 0 };
+}
+
+function requiredVotes(search: CatalogueSearch, sort: CatalogueSort) {
+  if (Number.isFinite(search.minVotes)) {
+    return Math.max(0, Math.trunc(search.minVotes ?? 0));
+  }
+
+  return sort === "score" || Number.isFinite(search.minScore) ? SCORE_SORT_MIN_VOTES : 0;
+}
+
+async function hydrate(db: D1Database, rows: CatalogTitleRow[]): Promise<MediaTitle[]> {
+  const hydrated = await hydrateTitleRows(db, rows);
+
+  return hydrated.map((title, index) => withStoredPoster(title, rows[index]?.poster_key));
+}
+
+export async function searchCatalogue(db: D1Database, search: CatalogueSearch) {
+  const match = search.query?.trim()
+    ? ftsMatchQuery(search.query.trim().slice(0, 120), search.scope, search.matchAny)
+    : null;
+  const limit = clamp(Math.floor(search.limit ?? 12), 1, 60);
+  const offset = clamp(Math.floor(search.offset ?? 0), 0, 2_000);
+  const sort = search.sort ?? (match ? "relevance" : "popularity");
+  const eligibility = eligibilityClause({ ...search, minVotes: requiredVotes(search, sort) });
+
+  if (eligibility.impossible) {
+    return [];
+  }
+
+  const orderBindings: unknown[] = [];
+  let orderBy = ORDER_BY[match ? sort : sort === "relevance" ? "popularity" : sort];
+
+  if (sort === "given" && eligibility.includedIds) {
+    orderBy = `(SELECT key FROM json_each(?) WHERE value = t.id)`;
+    orderBindings.push(JSON.stringify(eligibility.includedIds));
+  }
+
+  if (match && search.scope === "title" && sort === "relevance") {
+    const needle = (search.query ?? "").trim().toLowerCase().slice(0, 120);
+
+    orderBy = `${TITLE_EXACTNESS}, t.popularity DESC`;
+    orderBindings.push(needle, needle);
+  }
+
+  const conditions = match
+    ? ["catalog_search MATCH ?", ...eligibility.conditions]
+    : eligibility.conditions;
+  const bindings = match ? [match, ...eligibility.bindings] : eligibility.bindings;
   const from = match
     ? "catalog_search JOIN catalog_titles AS t ON t.rowid = catalog_search.rowid"
     : "catalog_titles AS t";
@@ -270,82 +314,17 @@ export type BrowseTrendingFilter = {
   keywords: string[];
   places: string[];
   providerIds: string[];
+  availability?: AvailabilityRule;
   minVotes: number;
 };
 
 async function trendingCandidates(db: D1Database, filter: BrowseTrendingFilter) {
-  const conditions = [`b.article <> ''`, `b.views >= ${MIN_TRENDING_VIEWS}`];
-  const bindings: unknown[] = [];
-
-  if (filter.mediaType === "movie" || filter.mediaType === "tv") {
-    conditions.push("t.media_type = ?");
-    bindings.push(filter.mediaType);
-  }
-
-  const genres = filter.genres
-    .map((genre) => genre.trim().toLowerCase())
-    .filter(Boolean)
-    .slice(0, 10);
-
-  if (genres.length) {
-    conditions.push(
-      `EXISTS (
-         SELECT 1 FROM catalog_title_genres AS g
-         WHERE g.title_id = t.id AND lower(g.genre) IN (${genres.map(() => "?").join(", ")})
-       )`,
-    );
-    bindings.push(...genres);
-  }
-
-  const places = filter.places
-    .map((place) => place.trim().toLowerCase())
-    .filter(Boolean)
-    .slice(0, 6);
-
-  if (places.length) {
-    conditions.push(
-      `EXISTS (
-         SELECT 1 FROM catalog_title_places AS tp
-         JOIN catalog_places AS cp ON cp.entity_id = tp.place_id
-         WHERE tp.title_id = t.id AND tp.kind = 'filming'
-           AND lower(cp.label) IN (${places.map(() => "?").join(", ")})
-       )`,
-    );
-    bindings.push(...places);
-  }
-
-  const keywords = filter.keywords
-    .map((keyword) => keyword.trim().toLowerCase())
-    .filter(Boolean)
-    .slice(0, 6);
-
-  if (keywords.length) {
-    conditions.push(
-      `EXISTS (
-         SELECT 1 FROM catalog_title_keywords AS k
-         WHERE k.title_id = t.id AND lower(k.keyword) IN (${keywords.map(() => "?").join(", ")})
-       )`,
-    );
-    bindings.push(...keywords);
-  }
-
-  const providerIds = validProviderIds(filter.providerIds);
-
-  if (providerIds.length) {
-    conditions.push(
-      `EXISTS (
-         SELECT 1 FROM catalog_title_providers AS p
-         WHERE p.title_id = t.id AND p.provider_id IN (SELECT value FROM json_each(?))
-       )`,
-    );
-    bindings.push(JSON.stringify(providerIds));
-  }
-
-  if (filter.minVotes > 0) {
-    conditions.push("t.vote_count >= ?");
-    bindings.push(filter.minVotes);
-  }
-
+  const eligibility = eligibilityClause(filter);
+  const conditions = [
+    `b.article <> ''`,
+    `b.views >= ${MIN_TRENDING_VIEWS}`,
+    ...eligibility.conditions,
+  ];
   const rows = await db
     .prepare(
       `SELECT ${catalogTitleColumns("t")}
@@ -354,7 +333,7 @@ async function trendingCandidates(db: D1Database, filter: BrowseTrendingFilter) 
        WHERE ${conditions.join(" AND ")}
        ORDER BY b.score DESC, t.popularity DESC`,
     )
-    .bind(...bindings)
+    .bind(...eligibility.bindings)
     .all<CatalogTitleRow>();
 
   return rows.results;
@@ -377,7 +356,9 @@ export async function browseTrending(
     mediaType: filter.mediaType,
     genres: filter.genres,
     keywords: filter.keywords,
+    places: filter.places,
     providerIds: filter.providerIds,
+    availability: filter.availability,
     minVotes: filter.minVotes,
     sort: "popularity",
     excludeIds: candidates.map((row) => row.id),

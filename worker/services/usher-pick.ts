@@ -8,19 +8,25 @@ import { logError } from "../lib/logging.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { isRecord } from "../lib/values.ts";
 import { readBeliefs } from "../repositories/beliefs.ts";
-import { searchCatalogue } from "../repositories/catalog-search.ts";
-import { neverTitleIds, rejectedTitleIds } from "../repositories/signals.ts";
-import { readShelfDetail, readViewerContext } from "../repositories/viewer-context.ts";
+import { searchCatalogue, type CatalogueSearch } from "../repositories/catalog-search.ts";
+import { readShelfDetail } from "../repositories/viewer-context.ts";
 import type { Bindings } from "../types.ts";
 import { viewerSummary } from "./beliefs.ts";
 import { beginDecision } from "./decisions.ts";
-import { retrieveTitles } from "./retrieval.ts";
+import { nearestTo } from "./embeddings.ts";
+import {
+  eligibleTitles,
+  poolFor,
+  rankTitles,
+  retrieveTitles,
+  type TitleSource,
+} from "./retrieval/index.ts";
 import { tasteVector } from "./taste.ts";
-import { preferenceSummary, readViewerPreferences } from "./usher.ts";
+import { preferenceSummary } from "./usher.ts";
+import { eligibilityFor, readViewerState } from "./viewer/state.ts";
 import { factBrief, factsFor, serviceFor } from "./why.ts";
 
 const SHORTLIST = 8;
-const NEIGHBOUR_TOP_K = 80;
 
 const PICK_PROMPT = [
   USHER_VOICE,
@@ -51,6 +57,7 @@ export type ShortlistConstraints = {
   maxRuntime?: number | null;
   mediaType?: "movie" | "tv";
   genres?: string[];
+  bannedGenres?: string[];
   certifications?: string[];
   text?: string;
   limit?: number;
@@ -66,62 +73,46 @@ export async function shortlistFor(
   } = {},
 ) {
   const constraints = options.constraints ?? {};
-  const [preferences, remembered, refused] = await Promise.all([
-    readViewerPreferences(env.DB, viewerId),
-    rejectedTitleIds(env.DB, viewerId),
-    neverTitleIds(env.DB, viewerId),
-  ]);
-  const services = [...new Set([...(options.providerIds ?? []), ...preferences.providerIds])];
-  const viewer = await readViewerContext(env.DB, viewerId, services);
-  const exclude = [
-    ...(options.rejected ?? []),
-    ...remembered,
-    ...viewer.entries
-      .filter((entry) => entry.status === "watched" || entry.status === "dropped")
-      .map((entry) => entry.titleId),
-  ];
-  const loose = {
-    providerIds: services,
-    excludeIds: exclude,
-    limit: constraints.limit ?? SHORTLIST,
-    minVotes: 200,
+  const viewer = await readViewerState(env, viewerId, {
+    providerIds: options.providerIds,
+  });
+  const preferences = viewer.preferences;
+  const eligibility = eligibilityFor(viewer, {
+    exclude: options.rejected ?? [],
+    ...(constraints.bannedGenres ? { excludeGenres: constraints.bannedGenres } : {}),
+    ...(constraints.certifications?.length ? { certifications: constraints.certifications } : {}),
     ...(constraints.maxRuntime ? { maxRuntime: constraints.maxRuntime } : {}),
     ...(constraints.mediaType ? { mediaType: constraints.mediaType } : {}),
-    ...(constraints.certifications?.length ? { certifications: constraints.certifications } : {}),
+  });
+  const loose = {
+    ...eligibility,
+    limit: constraints.limit ?? SHORTLIST,
+    minVotes: 200,
   };
-  const base = {
+  const base: CatalogueSearch = {
     ...loose,
     ...(constraints.genres?.length ? { genres: constraints.genres.slice(0, 6) } : {}),
   };
-  const vector = await tasteVector(env, viewer, preferences, {
-    never: refused,
+  const limit = constraints.limit ?? SHORTLIST;
+  const pool = poolFor(limit);
+  const vector = await tasteVector(env, viewer.entries, preferences, {
+    never: viewer.never,
     summary: await viewerSummary(env, viewerId, preferences),
   });
+  const sources: TitleSource[] = [];
 
   if (vector) {
     try {
-      const matches = await env.VECTORS.query(vector, {
-        topK: NEIGHBOUR_TOP_K,
-        returnMetadata: "none",
-      });
-      const ids = matches.matches.map((match) => match.id);
+      const matches = await nearestTo(env, vector, base);
+      const titles = await eligibleTitles(
+        env,
+        matches.map((match) => match.id),
+        base,
+        pool,
+      );
 
-      if (ids.length) {
-        const titles = await searchCatalogue(env.DB, {
-          ...base,
-          includeIds: ids,
-          sort: "given",
-        });
-
-        if (titles.length) {
-          const scores = new Map(matches.matches.map((match) => [match.id, match.score]));
-
-          return {
-            titles,
-            preferences,
-            candidates: candidatesFrom(titles, { scores, origin: "taste_vector" }),
-          };
-        }
+      if (titles.length) {
+        sources.push({ source: "semantic", titles });
       }
     } catch (error) {
       logError("usher_pick_neighbours_failed", error);
@@ -130,44 +121,67 @@ export async function shortlistFor(
 
   const wanted = constraints.genres?.length ? constraints.genres : preferences.genres.slice(0, 4);
 
-  if (wanted.length) {
+  if (sources.length === 0 && wanted.length) {
     const titles = await searchCatalogue(env.DB, {
       ...base,
       genres: wanted.slice(0, 6),
       sort: "score",
+      limit: pool,
     });
 
     if (titles.length) {
-      return { titles, preferences, candidates: candidatesFrom(titles, { origin: "genre" }) };
+      sources.push({ source: "genre", titles });
     }
   }
 
-  const titles = await retrieveTitles(env, {
-    ...loose,
-    text: constraints.text || "a film worth putting on tonight without thinking about it",
-  });
+  if (sources.length === 0) {
+    const titles = await retrieveTitles(env, {
+      ...loose,
+      text: constraints.text || "a film worth putting on tonight without thinking about it",
+    });
 
-  return { titles, preferences, candidates: candidatesFrom(titles, { origin: "retrieval" }) };
+    return {
+      titles,
+      viewer,
+      candidates: candidatesFrom(titles, { origin: "retrieval" }),
+    };
+  }
+
+  const ranked = rankTitles(sources, { limit });
+  const titles = ranked.map((candidate) => candidate.title);
+
+  return {
+    titles,
+    viewer,
+    candidates: candidatesFrom(titles, {
+      scores: new Map(ranked.map((candidate) => [candidate.title.id, candidate.score])),
+      origin: "ranked",
+    }),
+  };
 }
 
 export async function pickOne(
   env: Bindings,
   viewerId: string,
-  options: { providerIds?: string[]; rejected?: string[]; hour?: number; isWeekend?: boolean } = {},
+  options: {
+    providerIds?: string[];
+    rejected?: string[];
+    hour?: number;
+    isWeekend?: boolean;
+  } = {},
 ) {
-  const providerIds = options.providerIds ?? [];
   const rejected = (options.rejected ?? []).filter(isKnownTitle).slice(0, 40);
   const showing = showingFor(options.hour ?? 20, options.isWeekend ?? false);
+  const { titles, viewer, candidates } = await shortlistFor(env, viewerId, {
+    ...(options.providerIds ? { providerIds: options.providerIds } : {}),
+    rejected,
+    constraints: { maxRuntime: showing.maxRuntime },
+  });
   const decision = beginDecision(env, {
     feature: "usher_pick",
     promptVersion: PICK_PROMPT_VERSION,
     viewerId,
     surface: showing.slot,
-  });
-  const { titles, preferences, candidates } = await shortlistFor(env, viewerId, {
-    providerIds,
-    rejected,
-    constraints: { maxRuntime: showing.maxRuntime },
   });
 
   decision.candidates(candidates);
@@ -188,7 +202,7 @@ export async function pickOne(
           .join(", ")} · ${title.overview.slice(0, 240)}`,
     )
     .join("\n");
-  const summary = preferenceSummary(preferences);
+  const summary = preferenceSummary(viewer.preferences);
   const [shelf, beliefs] = await Promise.all([
     readShelfDetail(env.DB, viewerId, 20).catch((): never[] => []),
     readBeliefs(env.DB, viewerId),
@@ -196,7 +210,11 @@ export async function pickOne(
   const factsById = new Map(
     titles.map((title) => [
       title.id,
-      factsFor(title, { service: serviceFor(title, providerIds), shelf, beliefs }),
+      factsFor(title, {
+        service: serviceFor(title, viewer.providerIds),
+        shelf,
+        beliefs,
+      }),
     ]),
   );
   const messages: ChatMessage[] = [

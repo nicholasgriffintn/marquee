@@ -13,7 +13,7 @@ import {
 import { logError } from "../lib/logging.ts";
 import { isKnownTitle, validProviderIds } from "../lib/validation.ts";
 import { stringList } from "../lib/values.ts";
-import { readProviderPreferences } from "../repositories/profile.ts";
+import { readProviderPreferences, saveProviderPreferences } from "../repositories/profile.ts";
 import {
   readAnswers,
   readUsherRecord,
@@ -168,11 +168,21 @@ export async function questionFor(env: Bindings, id: string): Promise<UsherQuest
   }
 
   if (id === "runtime") {
-    return { id, kind: "single", line: "How long is too long?", options: RUNTIME_TOLERANCE };
+    return {
+      id,
+      kind: "single",
+      line: "How long is too long?",
+      options: RUNTIME_TOLERANCE,
+    };
   }
 
   if (id === "subtitles") {
-    return { id, kind: "single", line: "Do you read subtitles?", options: SUBTITLE_APPETITE };
+    return {
+      id,
+      kind: "single",
+      line: "Do you read subtitles?",
+      options: SUBTITLE_APPETITE,
+    };
   }
 
   if (id === "novelty") {
@@ -384,7 +394,19 @@ export async function markPrompted(env: Bindings, viewerId: string, moment: Ushe
     return;
   }
 
-  await writeUsherRecord(env.DB, viewerId, { lastPromptedAt: new Date().toISOString() });
+  await writeUsherRecord(env.DB, viewerId, {
+    lastPromptedAt: new Date().toISOString(),
+  });
+}
+
+async function mirrorProviderPreferences(db: D1Database, viewerId: string, providerIds: string[]) {
+  try {
+    const saved = await readProviderPreferences(db, viewerId);
+
+    await saveProviderPreferences(db, viewerId, [...new Set([...(saved ?? []), ...providerIds])]);
+  } catch (error) {
+    logError("usher_provider_mirror_failed", error);
+  }
 }
 
 function chipAnswer(value: unknown, question: UsherQuestion) {
@@ -467,6 +489,7 @@ export async function applyAnswer(
       const providerIds = validProviderIds(value).slice(0, 40);
 
       await saveAnswer(env.DB, viewerId, questionId, providerIds);
+      await mirrorProviderPreferences(env.DB, viewerId, providerIds);
 
       return { ok: true as const, answer: providerIds };
     }
@@ -498,7 +521,10 @@ export async function applyAnswer(
     const answer = await peopleAnswer(env, value);
 
     if (!answer) {
-      return { ok: false as const, error: "Names must be people in the catalogue" };
+      return {
+        ok: false as const,
+        error: "Names must be people in the catalogue",
+      };
     }
 
     await saveAnswer(env.DB, viewerId, questionId, answer);
@@ -594,7 +620,7 @@ export type ViewerPreferences = {
   novelty: string;
 };
 
-const NO_PREFERENCES: ViewerPreferences = {
+export const NO_PREFERENCES: ViewerPreferences = {
   providerIds: [],
   genres: [],
   frequency: "",

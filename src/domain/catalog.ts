@@ -272,6 +272,7 @@ export type CatalogSection = {
   angle?: string;
   reason?: string;
   decisionId?: string;
+  journey?: string;
 };
 
 export type CatalogResponse = {

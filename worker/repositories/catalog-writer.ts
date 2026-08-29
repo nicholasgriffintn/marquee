@@ -9,6 +9,7 @@ import type {
 import { EXTERNAL_ID_FIELDS, EXTERNAL_ID_OWNERS } from "../../src/domain/catalog.ts";
 import { computeBlendedRating, computeWeightedRating } from "../lib/ratings.ts";
 import { persistTitleExtensions } from "./catalog-arrays.ts";
+import { projectTitles } from "./catalog-index.ts";
 import { readRawItems } from "./catalog-reader.ts";
 
 const READ_CHUNK = 80;
@@ -306,11 +307,15 @@ export async function storeItems(db: D1Database, items: MediaTitle[], sourceUpda
   for (let index = 0; index < changed.length; index += READ_CHUNK) {
     const wave = changed.slice(index, index + READ_CHUNK);
 
-    // Extension tables must commit before catalog_titles: the search triggers read them.
     // oxlint-disable-next-line no-await-in-loop
     await persistTitleExtensions(db, wave);
     // oxlint-disable-next-line no-await-in-loop
     await db.batch(wave.map((title) => upsertTitle(db, title, sourceUpdatedAt)));
+    // oxlint-disable-next-line no-await-in-loop
+    await projectTitles(
+      db,
+      wave.map((title) => title.id),
+    );
   }
 
   await storeCredits(

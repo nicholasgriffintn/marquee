@@ -4,12 +4,11 @@ import { useResource } from "./useResource";
 export type TitleInsight = {
   hook: string;
   moods: string[];
-  decisionId?: string;
 };
 
 export type InsightPair = { item: MediaTitle; reason: string };
 
-type InsightResponse = { insight: TitleInsight | null; pairs: InsightPair[] };
+type InsightResponse = { insight: TitleInsight | null; pairs: InsightPair[]; journey?: string };
 
 const NO_PAIRS: InsightPair[] = [];
 
@@ -18,5 +17,10 @@ export function useTitleInsight(titleId: string | null) {
     titleId ? `/api/curator/insight/${encodeURIComponent(titleId)}` : null,
   );
 
-  return { insight: data?.insight ?? null, pairs: data?.pairs ?? NO_PAIRS, isLoading };
+  return {
+    insight: data?.insight ?? null,
+    pairs: data?.pairs ?? NO_PAIRS,
+    journey: data?.journey,
+    isLoading,
+  };
 }

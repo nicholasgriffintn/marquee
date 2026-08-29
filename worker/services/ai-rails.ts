@@ -12,21 +12,25 @@ import { logError, logEvent } from "../lib/logging.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { isRecord, parseJson, parseJsonContent } from "../lib/values.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
-import { searchCatalogue } from "../repositories/catalog-search.ts";
-import { neverTitleIds } from "../repositories/signals.ts";
+import { searchCatalogue, type CatalogueSearch } from "../repositories/catalog-search.ts";
 import { readRailFeedback } from "../repositories/usher.ts";
-import {
-  readShelfDetail,
-  readViewerAffinity,
-  readViewerContext,
-} from "../repositories/viewer-context.ts";
-import type { Bindings, ViewerContext } from "../types.ts";
+import { readShelfDetail, readViewerAffinity } from "../repositories/viewer-context.ts";
+import type { Bindings } from "../types.ts";
 import { readAngleScores } from "./angle-scores.ts";
 import { viewerSummary } from "./beliefs.ts";
 import { getGenres } from "./catalog.ts";
 import { beginDecision } from "./decisions.ts";
+import { nearestTo } from "./embeddings.ts";
+import {
+  eligibleTitles,
+  rankTitles,
+  type RetrievalSource,
+  type TitleSource,
+} from "./retrieval/index.ts";
 import { tasteVector } from "./taste.ts";
-import { preferenceSummary, readViewerPreferences, type ViewerPreferences } from "./usher.ts";
+import { preferenceSummary, type ViewerPreferences } from "./usher.ts";
+import type { Eligibility } from "./viewer/eligibility.ts";
+import { eligibilityFor, type ViewerState } from "./viewer/state.ts";
 
 const MAX_AGE_HOURS = 12;
 const RAIL_LIMIT = 3;
@@ -34,7 +38,6 @@ const SHORTLIST = 12;
 const SEED_POOL = 30;
 const RAIL_MIN = 2;
 const RAIL_MAX = 6;
-const NEIGHBOUR_TOP_K = 100;
 
 const SYSTEM_PROMPT = [
   "You are Marquee, building ONE themed shelf of films or television for a single viewer.",
@@ -67,7 +70,11 @@ export type Angle = {
   brief: string;
   fallbackText: string;
   query?: string;
-  search: { minScore?: number; minVotes?: number; sort?: "score" | "recent" | "popularity" };
+  search: {
+    minScore?: number;
+    minVotes?: number;
+    sort?: "score" | "recent" | "popularity";
+  };
   slice: "near" | "far";
 };
 
@@ -177,67 +184,69 @@ function preferenceSignature(preferences: ViewerPreferences) {
   ].join("|");
 }
 
-function viewerSignature(viewer: ViewerContext, preferences: ViewerPreferences) {
+function viewerSignature(viewer: ViewerState) {
   return [
     viewer.entries
       .map((entry) => `${entry.titleId}:${entry.status}:${entry.rating ?? ""}`)
       .join(","),
-    viewer.selectedProviderIds.join(","),
-    preferenceSignature(preferences),
+    viewer.providerIds.join(","),
+    preferenceSignature(viewer.preferences),
   ].join("|");
 }
 
-async function neighbours(env: Bindings, vector: number[], slice: Angle["slice"]) {
-  const matches = await env.VECTORS.query(vector, {
-    topK: NEIGHBOUR_TOP_K,
-    returnMetadata: "none",
-  });
+async function neighbours(
+  env: Bindings,
+  vector: number[],
+  slice: Angle["slice"],
+  search: CatalogueSearch,
+) {
+  const matches = await nearestTo(env, vector, search);
 
-  return slice === "near" ? matches.matches.slice(0, 60) : matches.matches.slice(40);
+  return slice === "near" ? matches.slice(0, 60) : matches.slice(40);
 }
 
 async function seedCandidates(
   env: Bindings,
-  viewer: ViewerContext,
+  eligibility: Eligibility,
   vector: number[] | null,
   angle: Angle,
-  exclude: string[],
   affinity: ViewerAffinity,
   wideGenres: string[],
   claimed: Set<string>,
 ) {
-  const base = {
-    providerIds: viewer.selectedProviderIds,
-    excludeIds: [...exclude, ...claimed],
+  const base: CatalogueSearch = {
+    ...eligibility,
+    excludeIds: [...eligibility.excludeIds, ...claimed],
     limit: SEED_POOL,
     ...angle.search,
   };
-  const merged = new Map<string, MediaTitle>();
-  const take = (titles: MediaTitle[]) => {
-    for (const title of titles) {
-      if (!merged.has(title.id) && !claimed.has(title.id)) {
-        merged.set(title.id, title);
-      }
+  const sources: TitleSource[] = [];
+  const gathered = new Set<string>();
+  const take = (source: RetrievalSource, titles: MediaTitle[]) => {
+    const fresh = titles.filter((title) => !claimed.has(title.id));
+
+    for (const title of fresh) {
+      gathered.add(title.id);
+    }
+
+    if (fresh.length) {
+      sources.push({ source, titles: fresh });
     }
   };
 
-  const scores = new Map<string, number>();
-
   if (vector) {
     try {
-      const matches = await neighbours(env, vector, angle.slice);
-
-      for (const match of matches) {
-        scores.set(match.id, match.score);
-      }
+      const matches = await neighbours(env, vector, angle.slice, base);
 
       if (matches.length) {
         take(
-          await searchCatalogue(env.DB, {
-            ...base,
-            includeIds: matches.map((match) => match.id),
-            sort: angle.search.sort ?? "given",
-          }),
+          "semantic",
+          await eligibleTitles(
+            env,
+            matches.map((match) => match.id),
+            base,
+            SEED_POOL,
+          ),
         );
       }
     } catch (error) {
@@ -245,9 +254,12 @@ async function seedCandidates(
     }
   }
 
-  if (merged.size < SHORTLIST && angle.query) {
+  if (gathered.size < SHORTLIST && angle.query) {
     try {
-      take(await searchCatalogue(env.DB, { ...base, query: angle.query, sort: "relevance" }));
+      take(
+        "lexical",
+        await searchCatalogue(env.DB, { ...base, query: angle.query, sort: "relevance" }),
+      );
     } catch (error) {
       logError("rail_query_seed_failed", error, { angle: angle.id });
     }
@@ -256,31 +268,32 @@ async function seedCandidates(
   const genres = angle.id === "widen" ? wideGenres.slice(0, 5) : affinity.genres.slice(0, 3);
   const keywords = angleKeywords(affinity, angle);
 
-  if (merged.size < SHORTLIST && keywords.length) {
+  if (gathered.size < SHORTLIST && keywords.length) {
     try {
-      take(await searchCatalogue(env.DB, { ...base, keywords }));
+      take("keyword", await searchCatalogue(env.DB, { ...base, keywords }));
     } catch (error) {
       logError("rail_keyword_seed_failed", error, { angle: angle.id });
     }
   }
 
-  if (merged.size < SHORTLIST && genres.length) {
+  if (gathered.size < SHORTLIST && genres.length) {
     try {
-      take(await searchCatalogue(env.DB, { ...base, genres }));
+      take("genre", await searchCatalogue(env.DB, { ...base, genres }));
     } catch (error) {
       logError("rail_genre_seed_failed", error, { angle: angle.id });
     }
   }
 
-  if (merged.size < RAIL_MIN) {
+  if (gathered.size < RAIL_MIN) {
     try {
-      take(await searchCatalogue(env.DB, base));
+      take("popularity", await searchCatalogue(env.DB, base));
     } catch (error) {
       logError("rail_fallback_failed", error, { angle: angle.id });
     }
   }
 
-  const seeds = [...merged.values()].slice(0, SEED_POOL);
+  const ranked = rankTitles(sources, { limit: SEED_POOL });
+  const seeds = ranked.map((candidate) => candidate.title);
 
   for (const title of seeds) {
     claimed.add(title.id);
@@ -289,12 +302,16 @@ async function seedCandidates(
   logEvent("rail_seeds", {
     angle: angle.id,
     seeds: seeds.length,
+    sources: sources.length,
     claimed: claimed.size,
   });
 
   return {
     seeds,
-    candidates: candidatesFrom(seeds, { scores, origin: `rail_${angle.id}` }),
+    candidates: candidatesFrom(seeds, {
+      scores: new Map(ranked.map((candidate) => [candidate.title.id, candidate.score])),
+      origin: `rail_${angle.id}`,
+    }),
   };
 }
 
@@ -396,9 +413,9 @@ export type BuiltRail = { rail: StoredRail | null; decision: DecisionDraft };
 
 export async function buildOneRail(
   env: Bindings,
-  viewer: ViewerContext,
+  viewer: ViewerState,
+  eligibility: Eligibility,
   angle: Angle,
-  exclude: string[],
   build: RailBuild = {},
 ): Promise<BuiltRail> {
   const seeds = build.seeds ?? [];
@@ -476,7 +493,7 @@ export async function buildOneRail(
           tool_call_id: call.id,
           name: call.function.name,
           content: JSON.stringify(
-            await executeCuratorTool(env, call, viewer, availableIds, exclude),
+            await executeCuratorTool(env, call, viewer, eligibility, availableIds),
           ),
         })),
       );
@@ -491,7 +508,11 @@ export async function buildOneRail(
       return built(rail);
     }
 
-    logEvent("rail_retry", { angle: angle.id, round, available: availableIds.size });
+    logEvent("rail_retry", {
+      angle: angle.id,
+      round,
+      available: availableIds.size,
+    });
     messages.push(response, { role: "user", content: nudge() });
   }
 
@@ -506,7 +527,11 @@ export async function buildOneRail(
     availableIds,
   );
 
-  logEvent("rail_final", { angle: angle.id, ok: Boolean(rail), available: availableIds.size });
+  logEvent("rail_final", {
+    angle: angle.id,
+    ok: Boolean(rail),
+    available: availableIds.size,
+  });
 
   return built(rail);
 }
@@ -544,13 +569,6 @@ async function titlesInDislikedRails(env: Bindings, viewerId: string) {
 
     return [];
   }
-}
-
-export async function readRailViewer(env: Bindings, viewerId: string) {
-  const preferences = await readViewerPreferences(env.DB, viewerId);
-  const viewer = await readViewerContext(env.DB, viewerId, preferences.providerIds);
-
-  return { viewer, preferences };
 }
 
 async function homepageTitleIds(env: Bindings) {
@@ -619,15 +637,14 @@ export async function persistRails(
   logEvent("ai_rails_generated", { rails: rails.length });
 }
 
-export async function getAiRails(env: Bindings, viewerId: string) {
-  const { viewer, preferences } = await readRailViewer(env, viewerId);
-  const signature = viewerSignature(viewer, preferences);
+export async function getAiRails(env: Bindings, viewer: ViewerState) {
+  const signature = viewerSignature(viewer);
   const cached = await env.DB.prepare(
     `SELECT signature, payload,
             (julianday('now') - julianday(created_at)) * 24 AS ageHours
      FROM ai_rails WHERE viewer_id = ?`,
   )
-    .bind(viewerId)
+    .bind(viewer.viewerId)
     .first<RailRow>();
   const isFresh = Boolean(
     cached && cached.signature === signature && cached.ageHours < MAX_AGE_HOURS,
@@ -637,26 +654,20 @@ export async function getAiRails(env: Bindings, viewerId: string) {
     sections: cached ? await hydrate(env, JSON.parse(cached.payload) as StoredRail[]) : [],
     isFresh,
     signature,
-    viewer,
-    preferences,
   };
 }
 
-export async function prepareRails(
-  env: Bindings,
-  viewer: ViewerContext,
-  viewerId: string,
-  preferences: ViewerPreferences,
-) {
+export async function prepareRails(env: Bindings, viewer: ViewerState) {
+  const { viewerId, preferences } = viewer;
   const scores = await readAngleScores(env.DB);
   const angles = rankAngles(anglesFor(preferences), scores);
-  const [refused, summary] = await Promise.all([
-    neverTitleIds(env.DB, viewerId),
-    viewerSummary(env, viewerId, preferences),
-  ]);
-  const [onHomepage, vector, behaviour, shelf, allGenres, rejected] = await Promise.all([
+  const summary = await viewerSummary(env, viewerId, preferences);
+  const [onHomepage, vector, behaviour, shelf, allGenres, disliked] = await Promise.all([
     homepageTitleIds(env),
-    tasteVector(env, viewer, preferences, { never: refused, summary }),
+    tasteVector(env, viewer.entries, preferences, {
+      never: viewer.never,
+      summary,
+    }),
     readViewerAffinity(env.DB, viewerId),
     readShelfDetail(env.DB, viewerId),
     getGenres(env, 100).catch((): string[] => []),
@@ -666,14 +677,9 @@ export async function prepareRails(
     ...behaviour,
     genres: behaviour.genres.length ? behaviour.genres : preferences.genres,
   };
-  const exclude = [
-    ...onHomepage,
-    ...refused,
-    ...rejected,
-    ...viewer.entries
-      .filter((entry) => entry.status === "watched" || entry.status === "dropped")
-      .map((entry) => entry.titleId),
-  ];
+  const eligibility = eligibilityFor(viewer, {
+    exclude: [...onHomepage, ...disliked],
+  });
   const familiar = new Set(affinity.genres.map((genre) => genre.toLowerCase()));
   const wideGenres = allGenres.filter((genre) => !familiar.has(genre.toLowerCase()));
   const claimed = new Set<string>();
@@ -684,10 +690,9 @@ export async function prepareRails(
     // oxlint-disable-next-line no-await-in-loop
     const seeded = await seedCandidates(
       env,
-      viewer,
+      eligibility,
       vector,
       angle,
-      exclude,
       affinity,
       wideGenres,
       claimed,
@@ -704,7 +709,7 @@ export async function prepareRails(
     shelf,
     seeds,
     candidates,
-    exclude,
+    eligibility,
     summary: preferenceSummary(preferences),
   };
 }

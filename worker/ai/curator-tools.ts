@@ -1,14 +1,17 @@
-import type { MediaTitle } from "../../src/domain/catalog.ts";
 import type { ToolCall } from "../lib/curator-payload.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { isRecord, parseJson } from "../lib/values.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
-import { readRanked, type CatalogueSearch } from "../repositories/catalog-search.ts";
-import { similarTo } from "../services/embeddings.ts";
-import { retrieveTitles } from "../services/retrieval.ts";
-import type { Bindings, ViewerContext } from "../types.ts";
-
-const SIMILAR_CANDIDATES = 60;
+import type { CatalogueSearch } from "../repositories/catalog-search.ts";
+import {
+  explainCandidate,
+  retrieveCandidates,
+  retrieveSimilar,
+  type Candidate,
+} from "../services/retrieval/index.ts";
+import type { Eligibility } from "../services/viewer/eligibility.ts";
+import type { ViewerState } from "../services/viewer/state.ts";
+import type { Bindings } from "../types.ts";
 
 export const CURATOR_TOOLS: ChatCompletionTool[] = [
   {
@@ -107,9 +110,9 @@ export const CURATOR_TOOLS: ChatCompletionTool[] = [
 export async function executeCuratorTool(
   env: Bindings,
   call: ToolCall,
-  viewer: ViewerContext,
+  viewer: ViewerState,
+  eligibility: Eligibility,
   availableIds: Set<string>,
-  alwaysExclude: string[] = [],
 ) {
   const parsedArguments = parseJson(call.function.arguments);
   const argumentsValue = isRecord(parsedArguments) ? parsedArguments : {};
@@ -122,7 +125,7 @@ export async function executeCuratorTool(
     const byId = new Map(titles.map((title) => [title.id, title]));
 
     return {
-      selectedProviderIds: viewer.selectedProviderIds,
+      selectedProviderIds: viewer.providerIds,
       entries: viewer.entries.map((entry) => {
         const title = byId.get(entry.titleId);
 
@@ -140,10 +143,10 @@ export async function executeCuratorTool(
   }
 
   if (call.function.name === "search_catalogue") {
-    const search = buildSearch(argumentsValue, viewer, alwaysExclude);
-    const results = await retrieveTitles(env, { ...search, text: search.query });
+    const search = buildSearch(argumentsValue, viewer, eligibility);
+    const candidates = await retrieveCandidates(env, { ...search, text: search.query });
 
-    return summarise(results, availableIds);
+    return summarise(candidates, availableIds);
   }
 
   if (call.function.name === "find_similar") {
@@ -153,13 +156,9 @@ export async function executeCuratorTool(
       return { error: "Unknown title id" };
     }
 
-    const search = buildSearch(argumentsValue, viewer, [...alwaysExclude, titleId]);
-    const neighbours = (await similarTo(env, titleId, SIMILAR_CANDIDATES))
-      .filter((id) => !search.excludeIds?.includes(id))
-      .slice(0, search.limit ?? 12);
-    const results = neighbours.length ? await readRanked(env.DB, neighbours) : [];
+    const search = buildSearch(argumentsValue, viewer, eligibility, [titleId]);
 
-    return summarise(results, availableIds);
+    return summarise(await retrieveSimilar(env, titleId, search), availableIds);
   }
 
   if (call.function.name === "get_title_details") {
@@ -188,51 +187,51 @@ export async function executeCuratorTool(
   return { error: "Unknown tool" };
 }
 
-function summarise(results: MediaTitle[], availableIds: Set<string>) {
-  for (const item of results) {
-    availableIds.add(item.id);
+function summarise(candidates: Candidate[], availableIds: Set<string>) {
+  for (const candidate of candidates) {
+    availableIds.add(candidate.title.id);
   }
 
   return {
-    results: results.map((item) => ({
-      id: item.id,
-      title: item.title,
-      year: item.year,
-      mediaType: item.mediaType,
-      genres: item.genres.slice(0, 3),
-      keywords: (item.keywords ?? []).slice(0, 6),
-      tmdbScore: item.tmdbScore,
-      tmdbVoteCount: item.tmdbVoteCount,
-      overview: item.overview.slice(0, 160),
+    results: candidates.map((candidate) => ({
+      id: candidate.title.id,
+      title: candidate.title.title,
+      year: candidate.title.year,
+      mediaType: candidate.title.mediaType,
+      genres: candidate.title.genres.slice(0, 3),
+      keywords: (candidate.title.keywords ?? []).slice(0, 6),
+      tmdbScore: candidate.title.tmdbScore,
+      tmdbVoteCount: candidate.title.tmdbVoteCount,
+      overview: candidate.title.overview.slice(0, 160),
+      matchedOn: explainCandidate(candidate),
     })),
   };
 }
 
 function buildSearch(
   argumentsValue: Record<string, unknown>,
-  viewer: ViewerContext,
-  alwaysExclude: string[] = [],
+  viewer: ViewerState,
+  eligibility: Eligibility,
+  alsoExclude: string[] = [],
 ): CatalogueSearch {
+  const keepShelved =
+    argumentsValue.excludeWatched === false ? new Set(viewer.finished) : new Set<string>();
   const excludeIds = [
-    ...alwaysExclude,
-    ...(argumentsValue.excludeWatched === false
-      ? []
-      : viewer.entries
-          .filter((entry) => entry.status === "watched" || entry.status === "dropped")
-          .map((entry) => entry.titleId)),
+    ...alsoExclude,
+    ...eligibility.excludeIds.filter((titleId) => !keepShelved.has(titleId)),
   ];
 
   return {
+    ...eligibility,
     query: typeof argumentsValue.query === "string" ? argumentsValue.query : undefined,
     genres: Array.isArray(argumentsValue.genres)
       ? argumentsValue.genres.filter((genre): genre is string => typeof genre === "string")
       : undefined,
-    mediaType:
-      argumentsValue.mediaType === "movie" || argumentsValue.mediaType === "tv"
-        ? argumentsValue.mediaType
-        : undefined,
+    ...(argumentsValue.mediaType === "movie" || argumentsValue.mediaType === "tv"
+      ? { mediaType: argumentsValue.mediaType }
+      : {}),
     providerIds:
-      argumentsValue.availableOnSelectedServices === false ? [] : viewer.selectedProviderIds,
+      argumentsValue.availableOnSelectedServices === false ? [] : eligibility.providerIds,
     minScore: typeof argumentsValue.minScore === "number" ? argumentsValue.minScore : undefined,
     minVotes: typeof argumentsValue.minVotes === "number" ? argumentsValue.minVotes : undefined,
     releasedAfter:

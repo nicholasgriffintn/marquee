@@ -7,7 +7,6 @@ import {
   queueVectorReindex,
 } from "../jobs/ingestion.ts";
 import { readBudgets, resumeSource } from "../repositories/budgets.ts";
-import { countSearchDrift, reconcileSearchIndex } from "../repositories/catalog-index.ts";
 import { readCinemaCoverage } from "../repositories/cinemas.ts";
 import { readBackfillProgress } from "../repositories/discover.ts";
 import { rebuildPeopleIndex } from "../repositories/usher.ts";
@@ -19,6 +18,8 @@ import { computeAngleScores } from "./angle-scores.ts";
 import { syncAwards } from "./awards.ts";
 import { queueCinemaDirectories, queueCinemaScreenings } from "./cinema-sync.ts";
 import { advanceDiscoverFrontier } from "./discover.ts";
+import { EMBEDDING_MODEL } from "./embeddings.ts";
+import { readIndexReadiness, rebuildSearchIndex, reconcileSearchIndex } from "./index-readiness.ts";
 import { queueRevivalMirrors } from "./revival-mirror.ts";
 import { queueRevivalSources } from "./revival.ts";
 import { syncTitlePlaces } from "./title-places.ts";
@@ -47,7 +48,8 @@ async function catalogueStats(env: Bindings) {
     env.DB.prepare(
       `SELECT
          tt.titles, tt.movies, tt.shows, tt.posters, tt.animeIds, tt.animeDetails,
-         (SELECT count(*) FROM title_embeddings WHERE content_hash IS NOT NULL) AS embeddings,
+         (SELECT count(*) FROM title_embeddings
+           WHERE content_hash IS NOT NULL AND model = ?1) AS embeddings,
          (SELECT count(*) FROM title_buzz WHERE article <> '') AS buzz,
          (SELECT count(*) FROM title_schedule WHERE airs_at >= datetime('now')) AS upcoming,
          (SELECT count(*) FROM catalog_sections) AS sections,
@@ -101,7 +103,9 @@ async function catalogueStats(env: Bindings) {
             sum(CASE WHEN mirror_state = 'mirrored' THEN 1 ELSE 0 END) AS revivalMirrored,
             sum(CASE WHEN status = 'candidate' THEN 1 ELSE 0 END) AS revivalPending
           FROM revival_works) AS rv`,
-    ).first<CountRow>(),
+    )
+      .bind(EMBEDDING_MODEL)
+      .first<CountRow>(),
     readWorkingSetStats(env.DB),
   ]);
 
@@ -275,9 +279,9 @@ export async function readAdminOverview(env: Bindings) {
 }
 
 export async function readAdminPipeline(env: Bindings) {
-  const [enrichment, searchDrift, failures, lastRuns] = await Promise.all([
+  const [enrichment, readiness, failures, lastRuns] = await Promise.all([
     enrichmentStats(env),
-    countSearchDrift(env.DB).catch(() => 0),
+    readIndexReadiness(env),
     env.DB.prepare(
       `SELECT job_type AS jobType, subject_id AS subjectId, error, started_at AS startedAt
          FROM ingestion_runs
@@ -311,7 +315,7 @@ export async function readAdminPipeline(env: Bindings) {
 
   return {
     enrichment,
-    searchDrift,
+    readiness,
     failures: failures.results,
     lastRuns: lastRuns.results,
     runWindowHours: RUN_WINDOW_HOURS,
@@ -414,6 +418,26 @@ export async function runAdminAction(env: Bindings, action: AdminAction) {
     return { detail: "Queued the next batch of embeddings" };
   }
 
+  if (action === "index-reconcile") {
+    const { projected, pending } = await reconcileSearchIndex(env);
+
+    return {
+      queued: pending,
+      detail: projected
+        ? `Reprojected ${projected.toLocaleString()} titles, ${pending.toLocaleString()} still waiting`
+        : "The search index is already in step with the catalogue",
+    };
+  }
+
+  if (action === "index-rebuild") {
+    const pending = await rebuildSearchIndex(env);
+
+    return {
+      queued: pending,
+      detail: `Queued ${pending.toLocaleString()} titles for reprojection`,
+    };
+  }
+
   if (action === "vector-metadata") {
     await queueVectorReindex(env);
 
@@ -426,17 +450,6 @@ export async function runAdminAction(env: Bindings, action: AdminAction) {
     return {
       queued: titles,
       detail: `Working set now tracks ${titles} titles`,
-    };
-  }
-
-  if (action === "search-index") {
-    const { repaired, remaining } = await reconcileSearchIndex(env.DB);
-
-    return {
-      queued: repaired,
-      detail: remaining
-        ? `Reprojected ${repaired.toLocaleString()} titles, ${remaining.toLocaleString()} still to go`
-        : `Reprojected ${repaired.toLocaleString()} titles, the index now matches`,
     };
   }
 

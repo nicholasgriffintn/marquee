@@ -61,12 +61,16 @@ export function DigestPage({
 }) {
   const { digest, isLoading } = useDigest(isSignedIn);
   const openLead = useJourneyOpen(onOpen, {
-    source: "digest_lead",
-    ...(digest?.lead?.decisionId ? { decisionId: digest.lead.decisionId } : {}),
+    journey: digest?.lead?.journey,
+    rank: 0,
   });
   const openFresh = useJourneyOpen(onOpen, {
-    source: "digest_fresh",
-    ...(digest?.decisionId ? { decisionId: digest.decisionId } : {}),
+    journey: digest?.freshJourney,
+    titleIds: digest?.fresh.map((item) => item.id),
+  });
+  const openTrending = useJourneyOpen(onOpen, {
+    journey: digest?.trendingJourney,
+    titleIds: digest?.trending.map((item) => item.id),
   });
   const isSettling = isSessionLoading || (isSignedIn && isLoading);
   const returning = (digest?.episodes ?? []).filter(
@@ -225,7 +229,7 @@ export function DigestPage({
           </Heading>
           <ResultsGrid>
             {digest.trending.map((item) => (
-              <TitleCard key={item.id} item={item} onOpen={onOpen} />
+              <TitleCard key={item.id} item={item} onOpen={openTrending} />
             ))}
           </ResultsGrid>
         </ErrorBoundary>

@@ -1,84 +1,30 @@
 import { logError, logEvent } from "../lib/logging.ts";
 import { normalise } from "../lib/vector.ts";
-import type { Bindings, ViewerContext, ViewingContext } from "../types.ts";
+import type { Bindings, ViewingContext } from "../types.ts";
 import { embedQuery, readVectors } from "./embeddings.ts";
 import { preferenceSummary, type ViewerPreferences } from "./usher.ts";
+import { entryWeight, recencyWeight } from "./viewer/weights.ts";
 
 const TASTE_SAMPLE = 24;
 const STATED_FLOOR = 0.2;
 const BEHAVIOUR_FULL = 12;
-const HALF_LIFE_DAYS = 240;
-const RECENCY_FLOOR = 0.15;
 const NEGATIVE_SCALE = 0.5;
 const NEVER_WEIGHT = -1.2;
 
 type WeightedTitle = { titleId: string; weight: number };
 
-function statusWeight(status: ViewingContext["status"]) {
-  if (status === "watched") {
-    return 1;
-  }
-
-  if (status === "watching") {
-    return 0.8;
-  }
-
-  if (status === "dropped") {
-    return -0.6;
-  }
-
-  return 0.5;
-}
-
-function ratingWeight(rating: number | null) {
-  if (rating === null) {
-    return 1;
-  }
-
-  if (rating >= 5) {
-    return 1.6;
-  }
-
-  if (rating === 4) {
-    return 1.3;
-  }
-
-  if (rating === 3) {
-    return 0.7;
-  }
-
-  return rating === 2 ? -0.5 : -1.1;
-}
-
-function entryWeight(status: ViewingContext["status"], rating: number | null) {
-  const stance = statusWeight(status);
-  const regard = ratingWeight(rating);
-  const strength = Math.abs(stance * regard);
-
-  return stance < 0 || regard < 0 ? -strength : strength;
-}
-
-function recencyWeight(updatedAt: string) {
-  const stamped = Date.parse(updatedAt);
-
-  if (Number.isNaN(stamped)) {
-    return RECENCY_FLOOR;
-  }
-
-  const ageDays = Math.max(0, (Date.now() - stamped) / 86_400_000);
-
-  return Math.max(RECENCY_FLOOR, 0.5 ** (ageDays / HALF_LIFE_DAYS));
-}
-
 export function weighTitles(
-  viewer: ViewerContext,
+  entries: ViewingContext[],
   never: string[] = [],
   sample = TASTE_SAMPLE,
 ): WeightedTitle[] {
-  const weighted = viewer.entries.map((entry): WeightedTitle => {
+  const weighted = entries.map((entry): WeightedTitle => {
     const base = entryWeight(entry.status, entry.rating);
 
-    return { titleId: entry.titleId, weight: base * recencyWeight(entry.updatedAt) };
+    return {
+      titleId: entry.titleId,
+      weight: base * recencyWeight(entry.updatedAt),
+    };
   });
   const seen = new Set(weighted.map((entry) => entry.titleId));
   const refused = never
@@ -182,11 +128,11 @@ export function statedWeight(savedCount: number) {
 
 export async function tasteVector(
   env: Bindings,
-  viewer: ViewerContext,
+  entries: ViewingContext[],
   preferences: ViewerPreferences,
   options: { never?: string[]; summary?: string } = {},
 ) {
-  const weighted = weighTitles(viewer, options.never ?? []);
+  const weighted = weighTitles(entries, options.never ?? []);
   const [behaviour, stated] = await Promise.all([
     behaviourVector(env, weighted),
     statedVector(env, options.summary ?? preferenceSummary(preferences)),

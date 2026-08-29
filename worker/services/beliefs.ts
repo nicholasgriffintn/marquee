@@ -3,7 +3,7 @@ import { logError } from "../lib/logging.ts";
 import { jsonStringList } from "../lib/values.ts";
 import { readBeliefs, writeDerivedBeliefs, type BeliefDraft } from "../repositories/beliefs.ts";
 import { readSignals } from "../repositories/signals.ts";
-import type { Bindings, ViewerContext } from "../types.ts";
+import type { Bindings, ViewingContext } from "../types.ts";
 import { noteFacets } from "./note-facets.ts";
 import { weighTitles } from "./taste.ts";
 import { preferenceSummary, readViewerPreferences, type ViewerPreferences } from "./usher.ts";
@@ -309,18 +309,18 @@ async function serviceDrafts(db: D1Database, viewerId: string): Promise<BeliefDr
 export async function refreshBeliefs(
   env: Bindings,
   viewerId: string,
-  viewer: ViewerContext,
+  entries: ViewingContext[],
   options: { includeFacets?: boolean } = {},
 ) {
   try {
     const preferences = await readViewerPreferences(env.DB, viewerId);
-    const weighted = weighTitles(viewer);
+    const weighted = weighTitles(entries);
     const facts = await factsFor(
       env.DB,
       weighted.map((entry) => entry.titleId),
     );
     const byId = new Map(facts.map((entry) => [entry.titleId, entry]));
-    const entries = weighted.flatMap((entry) => {
+    const weightedFacts = weighted.flatMap((entry) => {
       const found = byId.get(entry.titleId);
 
       return found ? [{ facts: found, weight: entry.weight }] : [];
@@ -328,7 +328,7 @@ export async function refreshBeliefs(
     const stated = new Set(canonicalGenres(preferences.genres));
     const drafts = [
       ...statedDrafts(preferences),
-      ...derivedDrafts(entries, stated),
+      ...derivedDrafts(weightedFacts, stated),
       ...(await serviceDrafts(env.DB, viewerId)),
       ...(await moodDrafts(env.DB, viewerId)),
       ...(options.includeFacets ? await noteFacets(env, viewerId) : []),

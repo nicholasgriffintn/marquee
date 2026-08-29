@@ -4,13 +4,15 @@ import { runAiMessage, runAiObject, runAiStream } from "../ai/run.ts";
 import { USHER_VOICE } from "../ai/usher-voice.ts";
 import { parseCuratorResult, type ChatMessage } from "../lib/curator-payload.ts";
 import { candidatesFrom, promptVersion } from "../lib/decisions.ts";
+import { mintJourney } from "../lib/journeys.ts";
 import { logError } from "../lib/logging.ts";
 import { parseJsonContent } from "../lib/values.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
-import { readViewerContext } from "../repositories/viewer-context.ts";
-import type { Bindings, ViewerContext } from "../types.ts";
+import type { Bindings } from "../types.ts";
 import { beginDecision, type Decision } from "./decisions.ts";
-import { preferenceSummary, readViewerPreferences } from "./usher.ts";
+import { preferenceSummary } from "./usher.ts";
+import type { Eligibility } from "./viewer/eligibility.ts";
+import { eligibilityFor, readViewerState, type ViewerState } from "./viewer/state.ts";
 
 const MAX_TOOL_ROUNDS = 4;
 
@@ -44,7 +46,7 @@ export type CuratorEvent =
   | {
       type: "result";
       titleIds: string[];
-      decisionId: string;
+      journey: string;
       items: Awaited<ReturnType<typeof readItems>>;
     }
   | { type: "delta"; text: string }
@@ -66,7 +68,8 @@ function historyMessages(turns: CuratorTurn[]): ChatMessage[] {
 async function runCurator(
   env: Bindings,
   prompt: string,
-  viewer: ViewerContext,
+  viewer: ViewerState,
+  eligibility: Eligibility,
   turns: CuratorTurn[],
   decision: Decision,
   summary = "",
@@ -134,7 +137,9 @@ async function runCurator(
         role: "tool" as const,
         tool_call_id: call.id,
         name: call.function.name,
-        content: JSON.stringify(await executeCuratorTool(env, call, viewer, availableIds)),
+        content: JSON.stringify(
+          await executeCuratorTool(env, call, viewer, eligibility, availableIds),
+        ),
       })),
     );
 
@@ -186,11 +191,9 @@ export async function* curateStream(
 
   yield { type: "status", label: viewerId ? "Reading your shelf" : "Reading your services" };
 
-  const preferences = await readViewerPreferences(env.DB, viewerId);
-  const viewer = await readViewerContext(env.DB, viewerId, [
-    ...new Set([...(options.providerIds ?? []), ...preferences.providerIds]),
-  ]);
-  const tasteLine = preferenceSummary(preferences);
+  const viewer = await readViewerState(env, viewerId, { providerIds: options.providerIds });
+  const eligibility = eligibilityFor(viewer);
+  const tasteLine = preferenceSummary(viewer.preferences);
   const showing = showingFor(options.hour ?? 20, options.isWeekend ?? false);
 
   yield {
@@ -199,6 +202,7 @@ export async function* curateStream(
   };
 
   let result;
+  let items;
 
   try {
     result = await runCurator(
@@ -207,24 +211,30 @@ export async function* curateStream(
         ? `${prompt}\n\nRefine the selection you just gave me. Keep what still fits and replace what does not.`
         : prompt,
       viewer,
+      eligibility,
       turns,
       decision,
       tasteLine,
       showing.brief,
     );
+    decision.select(result.titleIds);
+    items = await readItems(env.DB, result.titleIds);
   } catch (error) {
     await decision.settle("failed");
 
     throw error;
   }
 
-  decision.select(result.titleIds);
-
-  const items = await readItems(env.DB, result.titleIds);
-
   await decision.settle(items.length ? "served" : "empty");
 
-  yield { type: "result", titleIds: result.titleIds, decisionId: decision.id, items };
+  const journey = await mintJourney(env, {
+    mode: "curator",
+    angle: "curator",
+    size: items.length,
+    decisionId: decision.id,
+  });
+
+  yield { type: "result", titleIds: result.titleIds, journey: journey.token, items };
   yield { type: "status", label: "Writing it up" };
 
   const selection = items

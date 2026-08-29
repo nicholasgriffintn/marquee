@@ -1,20 +1,20 @@
 import { useCallback } from "react";
 
 import type { MediaTitle } from "../domain/catalog";
-import { startJourney, type JourneyStart } from "../lib/journey";
+import { startJourney } from "../lib/journey";
+
+type JourneyStart = { journey?: string; rank?: number; titleIds?: string[] };
 
 export function useJourneyOpen(onOpen: (item: MediaTitle) => void, start: JourneyStart) {
-  const { source, decisionId, position } = start;
+  const { journey, rank, titleIds } = start;
 
   return useCallback(
     (item: MediaTitle) => {
-      startJourney(item.id, {
-        source,
-        ...(position === undefined ? {} : { position }),
-        ...(decisionId ? { decisionId } : {}),
-      });
+      const inferredRank = rank ?? titleIds?.indexOf(item.id);
+
+      startJourney(item.id, journey, inferredRank === -1 ? undefined : inferredRank);
       onOpen(item);
     },
-    [decisionId, onOpen, position, source],
+    [journey, onOpen, rank, titleIds],
   );
 }

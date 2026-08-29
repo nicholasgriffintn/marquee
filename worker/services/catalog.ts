@@ -20,7 +20,7 @@ import { readProviders } from "../repositories/providers.ts";
 import type { Bindings } from "../types.ts";
 import { applyBuzz, readBuzz, readTrendingBuzz } from "./buzz.ts";
 import { findGapTitles } from "./catalogue-gaps.ts";
-import { retrieveTitles } from "./retrieval.ts";
+import { retrieveTitles } from "./retrieval/index.ts";
 import { readNextEpisode, readTonight } from "./schedule.ts";
 import { traktUpcoming } from "./trakt.ts";
 
@@ -91,6 +91,7 @@ export async function searchCatalogueHybrid(env: Bindings, query: string, provid
   const items = await retrieveTitles(env, {
     text: query,
     providerIds,
+    availability: "confirmed-or-unknown",
     limit: HYBRID_SEARCH_LIMIT,
   });
 

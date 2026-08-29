@@ -15,6 +15,21 @@ struct ExternalDestination: Identifiable {
   let url: URL
   let label: String
   let kind: Kind
+  var titleId: String? = nil
+  var providerId: String? = nil
+  var monetization: String? = nil
+
+  func reportExit() {
+    guard kind == .provider, let titleId else { return }
+
+    Telemetry.shared.record(
+      .providerExit,
+      titleId: titleId,
+      detail: label,
+      providerId: providerId,
+      monetization: monetization
+    )
+  }
 
   var message: String {
     switch kind {
@@ -46,6 +61,7 @@ struct ExternalLinkButton<Label: View>: View {
   var body: some View {
     Button {
       if skipsWarning {
+        destination.reportExit()
         openURL(destination.url)
       } else {
         pendingDestination = destination
@@ -148,6 +164,7 @@ struct ExternalExitView: View {
 
   private func leave() {
     if rememberChoice { skipsWarning = true }
+    destination.reportExit()
     openURL(destination.url)
     dismiss()
   }

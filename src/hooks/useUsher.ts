@@ -10,12 +10,7 @@ type StateResponse = { status: string; answered: string[]; awayDays?: number };
 
 type MomentResponse = { moment: UsherMoment | null };
 
-type PickResponse = {
-  item: MediaTitle | null;
-  line: string;
-  facts?: string[];
-  decisionId?: string;
-};
+type PickResponse = { item: MediaTitle | null; line: string; facts?: string[]; journey?: string };
 
 export type UsherPickState = {
   item: MediaTitle | null;
@@ -41,7 +36,7 @@ type OrderResponse = {
   pick: OrderResult | null;
   backups: OrderResult[];
   line: string;
-  decisionId?: string;
+  journey?: string;
 };
 
 const NO_PICK: UsherPickState = { item: null, line: "", facts: [], isPicking: false, error: "" };
@@ -270,10 +265,7 @@ export function useUsher(isSignedIn: boolean) {
         }
 
         if (response.item) {
-          startJourney(response.item.id, {
-            source: "usher_pick",
-            ...(response.decisionId ? { decisionId: response.decisionId } : {}),
-          });
+          startJourney(response.item.id, response.journey, 0);
         }
 
         setPick({
@@ -309,7 +301,7 @@ export function useUsher(isSignedIn: boolean) {
         jsonMutation("POST", {
           titleId,
           source,
-          ...(journey ? { journeyId: journey.id, decisionId: journey.decisionId } : {}),
+          ...(journey ? { journey: journey.token, rank: journey.rank } : {}),
           ...context,
         }),
       ).catch(() => undefined);
@@ -357,15 +349,13 @@ export function useUsher(isSignedIn: boolean) {
           }),
         );
 
-        const decision = response.decisionId ? { decisionId: response.decisionId } : {};
-
         if (response.pick) {
-          startJourney(response.pick.item.id, { source: "usher_order", ...decision });
+          startJourney(response.pick.item.id, response.journey, 0);
         }
 
-        for (const backup of response.backups ?? []) {
-          startJourney(backup.item.id, { source: "usher_order_backup", ...decision });
-        }
+        (response.backups ?? []).forEach((backup, index) => {
+          startJourney(backup.item.id, response.journey, index + 1);
+        });
 
         setOrder({
           isOpen: true,

@@ -10,6 +10,7 @@ import {
 } from "../auth/session.ts";
 import { recordEvent } from "../lib/events.ts";
 import { jsonResponse, readJsonObject } from "../lib/http.ts";
+import { mintJourney, ticketSections } from "../lib/journeys.ts";
 import { logError } from "../lib/logging.ts";
 import { isKnownTitle, validProviderIds } from "../lib/validation.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
@@ -17,6 +18,7 @@ import { pinShelf, readPinnedShelves, unpinShelf } from "../repositories/shelves
 import { getAiRails } from "../services/ai-rails.ts";
 import { readDigest } from "../services/digest.ts";
 import { getTitleInsight } from "../services/title-insight.ts";
+import { readViewerState } from "../services/viewer/state.ts";
 import type { Bindings } from "../types.ts";
 import { viewerHour } from "./usher.ts";
 
@@ -114,16 +116,22 @@ curatorRoutes.get("/rails", requireViewer, async (context) => {
   try {
     context.header("cache-control", "no-store");
 
-    const { sections, isFresh } = await getAiRails(context.env, user.id);
+    const startedAt = Date.now();
+    const viewer = await readViewerState(context.env, user.id);
+    const { sections, isFresh } = await getAiRails(context.env, viewer);
 
     if (isFresh) {
+      const ticketed = await ticketSections(context.env, sections, "ai-rail");
+
       recordEvent(context.env, {
         name: "rails_served",
         viewerId: user.id,
-        value: sections.length,
+        mode: "ai-rail",
+        value: ticketed.length,
+        latencyMs: Date.now() - startedAt,
       });
 
-      return jsonResponse({ sections, status: "ready" });
+      return jsonResponse({ sections: ticketed, status: "ready" });
     }
 
     if (context.req.query("generate") === "1") {
@@ -173,14 +181,23 @@ curatorRoutes.get("/insight/:titleId", async (context) => {
       insight.pairs.map((pair) => pair.titleId),
     );
     const byId = new Map(paired.map((item) => [item.id, item]));
+    const pairs = insight.pairs.flatMap((pair) => {
+      const item = byId.get(pair.titleId);
+
+      return item ? [{ item, reason: pair.reason }] : [];
+    });
+    const journey = await mintJourney(context.env, {
+      mode: "insight",
+      angle: "insight_pair",
+      size: pairs.length,
+      decisionId: insight.decisionId,
+    });
+    const { decisionId: _decisionId, ...publicInsight } = insight;
 
     return jsonResponse({
-      insight,
-      pairs: insight.pairs.flatMap((pair) => {
-        const item = byId.get(pair.titleId);
-
-        return item ? [{ item, reason: pair.reason }] : [];
-      }),
+      insight: publicInsight,
+      pairs,
+      journey: journey.token,
     });
   } catch (error) {
     logError("title_insight_failed", error);

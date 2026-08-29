@@ -8,11 +8,11 @@ import {
   getAiRails,
   persistRails,
   prepareRails,
-  readRailViewer,
   type BuiltRail,
   type StoredRail,
 } from "../services/ai-rails.ts";
 import { settleDecision } from "../services/decisions.ts";
+import { readViewerState } from "../services/viewer/state.ts";
 import type { Bindings } from "../types.ts";
 
 const RETRIES = { limit: 2, delay: "10 seconds", backoff: "exponential" } as const;
@@ -22,16 +22,16 @@ export type RailsParameters = { viewerId: string };
 export class RailsWorkflow extends WorkflowEntrypoint<Bindings, RailsParameters> {
   async run(event: Readonly<WorkflowEvent<RailsParameters>>, step: WorkflowStep) {
     const { viewerId } = event.payload;
-    const { viewer, preferences } = await readRailViewer(this.env, viewerId);
-    const { signature } = await getAiRails(this.env, viewerId);
+    const viewer = await readViewerState(this.env, viewerId);
+    const { signature } = await getAiRails(this.env, viewer);
     const prepared = await step.do("read taste", { retries: RETRIES }, async () =>
-      prepareRails(this.env, viewer, viewerId, preferences),
+      prepareRails(this.env, viewer),
     );
     const built = await Promise.all(
       prepared.angles.map((angle) =>
         step
           .do(`build ${angle.id}`, { retries: RETRIES }, async () =>
-            buildOneRail(this.env, viewer, angle, prepared.exclude, {
+            buildOneRail(this.env, viewer, prepared.eligibility, angle, {
               viewerId,
               seeds: prepared.seeds[angle.id] ?? [],
               candidates: prepared.candidates[angle.id] ?? [],

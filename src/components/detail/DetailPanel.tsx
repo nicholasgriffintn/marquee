@@ -137,10 +137,15 @@ export function DetailPanel({
   const { providers, nextEpisode, isRefreshing } = useAvailability(item, availabilityEnabled);
   const watchProviders = mergeAnimeProviders(item, providers);
   const watchOrder = useWatchOrder(item);
-  const { insight, pairs, isLoading: isInsightLoading } = useTitleInsight(item.id);
+  const {
+    insight,
+    pairs,
+    journey: insightJourney,
+    isLoading: isInsightLoading,
+  } = useTitleInsight(item.id);
   const openPair = useJourneyOpen(onOpen, {
-    source: "insight_pair",
-    ...(insight?.decisionId ? { decisionId: insight.decisionId } : {}),
+    journey: insightJourney,
+    titleIds: pairs.map((pair) => pair.item.id),
   });
   const similar = useRecommendations(item.id, item.recommendationIds, SIMILAR_LIMIT);
   const malSimilar = useAnimeRecommendations(item);
