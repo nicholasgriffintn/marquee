@@ -98,12 +98,20 @@ export function availabilityLine(title: string, providers: ProviderAvailability[
   }
 
   if (free.length > 0) {
-    const withAds = free.some((provider) => provider.offerTypes.includes("Free with ads"));
+    const adFree = free.filter((provider) => !provider.offerTypes.includes("Free with ads"));
+    const withAds = free.filter((provider) => provider.offerTypes.includes("Free with ads"));
     const subject = clauses.length > 0 ? "it" : title;
+    const parts: string[] = [];
 
-    clauses.push(
-      `watch ${subject} free ${withAds ? "with adverts " : ""}on ${providerNames(free)}`,
-    );
+    if (adFree.length > 0) {
+      parts.push(`free on ${providerNames(adFree)}`);
+    }
+
+    if (withAds.length > 0) {
+      parts.push(`free with adverts on ${providerNames(withAds)}`);
+    }
+
+    clauses.push(`watch ${subject} ${parts.join(" or ")}`);
   }
 
   const opening = clauses.length > 0 ? `Right now you can ${clauses.join(", or ")}.` : "";
