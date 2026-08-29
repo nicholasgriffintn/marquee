@@ -110,7 +110,7 @@
   width: 22px;
 }
 
-.pageCurrent {
+.pages i.pageCurrent {
   background: var(--acid);
 }
 
