@@ -53,10 +53,16 @@ export function QualityTab({ revision }: { revision: number }) {
 
         <Panel heading="What the angles are earning">
           <p className={styles.note}>
-            Counted from events that arrived with a journey this worker signed, over the last
-            twenty-eight days. Anything a client made up on its own carries no angle and never
-            reaches these numbers. Attrition is the share of clicks that ended without a provider or
-            a watch.
+            An angle is the reason a shelf exists — <code>close</code>, <code>acclaimed</code> and{" "}
+            <code>widen</code> for the curated rails, or the rail’s own id for the rest. Every title
+            opened from a shelf is credited back to its angle, and the score here decides which
+            angles get built first for the next viewer. Attrition is the share of clicks that ended
+            without a provider or a watch.
+          </p>
+          <p className={styles.note}>
+            These come from Analytics Engine, not the database, and only count events that arrived
+            with a journey this worker signed. Scoring needs an API token with Account Analytics
+            Read; without one “Rescore shelves” reports why it could not read them.
           </p>
           {quality && quality.angles.length > 0 ? (
             <ul className={styles.list}>
@@ -78,7 +84,8 @@ export function QualityTab({ revision }: { revision: number }) {
             </ul>
           ) : (
             <p className={styles.empty}>
-              No scored angles yet. Run “Rescore shelves” once events have accumulated.
+              No scored angles yet. Run “Rescore shelves”: it either scores them, or says what
+              stopped it.
             </p>
           )}
         </Panel>

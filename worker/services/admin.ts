@@ -377,7 +377,12 @@ export async function runAdminAction(env: Bindings, action: AdminAction) {
   if (action === "angle-scores") {
     const scores = await computeAngleScores(env);
 
-    return { angles: scores.length, detail: `Scored ${scores.length} angles` };
+    return {
+      angles: scores.length,
+      detail: scores.length
+        ? `Scored ${scores.length} angles`
+        : "Read the events, but none of the last 28 days carried an angle",
+    };
   }
 
   if (action === "sweep-light" || action === "sweep-deep") {

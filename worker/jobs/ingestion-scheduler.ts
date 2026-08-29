@@ -1,3 +1,4 @@
+import { logError } from "../lib/logging.ts";
 import { dispatchAlerts } from "../services/alerts/dispatch.ts";
 import { computeAngleScores } from "../services/angle-scores.ts";
 import type { Bindings } from "../types.ts";
@@ -7,7 +8,9 @@ const DEEP_SWEEP_CRON = "41 4 * * *";
 
 export async function scheduleIngestion(env: Bindings, cron: string) {
   if (cron === DIGEST_CRON) {
-    await computeAngleScores(env);
+    await computeAngleScores(env).catch((error: unknown) => {
+      logError("angle_scores_failed", error);
+    });
     await env.DIGEST_WORKFLOW.create({ params: {} });
 
     return;

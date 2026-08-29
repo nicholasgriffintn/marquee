@@ -1,8 +1,9 @@
-import { logEvent } from "../lib/logging.ts";
+import { logError, logEvent } from "../lib/logging.ts";
 import {
   projectTitles,
   queueSearchRebuild,
   readSearchIndexState,
+  sampleSearchDrift,
   takePendingTitles,
 } from "../repositories/catalog-index.ts";
 import type { Bindings } from "../types.ts";
@@ -17,6 +18,8 @@ export type IndexReadiness = {
     indexed: number;
     pending: number;
     oldestPendingAt: string | null;
+    sampled: number;
+    stale: number;
   };
   embeddings: EmbeddingCoverage;
 };
@@ -44,10 +47,15 @@ export async function rebuildSearchIndex(env: Bindings) {
 }
 
 export async function readIndexReadiness(env: Bindings): Promise<IndexReadiness> {
-  const [search, embeddings] = await Promise.all([
+  const [search, drift, embeddings] = await Promise.all([
     readSearchIndexState(env.DB),
+    sampleSearchDrift(env.DB).catch((error: unknown) => {
+      logError("search_drift_sample_failed", error);
+
+      return { sampled: 0, stale: 0 };
+    }),
     readEmbeddingCoverage(env),
   ]);
 
-  return { search, embeddings };
+  return { search: { ...search, ...drift }, embeddings };
 }

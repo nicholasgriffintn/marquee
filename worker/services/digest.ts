@@ -2,7 +2,11 @@ import type { MediaTitle } from "../../src/domain/catalog.ts";
 import { candidatesFrom, type DecisionCandidate } from "../lib/decisions.ts";
 import { mintJourney } from "../lib/journeys.ts";
 import { logError, logEvent } from "../lib/logging.ts";
-import { readRanked } from "../repositories/catalog-search.ts";
+import {
+  readRanked,
+  searchCatalogue,
+  type CatalogueSearch,
+} from "../repositories/catalog-search.ts";
 import type { Bindings } from "../types.ts";
 import { prepareRails } from "./ai-rails.ts";
 import { readTrending } from "./buzz.ts";
@@ -15,6 +19,8 @@ import type { Eligibility } from "./viewer/eligibility.ts";
 import { readViewerState } from "./viewer/state.ts";
 
 const FRESH_PICKS = 12;
+const FRESH_MIN_VOTES = 50;
+const GENRE_REACH = 4;
 const DIGEST_TRENDING = 12;
 const DIGEST_EPISODES = 16;
 
@@ -88,17 +94,12 @@ type FreshTitles = { titleIds: string[]; candidates: DecisionCandidate[] };
 
 const NO_FRESH: FreshTitles = { titleIds: [], candidates: [] };
 
-async function freshForViewer(
+async function freshByTaste(
   env: Bindings,
-  vector: number[] | null,
-  eligibility: Eligibility,
+  vector: number[],
+  search: CatalogueSearch,
 ): Promise<FreshTitles> {
-  if (!vector) {
-    return NO_FRESH;
-  }
-
-  const releasedAfter = new Date().getUTCFullYear() - 1;
-  const matches = await nearestTo(env, vector, { ...eligibility, releasedAfter });
+  const matches = await nearestTo(env, vector, search);
 
   if (matches.length === 0) {
     return NO_FRESH;
@@ -107,7 +108,7 @@ async function freshForViewer(
   const titles = await eligibleTitles(
     env,
     matches.map((match) => match.id),
-    { ...eligibility, releasedAfter, sort: "given" },
+    { ...search, sort: "given" },
     FRESH_PICKS,
   );
   const scores = new Map(matches.map((match) => [match.id, match.score]));
@@ -118,6 +119,38 @@ async function freshForViewer(
   };
 }
 
+async function freshByGenre(
+  env: Bindings,
+  genres: string[],
+  search: CatalogueSearch,
+): Promise<FreshTitles> {
+  const titles = await searchCatalogue(env.DB, {
+    ...search,
+    ...(genres.length ? { genres: genres.slice(0, GENRE_REACH) } : {}),
+    sort: "score",
+    minVotes: FRESH_MIN_VOTES,
+    limit: FRESH_PICKS,
+  });
+
+  return {
+    titleIds: titles.map((title) => title.id),
+    candidates: candidatesFrom(titles, { origin: "digest_recent" }),
+  };
+}
+
+async function freshForViewer(
+  env: Bindings,
+  vector: number[] | null,
+  eligibility: Eligibility,
+  genres: string[],
+): Promise<FreshTitles> {
+  const releasedAfter = new Date().getUTCFullYear() - 1;
+  const search: CatalogueSearch = { ...eligibility, releasedAfter };
+  const byTaste = vector ? await freshByTaste(env, vector, search) : NO_FRESH;
+
+  return byTaste.titleIds.length ? byTaste : freshByGenre(env, genres, search);
+}
+
 export async function buildDigest(env: Bindings, viewerId: string) {
   const viewer = await readViewerState(env, viewerId);
 
@@ -126,7 +159,7 @@ export async function buildDigest(env: Bindings, viewerId: string) {
   }
 
   const decision = beginDecision(env, { feature: "digest", viewerId });
-  const { vector, eligibility } = await prepareRails(env, viewer);
+  const { vector, eligibility, affinity } = await prepareRails(env, viewer);
   const digestEligibility: Eligibility = {
     ...eligibility,
     excludeIds: [
@@ -134,11 +167,13 @@ export async function buildDigest(env: Bindings, viewerId: string) {
     ],
   };
   const [fresh, trending, episodes, numbers, lead] = await Promise.all([
-    freshForViewer(env, vector, digestEligibility).catch((error: unknown): FreshTitles => {
-      logError("digest_fresh_failed", error, { viewerId });
+    freshForViewer(env, vector, digestEligibility, affinity.genres).catch(
+      (error: unknown): FreshTitles => {
+        logError("digest_fresh_failed", error, { viewerId });
 
-      return NO_FRESH;
-    }),
+        return NO_FRESH;
+      },
+    ),
     readTrending(env, DIGEST_TRENDING),
     readTonight(env, viewerId, DIGEST_EPISODES, 168),
     weekNumbers(env, viewerId),

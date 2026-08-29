@@ -45,6 +45,8 @@ export type AdminPipeline = {
       indexed: number;
       pending: number;
       oldestPendingAt: string | null;
+      sampled: number;
+      stale: number;
     };
     embeddings: {
       model: string;
