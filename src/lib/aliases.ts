@@ -5,6 +5,7 @@ export const ROUTE_ALIASES: Record<string, string> = {
   "/new": "/listings?sort=recent",
   "/popular": "/listings?sort=popularity",
   "/people": "/directory",
+  "/person": "/directory",
   "/collections": "/directory?tab=collections",
   "/collection": "/directory?tab=collections",
 };

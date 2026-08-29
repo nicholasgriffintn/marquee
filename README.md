@@ -261,22 +261,9 @@ option. `/api/auth/methods` only advertises what the deployment can actually do.
 [email-service]: https://developers.cloudflare.com/email-service/
 
 Every new account starts as a viewer. This prevents a public sign-in from claiming a fresh or
-temporarily empty deployment. After the intended administrator signs in, inspect the users with
-Wrangler from a trusted terminal and promote that account by its exact id:
+temporarily empty deployment. 
 
-```bash
-pnpm exec wrangler d1 execute DB --remote --command "SELECT id, name, github_login, email, role FROM users ORDER BY created_at, id"
-pnpm exec wrangler d1 execute DB --remote --command "UPDATE users SET role = 'admin' WHERE id = 'the-user-id'"
-```
-
-Keep this out-of-band promotion step in the deployment runbook. The application will reject any
-later change that would leave the database without an administrator.
-
-Run the two `create-metadata-index` commands against the deployed index as well. Vectorize only
-filters on metadata written after an index exists, so a populated deployment also needs "Reindex
-vector metadata" on `/admin` once. Search falls back to unfiltered neighbours until it finishes.
-
-A fresh deployment fills in over the first few sweeps rather than all at once. Watch it on `/admin`.
+A fresh deployment fills will automatically collect data. Watch it on `/admin`.
 
 ## Notes for the curious
 
