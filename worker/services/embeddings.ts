@@ -4,6 +4,7 @@ import { clamp } from "../lib/numbers.ts";
 import { isRecord, vectorValues } from "../lib/values.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
 import type { Bindings } from "../types.ts";
+import { titleVectorMetadata } from "./vector-index.ts";
 
 export const EMBEDDING_MODEL = "@cf/baai/bge-m3";
 
@@ -129,11 +130,7 @@ export async function embedTitles(
       wave.map((title, position) => ({
         id: title.id,
         values: vectors[position],
-        metadata: {
-          mediaType: title.mediaType,
-          year: title.year ?? 0,
-          popularity: Math.round(title.popularity),
-        },
+        metadata: titleVectorMetadata(title),
       })),
     );
 
@@ -177,6 +174,47 @@ export async function readVectors(env: Bindings, titleIds: string[]) {
   }
 
   return byId;
+}
+
+const REINDEX_BATCH = 25;
+
+async function selectEmbeddedAfter(env: Bindings, after: string, limit: number) {
+  const rows = await env.DB.prepare(
+    `SELECT title_id AS titleId
+     FROM title_embeddings
+     WHERE model = ? AND title_id > ?
+     ORDER BY title_id
+     LIMIT ?`,
+  )
+    .bind(EMBEDDING_MODEL, after, clamp(limit, 1, 100))
+    .all<{ titleId: string }>();
+
+  return rows.results.map((row) => row.titleId);
+}
+
+export async function reindexVectorMetadata(env: Bindings, after: string) {
+  const titleIds = await selectEmbeddedAfter(env, after, REINDEX_BATCH);
+  const cursor = titleIds.at(-1);
+
+  if (!cursor) {
+    return null;
+  }
+
+  const titles = await readItems(env.DB, titleIds, titleIds.length);
+  const stored = await readVectors(env, titleIds);
+  const pending = titles.flatMap((title) => {
+    const values = stored.get(title.id);
+
+    return values ? [{ id: title.id, values, metadata: titleVectorMetadata(title) }] : [];
+  });
+
+  if (pending.length > 0) {
+    await env.VECTORS.upsert(pending);
+  }
+
+  logEvent("vector_metadata_reindexed", { count: pending.length, cursor });
+
+  return cursor;
 }
 
 export async function selectUnembedded(env: Bindings, limit: number) {

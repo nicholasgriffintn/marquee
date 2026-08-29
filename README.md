@@ -216,6 +216,8 @@ to the list is silently absent at runtime. Add the name in both places.
 cp .dev.vars.example .dev.vars
 pnpm install
 pnpm exec wrangler vectorize create marquee-titles --dimensions=1024 --metric=cosine
+pnpm exec wrangler vectorize create-metadata-index marquee-titles --property-name=mediaType --type=string
+pnpm exec wrangler vectorize create-metadata-index marquee-titles --property-name=year --type=number
 pnpm exec wrangler queues create marquee-revival
 pnpm exec wrangler queues create marquee-anime
 pnpm db:migrate:local
@@ -270,15 +272,29 @@ pnpm exec wrangler d1 execute DB --remote --command "UPDATE users SET role = 'ad
 Keep this out-of-band promotion step in the deployment runbook. The application will reject any
 later change that would leave the database without an administrator.
 
+The two Vectorize metadata indexes are the same two commands as above, run once against the
+deployed index. Vectorize only filters on metadata written *after* an index exists, so an index
+created against a populated deployment needs the vectors rewritten before search constraints reach
+Vectorize — press "Reindex vector metadata" on `/admin`. It walks the catalogue in order, re-upserts
+each vector's stored values with fresh metadata and queues itself onward, so it costs no inference
+and can be interrupted. Until it finishes, a filtered query that Vectorize rejects falls back to the
+unfiltered one and the database narrows the results as it did before.
+
 A fresh deployment fills in over the first few sweeps rather than all at once. Watch it on `/admin`.
 
 ## Notes for the curious
 
 **Search** is hybrid: an FTS5 index over titles, synopses, keywords and credits for precision, a
 Vectorize index of bge-m3 embeddings for meaning, the two interleaved and reranked by
-`@cf/baai/bge-reranker-base`. The AI shelves sit on top of that rather than driving it — a viewer's
-taste vector is the mean of what they save, blended with what they have told the Usher, and the
-model only names a shelf and picks from a shortlist it can see.
+`@cf/baai/bge-reranker-base`. Media type and year are metadata indexes on the Vectorize side, so
+those constraints narrow the neighbour search itself rather than thinning its results afterwards;
+genres, providers and the rest still belong to the database, and the neighbour count grows with how
+many of them are in play. The browser asks for the semantic pass when the keyword results contain
+no literal match for what was typed, or when the query reads as a description rather than a title.
+
+The AI shelves sit on top of that rather than driving it — a viewer's taste vector is the mean of
+what they save, blended with what they have told the Usher, and the model only names a shelf and
+picks from a shortlist it can see.
 
 **The sweeps** are a Workflow on two crons: a light one every three hours, a deep one nightly that
 fans TMDB's discover pages out over the ingestion queue. Sweeps merge rather than replace,
