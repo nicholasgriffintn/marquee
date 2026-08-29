@@ -9,6 +9,7 @@ import {
 import { logError } from "../lib/logging.ts";
 import { clamp } from "../lib/numbers.ts";
 import { isKnownTitle } from "../lib/validation.ts";
+import { READ_CHUNK } from "./catalog-array-utils.ts";
 import { hydrateTitleRows } from "./catalog-arrays.ts";
 import { availabilityCondition, searchTitlesFirst } from "./catalog-search.ts";
 
@@ -31,7 +32,6 @@ function reaches(audience: string | null, mine: ReadonlySet<string>) {
   return gate.providerIds.some((id) => mine.has(id));
 }
 
-const READ_CHUNK = 80;
 const MIN_VISIBLE_ITEMS = 3;
 const SECTION_ITEMS = 14;
 const MAX_VISIBLE_SECTIONS = 18;

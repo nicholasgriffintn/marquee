@@ -8,12 +8,11 @@ import type {
 } from "../../src/domain/catalog.ts";
 import { EXTERNAL_ID_FIELDS, EXTERNAL_ID_OWNERS } from "../../src/domain/catalog.ts";
 import { computeBlendedRating, computeWeightedRating } from "../lib/ratings.ts";
-import { rowPlaceholders } from "./catalog-array-utils.ts";
+import { READ_CHUNK, rowPlaceholders } from "./catalog-array-utils.ts";
 import { persistTitleExtensions } from "./catalog-arrays.ts";
 import { projectTitles } from "./catalog-index.ts";
 import { readRawItems } from "./catalog-reader.ts";
 
-const READ_CHUNK = 80;
 const KEYWORD_LIMIT = 40;
 
 export const EXTERNAL_PROVIDER_SOURCES = new Set<ProviderAvailability["source"]>(["JustWatch"]);

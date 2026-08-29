@@ -1,4 +1,4 @@
-export const READ_CHUNK = 80;
+export const READ_CHUNK = 200;
 
 export async function queryChunked<T>(
   ids: string[],
