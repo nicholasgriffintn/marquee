@@ -58,9 +58,14 @@ export type Bindings = WithDatabase<WorkerBindings>;
 
 export type CatalogSweepParameters = { deep?: boolean };
 
-export type RailsParameters = { viewerId: string; revision: string; generationId: string };
+export type RailsParameters = {
+  viewerId: string;
+  revision: string;
+  generationId: string;
+};
 
-export type EnrichmentSource = "tmdb" | "justwatch" | "omdb" | "poster" | "mal" | "anilist";
+export type EnrichmentSource =
+  "tmdb" | "justwatch" | "omdb" | "poster" | "mal" | "anilist";
 
 export type TitleRatings = {
   imdbScore: number | null;
@@ -90,6 +95,7 @@ export type IngestionJob =
   | { type: "enrich-anilist"; titleId: string }
   | { type: "enrich-anilist-media"; titleId: string }
   | { type: "import-anime-ids"; offset?: number; force?: boolean }
+  | { type: "refresh-people"; chain?: boolean }
   | { type: "cache-poster"; titleId: string }
   | { type: "import-imdb-title"; imdbId: string }
   | {

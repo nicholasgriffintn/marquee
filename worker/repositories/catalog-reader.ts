@@ -67,7 +67,7 @@ export async function readRawItems(db: Database, ids: string[]) {
     const wave = uniqueIds.slice(index, index + READ_CHUNK);
     // oxlint-disable-next-line no-await-in-loop
     const result = await db.query<CatalogTitleRow>(
-      `SELECT ${CATALOG_TITLE_COLUMNS} FROM catalog_titles WHERE id IN (${wave.map((_, index) => `$${index + 1}`).join(",")})`,
+      `SELECT ${CATALOG_TITLE_COLUMNS} FROM catalog_titles WHERE id IN (${wave.map((_, position) => `$${position + 1}`).join(",")})`,
       [...wave],
     );
 
@@ -93,7 +93,7 @@ export async function readItems(db: Database, ids: string[], limit = 30) {
     // oxlint-disable-next-line no-await-in-loop
     const result = await db.query<CatalogTitleRow>(
       `SELECT ${CATALOG_TITLE_COLUMNS}
-         FROM catalog_titles WHERE id IN (${wave.map((_, index) => `$${index + 1}`).join(",")})`,
+         FROM catalog_titles WHERE id IN (${wave.map((_, position) => `$${position + 1}`).join(",")})`,
       [...wave],
     );
 

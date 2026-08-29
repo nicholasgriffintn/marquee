@@ -2,7 +2,13 @@
   "version": "7",
   "dialect": "postgresql",
   "entries": [
-    { "idx": 0, "version": "7", "when": 1787972400000, "tag": "0001_auth", "breakpoints": false },
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1787972400000,
+      "tag": "0001_auth",
+      "breakpoints": false
+    },
     {
       "idx": 1,
       "version": "7",
@@ -50,6 +56,27 @@
       "version": "7",
       "when": 1787972400007,
       "tag": "0008_operations",
+      "breakpoints": false
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1787972400008,
+      "tag": "0009_person_id_not_identity",
+      "breakpoints": false
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1787972400009,
+      "tag": "0010_purge_renumbered_people",
+      "breakpoints": false
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1787972400010,
+      "tag": "0011_person_verified_at",
       "breakpoints": false
     }
   ]

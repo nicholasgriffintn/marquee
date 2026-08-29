@@ -1,0 +1,1 @@
+ALTER TABLE catalog_people ALTER COLUMN person_id DROP IDENTITY IF EXISTS;

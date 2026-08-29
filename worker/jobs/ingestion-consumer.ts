@@ -27,7 +27,10 @@ function handleIngestionFailure(
       kind: error instanceof Error ? error.name : "UnknownError",
       status,
       permanent,
-      detail: error instanceof Error ? error.message.slice(0, 300) : String(error).slice(0, 300),
+      detail:
+        error instanceof Error
+          ? error.message.slice(0, 300)
+          : String(error).slice(0, 300),
     }),
   );
 
@@ -39,11 +42,16 @@ function handleIngestionFailure(
 
   message.retry({
     delaySeconds:
-      status === 429 ? Math.min(900, 180 * message.attempts) : Math.min(300, 30 * message.attempts),
+      status === 429
+        ? Math.min(900, 180 * message.attempts)
+        : Math.min(300, 30 * message.attempts),
   });
 }
 
-export async function consumeIngestion(batch: MessageBatch<unknown>, env: Bindings) {
+export async function consumeIngestion(
+  batch: MessageBatch<unknown>,
+  env: Bindings,
+) {
   const runs: {
     message: Message<unknown>;
     job: IngestionJob;
@@ -69,6 +77,7 @@ export async function consumeIngestion(batch: MessageBatch<unknown>, env: Bindin
     try {
       await env.DB.transaction(async (transaction) => {
         for (const { job, runId } of runs) {
+          // oxlint-disable-next-line no-await-in-loop
           await startIngestionRun(transaction, runId, job);
         }
       });
@@ -107,13 +116,19 @@ export async function consumeIngestion(batch: MessageBatch<unknown>, env: Bindin
   }
 }
 
-export async function consumeDeadLetters(batch: MessageBatch<unknown>, env: Bindings) {
+export async function consumeDeadLetters(
+  batch: MessageBatch<unknown>,
+  env: Bindings,
+) {
   try {
     if (batch.messages.length) {
       await env.DB.transaction(async (transaction) => {
         for (const message of batch.messages) {
-          const job: IngestionJob | null = isIngestionJob(message.body) ? message.body : null;
+          const job: IngestionJob | null = isIngestionJob(message.body)
+            ? message.body
+            : null;
 
+          // oxlint-disable-next-line no-await-in-loop
           await transaction.execute(
             `INSERT INTO ingestion_runs (id, job_type, subject_id, status, error, completed_at)
              VALUES ($1, $2, $3, 'failed', $4, CURRENT_TIMESTAMP)`,
@@ -139,7 +154,10 @@ export async function consumeDeadLetters(batch: MessageBatch<unknown>, env: Bind
       JSON.stringify({
         event: "dead_letters_record_failed",
         count: batch.messages.length,
-        detail: error instanceof Error ? error.message.slice(0, 300) : String(error).slice(0, 300),
+        detail:
+          error instanceof Error
+            ? error.message.slice(0, 300)
+            : String(error).slice(0, 300),
       }),
     );
   }

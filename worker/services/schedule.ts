@@ -30,7 +30,7 @@ async function titleIdsByImdb(env: Bindings, imdbIds: string[]) {
     const rows = await env.DB.query<{ id: string; imdbId: string }>(
       `SELECT id, imdb_id AS "imdbId"
        FROM catalog_titles
-       WHERE imdb_id IN (${wave.map((_, index) => `$${index + 1}`).join(", ")})`,
+       WHERE imdb_id IN (${wave.map((_, position) => `$${position + 1}`).join(", ")})`,
       [...wave],
     );
 
@@ -82,6 +82,7 @@ export async function syncSchedule(env: Bindings) {
     // oxlint-disable-next-line no-await-in-loop
     await env.DB.transaction(async (transaction) => {
       for (const episode of wave) {
+        // oxlint-disable-next-line no-await-in-loop
         await transaction.execute(
           `INSERT INTO title_schedule
              (id, title_id, imdb_id, show_name, season, episode, episode_name, airs_at, network)

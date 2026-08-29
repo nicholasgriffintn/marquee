@@ -103,6 +103,7 @@ function markEmbeddingFailure(db: DatabaseTransaction, titleId: string, reason: 
 function recordFailures(env: Bindings, titles: MediaTitle[], reason: string) {
   return env.DB.transaction(async (transaction) => {
     for (const title of titles) {
+      // oxlint-disable-next-line no-await-in-loop
       await markEmbeddingFailure(transaction, title.id, reason);
     }
   });
@@ -166,6 +167,7 @@ export async function embedTitles(
       // oxlint-disable-next-line no-await-in-loop
       await env.DB.transaction(async (transaction) => {
         for (const title of wave) {
+          // oxlint-disable-next-line no-await-in-loop
           await markEmbedded(transaction, title.id, hashById.get(title.id) as string);
         }
       });
@@ -182,6 +184,7 @@ export async function embedTitles(
   if (unchanged.length) {
     await env.DB.transaction(async (transaction) => {
       for (const title of unchanged) {
+        // oxlint-disable-next-line no-await-in-loop
         await markEmbedded(transaction, title.id, hashById.get(title.id) as string);
       }
     });

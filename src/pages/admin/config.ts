@@ -91,6 +91,7 @@ export const ACTION_GROUPS: {
       { id: "alerts-send", label: "Send the post" },
       { id: "angle-scores", label: "Rescore shelves" },
       { id: "people", label: "Reindex credits" },
+      { id: "people-refresh", label: "Re-read names from TMDB" },
     ],
   },
   {

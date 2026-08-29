@@ -204,6 +204,7 @@ export async function syncWorldBoard(env: Bindings) {
   if (updates.length > 0) {
     await env.DB.transaction(async (transaction) => {
       for (const update of updates) {
+        // oxlint-disable-next-line no-await-in-loop
         await transaction.execute(
           `UPDATE title_buzz
            SET world_views = $1, world_previous_views = $2, world_score = $3

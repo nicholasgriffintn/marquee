@@ -185,7 +185,7 @@ export async function attachTags(db: Database, works: RevivalWork[]) {
     const rows = await db.query<TagRow>(
       `SELECT work_id AS "workId", kind, slug, label
          FROM revival_tags
-         WHERE work_id IN (${wave.map((_, index) => `$${index + 1}`).join(",")})`,
+         WHERE work_id IN (${wave.map((_, position) => `$${position + 1}`).join(",")})`,
       [...wave],
     );
 

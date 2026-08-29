@@ -1,4 +1,7 @@
-import type { CuratorCandidate, ProviderAvailability } from "../../src/domain/catalog.ts";
+import type {
+  CuratorCandidate,
+  ProviderAvailability,
+} from "../../src/domain/catalog.ts";
 import { isEntryStatus } from "../../src/domain/entries.ts";
 import { providerRegistryIds } from "../../src/domain/providers.ts";
 import { isArchiveCollection } from "../clients/archive.ts";
@@ -101,7 +104,10 @@ export function isIngestionJob(value: unknown): value is IngestionJob {
     );
   }
 
-  if (value.type === "import-trakt-history" || value.type === "push-trakt-shelf") {
+  if (
+    value.type === "import-trakt-history" ||
+    value.type === "push-trakt-shelf"
+  ) {
     return (
       typeof value.viewerId === "string" &&
       value.viewerId.length > 0 &&
@@ -141,16 +147,25 @@ export function isIngestionJob(value: unknown): value is IngestionJob {
     return true;
   }
 
-  if (value.type === "match-revival-works" || value.type === "describe-revival-works") {
+  if (
+    value.type === "match-revival-works" ||
+    value.type === "describe-revival-works" ||
+    value.type === "refresh-people"
+  ) {
     return value.chain === undefined || typeof value.chain === "boolean";
   }
 
   if (value.type === "import-anime-ids") {
     const offsetOk =
       value.offset === undefined ||
-      (typeof value.offset === "number" && Number.isInteger(value.offset) && value.offset >= 0);
+      (typeof value.offset === "number" &&
+        Number.isInteger(value.offset) &&
+        value.offset >= 0);
 
-    return offsetOk && (value.force === undefined || typeof value.force === "boolean");
+    return (
+      offsetOk &&
+      (value.force === undefined || typeof value.force === "boolean")
+    );
   }
 
   if (
@@ -189,11 +204,18 @@ export function viewingContext(value: unknown): ViewingContext[] {
       {
         titleId: candidate.titleId,
         status: candidate.status,
-        rating: Number.isInteger(rating) && rating >= 1 && rating <= 5 ? rating : null,
+        rating:
+          Number.isInteger(rating) && rating >= 1 && rating <= 5
+            ? rating
+            : null,
         thoughts:
-          typeof candidate.thoughts === "string" ? candidate.thoughts.trim().slice(0, 500) : "",
+          typeof candidate.thoughts === "string"
+            ? candidate.thoughts.trim().slice(0, 500)
+            : "",
         updatedAt:
-          typeof candidate.updatedAt === "string" ? candidate.updatedAt : new Date().toISOString(),
+          typeof candidate.updatedAt === "string"
+            ? candidate.updatedAt
+            : new Date().toISOString(),
       },
     ];
   });
@@ -205,13 +227,19 @@ export function curatorCandidates(value: unknown): CuratorCandidate[] {
   }
 
   return value.slice(0, 30).flatMap((item): CuratorCandidate[] => {
-    if (!isRecord(item) || !isKnownTitle(item.id) || typeof item.title !== "string") {
+    if (
+      !isRecord(item) ||
+      !isKnownTitle(item.id) ||
+      typeof item.title !== "string"
+    ) {
       return [];
     }
 
     const mediaType = item.id.startsWith("movie:") ? "movie" : "tv";
     const genres = Array.isArray(item.genres)
-      ? item.genres.filter((genre): genre is string => typeof genre === "string").slice(0, 10)
+      ? item.genres
+          .filter((genre): genre is string => typeof genre === "string")
+          .slice(0, 10)
       : [];
     const providers: ProviderAvailability[] = Array.isArray(item.providers)
       ? item.providers
@@ -236,7 +264,10 @@ export function curatorCandidates(value: unknown): CuratorCandidate[] {
                 name: provider.name.slice(0, 100),
                 offerTypes,
                 webUrl: null,
-                source: provider.source === "JustWatch" ? "JustWatch" : "TMDB / JustWatch",
+                source:
+                  provider.source === "JustWatch"
+                    ? "JustWatch"
+                    : "TMDB / JustWatch",
               },
             ];
           })
@@ -248,7 +279,10 @@ export function curatorCandidates(value: unknown): CuratorCandidate[] {
         id: item.id,
         title: item.title.trim().slice(0, 200),
         mediaType,
-        year: typeof item.year === "number" && Number.isInteger(item.year) ? item.year : null,
+        year:
+          typeof item.year === "number" && Number.isInteger(item.year)
+            ? item.year
+            : null,
         genres,
         providers,
         tmdbScore:
@@ -256,10 +290,14 @@ export function curatorCandidates(value: unknown): CuratorCandidate[] {
             ? item.tmdbScore
             : null,
         tmdbVoteCount:
-          typeof item.tmdbVoteCount === "number" && Number.isInteger(item.tmdbVoteCount)
+          typeof item.tmdbVoteCount === "number" &&
+          Number.isInteger(item.tmdbVoteCount)
             ? item.tmdbVoteCount
             : 0,
-        overview: typeof item.overview === "string" ? item.overview.trim().slice(0, 1_000) : "",
+        overview:
+          typeof item.overview === "string"
+            ? item.overview.trim().slice(0, 1_000)
+            : "",
       },
     ];
   });

@@ -7,6 +7,7 @@ import type {
 import { logError } from "../lib/logging.ts";
 import { clamp } from "../lib/numbers.ts";
 import {
+  parseTmdbPerson,
   parseTmdbProviders,
   parseTmdbSeason,
   parseTmdbSeasonCredits,
@@ -38,21 +39,58 @@ export async function getItems(env: Bindings, ids: string[]) {
     const match = /^(movie|tv):(\d+)$/u.exec(id);
 
     return match
-      ? [{ mediaType: match[1] === "movie" ? "movie" : "tv", id: Number(match[2]) }]
+      ? [
+        {
+          mediaType: match[1] === "movie" ? "movie" : "tv",
+          id: Number(match[2]),
+        },
+      ]
       : [];
   });
 
   return hydrateTitles(env, summaries);
 }
 
+export async function getTmdbPeople(env: Bindings, ids: number[]) {
+  const people: NonNullable<ReturnType<typeof parseTmdbPerson>>[] = [];
+
+  for (let index = 0; index < ids.length; index += HYDRATE_BATCH) {
+    const wave = ids.slice(index, index + HYDRATE_BATCH);
+    // oxlint-disable-next-line no-await-in-loop
+    const fetched = await Promise.all(
+      wave.map(async (id) => {
+        try {
+          return parseTmdbPerson(await requestTmdb(env, `/person/${id}`));
+        } catch (error) {
+          logError("tmdb_person_failed", error, { personId: id });
+
+          return null;
+        }
+      }),
+    );
+
+    people.push(...fetched.filter((entry) => entry !== null));
+  }
+
+  return people;
+}
+
 export async function getTmdbProviders(env: Bindings) {
   const [movies, television] = await Promise.all([
-    requestTmdb(env, "/watch/providers/movie", { watch_region: PROVIDER_REGION }),
+    requestTmdb(env, "/watch/providers/movie", {
+      watch_region: PROVIDER_REGION,
+    }),
     requestTmdb(env, "/watch/providers/tv", { watch_region: PROVIDER_REGION }),
   ]);
-  const providers = new Map<number, ReturnType<typeof parseTmdbProviders>[number]>();
+  const providers = new Map<
+    number,
+    ReturnType<typeof parseTmdbProviders>[number]
+  >();
 
-  for (const provider of [...parseTmdbProviders(movies), ...parseTmdbProviders(television)]) {
+  for (const provider of [
+    ...parseTmdbProviders(movies),
+    ...parseTmdbProviders(television),
+  ]) {
     const existing = providers.get(provider.id);
 
     if (!existing || provider.displayPriority < existing.displayPriority) {
@@ -64,14 +102,18 @@ export async function getTmdbProviders(env: Bindings) {
   // oxlint-disable-next-line unicorn/no-array-sort
   return [...providers.values()].sort(
     (left, right) =>
-      left.displayPriority - right.displayPriority || left.name.localeCompare(right.name),
+      left.displayPriority - right.displayPriority ||
+      left.name.localeCompare(right.name),
   );
 }
 
 async function hydrateTitles(env: Bindings, summaries: TmdbSummary[]) {
   const uniqueSummaries = [
     ...new Map(
-      summaries.map((summary) => [`${summary.mediaType}:${summary.id}`, summary]),
+      summaries.map((summary) => [
+        `${summary.mediaType}:${summary.id}`,
+        summary,
+      ]),
     ).values(),
   ];
   const titles: MediaTitle[] = [];
@@ -79,7 +121,9 @@ async function hydrateTitles(env: Bindings, summaries: TmdbSummary[]) {
   for (let index = 0; index < uniqueSummaries.length; index += HYDRATE_BATCH) {
     const wave = uniqueSummaries.slice(index, index + HYDRATE_BATCH);
     // oxlint-disable-next-line no-await-in-loop
-    const settled = await Promise.allSettled(wave.map((summary) => getTitleDetails(env, summary)));
+    const settled = await Promise.allSettled(
+      wave.map((summary) => getTitleDetails(env, summary)),
+    );
 
     for (const [offset, result] of settled.entries()) {
       if (result.status === "fulfilled") {
@@ -105,12 +149,20 @@ function windowParameters(mediaType: MediaType, window: DiscoverWindow | null) {
     return {};
   }
 
-  const field = mediaType === "movie" ? "primary_release_date" : "first_air_date";
+  const field =
+    mediaType === "movie" ? "primary_release_date" : "first_air_date";
 
-  return { [`${field}.gte`]: window.startDate, [`${field}.lte`]: window.endDate };
+  return {
+    [`${field}.gte`]: window.startDate,
+    [`${field}.lte`]: window.endDate,
+  };
 }
 
-function discoverParameters(mediaType: MediaType, window: DiscoverWindow | null, page: number) {
+function discoverParameters(
+  mediaType: MediaType,
+  window: DiscoverWindow | null,
+  page: number,
+) {
   return {
     include_adult: "false",
     include_video: "false",
@@ -134,8 +186,12 @@ export async function measureDiscoverWindow(
   const totalPages = isRecord(response) ? Number(response.total_pages) : 0;
 
   return {
-    totalResults: Number.isFinite(totalResults) ? Math.max(0, Math.trunc(totalResults)) : 0,
-    totalPages: Number.isFinite(totalPages) ? Math.max(0, Math.trunc(totalPages)) : 0,
+    totalResults: Number.isFinite(totalResults)
+      ? Math.max(0, Math.trunc(totalResults))
+      : 0,
+    totalPages: Number.isFinite(totalPages)
+      ? Math.max(0, Math.trunc(totalPages))
+      : 0,
   };
 }
 
@@ -160,9 +216,13 @@ async function getTitleDetails(env: Bindings, summary: TmdbSummary) {
     summary.mediaType === "movie"
       ? "watch/providers,release_dates,external_ids,keywords,credits,videos,recommendations"
       : "watch/providers,content_ratings,external_ids,keywords,aggregate_credits,videos,recommendations";
-  const payload = await requestTmdb(env, `/${summary.mediaType}/${summary.id}`, {
-    append_to_response: append,
-  });
+  const payload = await requestTmdb(
+    env,
+    `/${summary.mediaType}/${summary.id}`,
+    {
+      append_to_response: append,
+    },
+  );
   const title = parseTmdbTitle(summary.mediaType, payload);
 
   if (!title) {
@@ -172,7 +232,11 @@ async function getTitleDetails(env: Bindings, summary: TmdbSummary) {
   return title;
 }
 
-async function requestTmdb(env: Bindings, path: string, parameters: Record<string, string> = {}) {
+async function requestTmdb(
+  env: Bindings,
+  path: string,
+  parameters: Record<string, string> = {},
+) {
   if (!env.TMDB_API_TOKEN) {
     throw new TmdbError("TMDB is not configured", 503);
   }
@@ -184,7 +248,9 @@ async function requestTmdb(env: Bindings, path: string, parameters: Record<strin
   const response = await upstreamFetch(url, {
     headers: { authorization: `Bearer ${env.TMDB_API_TOKEN}` },
     timeoutMs: TIMEOUT_MS,
-    cacheTtl: path.startsWith("/watch/providers") ? PROVIDERS_CACHE_TTL : CACHE_TTL,
+    cacheTtl: path.startsWith("/watch/providers")
+      ? PROVIDERS_CACHE_TTL
+      : CACHE_TTL,
   });
 
   if (!response.ok) {
@@ -193,7 +259,9 @@ async function requestTmdb(env: Bindings, path: string, parameters: Record<strin
     }
 
     throw new TmdbError(
-      response.status === 401 ? "TMDB credentials were rejected" : "TMDB request failed",
+      response.status === 401
+        ? "TMDB credentials were rejected"
+        : "TMDB request failed",
       response.status === 401 ? 503 : 502,
     );
   }
@@ -242,7 +310,9 @@ export async function getCatalog(
 
   const providerFilters = providerParameters(providerIds);
   const [trending, movies, television] = await Promise.all([
-    providerIds.length ? Promise.resolve(null) : requestTmdb(env, "/trending/all/week"),
+    providerIds.length
+      ? Promise.resolve(null)
+      : requestTmdb(env, "/trending/all/week"),
     requestTmdb(env, "/discover/movie", {
       include_adult: "false",
       sort_by: "popularity.desc",
@@ -308,8 +378,15 @@ export async function getTmdbSeasonSummaries(env: Bindings, tmdbId: number) {
   return parseTmdbSeasonSummaries(await requestTmdb(env, `/tv/${tmdbId}`));
 }
 
-export async function getTmdbSeason(env: Bindings, tmdbId: number, seasonNumber: number) {
-  const payload = await requestTmdb(env, `/tv/${tmdbId}/season/${seasonNumber}`);
+export async function getTmdbSeason(
+  env: Bindings,
+  tmdbId: number,
+  seasonNumber: number,
+) {
+  const payload = await requestTmdb(
+    env,
+    `/tv/${tmdbId}/season/${seasonNumber}`,
+  );
   const season = parseTmdbSeason(seasonNumber, payload);
 
   if (!season) {
@@ -325,7 +402,8 @@ export async function findByTitle(
   year: number | null,
   mediaType: MediaType = "movie",
 ) {
-  const yearKey = mediaType === "tv" ? "first_air_date_year" : "primary_release_year";
+  const yearKey =
+    mediaType === "tv" ? "first_air_date_year" : "primary_release_year";
   const response = await requestTmdb(env, `/search/${mediaType}`, {
     query: name.slice(0, 120),
     ...(year ? { [yearKey]: String(year) } : {}),
@@ -342,7 +420,9 @@ export async function findByTitle(
 }
 
 export async function findByImdbId(env: Bindings, imdbId: string) {
-  const response = await requestTmdb(env, `/find/${imdbId}`, { external_source: "imdb_id" });
+  const response = await requestTmdb(env, `/find/${imdbId}`, {
+    external_source: "imdb_id",
+  });
 
   if (!isRecord(response)) {
     return null;
@@ -350,7 +430,11 @@ export async function findByImdbId(env: Bindings, imdbId: string) {
 
   const movie = records(response.movie_results)[0];
   const television = records(response.tv_results)[0];
-  const mediaType: MediaType | null = movie ? "movie" : television ? "tv" : null;
+  const mediaType: MediaType | null = movie
+    ? "movie"
+    : television
+      ? "tv"
+      : null;
   const tmdbId = numberAt(movie ?? television ?? {}, "id");
 
   return mediaType && tmdbId ? `${mediaType}:${tmdbId}` : null;

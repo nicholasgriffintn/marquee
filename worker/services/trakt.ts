@@ -172,6 +172,7 @@ export async function importTraktHistory(env: Bindings, viewerId: string, origin
 
   await env.DB.transaction(async (transaction) => {
     for (const entry of planned) {
+      // oxlint-disable-next-line no-await-in-loop
       await transaction.execute(
         `INSERT INTO viewing_entries (id, viewer_id, title_id, status, rating, thoughts)
          VALUES ($1, $2, $3, $4, $5, '')

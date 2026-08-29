@@ -457,6 +457,7 @@ async function titlesAnswer(env: Bindings, viewerId: string, value: unknown) {
   if (titleIds.length) {
     await env.DB.transaction(async (transaction) => {
       for (const titleId of titleIds) {
+        // oxlint-disable-next-line no-await-in-loop
         await transaction.execute(
           `INSERT INTO viewing_entries (id, viewer_id, title_id, status, rating, thoughts)
            VALUES ($1, $2, $3, 'watched', NULL, '')

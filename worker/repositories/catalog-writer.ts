@@ -6,7 +6,10 @@ import type {
   TitleCredit,
   TitleCredits,
 } from "../../src/domain/catalog.ts";
-import { EXTERNAL_ID_FIELDS, EXTERNAL_ID_OWNERS } from "../../src/domain/catalog.ts";
+import {
+  EXTERNAL_ID_FIELDS,
+  EXTERNAL_ID_OWNERS,
+} from "../../src/domain/catalog.ts";
 import { computeBlendedRating, computeWeightedRating } from "../lib/ratings.ts";
 import { READ_CHUNK, rowPlaceholders } from "./catalog-array-utils.ts";
 import { persistTitleExtensions } from "./catalog-arrays.ts";
@@ -15,7 +18,9 @@ import { readRawItems } from "./catalog-reader.ts";
 
 const KEYWORD_LIMIT = 40;
 
-export const EXTERNAL_PROVIDER_SOURCES = new Set<ProviderAvailability["source"]>(["JustWatch"]);
+export const EXTERNAL_PROVIDER_SOURCES = new Set<
+  ProviderAvailability["source"]
+>(["JustWatch"]);
 
 function canonical(value: unknown): string {
   if (Array.isArray(value)) {
@@ -37,7 +42,9 @@ function canonical(value: unknown): string {
 }
 
 function mergeProviders(fresh: MediaTitle, stored: MediaTitle) {
-  const providers = new Map(fresh.providers.map((provider) => [provider.id, provider]));
+  const providers = new Map(
+    fresh.providers.map((provider) => [provider.id, provider]),
+  );
 
   for (const provider of stored.providers) {
     if (!EXTERNAL_PROVIDER_SOURCES.has(provider.source)) {
@@ -51,7 +58,9 @@ function mergeProviders(fresh: MediaTitle, stored: MediaTitle) {
       existing
         ? {
             ...provider,
-            offerTypes: [...new Set([...existing.offerTypes, ...provider.offerTypes])],
+            offerTypes: [
+              ...new Set([...existing.offerTypes, ...provider.offerTypes]),
+            ],
             webUrl: provider.webUrl ?? existing.webUrl,
           }
         : provider,
@@ -81,7 +90,10 @@ function mergeExternalIds(fresh: MediaTitle, stored: MediaTitle) {
   return merged;
 }
 
-function mergeWithStored(fresh: MediaTitle, stored: MediaTitle | null): MediaTitle {
+function mergeWithStored(
+  fresh: MediaTitle,
+  stored: MediaTitle | null,
+): MediaTitle {
   if (!stored) {
     return fresh;
   }
@@ -103,11 +115,15 @@ function mergeWithStored(fresh: MediaTitle, stored: MediaTitle | null): MediaTit
     studios: fresh.studios?.length ? fresh.studios : stored.studios,
     countries: fresh.countries?.length ? fresh.countries : stored.countries,
     languages: fresh.languages?.length ? fresh.languages : stored.languages,
-    originCountries: fresh.originCountries?.length ? fresh.originCountries : stored.originCountries,
+    originCountries: fresh.originCountries?.length
+      ? fresh.originCountries
+      : stored.originCountries,
     productionCountries: fresh.productionCountries?.length
       ? fresh.productionCountries
       : stored.productionCountries,
-    spokenLanguages: fresh.spokenLanguages?.length ? fresh.spokenLanguages : stored.spokenLanguages,
+    spokenLanguages: fresh.spokenLanguages?.length
+      ? fresh.spokenLanguages
+      : stored.spokenLanguages,
     videos: fresh.videos?.length ? fresh.videos : stored.videos,
     recommendationIds: fresh.recommendationIds?.length
       ? fresh.recommendationIds
@@ -122,10 +138,9 @@ function mergeWithStored(fresh: MediaTitle, stored: MediaTitle | null): MediaTit
     lastAirDate: fresh.lastAirDate ?? stored.lastAirDate,
     nextAirDate: fresh.nextAirDate ?? stored.nextAirDate,
     pending: fresh.pending ?? stored.pending,
-    keywords: [...new Set([...(fresh.keywords ?? []), ...(stored.keywords ?? [])])].slice(
-      0,
-      KEYWORD_LIMIT,
-    ),
+    keywords: [
+      ...new Set([...(fresh.keywords ?? []), ...(stored.keywords ?? [])]),
+    ].slice(0, KEYWORD_LIMIT),
     ratings: stored.ratings ?? fresh.ratings,
     externalIds: mergeExternalIds(fresh, stored),
     status: fresh.status ?? stored.status,
@@ -136,7 +151,9 @@ function mergeWithStored(fresh: MediaTitle, stored: MediaTitle | null): MediaTit
 export async function storeCatalog(db: Database, catalogue: CatalogResponse) {
   const titles = [
     ...new Map(
-      catalogue.sections.flatMap((section) => section.items).map((title) => [title.id, title]),
+      catalogue.sections
+        .flatMap((section) => section.items)
+        .map((title) => [title.id, title]),
     ).values(),
   ];
 
@@ -151,7 +168,10 @@ const STATEMENTS_PER_BATCH = 10;
 const PEOPLE_CHUNK = PEOPLE_ROWS_PER_STATEMENT * STATEMENTS_PER_BATCH;
 const CREDIT_CHUNK = CREDIT_ROWS_PER_STATEMENT * STATEMENTS_PER_BATCH;
 
-function upsertPeople(transaction: DatabaseTransaction, who: TitleCredit["person"][]) {
+function upsertPeople(
+  transaction: DatabaseTransaction,
+  who: TitleCredit["person"][],
+) {
   const placeholders = rowPlaceholders(who.length, 7);
   const params = who.flatMap((person) => [
     person.id,
@@ -230,33 +250,38 @@ function upsertCredits(
   );
 }
 
-// Scoped to (title_id, season_number): show-level credits (season_number null) and
-// each season's guest credits are fetched independently, so a stale credit_id left
-// behind by a TMDB re-issue (e.g. after they fix a merged/duplicate person) must be
-// cleared per-scope rather than for the whole title, or an unrelated season/the main
-// cast list would be wiped whenever only one scope is refreshed.
-async function deleteStaleCredits(
-  db: Database,
-  entries: { titleId: string; entry: TitleCredit }[],
-) {
-  const scopes = new Map(
-    entries.map(({ titleId, entry }) => [
-      `${titleId} ${entry.seasonNumber}`,
-      { titleId, seasonNumber: entry.seasonNumber },
-    ]),
-  );
+export async function storePeople(db: Database, who: TitleCredit["person"][]) {
+  const roster = [
+    ...new Map(who.map((person) => [person.id, person])).values(),
+  ].toSorted((left, right) => left.id - right.id);
 
-  for (const { titleId, seasonNumber } of scopes.values()) {
+  for (let index = 0; index < roster.length; index += PEOPLE_CHUNK) {
+    const chunk = roster.slice(index, index + PEOPLE_CHUNK);
+
     // oxlint-disable-next-line no-await-in-loop
-    await db.execute(
-      `DELETE FROM catalog_credits WHERE title_id = $1 AND season_number IS NOT DISTINCT FROM $2`,
-      [titleId, seasonNumber],
-    );
+    await db.transaction(async (transaction) => {
+      for (
+        let offset = 0;
+        offset < chunk.length;
+        offset += PEOPLE_ROWS_PER_STATEMENT
+      ) {
+        // oxlint-disable-next-line no-await-in-loop
+        await upsertPeople(
+          transaction,
+          chunk.slice(offset, offset + PEOPLE_ROWS_PER_STATEMENT),
+        );
+      }
+    });
   }
+
+  return roster.length;
 }
 
 export async function storeCredits(db: Database, credits: TitleCredits[]) {
-  const entriesByCreditId = new Map<string, { titleId: string; entry: TitleCredit }>();
+  const entriesByCreditId = new Map<
+    string,
+    { titleId: string; entry: TitleCredit }
+  >();
 
   for (const title of credits) {
     for (const entry of title.entries) {
@@ -269,8 +294,6 @@ export async function storeCredits(db: Database, credits: TitleCredits[]) {
   if (entries.length === 0) {
     return 0;
   }
-
-  await deleteStaleCredits(db, entries);
 
   const people = new Map<number, TitleCredit["person"]>();
 
@@ -285,9 +308,16 @@ export async function storeCredits(db: Database, credits: TitleCredits[]) {
 
     // oxlint-disable-next-line no-await-in-loop
     await db.transaction(async (transaction) => {
-      for (let offset = 0; offset < chunk.length; offset += PEOPLE_ROWS_PER_STATEMENT) {
+      for (
+        let offset = 0;
+        offset < chunk.length;
+        offset += PEOPLE_ROWS_PER_STATEMENT
+      ) {
         // oxlint-disable-next-line no-await-in-loop
-        await upsertPeople(transaction, chunk.slice(offset, offset + PEOPLE_ROWS_PER_STATEMENT));
+        await upsertPeople(
+          transaction,
+          chunk.slice(offset, offset + PEOPLE_ROWS_PER_STATEMENT),
+        );
       }
     });
   }
@@ -297,9 +327,16 @@ export async function storeCredits(db: Database, credits: TitleCredits[]) {
 
     // oxlint-disable-next-line no-await-in-loop
     await db.transaction(async (transaction) => {
-      for (let offset = 0; offset < chunk.length; offset += CREDIT_ROWS_PER_STATEMENT) {
+      for (
+        let offset = 0;
+        offset < chunk.length;
+        offset += CREDIT_ROWS_PER_STATEMENT
+      ) {
         // oxlint-disable-next-line no-await-in-loop
-        await upsertCredits(transaction, chunk.slice(offset, offset + CREDIT_ROWS_PER_STATEMENT));
+        await upsertCredits(
+          transaction,
+          chunk.slice(offset, offset + CREDIT_ROWS_PER_STATEMENT),
+        );
       }
     });
   }
@@ -307,7 +344,11 @@ export async function storeCredits(db: Database, credits: TitleCredits[]) {
   return entries.length;
 }
 
-export async function storeItems(db: Database, items: MediaTitle[], sourceUpdatedAt: string) {
+export async function storeItems(
+  db: Database,
+  items: MediaTitle[],
+  sourceUpdatedAt: string,
+) {
   if (items.length === 0) {
     return;
   }
@@ -321,7 +362,9 @@ export async function storeItems(db: Database, items: MediaTitle[], sourceUpdate
     const previous = stored.get(title.id) ?? null;
     const merged = mergeWithStored(title, previous);
 
-    return previous && canonical(merged) === canonical(previous) ? [] : [merged];
+    return previous && canonical(merged) === canonical(previous)
+      ? []
+      : [merged];
   });
 
   if (changed.length === 0) {
@@ -350,7 +393,9 @@ export async function storeItems(db: Database, items: MediaTitle[], sourceUpdate
   await storeCredits(
     db,
     changed.flatMap((title) =>
-      title.credits?.length ? [{ titleId: title.id, entries: title.credits }] : [],
+      title.credits?.length
+        ? [{ titleId: title.id, entries: title.credits }]
+        : [],
     ),
   );
 }
@@ -377,7 +422,11 @@ export function titleScalarColumns(title: MediaTitle) {
   };
 }
 
-function upsertTitle(transaction: DatabaseTransaction, title: MediaTitle, sourceUpdatedAt: string) {
+function upsertTitle(
+  transaction: DatabaseTransaction,
+  title: MediaTitle,
+  sourceUpdatedAt: string,
+) {
   const scalars = titleScalarColumns(title);
 
   return transaction.execute(

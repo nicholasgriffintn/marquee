@@ -125,13 +125,55 @@ export async function readCreditSeasons(db: Database, titleId: string) {
   return rows.rows;
 }
 
+const TITLES_CHUNK = 5_000;
+
 export async function rebuildPersonTitles(db: Database) {
-  await db.execute(`UPDATE catalog_people
-       SET titles = (
-         SELECT count(DISTINCT title_id)
-         FROM catalog_credits
-         WHERE catalog_credits.person_id = catalog_people.person_id
-       )`);
+  let after = 0;
+
+  for (;;) {
+    // oxlint-disable-next-line no-await-in-loop
+    const wave = await db.query<{ personId: number }>(
+      `SELECT person_id AS "personId"
+         FROM catalog_people
+        WHERE person_id > $1
+        ORDER BY person_id
+        LIMIT $2`,
+      [after, TITLES_CHUNK],
+    );
+    const last = wave.rows.at(-1)?.personId;
+
+    if (last === undefined) {
+      break;
+    }
+
+    // oxlint-disable-next-line no-await-in-loop
+    await db.execute(
+      `UPDATE catalog_people AS p
+          SET titles = counted.titles
+         FROM (
+           SELECT person_id, count(DISTINCT title_id) AS titles
+             FROM catalog_credits
+            WHERE person_id > $1 AND person_id <= $2
+            GROUP BY person_id
+         ) AS counted
+        WHERE p.person_id = counted.person_id
+          AND p.titles IS DISTINCT FROM counted.titles`,
+      [after, last],
+    );
+
+    // oxlint-disable-next-line no-await-in-loop
+    await db.execute(
+      `UPDATE catalog_people AS p
+          SET titles = 0
+        WHERE p.person_id > $1 AND p.person_id <= $2 AND p.titles <> 0
+          AND NOT EXISTS (
+            SELECT 1 FROM catalog_credits AS c WHERE c.person_id = p.person_id
+          )`,
+      [after, last],
+    );
+
+    after = last;
+  }
 
   const total = await db.first<{ credits: number }>(
     `SELECT count(*) AS credits FROM catalog_credits`,
@@ -140,11 +182,10 @@ export async function rebuildPersonTitles(db: Database) {
   return total?.credits ?? 0;
 }
 
-// `identifier` is a person_id when it parses as a positive integer (the canonical,
-// unambiguous lookup used by every link we generate). Otherwise it's a legacy name
-// from an old bookmarked/indexed URL — kept working via the old best-effort match,
-// which silently picks one row when multiple people share a name.
-export async function readPerson(db: Database, identifier: string): Promise<PersonRecord | null> {
+export async function readPerson(
+  db: Database,
+  identifier: string,
+): Promise<PersonRecord | null> {
   const personId = Number(identifier);
 
   if (Number.isInteger(personId) && personId > 0) {
@@ -223,7 +264,12 @@ export async function listPeople(
   }
 }
 
-export async function readPersonTitleIds(db: Database, personId: number, limit = 48, offset = 0) {
+export async function readPersonTitleIds(
+  db: Database,
+  personId: number,
+  limit = 48,
+  offset = 0,
+) {
   try {
     const rows = await db.query<{ titleId: string }>(
       `SELECT p.title_id AS "titleId"
@@ -244,7 +290,61 @@ export async function readPersonTitleIds(db: Database, personId: number, limit =
   }
 }
 
-export async function readPersonShelf(db: Database, viewerId: string, personId: number) {
+export async function unverifiedPeople(db: Database, limit: number) {
+  const size = clamp(limit, 1, 2_000);
+
+  try {
+    const stored = await db.query<{ personId: number }>(
+      `SELECT person_id AS "personId"
+           FROM catalog_people
+          WHERE verified_at IS NULL
+          ORDER BY titles DESC
+          LIMIT $1`,
+      [size],
+    );
+
+    if (stored.rows.length > 0) {
+      return stored.rows.map((row) => row.personId);
+    }
+
+    const missing = await db.query<{ personId: number }>(
+      `SELECT DISTINCT c.person_id AS "personId"
+           FROM catalog_credits AS c
+          WHERE c.person_id > (
+            SELECT COALESCE(max(person_id), 0) FROM catalog_people WHERE verified_at IS NOT NULL
+          )
+          ORDER BY c.person_id
+          LIMIT $1`,
+      [size],
+    );
+
+    return missing.rows.map((row) => row.personId);
+  } catch (error) {
+    logError("unverified_people_failed", error);
+
+    return [];
+  }
+}
+
+export async function markPeopleVerified(db: Database, personIds: number[]) {
+  if (personIds.length === 0) {
+    return;
+  }
+
+  const ordered = personIds.toSorted((left, right) => left - right);
+
+  await db.execute(
+    `UPDATE catalog_people SET verified_at = CURRENT_TIMESTAMP
+       WHERE person_id IN (${ordered.map((_unused, index) => `$${index + 1}`).join(",")})`,
+    ordered,
+  );
+}
+
+export async function readPersonShelf(
+  db: Database,
+  viewerId: string,
+  personId: number,
+) {
   try {
     const row = await db.first<{ shelved: number; watched: number | null }>(
       `SELECT count(*) AS shelved,

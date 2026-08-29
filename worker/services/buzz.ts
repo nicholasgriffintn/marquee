@@ -186,6 +186,7 @@ async function storeEntityIds(env: Bindings, entities: Map<string, TitleEntity>)
       let waveWritten = 0;
 
       for (const [titleId, entity] of updates.slice(index, index + 50)) {
+        // oxlint-disable-next-line no-await-in-loop
         const result = await transaction.execute(
           `UPDATE catalog_titles SET wikidata_id = $1 WHERE id = $2 AND wikidata_id IS NULL`,
           [entity.entityId, titleId],
@@ -244,6 +245,7 @@ export async function syncBuzz(env: Bindings) {
     // oxlint-disable-next-line no-await-in-loop
     await env.DB.transaction(async (transaction) => {
       for (const row of measured.slice(index, index + 50)) {
+        // oxlint-disable-next-line no-await-in-loop
         await transaction.execute(
           `INSERT INTO title_buzz
              (title_id, article, source, views, previous_views, delta, score, measured_at,

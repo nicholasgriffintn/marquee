@@ -105,6 +105,7 @@ export async function computeAngleScores(env: Bindings) {
   try {
     await env.DB.transaction(async (transaction) => {
       for (const entry of scores) {
+        // oxlint-disable-next-line no-await-in-loop
         await transaction.execute(
           `INSERT INTO angle_scores (angle, impressions, clicks, views, exits, watched, attrition, dwell_ms, score, computed_at)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
