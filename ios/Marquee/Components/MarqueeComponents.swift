@@ -316,6 +316,8 @@ struct TitleCard: View {
 }
 
 struct TitleRail: View {
+  @EnvironmentObject private var appState: AppState
+  @State private var hasReportedImpression = false
   let section: CatalogSection
   var ranked = false
 
@@ -339,10 +341,20 @@ struct TitleRail: View {
         LazyHStack(alignment: .top, spacing: 13) {
           ForEach(Array(section.items.enumerated()), id: \.element.id) { index, item in
             TitleCard(item: item, rank: ranked ? index + 1 : nil)
+              .simultaneousGesture(
+                TapGesture().onEnded {
+                  Telemetry.railClick(section, item: item, position: index, api: appState.api)
+                }
+              )
           }
         }
         .padding(.horizontal, 18)
       }
+    }
+    .onAppear {
+      guard !hasReportedImpression, !section.items.isEmpty else { return }
+      hasReportedImpression = true
+      Telemetry.railImpression(section, api: appState.api)
     }
   }
 }

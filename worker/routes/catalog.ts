@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 
 import { NO_AWARDS } from "../../src/domain/awards.ts";
+import { NO_RAILS } from "../../src/domain/rails.ts";
 import { requireAuthentication, sessionPrincipal, type AuthVariables } from "../auth/session.ts";
 import { refreshTitleAvailability } from "../jobs/availability.ts";
 import { edgeCache } from "../lib/cache.ts";
@@ -43,7 +44,7 @@ import {
   getTitleAvailability,
 } from "../services/catalog.ts";
 import { getFeaturedTitle } from "../services/featured.ts";
-import { getPersonalRails } from "../services/personal-rails.ts";
+import { deliverRails } from "../services/rail-delivery.ts";
 import { getSeason, getSeasonIndex } from "../services/seasons.ts";
 import type { Bindings } from "../types.ts";
 
@@ -88,15 +89,19 @@ catalogRoutes.get("/rails", requireAuthentication, async (context) => {
   const user = context.get("authenticatedUser");
 
   try {
-    const sections = await getPersonalRails(context.env, user.id, edgeOrigin(context.req.raw));
+    context.header("cache-control", "no-store");
 
-    context.header("cache-control", "private, max-age=120");
-
-    return context.json({ sections });
+    return context.json(
+      await deliverRails(context.env, {
+        viewerId: user.id,
+        origin: edgeOrigin(context.req.raw),
+        generate: context.req.query("generate") === "1",
+      }),
+    );
   } catch (error) {
-    logError("personal_rails_failed", error, { area: "catalogue" });
+    logError("rails_delivery_failed", error, { area: "catalogue" });
 
-    return context.json({ sections: [] });
+    return context.json({ ...NO_RAILS, status: "error" });
   }
 });
 

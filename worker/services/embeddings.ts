@@ -1,4 +1,5 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
+import { sha256Hex } from "../lib/hash.ts";
 import { logError, logEvent } from "../lib/logging.ts";
 import { clamp } from "../lib/numbers.ts";
 import { isRecord, vectorValues } from "../lib/values.ts";
@@ -27,13 +28,8 @@ function embeddingText(title: MediaTitle) {
     .slice(0, MAX_TEXT_LENGTH);
 }
 
-async function contentHash(text: string) {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
-
-  return [...new Uint8Array(digest)]
-    .slice(0, 16)
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
+function contentHash(text: string) {
+  return sha256Hex(text, 16);
 }
 
 function parseVectors(result: unknown) {

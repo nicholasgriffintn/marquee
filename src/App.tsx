@@ -9,15 +9,14 @@ import { TitleOverlay } from "./components/TitleOverlay";
 import { ManagersDoor } from "./components/usher/ManagersDoor";
 import { titlePath, weaveSections, type CatalogSection, type MediaTitle } from "./domain/catalog";
 import { asideFor, type UsherMoment } from "./domain/usher";
-import { useAiRails } from "./hooks/useAiRails";
 import { useCatalog } from "./hooks/useCatalog";
 import { useCurator } from "./hooks/useCurator";
 import { useFeaturedTitle } from "./hooks/useFeaturedTitle";
 import { usePageMetadata } from "./hooks/usePageMetadata";
-import { usePersonalRails } from "./hooks/usePersonalRails";
 import { usePinned } from "./hooks/usePinned";
 import { useProfile } from "./hooks/useProfile";
 import { useProviderPreferences } from "./hooks/useProviderPreferences";
+import { useRails } from "./hooks/useRails";
 import { useSearch } from "./hooks/useSearch";
 import { useSession } from "./hooks/useSession";
 import { useTitle } from "./hooks/useTitle";
@@ -130,8 +129,7 @@ export function App() {
   const curator = useCurator();
   const usher = useUsher(isSignedIn);
   const pinned = usePinned(isSignedIn);
-  const aiRails = useAiRails(isSignedIn && isViewerReady && isHome, profile.shelfKey);
-  const personalRails = usePersonalRails(isSignedIn && isViewerReady && isHome, profile.shelfKey);
+  const rails = useRails(isSignedIn && isViewerReady && isHome, profile.shelfKey);
   const episodes = useTonight(isViewerReady && isHome, TONIGHT_EPISODES);
   const trending = useTrending(isViewerReady && isHome);
   const movieMatch = useMatch("/movie/:tmdbId/*");
@@ -242,33 +240,21 @@ export function App() {
     void navigate("/", { viewTransition: true });
   }, [background, navigate]);
   const sections = useMemo(
-    () =>
-      weaveSections(
-        pinned.sections,
-        aiRails.sections,
-        personalRails.sections,
-        catalog.catalogue.sections,
-      ),
-    [aiRails.sections, catalog.catalogue, personalRails.sections, pinned.sections],
+    () => weaveSections(pinned.sections, rails.curated, rails.personal, catalog.catalogue.sections),
+    [catalog.catalogue, pinned.sections, rails.curated, rails.personal],
   );
   const heroSections = useMemo(
     () =>
-      weaveSections(
-        pinned.sections,
-        aiRails.heroSections,
-        personalRails.sections,
-        catalog.catalogue.sections,
-      ),
-    [aiRails.heroSections, catalog.catalogue, personalRails.sections, pinned.sections],
+      weaveSections(pinned.sections, rails.heroCurated, rails.personal, catalog.catalogue.sections),
+    [catalog.catalogue, pinned.sections, rails.heroCurated, rails.personal],
   );
   const featured = featuredTitle.item ?? heroSections.flatMap((section) => section.items)[0];
   const isHeroReady =
     isViewerReady &&
     !catalog.isLoading &&
     featuredTitle.isResolved &&
-    aiRails.isResolved &&
-    pinned.isResolved &&
-    personalRails.isResolved;
+    rails.isResolved &&
+    pinned.isResolved;
   const isPinned = Boolean(curator.state.prompt && pinned.pinnedPrompt === curator.state.prompt);
 
   const pinCurrentShelf = useCallback(() => {
@@ -484,7 +470,7 @@ export function App() {
                     curatorError={curator.error}
                     isAsking={curator.isAsking}
                     isLoading={catalog.isLoading || !isViewerReady}
-                    isBuildingRails={aiRails.isGenerating}
+                    isBuildingRails={rails.isGenerating}
                     isSessionLoading={!isViewerReady}
                     error={catalog.error}
                     providerError={catalog.providerError}

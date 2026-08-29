@@ -14,7 +14,6 @@ import { logError } from "../lib/logging.ts";
 import { isKnownTitle, validProviderIds } from "../lib/validation.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
 import { pinShelf, readPinnedShelves, unpinShelf } from "../repositories/shelves.ts";
-import { getAiRails } from "../services/ai-rails.ts";
 import { readDigest } from "../services/digest.ts";
 import { getTitleInsight } from "../services/title-insight.ts";
 import type { Bindings } from "../types.ts";
@@ -106,36 +105,6 @@ curatorRoutes.delete("/", async (context) => {
   await session.fetch("https://curator/reset", { method: "POST" });
 
   return jsonResponse({ cleared: true });
-});
-
-curatorRoutes.get("/rails", requireViewer, async (context) => {
-  const user = context.get("authenticatedUser");
-
-  try {
-    context.header("cache-control", "no-store");
-
-    const { sections, isFresh } = await getAiRails(context.env, user.id);
-
-    if (isFresh) {
-      recordEvent(context.env, {
-        name: "rails_served",
-        viewerId: user.id,
-        value: sections.length,
-      });
-
-      return jsonResponse({ sections, status: "ready" });
-    }
-
-    if (context.req.query("generate") === "1") {
-      await context.env.RAILS_WORKFLOW.create({ params: { viewerId: user.id } });
-    }
-
-    return jsonResponse({ sections, status: "generating" });
-  } catch (error) {
-    logError("ai_rails_failed", error);
-
-    return jsonResponse({ sections: [], status: "error" });
-  }
 });
 
 curatorRoutes.get("/digest", requireViewer, async (context) => {

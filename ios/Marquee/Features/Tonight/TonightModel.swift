@@ -2,8 +2,13 @@ import Foundation
 
 @MainActor
 final class TonightModel: ObservableObject {
+  private static let railRetryDelaySeconds = [5, 10, 20, 30]
+
   @Published private(set) var featured: MediaTitle?
   @Published private(set) var sections: [CatalogSection] = []
+  @Published private(set) var rails: [CatalogSection] = []
+  @Published private(set) var railVerdicts: [String: String] = [:]
+  @Published private(set) var isBuildingRails = false
   @Published private(set) var episodes: [ScheduledEpisode] = []
   @Published private(set) var trending: [MediaTitle] = []
   @Published private(set) var providers: [MarqueeProvider] = []
@@ -22,7 +27,7 @@ final class TonightModel: ObservableObject {
     isAsking || isPicking || !curatorPrompt.isEmpty || pick != nil || !usherError.isEmpty
   }
 
-  func load(api: APIClient, providerIDs: [String], isSignedIn: Bool) async {
+  func load(api: APIClient, providerIDs: [String]) async {
     isLoading = true
     error = ""
     featured = nil
@@ -49,18 +54,8 @@ final class TonightModel: ObservableObject {
       let (catalogueValue, featureValue, scheduleValue, trendValue, providerValue) = try await (
         catalogue, feature, schedule, trend, providerList
       )
-      var allSections = catalogueValue.sections
-
-      if isSignedIn, let personal: RailsResponse = try? await api.get("/api/catalog/rails") {
-        allSections =
-          personal.sections
-          + allSections.filter { section in
-            !personal.sections.contains(where: { $0.id == section.id })
-          }
-      }
-
-      sections = allSections
-      featured = featureValue?.item ?? allSections.first?.items.first
+      sections = catalogueValue.sections
+      featured = featureValue?.item ?? rails.first?.items.first ?? sections.first?.items.first
       episodes = scheduleValue.episodes
       trending = trendValue.items
       providers = providerValue.providers
@@ -69,6 +64,51 @@ final class TonightModel: ObservableObject {
     }
 
     isLoading = false
+  }
+
+  func loadRails(api: APIClient, isSignedIn: Bool, retrying: Bool = true) async {
+    guard isSignedIn else {
+      rails = []
+      isBuildingRails = false
+      return
+    }
+
+    let retries = retrying ? Self.railRetryDelaySeconds.count : 0
+
+    for attempt in 0...retries {
+      guard
+        let delivery: RailsDelivery = try? await api.get(
+          "/api/catalog/rails",
+          query: [URLQueryItem(name: "generate", value: "1")]
+        )
+      else {
+        isBuildingRails = false
+        return
+      }
+
+      rails = delivery.rails
+      isBuildingRails = delivery.isBuilding
+
+      guard delivery.isBuilding, attempt < retries else { return }
+
+      try? await Task.sleep(for: .seconds(Self.railRetryDelaySeconds[attempt]))
+
+      if Task.isCancelled { return }
+    }
+  }
+
+  func recordRailVerdict(_ railId: String, verdict: String, api: APIClient) async {
+    railVerdicts[railId] = verdict
+
+    do {
+      _ = try await api.data(
+        "/api/usher/feedback",
+        method: "POST",
+        body: RailFeedbackRequest(railId: railId, verdict: verdict)
+      )
+    } catch {
+      railVerdicts[railId] = nil
+    }
   }
 
   func ask(

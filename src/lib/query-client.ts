@@ -49,8 +49,8 @@ export function jsonQueryOptions<T>(path: string, identity = "") {
   });
 }
 
-export function queryJson<T>(path: string) {
-  return queryClient.fetchQuery(jsonQueryOptions<T>(path));
+export function queryJson<T>(path: string, identity = "") {
+  return queryClient.fetchQuery(jsonQueryOptions<T>(path, identity));
 }
 
 export function jsonMutation(method: "POST" | "PATCH" | "DELETE", body?: unknown): RequestInit {

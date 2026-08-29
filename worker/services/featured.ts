@@ -1,13 +1,13 @@
 import type { CatalogSection, MediaTitle } from "../../src/domain/catalog.ts";
 import type { ViewerOrigin } from "../../src/domain/cinema.ts";
+import { personalFrom } from "../../src/domain/rails.ts";
 import { hashString } from "../../src/lib/string.ts";
 import { includesProvider } from "../repositories/catalog-reader.ts";
 import { neverTitleIds } from "../repositories/signals.ts";
 import { readViewerContext } from "../repositories/viewer-context.ts";
 import type { Bindings } from "../types.ts";
-import { getAiRails } from "./ai-rails.ts";
 import { getCatalogue, getTrending } from "./catalog.ts";
-import { getPersonalRails } from "./personal-rails.ts";
+import { deliverRails } from "./rail-delivery.ts";
 
 const ITEMS_PER_SOURCE = 6;
 const ITEMS_PER_SECTION = 2;
@@ -111,14 +111,9 @@ function chooseFeatured(candidates: FeaturedCandidate[], identity: string, now: 
 }
 
 async function personalSections(env: Bindings, viewerId: string, origin: ViewerOrigin | null) {
-  const [personal, ai] = await Promise.all([
-    getPersonalRails(env, viewerId, origin),
-    getAiRails(env, viewerId)
-      .then((result) => (result.isFresh ? result.sections : []))
-      .catch((): CatalogSection[] => []),
-  ]);
+  const delivery = await deliverRails(env, { viewerId, origin, generate: false });
 
-  return [...ai, ...personal];
+  return delivery.status === "ready" ? delivery.rails : personalFrom(delivery);
 }
 
 async function excludedTitleIds(env: Bindings, viewerId: string | null, providerIds: string[]) {

@@ -528,3 +528,41 @@ struct TonightEpisodeBoard: View {
     return date.formatted(.dateTime.weekday(.abbreviated).hour().minute())
   }
 }
+
+struct RailVerdictRow: View {
+  let name: String
+  let verdict: String?
+  let onVerdict: (String) -> Void
+
+  var body: some View {
+    HStack(spacing: 9) {
+      Text(verdict == nil ? "Did “\(name)” land?" : "Noted, thank you.")
+        .font(MarqueeTheme.mono(9, weight: .bold))
+        .tracking(0.6)
+        .textCase(.uppercase)
+        .foregroundStyle(MarqueeTheme.muted)
+        .lineLimit(1)
+      Spacer()
+      if verdict == nil {
+        verdictButton("It did", verdict: "good")
+        verdictButton("Not really", verdict: "bad")
+      }
+    }
+    .padding(.horizontal, 13)
+    .frame(height: 42)
+    .background(MarqueeTheme.tile)
+    .overlay { Rectangle().stroke(MarqueeTheme.line) }
+  }
+
+  private func verdictButton(_ label: String, verdict value: String) -> some View {
+    Button { onVerdict(value) } label: {
+      Text(label)
+        .font(MarqueeTheme.mono(9, weight: .bold))
+        .foregroundStyle(MarqueeTheme.ink)
+        .padding(.horizontal, 10)
+        .frame(height: 26)
+        .background(MarqueeTheme.acid)
+    }
+    .buttonStyle(.plain)
+  }
+}
