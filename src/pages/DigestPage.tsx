@@ -6,6 +6,7 @@ import { UsherFacts } from "../components/usher/UsherHeroShell";
 import { UsherMark } from "../components/usher/UsherMark";
 import type { MediaTitle } from "../domain/catalog";
 import { useDigest } from "../hooks/useDigest";
+import { useJourneyOpen } from "../hooks/useJourneyOpen";
 import { formatDateTime, parseDate } from "../lib/dates";
 import { mediaMeta } from "../lib/media";
 import {
@@ -59,6 +60,14 @@ export function DigestPage({
   onOpen: (item: MediaTitle) => void;
 }) {
   const { digest, isLoading } = useDigest(isSignedIn);
+  const openLead = useJourneyOpen(onOpen, {
+    source: "digest_lead",
+    ...(digest?.lead?.decisionId ? { decisionId: digest.lead.decisionId } : {}),
+  });
+  const openFresh = useJourneyOpen(onOpen, {
+    source: "digest_fresh",
+    ...(digest?.decisionId ? { decisionId: digest.decisionId } : {}),
+  });
   const isSettling = isSessionLoading || (isSignedIn && isLoading);
   const returning = (digest?.episodes ?? []).filter(
     (episode) => episode.episode === 1 && (episode.season ?? 1) > 1,
@@ -106,7 +115,7 @@ export function DigestPage({
             <button
               type="button"
               className={styles.leadArt}
-              onClick={() => digest.lead?.item && onOpen(digest.lead.item)}
+              onClick={() => digest.lead?.item && openLead(digest.lead.item)}
             >
               <TitleArt
                 url={digest.lead.item.backdropUrl ?? digest.lead.item.posterUrl}
@@ -132,7 +141,7 @@ export function DigestPage({
               <Button
                 variant="primary"
                 size="lg"
-                onClick={() => digest.lead?.item && onOpen(digest.lead.item)}
+                onClick={() => digest.lead?.item && openLead(digest.lead.item)}
               >
                 See where to watch
               </Button>
@@ -182,7 +191,7 @@ export function DigestPage({
           </Heading>
           <ResultsGrid>
             {digest.fresh.map((item) => (
-              <TitleCard key={item.id} item={item} onOpen={onOpen} />
+              <TitleCard key={item.id} item={item} onOpen={openFresh} />
             ))}
           </ResultsGrid>
         </ErrorBoundary>

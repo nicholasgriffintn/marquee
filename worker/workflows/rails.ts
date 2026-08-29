@@ -7,9 +7,11 @@ import {
   getAiRails,
   persistRails,
   prepareRails,
+  RAILS_PROMPT_VERSION,
   readRailViewer,
   type StoredRail,
 } from "../services/ai-rails.ts";
+import { beginDecision } from "../services/decisions.ts";
 import type { Bindings } from "../types.ts";
 
 const RETRIES = { limit: 2, delay: "10 seconds", backoff: "exponential" } as const;
@@ -24,20 +26,29 @@ export class RailsWorkflow extends WorkflowEntrypoint<Bindings, RailsParameters>
     const prepared = await step.do("read taste", { retries: RETRIES }, async () =>
       prepareRails(this.env, viewer, viewerId, preferences),
     );
+    const decisions = new Map(
+      prepared.angles.map((angle) => [
+        angle.id,
+        beginDecision(this.env, {
+          feature: "rails",
+          promptVersion: RAILS_PROMPT_VERSION,
+          viewerId,
+          surface: angle.id,
+        }),
+      ]),
+    );
     const built = await Promise.all(
       prepared.angles.map((angle) =>
         step
           .do(`build ${angle.id}`, { retries: RETRIES }, async () => {
-            const rail = await buildOneRail(
-              this.env,
-              viewer,
-              angle,
-              prepared.exclude,
+            const rail = await buildOneRail(this.env, viewer, angle, prepared.exclude, {
               viewerId,
-              prepared.seeds[angle.id] ?? [],
-              prepared.shelf,
-              prepared.summary,
-            );
+              seeds: prepared.seeds[angle.id] ?? [],
+              candidates: prepared.candidates[angle.id] ?? [],
+              shelf: prepared.shelf,
+              summary: prepared.summary,
+              ...(decisions.get(angle.id) ? { decision: decisions.get(angle.id) } : {}),
+            });
 
             return rail ?? null;
           })
@@ -45,6 +56,17 @@ export class RailsWorkflow extends WorkflowEntrypoint<Bindings, RailsParameters>
       ),
     );
     const rails = dedupeRails(built.filter((rail): rail is StoredRail => Boolean(rail)));
+    const served = new Map(rails.map((rail) => [rail.angle ?? "", rail.titleIds]));
+
+    await Promise.all(
+      [...decisions].map(async ([angle, decision]) => {
+        const titleIds = served.get(angle) ?? [];
+
+        decision.select(titleIds);
+
+        await decision.settle(titleIds.length ? "served" : "empty");
+      }),
+    );
 
     if (rails.length === 0) {
       return { rails: 0 };

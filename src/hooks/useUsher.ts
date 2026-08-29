@@ -3,14 +3,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MediaTitle } from "../domain/catalog";
 import type { Guest } from "../domain/notebook";
 import type { TonightOrder, UsherMoment, UsherSurface } from "../domain/usher";
-import { startJourney } from "../lib/journey";
+import { journeyFor, startJourney } from "../lib/journey";
 import { jsonMutation, mutateJson, queryJson } from "../lib/query-client";
 
 type StateResponse = { status: string; answered: string[]; awayDays?: number };
 
 type MomentResponse = { moment: UsherMoment | null };
 
-type PickResponse = { item: MediaTitle | null; line: string; facts?: string[] };
+type PickResponse = {
+  item: MediaTitle | null;
+  line: string;
+  facts?: string[];
+  decisionId?: string;
+};
 
 export type UsherPickState = {
   item: MediaTitle | null;
@@ -32,7 +37,12 @@ export type UsherOrderState = {
   error: string;
 };
 
-type OrderResponse = { pick: OrderResult | null; backups: OrderResult[]; line: string };
+type OrderResponse = {
+  pick: OrderResult | null;
+  backups: OrderResult[];
+  line: string;
+  decisionId?: string;
+};
 
 const NO_PICK: UsherPickState = { item: null, line: "", facts: [], isPicking: false, error: "" };
 
@@ -260,7 +270,10 @@ export function useUsher(isSignedIn: boolean) {
         }
 
         if (response.item) {
-          startJourney(response.item.id, "usher_pick");
+          startJourney(response.item.id, {
+            source: "usher_pick",
+            ...(response.decisionId ? { decisionId: response.decisionId } : {}),
+          });
         }
 
         setPick({
@@ -289,9 +302,16 @@ export function useUsher(isSignedIn: boolean) {
 
   const remember = useCallback(
     async (titleId: string, source: string, context: Record<string, unknown>) => {
+      const journey = journeyFor(titleId);
+
       await mutateJson(
         "/api/usher/reject",
-        jsonMutation("POST", { titleId, source, ...context }),
+        jsonMutation("POST", {
+          titleId,
+          source,
+          ...(journey ? { journeyId: journey.id, decisionId: journey.decisionId } : {}),
+          ...context,
+        }),
       ).catch(() => undefined);
     },
     [],
@@ -337,12 +357,14 @@ export function useUsher(isSignedIn: boolean) {
           }),
         );
 
+        const decision = response.decisionId ? { decisionId: response.decisionId } : {};
+
         if (response.pick) {
-          startJourney(response.pick.item.id, "usher_order");
+          startJourney(response.pick.item.id, { source: "usher_order", ...decision });
         }
 
         for (const backup of response.backups ?? []) {
-          startJourney(backup.item.id, "usher_order_backup");
+          startJourney(backup.item.id, { source: "usher_order_backup", ...decision });
         }
 
         setOrder({

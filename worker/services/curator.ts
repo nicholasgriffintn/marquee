@@ -3,10 +3,12 @@ import { CURATOR_TOOLS, executeCuratorTool } from "../ai/curator-tools.ts";
 import { USHER_VOICE } from "../ai/usher-voice.ts";
 import { fastModel, requestAiCompletion, streamAiCompletion } from "../clients/ai-gateway.ts";
 import { parseCuratorResult, type ChatMessage } from "../lib/curator-payload.ts";
+import { candidatesFrom, promptVersion } from "../lib/decisions.ts";
 import { logError } from "../lib/logging.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
 import { readViewerContext } from "../repositories/viewer-context.ts";
 import type { Bindings, ViewerContext } from "../types.ts";
+import { beginDecision, type Decision } from "./decisions.ts";
 import { preferenceSummary, readViewerPreferences } from "./usher.ts";
 
 const MAX_TOOL_ROUNDS = 4;
@@ -32,11 +34,18 @@ const NARRATION_PROMPT = [
   "Never invent titles beyond the ones listed. No lists, no JSON, no headings.",
 ].join(" ");
 
+const PROMPT_VERSION = promptVersion(SYSTEM_PROMPT);
+
 export type CuratorTurn = { prompt: string; titleIds: string[]; summary: string };
 
 export type CuratorEvent =
   | { type: "status"; label: string }
-  | { type: "result"; titleIds: string[]; items: Awaited<ReturnType<typeof readItems>> }
+  | {
+      type: "result";
+      titleIds: string[];
+      decisionId: string;
+      items: Awaited<ReturnType<typeof readItems>>;
+    }
   | { type: "delta"; text: string }
   | { type: "done"; summary: string; reasons: Record<string, string> }
   | { type: "turn"; turn: CuratorTurn };
@@ -59,6 +68,7 @@ async function runCurator(
   viewer: ViewerContext,
   turns: CuratorTurn[],
   viewerId: string,
+  decision: Decision,
   summary = "",
   showingBrief = "",
 ) {
@@ -78,6 +88,15 @@ async function runCurator(
   ];
   const availableIds = new Set<string>();
 
+  const recordCandidates = () => {
+    decision.candidates(
+      candidatesFrom(
+        [...availableIds].map((id) => ({ id })),
+        { origin: "curator_tool" },
+      ),
+    );
+  };
+
   for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
     // oxlint-disable-next-line no-await-in-loop
     const response = await requestAiCompletion(env, messages, CURATOR_TOOLS, true, {
@@ -85,12 +104,15 @@ async function runCurator(
       timeoutMs: 25_000,
       toolChoice: availableIds.size === 0 ? "required" : "auto",
       metadata: { feature: "curator", round: String(round), viewer: viewerId || "guest" },
+      record: decision,
     });
 
     if (!response.tool_calls?.length) {
       const result = response.content ? parseCuratorResult(response.content, availableIds) : null;
 
       if (result) {
+        recordCandidates();
+
         return result;
       }
 
@@ -122,6 +144,8 @@ async function runCurator(
     throw new Error("The curator retrieved no catalogue titles");
   }
 
+  recordCandidates();
+
   messages.push({
     role: "user",
     content: `Choose only from these IDs returned by your tool calls: ${[...availableIds].join(", ")}. Reply with the required JSON only.`,
@@ -132,6 +156,7 @@ async function runCurator(
     timeoutMs: 25_000,
     json: true,
     metadata: { feature: "curator", round: "final", viewer: viewerId || "guest" },
+    record: decision,
   });
   const result = response.content ? parseCuratorResult(response.content, availableIds) : null;
 
@@ -149,6 +174,13 @@ export async function* curateStream(
   turns: CuratorTurn[] = [],
   options: { providerIds?: string[]; hour?: number; isWeekend?: boolean } = {},
 ): AsyncGenerator<CuratorEvent> {
+  const decision = beginDecision(env, {
+    feature: "curator",
+    promptVersion: PROMPT_VERSION,
+    viewerId,
+    surface: turns.length ? "refinement" : "ask",
+  });
+
   yield { type: "status", label: viewerId ? "Reading your shelf" : "Reading your services" };
 
   const preferences = await readViewerPreferences(env.DB, viewerId);
@@ -163,20 +195,34 @@ export async function* curateStream(
     label: turns.length ? "Refining your selection" : "Searching your catalogue",
   };
 
-  const result = await runCurator(
-    env,
-    turns.length
-      ? `${prompt}\n\nRefine the selection you just gave me. Keep what still fits and replace what does not.`
-      : prompt,
-    viewer,
-    turns,
-    viewerId,
-    tasteLine,
-    showing.brief,
-  );
+  let result;
+
+  try {
+    result = await runCurator(
+      env,
+      turns.length
+        ? `${prompt}\n\nRefine the selection you just gave me. Keep what still fits and replace what does not.`
+        : prompt,
+      viewer,
+      turns,
+      viewerId,
+      decision,
+      tasteLine,
+      showing.brief,
+    );
+  } catch (error) {
+    await decision.settle("failed");
+
+    throw error;
+  }
+
+  decision.select(result.titleIds);
+
   const items = await readItems(env.DB, result.titleIds);
 
-  yield { type: "result", titleIds: result.titleIds, items };
+  await decision.settle(items.length ? "served" : "empty");
+
+  yield { type: "result", titleIds: result.titleIds, decisionId: decision.id, items };
   yield { type: "status", label: "Writing it up" };
 
   const selection = items

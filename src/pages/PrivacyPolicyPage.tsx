@@ -382,6 +382,11 @@ export function PrivacyPolicyPage() {
                 connection records expire after their short security window.
               </li>
               <li>
+                Records of how a recommendation was made — the titles considered, the model that
+                answered and what you did next, never the prompt itself — expire ninety days after
+                the recommendation, and go with the account when it is erased.
+              </li>
+              <li>
                 Usage and security records are kept only for as long as reasonably needed to analyse
                 service trends, investigate incidents and establish legal claims. Where possible,
                 longer-term statistics are aggregated so they no longer identify a viewer.

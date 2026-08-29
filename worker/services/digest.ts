@@ -1,9 +1,11 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
+import { candidatesFrom, type DecisionCandidate } from "../lib/decisions.ts";
 import { logError, logEvent } from "../lib/logging.ts";
 import { readRanked } from "../repositories/catalog-search.ts";
 import type { Bindings } from "../types.ts";
 import { prepareRails, readRailViewer } from "./ai-rails.ts";
 import { readTrending } from "./buzz.ts";
+import { beginDecision } from "./decisions.ts";
 import { readTonight } from "./schedule.ts";
 import { pickOne } from "./usher-pick.ts";
 
@@ -21,7 +23,8 @@ export type DigestNumbers = {
 
 export type Digest = {
   createdAt: string;
-  lead: { titleId: string; line: string; facts: string[] } | null;
+  decisionId?: string;
+  lead: { titleId: string; line: string; facts: string[]; decisionId?: string } | null;
   numbers: DigestNumbers;
   fresh: string[];
   trending: string[];
@@ -63,7 +66,14 @@ async function leadForViewer(env: Bindings, viewerId: string, providerIds: strin
   try {
     const pick = await pickOne(env, viewerId, { providerIds, hour: 20 });
 
-    return pick ? { titleId: pick.item.id, line: pick.line, facts: pick.facts } : null;
+    return pick
+      ? {
+          titleId: pick.item.id,
+          line: pick.line,
+          facts: pick.facts,
+          decisionId: pick.decisionId,
+        }
+      : null;
   } catch (error) {
     logError("digest_lead_failed", error, { viewerId });
 
@@ -71,9 +81,17 @@ async function leadForViewer(env: Bindings, viewerId: string, providerIds: strin
   }
 }
 
-async function freshForViewer(env: Bindings, vector: number[] | null, exclude: string[]) {
+type FreshTitles = { titleIds: string[]; candidates: DecisionCandidate[] };
+
+const NO_FRESH: FreshTitles = { titleIds: [], candidates: [] };
+
+async function freshForViewer(
+  env: Bindings,
+  vector: number[] | null,
+  exclude: string[],
+): Promise<FreshTitles> {
   if (!vector) {
-    return [];
+    return NO_FRESH;
   }
 
   const matches = await env.VECTORS.query(vector, {
@@ -84,7 +102,7 @@ async function freshForViewer(env: Bindings, vector: number[] | null, exclude: s
   const ids = matches.matches.map((match) => match.id).filter((id) => !excluded.has(id));
 
   if (ids.length === 0) {
-    return [];
+    return NO_FRESH;
   }
 
   const rows = await env.DB.prepare(
@@ -97,8 +115,12 @@ async function freshForViewer(env: Bindings, vector: number[] | null, exclude: s
   )
     .bind(JSON.stringify(ids), new Date().getUTCFullYear() - 1, FRESH_PICKS)
     .all<{ id: string }>();
+  const scores = new Map(matches.matches.map((match) => [match.id, match.score]));
 
-  return rows.results.map((row) => row.id);
+  return {
+    titleIds: rows.results.map((row) => row.id),
+    candidates: candidatesFrom(rows.results, { scores, origin: "digest_vector" }),
+  };
 }
 
 export async function buildDigest(env: Bindings, viewerId: string) {
@@ -108,26 +130,32 @@ export async function buildDigest(env: Bindings, viewerId: string) {
     return null;
   }
 
+  const decision = beginDecision(env, { feature: "digest", viewerId });
   const { vector, exclude } = await prepareRails(env, viewer, viewerId, preferences);
   const [fresh, trending, episodes, numbers, lead] = await Promise.all([
     freshForViewer(env, vector, [
       ...exclude,
       ...viewer.entries.map((entry) => entry.titleId),
-    ]).catch((error: unknown): string[] => {
+    ]).catch((error: unknown): FreshTitles => {
       logError("digest_fresh_failed", error, { viewerId });
 
-      return [];
+      return NO_FRESH;
     }),
     readTrending(env, DIGEST_TRENDING),
     readTonight(env, viewerId, DIGEST_EPISODES, 168),
     weekNumbers(env, viewerId),
     leadForViewer(env, viewerId, preferences.providerIds),
   ]);
+
+  decision.candidates(fresh.candidates);
+  decision.select(fresh.titleIds);
+
   const digest: Digest = {
     createdAt: new Date().toISOString(),
+    decisionId: decision.id,
     lead,
     numbers,
-    fresh,
+    fresh: fresh.titleIds,
     trending,
     episodes: episodes.map((episode) => ({
       titleId: episode.titleId,
@@ -139,8 +167,12 @@ export async function buildDigest(env: Bindings, viewerId: string) {
   };
 
   if (digest.fresh.length === 0 && digest.episodes.length === 0) {
+    await decision.settle("empty");
+
     return null;
   }
+
+  await decision.settle("served");
 
   await env.DB.prepare(
     `INSERT INTO viewer_digests (viewer_id, payload)
@@ -153,7 +185,7 @@ export async function buildDigest(env: Bindings, viewerId: string) {
     .run();
 
   logEvent("digest_built", {
-    fresh: fresh.length,
+    fresh: fresh.titleIds.length,
     episodes: digest.episodes.length,
   });
 
@@ -185,11 +217,13 @@ export async function readDigest(env: Bindings, viewerId: string) {
 
   return {
     createdAt: digest.createdAt,
+    ...(digest.decisionId ? { decisionId: digest.decisionId } : {}),
     lead: digest.lead
       ? {
           item: byId.get(digest.lead.titleId) ?? null,
           line: digest.lead.line,
           facts: digest.lead.facts ?? [],
+          ...(digest.lead.decisionId ? { decisionId: digest.lead.decisionId } : {}),
         }
       : null,
     numbers: digest.numbers ?? { added: 0, finished: 0, shelved: 0, catalogue: 0 },

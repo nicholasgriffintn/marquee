@@ -10,7 +10,8 @@ export type DigestNumbers = {
 
 export type Digest = {
   createdAt: string;
-  lead: { item: MediaTitle | null; line: string; facts: string[] } | null;
+  decisionId?: string;
+  lead: { item: MediaTitle | null; line: string; facts: string[]; decisionId?: string } | null;
   numbers: DigestNumbers;
   fresh: MediaTitle[];
   trending: MediaTitle[];

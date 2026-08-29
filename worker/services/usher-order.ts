@@ -3,6 +3,7 @@ import { showingFor, type TonightOrder } from "../../src/domain/usher.ts";
 import { USHER_VOICE } from "../ai/usher-voice.ts";
 import { fastModel, requestAiCompletion } from "../clients/ai-gateway.ts";
 import type { ChatMessage } from "../lib/curator-payload.ts";
+import { promptVersion } from "../lib/decisions.ts";
 import { logError } from "../lib/logging.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { isRecord } from "../lib/values.ts";
@@ -10,6 +11,7 @@ import { readBeliefs } from "../repositories/beliefs.ts";
 import { readGuests, type Guest } from "../repositories/guests.ts";
 import { readShelfDetail } from "../repositories/viewer-context.ts";
 import type { Bindings } from "../types.ts";
+import { beginDecision } from "./decisions.ts";
 import { shortlistFor, type ShortlistConstraints } from "./usher-pick.ts";
 import { preferenceSummary } from "./usher.ts";
 import { factBrief, factsFor, serviceFor } from "./why.ts";
@@ -92,6 +94,8 @@ const ORDER_PROMPT = [
   'Reply with JSON only: {"pick":{"titleId":"","line":""},"backups":[{"titleId":"","line":""},{"titleId":"","line":""}]}.',
 ].join(" ");
 
+export const ORDER_PROMPT_VERSION = promptVersion(ORDER_PROMPT);
+
 export function constraintsFor(order: TonightOrder, guests: Guest[] = []): ShortlistConstraints {
   const company = COMPANY[order.company];
   const length = LENGTH[order.length];
@@ -150,13 +154,23 @@ export async function pickToOrder(
   const guests = options.guestIds?.length
     ? everyone.filter((guest) => options.guestIds?.includes(guest.id))
     : [];
-  const { titles, preferences } = await shortlistFor(env, viewerId, {
+  const decision = beginDecision(env, {
+    feature: "usher_order",
+    promptVersion: ORDER_PROMPT_VERSION,
+    viewerId,
+    surface: `${order.company}:${order.length}:${order.mood}`,
+  });
+  const { titles, preferences, candidates } = await shortlistFor(env, viewerId, {
     providerIds,
     rejected,
     constraints: constraintsFor(order, guests),
   });
 
+  decision.candidates(candidates);
+
   if (titles.length === 0) {
+    await decision.settle("empty");
+
     return null;
   }
 
@@ -217,11 +231,29 @@ export async function pickToOrder(
       ].join("\n"),
     },
   ];
-  const fallback = () => ({
-    order,
-    pick: dress(titles[0], orderLine(titles[0], order)),
-    backups: titles.slice(1, 1 + BACKUPS).map((item, index) => dress(item, backupLine(index))),
-  });
+  const settle = async (pick: string, backups: string[]) => {
+    decision.select([pick, ...backups]);
+
+    await decision.settle("served");
+  };
+
+  const fallback = async () => {
+    const backups = titles
+      .slice(1, 1 + BACKUPS)
+      .map((item, index) => dress(item, backupLine(index)));
+
+    await settle(
+      titles[0].id,
+      backups.map((backup) => backup.item.id),
+    );
+
+    return {
+      order,
+      pick: dress(titles[0], orderLine(titles[0], order)),
+      backups,
+      decisionId: decision.id,
+    };
+  };
 
   try {
     const response = await requestAiCompletion(env, messages, [], false, {
@@ -230,6 +262,7 @@ export async function pickToOrder(
       maxTokens: 320,
       json: true,
       metadata: { feature: "usher_order", viewer: viewerId },
+      record: decision,
     });
     const json = response.content?.match(/\{[\s\S]*\}/u)?.[0];
     const parsed: unknown = json ? JSON.parse(json) : null;
@@ -237,13 +270,13 @@ export async function pickToOrder(
     const proposed = isRecord(parsed) && isRecord(parsed.pick) ? parsed.pick : null;
 
     if (!proposed || !isKnownTitle(proposed.titleId)) {
-      return fallback();
+      return await fallback();
     }
 
     const headline = titles.find((title) => title.id === proposed.titleId);
 
     if (!headline) {
-      return fallback();
+      return await fallback();
     }
 
     const taken = new Set([headline.id]);
@@ -288,7 +321,12 @@ export async function pickToOrder(
         ? proposed.line.trim().slice(0, 160)
         : orderLine(headline, order);
 
-    return { order, pick: dress(headline, line), backups };
+    await settle(
+      headline.id,
+      backups.map((backup) => backup.item.id),
+    );
+
+    return { order, pick: dress(headline, line), backups, decisionId: decision.id };
   } catch (error) {
     logError("usher_order_failed", error);
 

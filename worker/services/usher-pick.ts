@@ -3,6 +3,7 @@ import { showingFor, type Showing } from "../../src/domain/usher.ts";
 import { USHER_VOICE } from "../ai/usher-voice.ts";
 import { fastModel, requestAiCompletion } from "../clients/ai-gateway.ts";
 import type { ChatMessage } from "../lib/curator-payload.ts";
+import { candidatesFrom, promptVersion } from "../lib/decisions.ts";
 import { logError } from "../lib/logging.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { isRecord } from "../lib/values.ts";
@@ -12,6 +13,7 @@ import { neverTitleIds, rejectedTitleIds } from "../repositories/signals.ts";
 import { readShelfDetail, readViewerContext } from "../repositories/viewer-context.ts";
 import type { Bindings } from "../types.ts";
 import { viewerSummary } from "./beliefs.ts";
+import { beginDecision } from "./decisions.ts";
 import { retrieveTitles } from "./retrieval.ts";
 import { tasteVector } from "./taste.ts";
 import { preferenceSummary, readViewerPreferences } from "./usher.ts";
@@ -26,6 +28,8 @@ const PICK_PROMPT = [
   "Give one sentence on why, in your own voice. Use only the facts you are given; never invent a comparison, a runtime or a service.",
   'Reply with JSON only: {"titleId":"","line":""}.',
 ].join(" ");
+
+export const PICK_PROMPT_VERSION = promptVersion(PICK_PROMPT);
 
 function fallbackLine(title: MediaTitle, showing: Showing) {
   if (showing.slot === "late" || showing.slot === "small-hours") {
@@ -104,7 +108,13 @@ export async function shortlistFor(
         const titles = await searchCatalogue(env.DB, { ...base, includeIds: ids });
 
         if (titles.length) {
-          return { titles, preferences };
+          const scores = new Map(matches.matches.map((match) => [match.id, match.score]));
+
+          return {
+            titles,
+            preferences,
+            candidates: candidatesFrom(titles, { scores, origin: "taste_vector" }),
+          };
         }
       }
     } catch (error) {
@@ -122,17 +132,16 @@ export async function shortlistFor(
     });
 
     if (titles.length) {
-      return { titles, preferences };
+      return { titles, preferences, candidates: candidatesFrom(titles, { origin: "genre" }) };
     }
   }
 
-  return {
-    titles: await retrieveTitles(env, {
-      ...loose,
-      text: constraints.text || "a film worth putting on tonight without thinking about it",
-    }),
-    preferences,
-  };
+  const titles = await retrieveTitles(env, {
+    ...loose,
+    text: constraints.text || "a film worth putting on tonight without thinking about it",
+  });
+
+  return { titles, preferences, candidates: candidatesFrom(titles, { origin: "retrieval" }) };
 }
 
 export async function pickOne(
@@ -143,13 +152,23 @@ export async function pickOne(
   const providerIds = options.providerIds ?? [];
   const rejected = (options.rejected ?? []).filter(isKnownTitle).slice(0, 40);
   const showing = showingFor(options.hour ?? 20, options.isWeekend ?? false);
-  const { titles, preferences } = await shortlistFor(env, viewerId, {
+  const decision = beginDecision(env, {
+    feature: "usher_pick",
+    promptVersion: PICK_PROMPT_VERSION,
+    viewerId,
+    surface: showing.slot,
+  });
+  const { titles, preferences, candidates } = await shortlistFor(env, viewerId, {
     providerIds,
     rejected,
     constraints: { maxRuntime: showing.maxRuntime },
   });
 
+  decision.candidates(candidates);
+
   if (titles.length === 0) {
+    await decision.settle("empty");
+
     return null;
   }
 
@@ -199,6 +218,7 @@ export async function pickOne(
       maxTokens: 160,
       json: true,
       metadata: { feature: "usher_pick", viewer: viewerId },
+      record: decision,
     });
     const json = response.content?.match(/\{[\s\S]*\}/u)?.[0];
     const parsed: unknown = json ? JSON.parse(json) : null;
@@ -209,10 +229,14 @@ export async function pickOne(
       if (chosen) {
         const line = typeof parsed.line === "string" ? parsed.line.trim().slice(0, 160) : "";
 
+        decision.select([chosen.id]);
+        await decision.settle("served");
+
         return {
           item: chosen,
           line: line || fallbackLine(chosen, showing),
           facts: factsById.get(chosen.id) ?? [],
+          decisionId: decision.id,
         };
       }
     }
@@ -222,9 +246,13 @@ export async function pickOne(
 
   const [chosen] = titles;
 
+  decision.select([chosen.id]);
+  await decision.settle("served");
+
   return {
     item: chosen,
     line: fallbackLine(chosen, showing),
     facts: factsById.get(chosen.id) ?? [],
+    decisionId: decision.id,
   };
 }

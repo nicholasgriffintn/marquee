@@ -2,6 +2,7 @@ import { Hono } from "hono";
 
 import { isTonightOrder, isUsherSurface } from "../../src/domain/usher.ts";
 import { requireAuthentication, type AuthVariables } from "../auth/session.ts";
+import { isDecisionId } from "../lib/decisions.ts";
 import { recordEvent } from "../lib/events.ts";
 import { jsonResponse, readJsonObject } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
@@ -260,9 +261,15 @@ usherRoutes.post("/pick", async (context) => {
       name: "usher_pick",
       viewerId: user.id,
       titleId: pick.item.id,
+      decisionId: pick.decisionId,
     });
 
-    return jsonResponse({ item: pick.item, line: pick.line, facts: pick.facts });
+    return jsonResponse({
+      item: pick.item,
+      line: pick.line,
+      facts: pick.facts,
+      decisionId: pick.decisionId,
+    });
   } catch (error) {
     logError("usher_pick_route_failed", error);
 
@@ -302,9 +309,15 @@ usherRoutes.post("/order", async (context) => {
       viewerId: user.id,
       titleId: result.pick.item.id,
       detail: `${body.order.company}:${body.order.length}:${body.order.mood}`,
+      decisionId: result.decisionId,
     });
 
-    return jsonResponse({ pick: result.pick, backups: result.backups, line: "" });
+    return jsonResponse({
+      pick: result.pick,
+      backups: result.backups,
+      line: "",
+      decisionId: result.decisionId,
+    });
   } catch (error) {
     logError("usher_order_route_failed", error);
 
@@ -329,6 +342,7 @@ usherRoutes.post("/reject", async (context) => {
       type: forever ? "never" : "rejection",
       titleId: body.titleId,
       ...(typeof body?.journeyId === "string" ? { journeyId: body.journeyId } : {}),
+      ...(isDecisionId(body?.decisionId) ? { decisionId: body.decisionId } : {}),
       context: {
         source: typeof body?.source === "string" ? body.source.slice(0, 40) : "",
         reason: typeof body?.reason === "string" ? body.reason.slice(0, 80) : "",

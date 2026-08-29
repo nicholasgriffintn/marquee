@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 
 import { sessionPrincipal } from "../auth/session.ts";
+import { isDecisionId } from "../lib/decisions.ts";
 import { recordEvent, type MarqueeEvent } from "../lib/events.ts";
 import { readJsonObject } from "../lib/http.ts";
 import { logRejection } from "../lib/logging.ts";
@@ -47,6 +48,7 @@ eventRoutes.post("/", async (context) => {
     ...(titleId ? { titleId } : {}),
     ...(text(body?.detail, 200) ? { detail: text(body?.detail, 200) } : {}),
     ...(text(body?.journeyId, 40) ? { journeyId: text(body?.journeyId, 40) } : {}),
+    ...(isDecisionId(body?.decisionId) ? { decisionId: body.decisionId } : {}),
     ...(text(body?.source, 60) ? { source: text(body?.source, 60) } : {}),
     ...(position(body?.position) === undefined ? {} : { position: position(body?.position) }),
     ...(providerId ? { providerId } : {}),
@@ -62,6 +64,7 @@ eventRoutes.post("/", async (context) => {
           type: "provider_exit",
           titleId,
           ...(event.journeyId ? { journeyId: event.journeyId } : {}),
+          ...(event.decisionId ? { decisionId: event.decisionId } : {}),
           context: {
             source: event.source ?? "",
             providerId: providerId ?? "",

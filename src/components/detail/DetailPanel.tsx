@@ -8,6 +8,7 @@ import { useAdaptations } from "../../hooks/useAdaptations";
 import { useAnimeRecommendations } from "../../hooks/useAnimeRecommendations";
 import { useAvailability } from "../../hooks/useAvailability";
 import { useCollection } from "../../hooks/useCollection";
+import { useJourneyOpen } from "../../hooks/useJourneyOpen";
 import { useRecommendations } from "../../hooks/useRecommendations";
 import { useTitleReels } from "../../hooks/useRevival";
 import { useEpisodeEntries, useSeasons } from "../../hooks/useSeasons";
@@ -137,6 +138,10 @@ export function DetailPanel({
   const watchProviders = mergeAnimeProviders(item, providers);
   const watchOrder = useWatchOrder(item);
   const { insight, pairs, isLoading: isInsightLoading } = useTitleInsight(item.id);
+  const openPair = useJourneyOpen(onOpen, {
+    source: "insight_pair",
+    ...(insight?.decisionId ? { decisionId: insight.decisionId } : {}),
+  });
   const similar = useRecommendations(item.id, item.recommendationIds, SIMILAR_LIMIT);
   const malSimilar = useAnimeRecommendations(item);
   const showings = useShowings(item, canSave);
@@ -447,7 +452,7 @@ export function DetailPanel({
           <ErrorBoundary label="The credits">
             <CreditsBlock key={item.id} titleId={item.id} people={item.people ?? []} />
           </ErrorBoundary>
-          <WatchNext pairs={pairs} onOpen={onOpen} />
+          <WatchNext pairs={pairs} onOpen={openPair} />
           <TitleTrack
             label="More like this"
             items={similar}

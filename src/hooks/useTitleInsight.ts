@@ -4,6 +4,7 @@ import { useResource } from "./useResource";
 export type TitleInsight = {
   hook: string;
   moods: string[];
+  decisionId?: string;
 };
 
 export type InsightPair = { item: MediaTitle; reason: string };

@@ -90,6 +90,15 @@ export function parseAssistantMessage(payload: unknown): AssistantMessage | null
   };
 }
 
+export function parseUsage(payload: unknown) {
+  const usage = isRecord(payload) && isRecord(payload.usage) ? payload.usage : null;
+
+  return {
+    inputTokens: typeof usage?.prompt_tokens === "number" ? usage.prompt_tokens : 0,
+    outputTokens: typeof usage?.completion_tokens === "number" ? usage.completion_tokens : 0,
+  };
+}
+
 export function parseCuratorResult(
   content: string,
   availableIds: Set<string>,

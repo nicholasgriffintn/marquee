@@ -6,6 +6,7 @@ type TrackPayload = {
   detail?: string;
   titleId?: string;
   journeyId?: string;
+  decisionId?: string;
   source?: string;
   position?: number;
   providerId?: string;
@@ -26,6 +27,7 @@ export function track(name: ClientEvent, payload: TrackPayload = {}) {
     name,
     ...payload,
     journeyId: payload.journeyId ?? journey?.id,
+    decisionId: payload.decisionId ?? journey?.decisionId,
     source: payload.source ?? journey?.source,
     position: payload.position ?? journey?.position,
   };
