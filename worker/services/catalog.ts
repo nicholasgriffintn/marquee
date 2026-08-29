@@ -2,7 +2,6 @@ import type { MediaTitle, TitleBuzz } from "../../src/domain/catalog.ts";
 import { readCachedValue, writeCachedValue } from "../lib/cache.ts";
 import { logError } from "../lib/logging.ts";
 import {
-  includesProvider,
   readAvailability,
   readCatalog,
   readItems,
@@ -89,9 +88,11 @@ export async function searchCatalogue(env: Bindings, query: string, providerIds:
 }
 
 export async function searchCatalogueHybrid(env: Bindings, query: string, providerIds: string[]) {
-  const items = (await retrieveTitles(env, { text: query, limit: HYBRID_SEARCH_LIMIT })).filter(
-    (title) => includesProvider(title, providerIds),
-  );
+  const items = await retrieveTitles(env, {
+    text: query,
+    providerIds,
+    limit: HYBRID_SEARCH_LIMIT,
+  });
 
   return {
     items: await withBuzz(env.DB, items),

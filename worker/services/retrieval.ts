@@ -80,9 +80,9 @@ async function vectorCandidates(env: Bindings, query: RetrievalQuery, text: stri
   return searchCatalogue(env.DB, {
     ...query,
     query: undefined,
-    sort: "popularity",
+    sort: "given",
     includeIds: ids,
-    limit: 60,
+    limit: VECTOR_TOP_K,
   });
 }
 

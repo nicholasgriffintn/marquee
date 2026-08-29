@@ -8,6 +8,7 @@ import {
 } from "../lib/catalog-payload.ts";
 import { logError } from "../lib/logging.ts";
 import { clamp } from "../lib/numbers.ts";
+import { providerFilterSql } from "../lib/providers.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { hydrateTitleRows } from "./catalog-arrays.ts";
 import { searchTitlesFirst } from "./catalog-search.ts";
@@ -31,14 +32,6 @@ function reaches(audience: string | null, mine: ReadonlySet<string>) {
   return gate.providerIds.some((id) => mine.has(id));
 }
 
-export function includesProvider(title: MediaTitle, providerIds: string[]) {
-  return (
-    providerIds.length === 0 ||
-    title.providers.length === 0 ||
-    title.providers.some((provider) => providerIds.includes(provider.id))
-  );
-}
-
 const READ_CHUNK = 80;
 const MIN_VISIBLE_ITEMS = 3;
 const SECTION_ITEMS = 14;
@@ -54,17 +47,8 @@ async function matchingTitleIds(db: D1Database, ids: string[], providerIds: stri
   const rows = await db
     .prepare(
       `SELECT id FROM catalog_titles
-        WHERE id IN (SELECT value FROM json_each(?1))
-          AND (
-            NOT EXISTS (
-              SELECT 1 FROM catalog_title_providers WHERE title_id = catalog_titles.id
-            )
-            OR EXISTS (
-              SELECT 1 FROM catalog_title_providers
-               WHERE title_id = catalog_titles.id
-                 AND provider_id IN (SELECT value FROM json_each(?2))
-            )
-          )`,
+        WHERE id IN (SELECT value FROM json_each(?))
+          AND ${providerFilterSql("catalog_titles.id")}`,
     )
     .bind(JSON.stringify(uniqueIds), JSON.stringify(providerIds))
     .all<{ id: string }>();
@@ -257,9 +241,7 @@ export async function readAvailability(db: D1Database, titleId: string) {
 }
 
 async function readSearchResults(db: D1Database, query: string, providerIds: string[]) {
-  const items = (await searchTitlesFirst(db, { query, limit: 30 })).filter((title) =>
-    includesProvider(title, providerIds),
-  );
+  const items = await searchTitlesFirst(db, { query, providerIds, limit: 30 });
 
   return {
     sections: [

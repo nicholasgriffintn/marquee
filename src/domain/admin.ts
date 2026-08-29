@@ -22,6 +22,7 @@ export const ADMIN_ACTIONS = [
   "providers",
   "sections",
   "working-set",
+  "search-index",
   "cinemas",
   "showtimes",
   "alerts-preview",

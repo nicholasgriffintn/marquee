@@ -1,10 +1,15 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
 import { searchOmdb, type OmdbSearchResult } from "../clients/omdb.ts";
+import { withSourceBudget } from "../jobs/sources.ts";
+import { readCachedValue, writeCachedValue } from "../lib/cache.ts";
 import type { Bindings, IngestionJob } from "../types.ts";
 
 const PENDING_LIMIT = 12;
-const SEARCH_PAGES = 3;
+const SEARCH_PAGES = 2;
 const PAGE_SIZE = 10;
+const LOCAL_ENOUGH = 8;
+const SEARCH_RESERVE = 1_000;
+const SEARCH_CACHE_SECONDS = 6 * 3_600;
 
 function pendingTitle(result: OmdbSearchResult): MediaTitle {
   return {
@@ -34,26 +39,51 @@ function pendingTitle(result: OmdbSearchResult): MediaTitle {
 }
 
 async function searchPages(env: Bindings, query: string) {
+  const cacheKey = `omdb-search:${query.trim().toLowerCase()}`;
+  const cached = await readCachedValue<OmdbSearchResult[]>(cacheKey);
+
+  if (cached) {
+    return cached;
+  }
+
   const found = new Map<string, OmdbSearchResult>();
+  let answered = false;
 
   for (let page = 1; page <= SEARCH_PAGES; page += 1) {
     // oxlint-disable-next-line no-await-in-loop
-    const results = await searchOmdb(env, query, { page });
+    const results = await withSourceBudget(
+      env,
+      "omdb",
+      () => searchOmdb(env, query, { page }),
+      SEARCH_RESERVE,
+    );
+
+    if (!results) {
+      break;
+    }
+
+    answered = true;
 
     for (const result of results) {
       found.set(result.imdbId, result);
     }
 
-    if (results.length < PAGE_SIZE || found.size >= PENDING_LIMIT * 2) {
+    if (results.length < PAGE_SIZE || found.size >= PENDING_LIMIT) {
       break;
     }
   }
 
-  return [...found.values()];
+  const results = [...found.values()];
+
+  if (answered) {
+    await writeCachedValue(cacheKey, results, SEARCH_CACHE_SECONDS);
+  }
+
+  return results;
 }
 
 export async function findPendingTitles(env: Bindings, query: string, known: MediaTitle[]) {
-  if (!env.OMDB_API_KEY || !query) {
+  if (!env.OMDB_API_KEY || !query || known.length >= LOCAL_ENOUGH) {
     return [];
   }
 

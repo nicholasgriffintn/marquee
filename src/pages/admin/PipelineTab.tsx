@@ -85,6 +85,12 @@ export function PipelineTab({
             </ul>
           </Panel>
         )}
+        {pipeline && pipeline.searchDrift > 0 && (
+          <Callout>
+            {pipeline.searchDrift.toLocaleString()} titles are indexed for search without their
+            current genres, keywords or cast. Run “Reconcile search index” under Rebuilds.
+          </Callout>
+        )}
         {pipeline && pipeline.enrichment.length > 0 && (
           <Panel heading="Enrichment coverage">
             <ul className={styles.list}>
