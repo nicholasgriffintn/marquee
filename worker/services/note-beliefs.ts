@@ -1,6 +1,6 @@
 import { slugify } from "../../src/domain/slug.ts";
+import { newDecisionId, runAiObject } from "../ai/run.ts";
 import { USHER_VOICE } from "../ai/usher-voice.ts";
-import { fastModel, requestAiCompletion } from "../clients/ai-gateway.ts";
 import type { ChatMessage } from "../lib/curator-payload.ts";
 import { logError } from "../lib/logging.ts";
 import { isRecord } from "../lib/values.ts";
@@ -62,15 +62,11 @@ export async function noteHunches(env: Bindings, viewerId: string): Promise<Beli
       { role: "system", content: NOTE_PROMPT },
       { role: "user", content: `Their notes:\n${notes}` },
     ];
-    const response = await requestAiCompletion(env, messages, [], false, {
-      model: fastModel(env),
-      timeoutMs: 20_000,
-      maxTokens: 260,
-      json: true,
-      metadata: { feature: "note_hunches", viewer: viewerId },
+    const parsed = await runAiObject(env, {
+      feature: "note_hunches",
+      decisionId: newDecisionId(),
+      messages,
     });
-    const json = response.content?.match(/\{[\s\S]*\}/u)?.[0];
-    const parsed: unknown = json ? JSON.parse(json) : null;
 
     if (!isRecord(parsed) || !Array.isArray(parsed.observations)) {
       return [];
