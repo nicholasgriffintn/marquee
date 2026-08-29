@@ -41,6 +41,7 @@ function unindexedConstraints(search: CatalogueSearch) {
     search.places?.length,
     search.providerIds?.length,
     search.excludeIds?.length,
+    search.certifications?.length,
     Number.isFinite(search.minScore),
     Number.isFinite(search.minVotes),
     Number.isFinite(search.maxRuntime),

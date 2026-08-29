@@ -50,6 +50,14 @@ function ratingWeight(rating: number | null) {
   return rating === 2 ? -0.5 : -1.1;
 }
 
+function entryWeight(status: ViewingContext["status"], rating: number | null) {
+  const stance = statusWeight(status);
+  const regard = ratingWeight(rating);
+  const strength = Math.abs(stance * regard);
+
+  return stance < 0 || regard < 0 ? -strength : strength;
+}
+
 function recencyWeight(updatedAt: string) {
   const stamped = Date.parse(updatedAt);
 
@@ -68,7 +76,7 @@ export function weighTitles(
   sample = TASTE_SAMPLE,
 ): WeightedTitle[] {
   const weighted = viewer.entries.map((entry): WeightedTitle => {
-    const base = statusWeight(entry.status) * ratingWeight(entry.rating);
+    const base = entryWeight(entry.status, entry.rating);
 
     return { titleId: entry.titleId, weight: base * recencyWeight(entry.updatedAt) };
   });

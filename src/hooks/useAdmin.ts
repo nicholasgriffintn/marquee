@@ -29,6 +29,7 @@ export type AdminOverview = {
 };
 
 export type AdminPipeline = {
+  searchDrift: number;
   enrichment: {
     source: string;
     titles: number;

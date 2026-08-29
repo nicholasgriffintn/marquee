@@ -212,7 +212,13 @@ async function seedCandidates(
       const ids = await neighbourIds(env, vector, angle.slice);
 
       if (ids.length) {
-        take(await searchCatalogue(env.DB, { ...base, includeIds: ids }));
+        take(
+          await searchCatalogue(env.DB, {
+            ...base,
+            includeIds: ids,
+            sort: angle.search.sort ?? "given",
+          }),
+        );
       }
     } catch (error) {
       logError("rail_neighbours_failed", error, { angle: angle.id });
@@ -612,6 +618,7 @@ export async function prepareRails(
   };
   const exclude = [
     ...onHomepage,
+    ...refused,
     ...rejected,
     ...viewer.entries
       .filter((entry) => entry.status === "watched" || entry.status === "dropped")
