@@ -6,16 +6,11 @@ import { storeCatalog, storeItems } from "../repositories/catalog-writer.ts";
 import { readPartition, recordPageDrained } from "../repositories/discover.ts";
 import { storeProviders } from "../repositories/providers.ts";
 import { syncBuzz } from "../services/buzz.ts";
-import {
-  syncCinemaDirectory,
-  syncCinemaScreenings,
-} from "../services/cinema-sync.ts";
-import {
-  advanceDiscoverFrontier,
-  measureDiscoverPartition,
-} from "../services/discover.ts";
+import { syncCinemaDirectory, syncCinemaScreenings } from "../services/cinema-sync.ts";
+import { advanceDiscoverFrontier, measureDiscoverPartition } from "../services/discover.ts";
 import { embedTitles, reindexVectorMetadata } from "../services/embeddings.ts";
 import { syncTitleIdentifiers } from "../services/identifiers.ts";
+import { refreshPeople } from "../services/people.ts";
 import { describeRevivalWorks } from "../services/revival-descriptions.ts";
 import { groupRevivalPrints } from "../services/revival-groups.ts";
 import { mirrorWork } from "../services/revival-mirror.ts";
@@ -32,16 +27,10 @@ import { syncSchedule } from "../services/schedule.ts";
 import { buildSections } from "../services/sections.ts";
 import { exportTraktShelf, importTraktHistory } from "../services/trakt.ts";
 import type { Bindings, IngestionJob } from "../types.ts";
-import { refreshPeople } from "../services/people.ts";
 import { importAnimeIds } from "./anime-ids.ts";
 import { enrichQueuedAvailability, queueAvailability } from "./availability.ts";
 import { queueEmbeddings } from "./embeddings.ts";
-import {
-  enrichAniListMedia,
-  enrichAnime,
-  enrichRatings,
-  queueEnrichment,
-} from "./enrichment.ts";
+import { enrichAniListMedia, enrichAnime, enrichRatings, queueEnrichment } from "./enrichment.ts";
 import { importDiaryRow, importImdbTitle } from "./imports.ts";
 import { cachePoster } from "./posters.ts";
 import { getProviderLedger } from "./provider-ledger.ts";
@@ -105,9 +94,7 @@ async function syncDiscoverPage(
     return;
   }
 
-  const window = partition
-    ? { startDate: partition.startDate, endDate: partition.endDate }
-    : null;
+  const window = partition ? { startDate: partition.startDate, endDate: partition.endDate } : null;
   const titles = await withRateLimitPause(env, "tmdb", () =>
     getDiscoverPage(env, mediaType, page, window),
   );
@@ -168,12 +155,7 @@ export async function executeIngestionJob(env: Bindings, job: IngestionJob) {
     }
 
     case "sync-discover-page": {
-      await syncDiscoverPage(
-        env,
-        job.mediaType,
-        job.page,
-        job.partitionId ?? null,
-      );
+      await syncDiscoverPage(env, job.mediaType, job.page, job.partitionId ?? null);
 
       return;
     }
@@ -204,11 +186,7 @@ export async function executeIngestionJob(env: Bindings, job: IngestionJob) {
     }
 
     case "import-anime-ids": {
-      const run = await importAnimeIds(
-        env,
-        job.offset ?? 0,
-        job.force ?? false,
-      );
+      const run = await importAnimeIds(env, job.offset ?? 0, job.force ?? false);
 
       if (!run.done) {
         await env.ANIME_QUEUE.send({

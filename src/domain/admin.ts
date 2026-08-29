@@ -46,7 +46,5 @@ export const ADMIN_ACTIONS = [
 export type AdminAction = (typeof ADMIN_ACTIONS)[number];
 
 export function isAdminAction(value: unknown): value is AdminAction {
-  return (
-    typeof value === "string" && ADMIN_ACTIONS.includes(value as AdminAction)
-  );
+  return typeof value === "string" && ADMIN_ACTIONS.includes(value as AdminAction);
 }

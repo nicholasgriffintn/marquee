@@ -21,10 +21,7 @@ import { titleParts, withRateLimitPause } from "./sources.ts";
 const AVAILABILITY_PER_RUN = 600;
 const INTERACTIVE_BUDGET_RESERVE = 5_000;
 
-export async function queueStaleAvailability(
-  env: Bindings,
-  alreadyQueued: string[] = [],
-) {
+export async function queueStaleAvailability(env: Bindings, alreadyQueued: string[] = []) {
   const room = await readBudgetRoom(env, "justwatch");
 
   if (room <= 0) {
@@ -99,11 +96,7 @@ export async function enrichQueuedAvailability(env: Bindings, titleId: string) {
   await enrichTitleAvailability(env, titleId);
 }
 
-export async function enrichTitleAvailability(
-  env: Bindings,
-  titleId: string,
-  budgetReserve = 0,
-) {
+export async function enrichTitleAvailability(env: Bindings, titleId: string, budgetReserve = 0) {
   const parts = titleParts(titleId);
 
   if (!parts) {

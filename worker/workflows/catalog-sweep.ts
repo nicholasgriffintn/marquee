@@ -1,15 +1,8 @@
-import {
-  WorkflowEntrypoint,
-  type WorkflowEvent,
-  type WorkflowStep,
-} from "cloudflare:workers";
+import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from "cloudflare:workers";
 
 import { withDatabase } from "../database/runtime.ts";
 import { pruneIngestionRuns } from "../jobs/ingestion-runs.ts";
-import {
-  queueEmbeddings,
-  queueStaleAvailability,
-} from "../jobs/ingestion.ts";
+import { queueEmbeddings, queueStaleAvailability } from "../jobs/ingestion.ts";
 import { getProviderLedger } from "../jobs/provider-ledger.ts";
 import { GAP_DISCOVERY } from "../lib/catalogue-gaps.ts";
 import { ensureBudgets } from "../repositories/budgets.ts";
@@ -20,10 +13,7 @@ import { rebuildPeopleIndex } from "../repositories/usher.ts";
 import { rebuildWorkingSet } from "../repositories/working-set.ts";
 import { syncAdaptations } from "../services/adaptations.ts";
 import { syncAwards } from "../services/awards.ts";
-import {
-  queueCinemaDirectories,
-  queueCinemaScreenings,
-} from "../services/cinema-sync.ts";
+import { queueCinemaDirectories, queueCinemaScreenings } from "../services/cinema-sync.ts";
 import {
   DEEP_RECONCILE_LIMIT,
   RECONCILE_LIMIT,
@@ -42,14 +32,8 @@ const RETRIES = {
   backoff: "exponential",
 } as const;
 
-export class CatalogSweep extends WorkflowEntrypoint<
-  WorkerBindings,
-  CatalogSweepParameters
-> {
-  async run(
-    event: Readonly<WorkflowEvent<CatalogSweepParameters>>,
-    step: WorkflowStep,
-  ) {
+export class CatalogSweep extends WorkflowEntrypoint<WorkerBindings, CatalogSweepParameters> {
+  async run(event: Readonly<WorkflowEvent<CatalogSweepParameters>>, step: WorkflowStep) {
     const deep = event.payload?.deep === true;
 
     if (deep) {
@@ -111,9 +95,7 @@ export class CatalogSweep extends WorkflowEntrypoint<
       return true;
     });
 
-    await step.do("sync awards", { retries: RETRIES }, () =>
-      withDatabase(this.env, syncAwards),
-    );
+    await step.do("sync awards", { retries: RETRIES }, () => withDatabase(this.env, syncAwards));
 
     await step.do("sync visual format", { retries: RETRIES }, async () =>
       withDatabase(this.env, syncVisualFormat),
@@ -135,10 +117,7 @@ export class CatalogSweep extends WorkflowEntrypoint<
 
     await step.do("reconcile search index", { retries: RETRIES }, async () =>
       withDatabase(this.env, (env) =>
-        reconcileSearchIndex(
-          env,
-          deep ? DEEP_RECONCILE_LIMIT : RECONCILE_LIMIT,
-        ),
+        reconcileSearchIndex(env, deep ? DEEP_RECONCILE_LIMIT : RECONCILE_LIMIT),
       ),
     );
 
@@ -171,67 +150,47 @@ export class CatalogSweep extends WorkflowEntrypoint<
     );
 
     if (deep) {
-      await step.do(
-        "sweep public domain sources",
-        { retries: RETRIES },
-        async () => withDatabase(this.env, queueRevivalSources),
+      await step.do("sweep public domain sources", { retries: RETRIES }, async () =>
+        withDatabase(this.env, queueRevivalSources),
       );
     }
 
-    await step.do(
-      "match public domain works",
-      { retries: RETRIES },
-      async () => {
-        await this.env.REVIVAL_QUEUE.send({
-          type: "match-revival-works",
-          chain: true,
-        });
+    await step.do("match public domain works", { retries: RETRIES }, async () => {
+      await this.env.REVIVAL_QUEUE.send({
+        type: "match-revival-works",
+        chain: true,
+      });
 
-        return true;
-      },
+      return true;
+    });
+
+    await step.do("describe public domain works", { retries: RETRIES }, async () => {
+      await this.env.REVIVAL_QUEUE.send({
+        type: "describe-revival-works",
+        chain: true,
+      });
+
+      return true;
+    });
+
+    await step.do("group public domain prints", { retries: RETRIES }, async () => {
+      await this.env.REVIVAL_QUEUE.send({ type: "group-revival-prints" });
+
+      return true;
+    });
+
+    await step.do("check public domain rights", { retries: RETRIES }, async () =>
+      withDatabase(this.env, checkRevivalRights),
     );
 
-    await step.do(
-      "describe public domain works",
-      { retries: RETRIES },
-      async () => {
-        await this.env.REVIVAL_QUEUE.send({
-          type: "describe-revival-works",
-          chain: true,
-        });
+    await step.do("recheck print suitability", { retries: RETRIES }, async () => {
+      await this.env.REVIVAL_QUEUE.send({
+        type: "recheck-revival-works",
+        chain: true,
+      });
 
-        return true;
-      },
-    );
-
-    await step.do(
-      "group public domain prints",
-      { retries: RETRIES },
-      async () => {
-        await this.env.REVIVAL_QUEUE.send({ type: "group-revival-prints" });
-
-        return true;
-      },
-    );
-
-    await step.do(
-      "check public domain rights",
-      { retries: RETRIES },
-      async () => withDatabase(this.env, checkRevivalRights),
-    );
-
-    await step.do(
-      "recheck print suitability",
-      { retries: RETRIES },
-      async () => {
-        await this.env.REVIVAL_QUEUE.send({
-          type: "recheck-revival-works",
-          chain: true,
-        });
-
-        return true;
-      },
-    );
+      return true;
+    });
 
     await step.do("queue reel mirrors", { retries: RETRIES }, async () =>
       withDatabase(this.env, queueRevivalMirrors),
@@ -242,9 +201,7 @@ export class CatalogSweep extends WorkflowEntrypoint<
     );
 
     await step.do("prune catalogue gaps", { retries: RETRIES }, async () =>
-      withDatabase(this.env, (env) =>
-        pruneCatalogueGaps(env.DB, GAP_DISCOVERY.retentionDays),
-      ),
+      withDatabase(this.env, (env) => pruneCatalogueGaps(env.DB, GAP_DISCOVERY.retentionDays)),
     );
 
     return { deep };

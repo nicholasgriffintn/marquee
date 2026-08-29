@@ -1,10 +1,7 @@
 import { getTmdbPeople } from "../clients/tmdb.ts";
 import { logEvent } from "../lib/logging.ts";
 import { storePeople } from "../repositories/catalog-writer.ts";
-import {
-  markPeopleVerified,
-  unverifiedPeople,
-} from "../repositories/people.ts";
+import { markPeopleVerified, unverifiedPeople } from "../repositories/people.ts";
 import type { Bindings } from "../types.ts";
 
 const SAMPLE = 500;
