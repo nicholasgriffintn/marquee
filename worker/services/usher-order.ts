@@ -17,9 +17,17 @@ import { factBrief, factsFor, serviceFor } from "./why.ts";
 
 const ORDER_SHORTLIST = 12;
 const BACKUPS = 2;
+const FAMILY_UNSUITABLE_GENRES = ["horror", "thriller", "crime", "war"];
+
 const COMPANY: Record<
   string,
-  { note: string; text: string; genres?: string[]; certifications?: string[] }
+  {
+    note: string;
+    text: string;
+    genres?: string[];
+    bannedGenres?: string[];
+    certifications?: string[];
+  }
 > = {
   alone: {
     note: "watching on their own, answerable to nobody",
@@ -37,17 +45,34 @@ const COMPANY: Record<
     note: "children in the room, so nothing that will need explaining afterwards",
     text: "something the whole family can watch together",
     genres: ["family", "animation", "adventure", "comedy"],
+    bannedGenres: FAMILY_UNSUITABLE_GENRES,
     certifications: ADULT_CERTIFICATIONS,
   },
 };
 
 const LENGTH: Record<
   string,
-  { note: string; maxRuntime?: number; mediaType?: "movie" | "tv"; text?: string }
+  {
+    note: string;
+    maxRuntime?: number;
+    mediaType?: "movie" | "tv";
+    text?: string;
+  }
 > = {
-  short: { note: "ninety minutes at most", maxRuntime: 100, mediaType: "movie" },
-  evening: { note: "an ordinary evening's worth", maxRuntime: 150, mediaType: "movie" },
-  long: { note: "as long as it needs to be", text: "a long film that earns its running time" },
+  short: {
+    note: "ninety minutes at most",
+    maxRuntime: 100,
+    mediaType: "movie",
+  },
+  evening: {
+    note: "an ordinary evening's worth",
+    maxRuntime: 150,
+    mediaType: "movie",
+  },
+  long: {
+    note: "as long as it needs to be",
+    text: "a long film that earns its running time",
+  },
   episode: {
     note: "a series to start tonight, one episode in",
     mediaType: "tv",
@@ -101,11 +126,18 @@ export function constraintsFor(order: TonightOrder, guests: Guest[] = []): Short
   const company = COMPANY[order.company];
   const length = LENGTH[order.length];
   const mood = MOOD[order.mood];
-  const vetoed = new Set(guests.flatMap((guest) => guest.vetoes.map((veto) => veto.toLowerCase())));
+  const bannedGenres = [
+    ...new Set(
+      [...guests.flatMap((guest) => guest.vetoes), ...(company?.bannedGenres ?? [])].map((genre) =>
+        genre.toLowerCase(),
+      ),
+    ),
+  ];
+  const banned = new Set(bannedGenres);
   const leanings = guests.flatMap((guest) => guest.leanings);
   const genres = [
     ...new Set([...(mood?.genres ?? []), ...(company?.genres ?? []), ...leanings]),
-  ].filter((genre) => !vetoed.has(genre.toLowerCase()));
+  ].filter((genre) => !banned.has(genre.toLowerCase()));
 
   return {
     limit: ORDER_SHORTLIST,
@@ -113,6 +145,7 @@ export function constraintsFor(order: TonightOrder, guests: Guest[] = []): Short
     ...(length?.mediaType ? { mediaType: length.mediaType } : {}),
     ...(company?.certifications ? { certifications: company.certifications } : {}),
     ...(genres.length ? { genres } : {}),
+    ...(bannedGenres.length ? { bannedGenres } : {}),
     text: [mood?.text, company?.text, length?.text].filter(Boolean).join(", "),
   };
 }
@@ -149,15 +182,14 @@ export async function pickToOrder(
     guestIds?: string[];
   } = {},
 ) {
-  const providerIds = options.providerIds ?? [];
   const rejected = (options.rejected ?? []).filter(isKnownTitle).slice(0, 40);
   const showing = showingFor(options.hour ?? 20, options.isWeekend ?? false);
   const everyone = await readGuests(env.DB, viewerId);
   const guests = options.guestIds?.length
     ? everyone.filter((guest) => options.guestIds?.includes(guest.id))
     : [];
-  const { titles, preferences } = await shortlistFor(env, viewerId, {
-    providerIds,
+  const { titles, viewer } = await shortlistFor(env, viewerId, {
+    ...(options.providerIds ? { providerIds: options.providerIds } : {}),
     rejected,
     constraints: constraintsFor(order, guests),
   });
@@ -171,9 +203,14 @@ export async function pickToOrder(
     readBeliefs(env.DB, viewerId),
   ]);
   const dress = (item: MediaTitle, line: string) => {
-    const service = serviceFor(item, providerIds);
+    const service = serviceFor(item, viewer.providerIds);
 
-    return { item, line, service, facts: factsFor(item, { service, shelf, beliefs }) };
+    return {
+      item,
+      line,
+      service,
+      facts: factsFor(item, { service, shelf, beliefs }),
+    };
   };
 
   const listing = titles
@@ -186,7 +223,7 @@ export async function pickToOrder(
           .join(", ")} · ${title.overview.slice(0, 200)}`,
     )
     .join("\n");
-  const summary = preferenceSummary(preferences);
+  const summary = preferenceSummary(viewer.preferences);
   const messages: ChatMessage[] = [
     { role: "system", content: ORDER_PROMPT },
     {
@@ -215,7 +252,7 @@ export async function pickToOrder(
         "",
         titles
           .map((title) => {
-            const service = serviceFor(title, providerIds);
+            const service = serviceFor(title, viewer.providerIds);
 
             return `${title.id} — ${factBrief(factsFor(title, { service, shelf, beliefs }))}`;
           })

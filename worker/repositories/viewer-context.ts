@@ -1,3 +1,4 @@
+import { entryWeightSql } from "../services/viewer/weights.ts";
 import type { EntryStatus, ViewingContext } from "../types.ts";
 
 type EntryRow = {
@@ -8,31 +9,29 @@ type EntryRow = {
   updatedAt: string;
 };
 
-export async function readViewerContext(
+export async function readViewerEntries(
   db: D1Database,
   viewerId: string,
-  selectedProviderIds: string[] = [],
-) {
+): Promise<ViewingContext[]> {
   const entriesResult = await db
     .prepare(
       `SELECT title_id AS titleId, status, rating, thoughts, updated_at AS updatedAt FROM viewing_entries WHERE viewer_id = ? ORDER BY updated_at DESC LIMIT 100`,
     )
     .bind(viewerId)
     .all<EntryRow>();
-  const entries: ViewingContext[] = entriesResult.results.map((entry) => ({
+
+  return entriesResult.results.map((entry) => ({
     titleId: entry.titleId,
     status: entry.status,
     rating: entry.rating,
     thoughts: entry.thoughts.slice(0, 500),
     updatedAt: entry.updatedAt,
   }));
-
-  return { entries, selectedProviderIds };
 }
 
 type AffinityRow = { value: string; weight: number };
 
-const AFFINITY_WEIGHT = `sum(CASE WHEN v.rating IS NULL THEN 0.5 ELSE (v.rating - 3.0) / 2.0 END) AS weight`;
+const AFFINITY_WEIGHT = entryWeightSql("v.status", "v.rating");
 
 function toAffinityValues(rows: AffinityRow[]) {
   return rows.filter((row) => typeof row.value === "string" && row.value).map((row) => row.value);
@@ -47,12 +46,12 @@ async function affinityForTable(
 ) {
   const rows = await db
     .prepare(
-      `SELECT f.${column} AS value, ${AFFINITY_WEIGHT}
+      `SELECT f.${column} AS value, sum(${AFFINITY_WEIGHT}) AS weight
        FROM viewing_entries AS v
        JOIN ${table} AS f ON f.title_id = v.title_id
-       WHERE v.viewer_id = ? AND v.status != 'dropped'
+       WHERE v.viewer_id = ?
        GROUP BY f.${column}
-       HAVING weight > 0
+       HAVING sum(${AFFINITY_WEIGHT}) > 0
        ORDER BY weight DESC
        LIMIT ?`,
     )

@@ -1,13 +1,12 @@
 import type { CatalogSection, MediaTitle } from "../../src/domain/catalog.ts";
 import type { ViewerOrigin } from "../../src/domain/cinema.ts";
 import { hashString } from "../../src/lib/string.ts";
-import { includesProvider } from "../lib/providers.ts";
-import { neverTitleIds } from "../repositories/signals.ts";
-import { readViewerContext } from "../repositories/viewer-context.ts";
 import type { Bindings } from "../types.ts";
 import { getAiRails } from "./ai-rails.ts";
 import { getCatalogue, getTrending } from "./catalog.ts";
 import { getPersonalRails } from "./personal-rails.ts";
+import { eligibilityGate, type Eligibility } from "./viewer/eligibility.ts";
+import { eligibilityFor, readViewerState, type ViewerState } from "./viewer/state.ts";
 
 const ITEMS_PER_SOURCE = 6;
 const ITEMS_PER_SECTION = 2;
@@ -38,11 +37,11 @@ function sectionFronts(sections: CatalogSection[]) {
 
 function candidatePool(
   sources: Array<{ source: FeaturedSource; items: MediaTitle[] }>,
-  providerIds: string[],
-  excluded: ReadonlySet<string>,
+  eligibility: Eligibility,
 ) {
   const seen = new Set<string>();
   const candidates: FeaturedCandidate[] = [];
+  const admits = eligibilityGate(eligibility);
 
   for (const source of sources) {
     let added = 0;
@@ -52,13 +51,7 @@ function candidatePool(
         break;
       }
 
-      if (
-        seen.has(item.id) ||
-        excluded.has(item.id) ||
-        !item.backdropUrl ||
-        !item.overview.trim() ||
-        !includesProvider(item, providerIds)
-      ) {
+      if (seen.has(item.id) || !item.backdropUrl || !item.overview.trim() || !admits(item)) {
         continue;
       }
 
@@ -110,33 +103,15 @@ function chooseFeatured(candidates: FeaturedCandidate[], identity: string, now: 
     : first;
 }
 
-async function personalSections(env: Bindings, viewerId: string, origin: ViewerOrigin | null) {
+async function personalSections(env: Bindings, viewer: ViewerState, origin: ViewerOrigin | null) {
   const [personal, ai] = await Promise.all([
-    getPersonalRails(env, viewerId, origin),
-    getAiRails(env, viewerId)
+    getPersonalRails(env, viewer.viewerId, origin),
+    getAiRails(env, viewer)
       .then((result) => (result.isFresh ? result.sections : []))
       .catch((): CatalogSection[] => []),
   ]);
 
   return [...ai, ...personal];
-}
-
-async function excludedTitleIds(env: Bindings, viewerId: string | null, providerIds: string[]) {
-  if (!viewerId) {
-    return new Set<string>();
-  }
-
-  const [viewer, refused] = await Promise.all([
-    readViewerContext(env.DB, viewerId, providerIds),
-    neverTitleIds(env.DB, viewerId),
-  ]);
-
-  return new Set([
-    ...refused,
-    ...viewer.entries
-      .filter((entry) => entry.status === "watched" || entry.status === "dropped")
-      .map((entry) => entry.titleId),
-  ]);
 }
 
 export async function getFeaturedTitle(
@@ -149,11 +124,11 @@ export async function getFeaturedTitle(
   },
 ) {
   const { viewerId, providerIds, origin, now = new Date() } = options;
-  const [catalogue, trending, personal, excluded] = await Promise.all([
-    getCatalogue(env, providerIds),
+  const viewer = await readViewerState(env, viewerId ?? "", { providerIds });
+  const [catalogue, trending, personal] = await Promise.all([
+    getCatalogue(env, viewer.providerIds),
     getTrending(env).catch(() => ({ items: [] })),
-    viewerId ? personalSections(env, viewerId, origin) : Promise.resolve([]),
-    excludedTitleIds(env, viewerId, providerIds),
+    viewerId ? personalSections(env, viewer, origin) : Promise.resolve([]),
   ]);
   const candidates = candidatePool(
     [
@@ -161,8 +136,7 @@ export async function getFeaturedTitle(
       { source: "trending", items: trending.items },
       { source: "catalogue", items: sectionFronts(catalogue?.sections ?? []) },
     ],
-    providerIds,
-    excluded,
+    eligibilityFor(viewer, { availability: "confirmed-or-unknown" }),
   );
   const featured = chooseFeatured(candidates, viewerId ?? "front-of-house", now);
 

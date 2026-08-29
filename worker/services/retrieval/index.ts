@@ -23,12 +23,14 @@ export function eligibilityOf(query: RetrievalQuery): CatalogueSearch {
     keywords: query.keywords,
     places: query.places,
     providerIds: query.providerIds,
+    availability: query.availability,
     certifications: query.certifications,
     minScore: query.minScore,
     minVotes: query.minVotes,
     maxRuntime: query.maxRuntime,
     releasedAfter: query.releasedAfter,
     excludeIds: query.excludeIds,
+    excludeGenres: query.excludeGenres,
   };
 }
 

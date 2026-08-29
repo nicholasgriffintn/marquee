@@ -8,10 +8,9 @@ import {
 } from "../lib/catalog-payload.ts";
 import { logError } from "../lib/logging.ts";
 import { clamp } from "../lib/numbers.ts";
-import { providerFilterSql } from "../lib/providers.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { hydrateTitleRows } from "./catalog-arrays.ts";
-import { searchTitlesFirst } from "./catalog-search.ts";
+import { availabilityCondition, searchTitlesFirst } from "./catalog-search.ts";
 
 type SectionRow = {
   id: string;
@@ -48,7 +47,7 @@ async function matchingTitleIds(db: D1Database, ids: string[], providerIds: stri
     .prepare(
       `SELECT id FROM catalog_titles
         WHERE id IN (SELECT value FROM json_each(?))
-          AND ${providerFilterSql("catalog_titles.id")}`,
+          AND ${availabilityCondition("catalog_titles", "confirmed-or-unknown")}`,
     )
     .bind(JSON.stringify(uniqueIds), JSON.stringify(providerIds))
     .all<{ id: string }>();
@@ -241,7 +240,12 @@ export async function readAvailability(db: D1Database, titleId: string) {
 }
 
 async function readSearchResults(db: D1Database, query: string, providerIds: string[]) {
-  const items = await searchTitlesFirst(db, { query, providerIds, limit: 30 });
+  const items = await searchTitlesFirst(db, {
+    query,
+    providerIds,
+    availability: "confirmed-or-unknown",
+    limit: 30,
+  });
 
   return {
     sections: [

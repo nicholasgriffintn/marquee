@@ -8,8 +8,7 @@ import { isKnownTitle } from "../lib/validation.ts";
 import { isRecord } from "../lib/values.ts";
 import { readBeliefs } from "../repositories/beliefs.ts";
 import { searchCatalogue, type CatalogueSearch } from "../repositories/catalog-search.ts";
-import { neverTitleIds, rejectedTitleIds } from "../repositories/signals.ts";
-import { readShelfDetail, readViewerContext } from "../repositories/viewer-context.ts";
+import { readShelfDetail } from "../repositories/viewer-context.ts";
 import type { Bindings } from "../types.ts";
 import { viewerSummary } from "./beliefs.ts";
 import { nearestTo } from "./embeddings.ts";
@@ -21,7 +20,8 @@ import {
   type TitleSource,
 } from "./retrieval/index.ts";
 import { tasteVector } from "./taste.ts";
-import { preferenceSummary, readViewerPreferences } from "./usher.ts";
+import { preferenceSummary } from "./usher.ts";
+import { eligibilityFor, readViewerState } from "./viewer/state.ts";
 import { factBrief, factsFor, serviceFor } from "./why.ts";
 
 const SHORTLIST = 8;
@@ -53,6 +53,7 @@ export type ShortlistConstraints = {
   maxRuntime?: number | null;
   mediaType?: "movie" | "tv";
   genres?: string[];
+  bannedGenres?: string[];
   certifications?: string[];
   text?: string;
   limit?: number;
@@ -68,28 +69,21 @@ export async function shortlistFor(
   } = {},
 ) {
   const constraints = options.constraints ?? {};
-  const [preferences, remembered, refused] = await Promise.all([
-    readViewerPreferences(env.DB, viewerId),
-    rejectedTitleIds(env.DB, viewerId),
-    neverTitleIds(env.DB, viewerId),
-  ]);
-  const services = [...new Set([...(options.providerIds ?? []), ...preferences.providerIds])];
-  const viewer = await readViewerContext(env.DB, viewerId, services);
-  const exclude = [
-    ...(options.rejected ?? []),
-    ...remembered,
-    ...viewer.entries
-      .filter((entry) => entry.status === "watched" || entry.status === "dropped")
-      .map((entry) => entry.titleId),
-  ];
-  const loose: CatalogueSearch = {
-    providerIds: services,
-    excludeIds: exclude,
-    limit: constraints.limit ?? SHORTLIST,
-    minVotes: 200,
+  const viewer = await readViewerState(env, viewerId, {
+    providerIds: options.providerIds,
+  });
+  const preferences = viewer.preferences;
+  const eligibility = eligibilityFor(viewer, {
+    exclude: options.rejected ?? [],
+    ...(constraints.bannedGenres ? { excludeGenres: constraints.bannedGenres } : {}),
+    ...(constraints.certifications?.length ? { certifications: constraints.certifications } : {}),
     ...(constraints.maxRuntime ? { maxRuntime: constraints.maxRuntime } : {}),
     ...(constraints.mediaType ? { mediaType: constraints.mediaType } : {}),
-    ...(constraints.certifications?.length ? { certifications: constraints.certifications } : {}),
+  });
+  const loose = {
+    ...eligibility,
+    limit: constraints.limit ?? SHORTLIST,
+    minVotes: 200,
   };
   const base: CatalogueSearch = {
     ...loose,
@@ -97,8 +91,8 @@ export async function shortlistFor(
   };
   const limit = constraints.limit ?? SHORTLIST;
   const pool = poolFor(limit);
-  const vector = await tasteVector(env, viewer, preferences, {
-    never: refused,
+  const vector = await tasteVector(env, viewer.entries, preferences, {
+    never: viewer.never,
     summary: await viewerSummary(env, viewerId, preferences),
   });
   const sources: TitleSource[] = [];
@@ -142,26 +136,30 @@ export async function shortlistFor(
         ...loose,
         text: constraints.text || "a film worth putting on tonight without thinking about it",
       }),
-      preferences,
+      viewer,
     };
   }
 
   return {
     titles: rankTitles(sources, { limit }).map((candidate) => candidate.title),
-    preferences,
+    viewer,
   };
 }
 
 export async function pickOne(
   env: Bindings,
   viewerId: string,
-  options: { providerIds?: string[]; rejected?: string[]; hour?: number; isWeekend?: boolean } = {},
+  options: {
+    providerIds?: string[];
+    rejected?: string[];
+    hour?: number;
+    isWeekend?: boolean;
+  } = {},
 ) {
-  const providerIds = options.providerIds ?? [];
   const rejected = (options.rejected ?? []).filter(isKnownTitle).slice(0, 40);
   const showing = showingFor(options.hour ?? 20, options.isWeekend ?? false);
-  const { titles, preferences } = await shortlistFor(env, viewerId, {
-    providerIds,
+  const { titles, viewer } = await shortlistFor(env, viewerId, {
+    ...(options.providerIds ? { providerIds: options.providerIds } : {}),
     rejected,
     constraints: { maxRuntime: showing.maxRuntime },
   });
@@ -180,7 +178,7 @@ export async function pickOne(
           .join(", ")} · ${title.overview.slice(0, 240)}`,
     )
     .join("\n");
-  const summary = preferenceSummary(preferences);
+  const summary = preferenceSummary(viewer.preferences);
   const [shelf, beliefs] = await Promise.all([
     readShelfDetail(env.DB, viewerId, 20).catch((): never[] => []),
     readBeliefs(env.DB, viewerId),
@@ -188,7 +186,11 @@ export async function pickOne(
   const factsById = new Map(
     titles.map((title) => [
       title.id,
-      factsFor(title, { service: serviceFor(title, providerIds), shelf, beliefs }),
+      factsFor(title, {
+        service: serviceFor(title, viewer.providerIds),
+        shelf,
+        beliefs,
+      }),
     ]),
   );
   const messages: ChatMessage[] = [

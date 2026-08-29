@@ -5,7 +5,7 @@ import { logError } from "../lib/logging.ts";
 import { clamp } from "../lib/numbers.ts";
 import { centre, cosine, dot, normalise } from "../lib/vector.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
-import { readViewerContext } from "../repositories/viewer-context.ts";
+import { readViewerEntries } from "../repositories/viewer-context.ts";
 import type { Bindings, EntryStatus, ViewingContext } from "../types.ts";
 import { embedTitles, readVectors } from "./embeddings.ts";
 import { weighTitles } from "./taste.ts";
@@ -298,14 +298,14 @@ export async function buildTasteMap(
   viewerId: string,
   options: { schedule?: (task: Promise<unknown>) => void } = {},
 ): Promise<TasteMap> {
-  const viewer = await readViewerContext(env.DB, viewerId);
-  const weighted = weighTitles(viewer, [], MAP_SAMPLE);
+  const entries = await readViewerEntries(env.DB, viewerId);
+  const weighted = weighTitles(entries, [], MAP_SAMPLE);
 
   if (weighted.length < MINIMUM_POINTS) {
     return empty("sparse", weighted.length);
   }
 
-  const cacheKey = `notebook-map:${viewerId}:${shelfSignature(viewer.entries)}`;
+  const cacheKey = `notebook-map:${viewerId}:${shelfSignature(entries)}`;
   const cached = await readCachedValue<TasteMap>(cacheKey);
 
   if (cached) {
@@ -346,7 +346,7 @@ export async function buildTasteMap(
     found.length,
   );
   const byTitleId = new Map(titles.map((title) => [title.id, title]));
-  const entryByTitleId = new Map(viewer.entries.map((entry) => [entry.titleId, entry]));
+  const entryByTitleId = new Map(entries.map((entry) => [entry.titleId, entry]));
   const raw = found.map((entry, index) => {
     const row = centred[index] ?? [];
 

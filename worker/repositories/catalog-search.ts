@@ -10,6 +10,7 @@ import {
 import { clamp } from "../lib/numbers.ts";
 import { providerFilterSql } from "../lib/providers.ts";
 import { isKnownTitle, validProviderIds } from "../lib/validation.ts";
+import type { AvailabilityRule } from "../services/viewer/eligibility.ts";
 import { hydrateTitleRows } from "./catalog-arrays.ts";
 
 export type CatalogueSort = "trending" | "popularity" | "score" | "recent" | "relevance" | "given";
@@ -36,10 +37,12 @@ export type CatalogueSearch = {
   places?: string[];
   mediaType?: "movie" | "tv";
   providerIds?: string[];
+  availability?: AvailabilityRule;
   minScore?: number;
   releasedAfter?: number;
   maxRuntime?: number;
   excludeIds?: string[];
+  excludeGenres?: string[];
   includeIds?: string[];
   certifications?: string[];
   sort?: CatalogueSort;
@@ -55,6 +58,18 @@ type Eligibility = {
   includedIds: string[] | null;
   impossible: boolean;
 };
+
+function hasProviders(alias: string) {
+  return `EXISTS (SELECT 1 FROM catalog_title_providers AS p WHERE p.title_id = ${alias}.id)`;
+}
+
+export function availabilityCondition(alias: string, availability: AvailabilityRule = "confirmed") {
+  const confirmedOrUnknown = providerFilterSql(`${alias}.id`);
+
+  return availability === "confirmed-or-unknown"
+    ? confirmedOrUnknown
+    : `(${hasProviders(alias)} AND ${confirmedOrUnknown})`;
+}
 
 const TITLE_EXACTNESS = `(CASE WHEN lower(t.title) = ? OR lower(t.original_title) = ? THEN 0 ELSE 1 END)`;
 
@@ -109,6 +124,7 @@ function eligibilityClause(search: CatalogueSearch): Eligibility {
   const places = lowered(search.places, 6);
   const keywords = lowered(search.keywords, 6);
   const providerIds = validProviderIds(search.providerIds);
+  const excludeGenres = lowered(search.excludeGenres, 20);
   const excludedIds = [...new Set((search.excludeIds ?? []).filter(isKnownTitle))].slice(
     0,
     EXCLUDE_ID_LIMIT,
@@ -135,8 +151,18 @@ function eligibilityClause(search: CatalogueSearch): Eligibility {
   }
 
   if (providerIds.length) {
-    conditions.push(providerFilterSql("t.id"));
+    conditions.push(availabilityCondition("t", search.availability));
     bindings.push(JSON.stringify(providerIds));
+  }
+
+  if (excludeGenres.length) {
+    conditions.push(
+      `NOT EXISTS (
+         SELECT 1 FROM catalog_title_genres AS bg
+         WHERE bg.title_id = t.id AND lower(bg.genre) IN (${excludeGenres.map(() => "?").join(", ")})
+       )`,
+    );
+    bindings.push(...excludeGenres);
   }
 
   if (Number.isFinite(search.minScore)) {
@@ -288,6 +314,7 @@ export type BrowseTrendingFilter = {
   keywords: string[];
   places: string[];
   providerIds: string[];
+  availability?: AvailabilityRule;
   minVotes: number;
 };
 
@@ -331,6 +358,7 @@ export async function browseTrending(
     keywords: filter.keywords,
     places: filter.places,
     providerIds: filter.providerIds,
+    availability: filter.availability,
     minVotes: filter.minVotes,
     sort: "popularity",
     excludeIds: candidates.map((row) => row.id),

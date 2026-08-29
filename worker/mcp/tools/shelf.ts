@@ -1,7 +1,7 @@
 import { ENTRY_STATUSES, isEntryStatus } from "../../../src/domain/entries.ts";
 import { isKnownTitle } from "../../lib/validation.ts";
 import { readItems } from "../../repositories/catalog-reader.ts";
-import { readViewerContext } from "../../repositories/viewer-context.ts";
+import { readViewerEntries } from "../../repositories/viewer-context.ts";
 import { getViewingEntry, updateProfile } from "../../services/profile.ts";
 import {
   answer,
@@ -41,16 +41,16 @@ export const shelfTools: readonly McpTool[] = [
       required: ["entries"],
     },
     async run({ env, user }) {
-      const viewer = await readViewerContext(env.DB, user.id);
+      const entries = await readViewerEntries(env.DB, user.id);
       const titles = await readItems(
         env.DB,
-        viewer.entries.map((entry) => entry.titleId),
+        entries.map((entry) => entry.titleId),
         SHELF_PAGE,
       );
       const byId = new Map(titles.map((title) => [title.id, title]));
 
       return answer({
-        entries: viewer.entries.map((entry) => ({
+        entries: entries.map((entry) => ({
           id: entry.titleId,
           title: byId.get(entry.titleId)?.title ?? entry.titleId,
           year: byId.get(entry.titleId)?.year ?? null,
@@ -76,7 +76,10 @@ export const shelfTools: readonly McpTool[] = [
     inputSchema: {
       type: "object",
       properties: {
-        titleId: { type: "string", description: "A Marquee id such as movie:550." },
+        titleId: {
+          type: "string",
+          description: "A Marquee id such as movie:550.",
+        },
         status: { type: "string", enum: [...ENTRY_STATUSES] },
         rating: { type: "integer", minimum: 1, maximum: 5 },
         thoughts: { type: "string" },
@@ -119,7 +122,11 @@ export const shelfTools: readonly McpTool[] = [
           titleId: input.titleId,
           title: title?.title ?? input.titleId,
           from: existing
-            ? { status: existing.status, rating: existing.rating, thoughts: existing.thoughts }
+            ? {
+                status: existing.status,
+                rating: existing.rating,
+                thoughts: existing.thoughts,
+              }
             : null,
           to: {
             status: input.status,

@@ -132,10 +132,18 @@ export async function readSignals(
   }
 }
 
-export async function rejectedTitleIds(db: D1Database, viewerId: string) {
+export async function readRefusals(db: D1Database, viewerId: string) {
   const signals = await readSignals(db, viewerId, ["rejection", "never"], 300);
+  const titleIds = (type: SignalType) => [
+    ...new Set(
+      signals
+        .filter((signal) => signal.type === type)
+        .map((signal) => signal.titleId)
+        .filter(Boolean),
+    ),
+  ];
 
-  return [...new Set(signals.map((signal) => signal.titleId).filter(Boolean))];
+  return { never: titleIds("never"), rejected: titleIds("rejection") };
 }
 
 export async function recentExitFor(db: D1Database, viewerId: string, titleId: string, days = 45) {
@@ -167,12 +175,6 @@ export async function recentExitFor(db: D1Database, viewerId: string, titleId: s
 
     return null;
   }
-}
-
-export async function neverTitleIds(db: D1Database, viewerId: string) {
-  const signals = await readSignals(db, viewerId, ["never"], 100);
-
-  return [...new Set(signals.map((signal) => signal.titleId).filter(Boolean))];
 }
 
 export async function pruneSignals(db: D1Database) {

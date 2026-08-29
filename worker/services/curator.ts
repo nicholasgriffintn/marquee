@@ -6,9 +6,10 @@ import { parseCuratorResult, type ChatMessage } from "../lib/curator-payload.ts"
 import { logError } from "../lib/logging.ts";
 import { parseJsonContent } from "../lib/values.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
-import { readViewerContext } from "../repositories/viewer-context.ts";
-import type { Bindings, ViewerContext } from "../types.ts";
-import { preferenceSummary, readViewerPreferences } from "./usher.ts";
+import type { Bindings } from "../types.ts";
+import { preferenceSummary } from "./usher.ts";
+import type { Eligibility } from "./viewer/eligibility.ts";
+import { eligibilityFor, readViewerState, type ViewerState } from "./viewer/state.ts";
 
 const MAX_TOOL_ROUNDS = 4;
 
@@ -57,7 +58,8 @@ function historyMessages(turns: CuratorTurn[]): ChatMessage[] {
 async function runCurator(
   env: Bindings,
   prompt: string,
-  viewer: ViewerContext,
+  viewer: ViewerState,
+  eligibility: Eligibility,
   turns: CuratorTurn[],
   decisionId: string,
   summary = "",
@@ -114,7 +116,9 @@ async function runCurator(
         role: "tool" as const,
         tool_call_id: call.id,
         name: call.function.name,
-        content: JSON.stringify(await executeCuratorTool(env, call, viewer, availableIds)),
+        content: JSON.stringify(
+          await executeCuratorTool(env, call, viewer, eligibility, availableIds),
+        ),
       })),
     );
 
@@ -158,11 +162,9 @@ export async function* curateStream(
 
   yield { type: "status", label: viewerId ? "Reading your shelf" : "Reading your services" };
 
-  const preferences = await readViewerPreferences(env.DB, viewerId);
-  const viewer = await readViewerContext(env.DB, viewerId, [
-    ...new Set([...(options.providerIds ?? []), ...preferences.providerIds]),
-  ]);
-  const tasteLine = preferenceSummary(preferences);
+  const viewer = await readViewerState(env, viewerId, { providerIds: options.providerIds });
+  const eligibility = eligibilityFor(viewer);
+  const tasteLine = preferenceSummary(viewer.preferences);
   const showing = showingFor(options.hour ?? 20, options.isWeekend ?? false);
 
   yield {
@@ -176,6 +178,7 @@ export async function* curateStream(
       ? `${prompt}\n\nRefine the selection you just gave me. Keep what still fits and replace what does not.`
       : prompt,
     viewer,
+    eligibility,
     turns,
     decisionId,
     tasteLine,
