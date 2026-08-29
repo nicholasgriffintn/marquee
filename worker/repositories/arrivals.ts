@@ -43,7 +43,7 @@ export async function recordProviderState(
           `INSERT INTO title_provider_state (title_id, provider_id, offer_kind, announced_at)
              VALUES ($1, $2, $3, ${baseline ? "CURRENT_TIMESTAMP" : "NULL"})
              ON CONFLICT (title_id, provider_id) DO UPDATE SET
-               seen_count = seen_count + 1,
+               seen_count = title_provider_state.seen_count + 1,
                offer_kind = excluded.offer_kind,
                last_seen_at = CURRENT_TIMESTAMP`,
           [titleId, providerId, kind],
