@@ -1,7 +1,7 @@
 import {
   CURATOR_SCHEMA,
   INSIGHT_SCHEMA,
-  NOTE_HUNCHES_SCHEMA,
+  NOTE_FACETS_SCHEMA,
   type OutputSchema,
   RAIL_SCHEMA,
   USHER_ORDER_SCHEMA,
@@ -13,7 +13,7 @@ export type AiFeature =
   | "curator_narration"
   | "rails"
   | "insight"
-  | "note_hunches"
+  | "note_facets"
   | "usher_order"
   | "usher_pick";
 
@@ -67,13 +67,13 @@ const POLICIES: Record<AiFeature, AiPolicy> = {
     temperature: 0.2,
     schema: INSIGHT_SCHEMA,
   },
-  note_hunches: {
+  note_facets: {
     ...LOGGED_AND_CACHED,
     tier: "fast",
     timeoutMs: 20_000,
-    maxTokens: 260,
+    maxTokens: 320,
     temperature: 0.2,
-    schema: NOTE_HUNCHES_SCHEMA,
+    schema: NOTE_FACETS_SCHEMA,
   },
   usher_order: {
     ...LOGGED_AND_CACHED,
