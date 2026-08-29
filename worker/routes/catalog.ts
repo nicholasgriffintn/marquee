@@ -58,6 +58,7 @@ const KEYWORDS_DEFAULT_LIMIT = 120;
 const PLACES_DEFAULT_LIMIT = 80;
 const GENRES_DEFAULT_LIMIT = 40;
 const SEASON_LIMIT = 100;
+const RAILS_CACHE_SECONDS = 120;
 const MAX_TMDB_ID = 9_999_999_999;
 
 export const catalogRoutes = new Hono<{
@@ -89,17 +90,21 @@ catalogRoutes.get("/rails", requireAuthentication, async (context) => {
   const user = context.get("authenticatedUser");
 
   try {
-    context.header("cache-control", "no-store");
+    const delivery = await deliverRails(context.env, {
+      viewerId: user.id,
+      origin: edgeOrigin(context.req.raw),
+      generate: context.req.query("generate") === "1",
+    });
 
-    return context.json(
-      await deliverRails(context.env, {
-        viewerId: user.id,
-        origin: edgeOrigin(context.req.raw),
-        generate: context.req.query("generate") === "1",
-      }),
+    context.header(
+      "cache-control",
+      delivery.status === "ready" ? `private, max-age=${RAILS_CACHE_SECONDS}` : "no-store",
     );
+
+    return context.json(delivery);
   } catch (error) {
     logError("rails_delivery_failed", error, { area: "catalogue" });
+    context.header("cache-control", "no-store");
 
     return context.json({ ...NO_RAILS, status: "error" });
   }
