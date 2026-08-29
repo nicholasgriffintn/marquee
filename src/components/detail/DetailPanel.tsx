@@ -310,12 +310,6 @@ export function DetailPanel({
           <Text size="lede" leading="relaxed" className={styles.synopsis}>
             {item.overview || "No synopsis available."}
           </Text>
-          {item.anime?.background && (
-            <Text size="sm" leading="relaxed" className={styles.background}>
-              {item.anime.background}
-              <DetailCredit>Background from MyAnimeList</DetailCredit>
-            </Text>
-          )}
           <MarqueeRead insight={insight} isLoading={isInsightLoading} />
           <AirLine item={item} nextEpisode={nextEpisode} />
           {continueAt && (
@@ -326,6 +320,31 @@ export function DetailPanel({
               <ArrowIcon />
             </button>
           )}
+          {canSave && entryState.status === "loaded" && !entryState.entry && (
+            <Button
+              variant="primary"
+              size="lg"
+              surface="paper"
+              fullWidth
+              className={styles.save}
+              onClick={() => onSave(item)}
+            >
+              <PlusIcon /> Save to my shelf
+            </Button>
+          )}
+          <WatchOrder label="Before this" entries={watchOrder.before} onOpen={onOpen} />
+          <ErrorBoundary label="Where to watch">
+            <WatchBlock
+              title={item.title}
+              providers={watchProviders}
+              fallbackHref={item.watchLink}
+              selectedProviderIds={selectedProviderIds}
+              hideIfEmpty={reels.length > 0}
+              isRefreshing={isRefreshing}
+              onLeave={leaveVia}
+            />
+          </ErrorBoundary>
+          <WatchOrder label="After this" entries={watchOrder.after} onOpen={onOpen} />
           {isSeries && (
             <SeasonsRail
               seasons={seasons}
@@ -384,33 +403,9 @@ export function DetailPanel({
                   onStatus={onStatus}
                   onUpdateDraft={onUpdateDraft}
                 />
-              ) : (
-                <Button
-                  variant="primary"
-                  size="lg"
-                  surface="paper"
-                  fullWidth
-                  className={styles.save}
-                  onClick={() => onSave(item)}
-                >
-                  <PlusIcon /> Save to my shelf
-                </Button>
-              )}
+              ) : null}
             </ErrorBoundary>
           )}
-          <WatchOrder label="Before this" entries={watchOrder.before} onOpen={onOpen} />
-          <ErrorBoundary label="Where to watch">
-            <WatchBlock
-              title={item.title}
-              providers={watchProviders}
-              fallbackHref={item.watchLink}
-              selectedProviderIds={selectedProviderIds}
-              hideIfEmpty={reels.length > 0}
-              isRefreshing={isRefreshing}
-              onLeave={leaveVia}
-            />
-          </ErrorBoundary>
-          <WatchOrder label="After this" entries={watchOrder.after} onOpen={onOpen} />
           <WatchOrder label="Related" entries={watchOrder.related} onOpen={onOpen} />
           <SourceWorkTrack
             source={adaptations.source}
@@ -435,6 +430,12 @@ export function DetailPanel({
           </ErrorBoundary>
           {usherSlot}
           <ScoreRow item={item} />
+          {item.anime?.background && (
+            <Text size="sm" leading="relaxed" className={styles.background}>
+              {item.anime.background}
+              <DetailCredit>Background from MyAnimeList</DetailCredit>
+            </Text>
+          )}
           <TitleAwards titleId={item.id} />
           {item.buzz && <BuzzNote buzz={item.buzz} />}
           <CastAndStaff item={item} />
