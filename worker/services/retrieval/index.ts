@@ -23,6 +23,7 @@ export function eligibilityOf(query: RetrievalQuery): CatalogueSearch {
     keywords: query.keywords,
     places: query.places,
     providerIds: query.providerIds,
+    certifications: query.certifications,
     minScore: query.minScore,
     minVotes: query.minVotes,
     maxRuntime: query.maxRuntime,
