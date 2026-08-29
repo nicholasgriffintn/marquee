@@ -2,7 +2,11 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { personPath } from "../../domain/catalog";
-import { useTitleCredits, type CreditSeason, type TitleCredit } from "../../hooks/useTitleCredits";
+import {
+  useTitleCredits,
+  type CreditSeason,
+  type TitleCredit,
+} from "../../hooks/useTitleCredits";
 import { Dropdown, Heading, StatusNote, type DropdownOption } from "../../ui";
 import { DetailCredit } from "./DetailNote";
 
@@ -27,14 +31,17 @@ const CREW_ORDER = [
 ];
 
 function byJob(crew: TitleCredit[]) {
-  const grouped = new Map<string, string[]>();
+  const grouped = new Map<string, { personId: number; name: string }[]>();
 
   for (const credit of crew) {
     if (!credit.job) {
       continue;
     }
 
-    grouped.set(credit.job, [...(grouped.get(credit.job) ?? []), credit.name]);
+    grouped.set(credit.job, [
+      ...(grouped.get(credit.job) ?? []),
+      { personId: credit.personId, name: credit.name },
+    ]);
   }
 
   return [...grouped.entries()].toSorted((left, right) => {
@@ -48,7 +55,13 @@ function byJob(crew: TitleCredit[]) {
   });
 }
 
-export function CreditsBlock({ titleId, people }: { titleId: string; people: string[] }) {
+export function CreditsBlock({
+  titleId,
+  people,
+}: {
+  titleId: string;
+  people: string[];
+}) {
   const [season, setSeason] = useState<number | null>(null);
   const [page, setPage] = useState(1);
   const { credits, isLoading } = useTitleCredits(titleId, season, page);
@@ -74,7 +87,8 @@ export function CreditsBlock({ titleId, people }: { titleId: string; people: str
   }
 
   const jobs = byJob(crew);
-  const billed = !isLoading && cast.length === 0 && jobs.length === 0 ? people : [];
+  const billed =
+    !isLoading && cast.length === 0 && jobs.length === 0 ? people : [];
   const bare = cast.length === 0 && jobs.length === 0 && billed.length === 0;
 
   if (bare && !isLoading && seasons.length === 0 && people.length === 0) {
@@ -121,27 +135,28 @@ export function CreditsBlock({ titleId, people }: { titleId: string; people: str
           <ul className={styles.cast}>
             {billed.map((name) => (
               <li key={name}>
-                <Link to={personPath(name)}>
+                <Link to={`/directory?q=${encodeURIComponent(name)}`}>
                   <strong>{name}</strong>
                 </Link>
               </li>
             ))}
           </ul>
           <DetailCredit>
-            Top billing for the title from TMDB. The full credits are not read yet.
+            Top billing for the title from TMDB. The full credits are not read
+            yet.
           </DetailCredit>
         </>
       )}
       {jobs.length > 0 && (
         <dl className={styles.crew}>
-          {jobs.map(([job, names]) => (
+          {jobs.map(([job, people_]) => (
             <div key={job}>
               <dt>{job}</dt>
               <dd>
-                {names.map((name, index) => (
-                  <span key={`${job}-${name}`}>
+                {people_.map((person, index) => (
+                  <span key={`${job}-${person.personId}`}>
                     {index > 0 ? ", " : ""}
-                    <Link to={personPath(name)}>{name}</Link>
+                    <Link to={personPath(person.personId)}>{person.name}</Link>
                   </span>
                 ))}
               </dd>
@@ -153,7 +168,7 @@ export function CreditsBlock({ titleId, people }: { titleId: string; people: str
         <ul className={styles.cast}>
           {cast.map((credit) => (
             <li key={`${credit.personId}-${credit.episodeNumber ?? "s"}`}>
-              <Link to={personPath(credit.name)}>
+              <Link to={personPath(credit.personId)}>
                 <strong>{credit.name}</strong>
                 {credit.character ? <small>{credit.character}</small> : null}
                 {credit.episodeNumber !== null ? (

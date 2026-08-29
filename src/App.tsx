@@ -1,5 +1,20 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Navigate, Route, Routes, useLocation, useMatch, useNavigate } from "react-router-dom";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useMatch,
+  useNavigate,
+} from "react-router-dom";
 
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { SearchBox } from "./components/SearchBox";
@@ -7,7 +22,12 @@ import { SiteFooter } from "./components/SiteFooter";
 import { SiteHeader } from "./components/SiteHeader";
 import { TitleOverlay } from "./components/TitleOverlay";
 import { ManagersDoor } from "./components/usher/ManagersDoor";
-import { titlePath, weaveSections, type CatalogSection, type MediaTitle } from "./domain/catalog";
+import {
+  titlePath,
+  weaveSections,
+  type CatalogSection,
+  type MediaTitle,
+} from "./domain/catalog";
 import { asideFor, type UsherMoment } from "./domain/usher";
 import { useCatalog } from "./hooks/useCatalog";
 import { useCurator } from "./hooks/useCurator";
@@ -55,14 +75,22 @@ const SignInPage = lazy(() =>
   import("./pages/SignInPage").then((m) => ({ default: m.SignInPage })),
 );
 const PrivacyPolicyPage = lazy(() =>
-  import("./pages/PrivacyPolicyPage").then((m) => ({ default: m.PrivacyPolicyPage })),
+  import("./pages/PrivacyPolicyPage").then((m) => ({
+    default: m.PrivacyPolicyPage,
+  })),
 );
-const TermsPage = lazy(() => import("./pages/TermsPage").then((m) => ({ default: m.TermsPage })));
+const TermsPage = lazy(() =>
+  import("./pages/TermsPage").then((m) => ({ default: m.TermsPage })),
+);
 const SourcesPage = lazy(() =>
   import("./pages/SourcesPage").then((m) => ({ default: m.SourcesPage })),
 );
-const UsherPage = lazy(() => import("./pages/UsherPage").then((m) => ({ default: m.UsherPage })));
-const AdminPage = lazy(() => import("./pages/AdminPage").then((m) => ({ default: m.AdminPage })));
+const UsherPage = lazy(() =>
+  import("./pages/UsherPage").then((m) => ({ default: m.UsherPage })),
+);
+const AdminPage = lazy(() =>
+  import("./pages/AdminPage").then((m) => ({ default: m.AdminPage })),
+);
 const RevivalPage = lazy(() =>
   import("./pages/RevivalPage").then((m) => ({ default: m.RevivalPage })),
 );
@@ -88,7 +116,9 @@ const HOME_DRIP_DELAY_MS = 45_000;
 
 function isTitlePath(pathname: string) {
   return (
-    pathname.startsWith("/title/") || pathname.startsWith("/movie/") || pathname.startsWith("/tv/")
+    pathname.startsWith("/title/") ||
+    pathname.startsWith("/movie/") ||
+    pathname.startsWith("/tv/")
   );
 }
 
@@ -100,7 +130,8 @@ function AliasRedirect({ alias }: { alias: string }) {
 
 const LISTINGS: BrowsePreset = {
   title: "Listings",
-  description: "Everything in the building. Narrow it down and I will get out of your way.",
+  description:
+    "Everything in the building. Narrow it down and I will get out of your way.",
   sort: "popularity",
 };
 
@@ -117,7 +148,8 @@ export function App() {
     selectProviders,
     isResolved: providersResolved,
   } = useProviderPreferences(isSignedIn);
-  const isViewerReady = !session.isLoading && profile.isLoaded && providersResolved;
+  const isViewerReady =
+    !session.isLoading && profile.isLoaded && providersResolved;
   const isHome = location.pathname === "/";
   const catalog = useCatalog(selectedProviderIds, isViewerReady && isHome);
   const featuredTitle = useFeaturedTitle(
@@ -141,13 +173,19 @@ export function App() {
   const legacyMatch = useMatch("/title/:titleId");
   const openMediaType = movieMatch ? "movie" : seriesMatch ? "tv" : null;
   const openTmdbId = (movieMatch ?? seriesMatch)?.params.tmdbId ?? "";
-  const routedTitleId = openMediaType && openTmdbId ? `${openMediaType}:${openTmdbId}` : "";
+  const routedTitleId =
+    openMediaType && openTmdbId ? `${openMediaType}:${openTmdbId}` : "";
   const titleMatch = Boolean(routedTitleId || legacyMatch);
-  const openedState = location.state as { background?: typeof location; instance?: string } | null;
+  const openedState = location.state as {
+    background?: typeof location;
+    instance?: string;
+  } | null;
   const storedBackground =
     openedState?.instance === APP_INSTANCE ? openedState.background : undefined;
   const background =
-    storedBackground && isTitlePath(storedBackground.pathname) ? undefined : storedBackground;
+    storedBackground && isTitlePath(storedBackground.pathname)
+      ? undefined
+      : storedBackground;
   const isOverlay = titleMatch && Boolean(background);
   const pageLocation = background ?? location;
   const pagePath = pageLocation.pathname;
@@ -169,7 +207,9 @@ export function App() {
   const openDetails = useTitle(openTitleId || undefined, knownTitles);
 
   const requestMoment = usher.request;
-  const pageQuery = (new URLSearchParams(pageLocation.search).get("q") ?? "").trim();
+  const pageQuery = (
+    new URLSearchParams(pageLocation.search).get("q") ?? ""
+  ).trim();
 
   const fallbackTitle = openTitleId
     ? openDetails.title
@@ -188,14 +228,18 @@ export function App() {
     [requestMoment],
   );
 
-  const wantsDrip = isSignedIn && isHome && isViewerReady && !usher.isOnboarding;
+  const wantsDrip =
+    isSignedIn && isHome && isViewerReady && !usher.isOnboarding;
 
   useEffect(() => {
     if (!wantsDrip) {
       return undefined;
     }
 
-    const timer = window.setTimeout(() => void requestMoment("home"), HOME_DRIP_DELAY_MS);
+    const timer = window.setTimeout(
+      () => void requestMoment("home"),
+      HOME_DRIP_DELAY_MS,
+    );
 
     return () => window.clearTimeout(timer);
   }, [requestMoment, wantsDrip]);
@@ -203,7 +247,8 @@ export function App() {
   const openBackgroundRef = useRef<typeof location | undefined>(undefined);
 
   useEffect(() => {
-    openBackgroundRef.current = background ?? (titleMatch ? undefined : location);
+    openBackgroundRef.current =
+      background ?? (titleMatch ? undefined : location);
   });
 
   const openTriggerRef = useRef<HTMLElement | null>(null);
@@ -226,9 +271,14 @@ export function App() {
   const openTitle = useCallback(
     (item: MediaTitle) => {
       openTriggerRef.current =
-        document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
       void navigate(titlePath(item), {
-        state: { background: openBackgroundRef.current, instance: APP_INSTANCE },
+        state: {
+          background: openBackgroundRef.current,
+          instance: APP_INSTANCE,
+        },
         viewTransition: true,
       });
     },
@@ -244,22 +294,36 @@ export function App() {
     void navigate("/", { viewTransition: true });
   }, [background, navigate]);
   const sections = useMemo(
-    () => weaveSections(pinned.sections, rails.curated, rails.personal, catalog.catalogue.sections),
+    () =>
+      weaveSections(
+        pinned.sections,
+        rails.curated,
+        rails.personal,
+        catalog.catalogue.sections,
+      ),
     [catalog.catalogue, pinned.sections, rails.curated, rails.personal],
   );
   const heroSections = useMemo(
     () =>
-      weaveSections(pinned.sections, rails.heroCurated, rails.personal, catalog.catalogue.sections),
+      weaveSections(
+        pinned.sections,
+        rails.heroCurated,
+        rails.personal,
+        catalog.catalogue.sections,
+      ),
     [catalog.catalogue, pinned.sections, rails.heroCurated, rails.personal],
   );
-  const featured = featuredTitle.item ?? heroSections.flatMap((section) => section.items)[0];
+  const featured =
+    featuredTitle.item ?? heroSections.flatMap((section) => section.items)[0];
   const isHeroReady =
     isViewerReady &&
     !catalog.isLoading &&
     featuredTitle.isResolved &&
     rails.isResolved &&
     pinned.isResolved;
-  const isPinned = Boolean(curator.state.prompt && pinned.pinnedPrompt === curator.state.prompt);
+  const isPinned = Boolean(
+    curator.state.prompt && pinned.pinnedPrompt === curator.state.prompt,
+  );
 
   const pinCurrentShelf = useCallback(() => {
     if (curator.state.items.length < 2) {
@@ -339,7 +403,9 @@ export function App() {
       const saved = await usher.answer(questionId, value);
 
       if (questionId === "providers" && Array.isArray(saved)) {
-        selectProviders(saved.filter((id): id is string => typeof id === "string"));
+        selectProviders(
+          saved.filter((id): id is string => typeof id === "string"),
+        );
       }
 
       return saved;
@@ -383,7 +449,11 @@ export function App() {
   }
 
   const titleView = openTitleId ? (
-    <ErrorBoundary label="The title card" resetKey={openTitleId} onRetry={closeDetails}>
+    <ErrorBoundary
+      label="The title card"
+      resetKey={openTitleId}
+      onRetry={closeDetails}
+    >
       <TitleOverlay
         layout={isOverlay ? "overlay" : "page"}
         titleId={openTitleId}
@@ -438,7 +508,11 @@ export function App() {
                 const trimmed = query.trim();
 
                 curator.clear();
-                void navigate(trimmed ? `/listings?q=${encodeURIComponent(trimmed)}` : "/listings");
+                void navigate(
+                  trimmed
+                    ? `/listings?q=${encodeURIComponent(trimmed)}`
+                    : "/listings",
+                );
               }}
             />
           </ErrorBoundary>
@@ -452,7 +526,10 @@ export function App() {
       )}
 
       <p
-        className={classNames(styles.syncMessage, profile.message && styles.syncMessageVisible)}
+        className={classNames(
+          styles.syncMessage,
+          profile.message && styles.syncMessageVisible,
+        )}
         aria-live="polite"
       >
         {profile.message}
@@ -496,14 +573,26 @@ export function App() {
                     onOpen={openTitle}
                     onPin={pinCurrentShelf}
                     onPick={() =>
-                      isSignedIn ? void usher.askForPick(selectedProviderIds) : askForTicket()
+                      isSignedIn
+                        ? void usher.askForPick(selectedProviderIds)
+                        : askForTicket()
                     }
-                    onRejectPick={(scope) => void usher.rejectPick(selectedProviderIds, scope)}
-                    onStartOrder={() => (isSignedIn ? usher.openOrder() : askForTicket())}
+                    onRejectPick={(scope) =>
+                      void usher.rejectPick(selectedProviderIds, scope)
+                    }
+                    onStartOrder={() =>
+                      isSignedIn ? usher.openOrder() : askForTicket()
+                    }
                     onOrder={(order, guestIds) =>
-                      void usher.placeOrder(order, selectedProviderIds, guestIds)
+                      void usher.placeOrder(
+                        order,
+                        selectedProviderIds,
+                        guestIds,
+                      )
                     }
-                    onOrderAnother={() => void usher.reorder(selectedProviderIds)}
+                    onOrderAnother={() =>
+                      void usher.reorder(selectedProviderIds)
+                    }
                     onOrderEdit={usher.editOrder}
                     onSelectProviders={selectProviders}
                     onShowSources={() => void navigate("/notebook#services")}
@@ -522,7 +611,10 @@ export function App() {
                 path="/revival"
                 element={
                   <Suspense fallback={<RouteFallback />}>
-                    <RevivalPage isReady={isViewerReady} isSignedIn={isSignedIn} />
+                    <RevivalPage
+                      isReady={isViewerReady}
+                      isSignedIn={isSignedIn}
+                    />
                   </Suspense>
                 }
               />
@@ -555,7 +647,10 @@ export function App() {
               <Route
                 path="/sign-in"
                 element={
-                  <SignInPage isSignedIn={isSignedIn} isSessionLoading={session.isLoading} />
+                  <SignInPage
+                    isSignedIn={isSignedIn}
+                    isSessionLoading={session.isLoading}
+                  />
                 }
               />
 
@@ -580,7 +675,9 @@ export function App() {
                   isSignedIn ? (
                     <LibraryPage
                       isSignedIn={isSignedIn}
-                      usherMoment={usher.moment?.surface === "shelf" ? usher.moment : null}
+                      usherMoment={
+                        usher.moment?.surface === "shelf" ? usher.moment : null
+                      }
                       onClaim={(entry) => profile.saveEntry(entry)}
                       onDiscard={(titleId) => profile.removeEntry(titleId)}
                       onUsherRequest={onShelfMoment}
@@ -596,11 +693,16 @@ export function App() {
               />
 
               <Route
-                path="/person/:name"
-                element={<PersonPage isSignedIn={isSignedIn} onOpen={openTitle} />}
+                path="/person/:id"
+                element={
+                  <PersonPage isSignedIn={isSignedIn} onOpen={openTitle} />
+                }
               />
 
-              <Route path="/collection/:id" element={<CollectionPage onOpen={openTitle} />} />
+              <Route
+                path="/collection/:id"
+                element={<CollectionPage onOpen={openTitle} />}
+              />
 
               <Route path="/directory" element={<DirectoryPage />} />
 
@@ -634,7 +736,11 @@ export function App() {
                   <BrowsePage
                     preset={LISTINGS}
                     providers={catalog.providers}
-                    usherMoment={usher.moment?.surface === "search-empty" ? usher.moment : null}
+                    usherMoment={
+                      usher.moment?.surface === "search-empty"
+                        ? usher.moment
+                        : null
+                    }
                     onOpen={openTitle}
                     onUsherRequest={onEmptyListings}
                     onUsherAction={onUsherAction}
@@ -648,7 +754,11 @@ export function App() {
               <Route path="/title/:titleId" element={titleView} />
 
               {Object.keys(ROUTE_ALIASES).map((path) => (
-                <Route key={path} path={path} element={<AliasRedirect alias={path} />} />
+                <Route
+                  key={path}
+                  path={path}
+                  element={<AliasRedirect alias={path} />}
+                />
               ))}
 
               <Route path="*" element={<NotFoundPage />} />

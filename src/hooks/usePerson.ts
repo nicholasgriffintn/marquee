@@ -2,7 +2,12 @@ import { useCallback, useEffect, useState } from "react";
 
 import { NO_AWARDS, type AwardSummary } from "../domain/awards";
 import type { MediaTitle } from "../domain/catalog";
-import { jsonMutation, mutateJson, queryJson, QueryError } from "../lib/query-client";
+import {
+  jsonMutation,
+  mutateJson,
+  queryJson,
+  QueryError,
+} from "../lib/query-client";
 import { useResource } from "./useResource";
 
 export type PersonResponse = {
@@ -16,7 +21,7 @@ export type PersonResponse = {
 
 const NO_ITEMS: MediaTitle[] = [];
 
-export function usePerson(name: string, isSignedIn: boolean) {
+export function usePerson(identifier: string, isSignedIn: boolean) {
   const [person, setPerson] = useState<PersonResponse["person"] | null>(null);
   const [shelf, setShelf] = useState({ shelved: 0, watched: 0 });
   const [awards, setAwards] = useState<AwardSummary>(NO_AWARDS);
@@ -25,9 +30,9 @@ export function usePerson(name: string, isSignedIn: boolean) {
   const [hasMore, setHasMore] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-  const key = name.toLowerCase();
+  const key = identifier.toLowerCase();
   const page = pageState.key === key ? pageState.page : 0;
-  const active = Boolean(name);
+  const active = Boolean(identifier);
 
   useEffect(() => {
     if (!active) {
@@ -41,7 +46,7 @@ export function usePerson(name: string, isSignedIn: boolean) {
 
       try {
         const response = await queryJson<PersonResponse>(
-          `/api/catalog/people/${encodeURIComponent(name)}?page=${page}`,
+          `/api/catalog/people/${encodeURIComponent(identifier)}?page=${page}`,
         );
 
         if (!alive) {
@@ -51,13 +56,16 @@ export function usePerson(name: string, isSignedIn: boolean) {
         setPerson(response.person);
         setShelf(response.shelf);
         setAwards(response.awards);
-        setItems((current) => (page === 0 ? response.items : [...current, ...response.items]));
+        setItems((current) =>
+          page === 0 ? response.items : [...current, ...response.items],
+        );
         setHasMore(response.hasMore);
         setLoadError("");
       } catch (caught) {
         if (alive) {
           if (page === 0) {
-            const notFound = caught instanceof QueryError && caught.status === 404;
+            const notFound =
+              caught instanceof QueryError && caught.status === 404;
 
             setLoadError(
               notFound
@@ -82,30 +90,41 @@ export function usePerson(name: string, isSignedIn: boolean) {
     return () => {
       alive = false;
     };
-  }, [active, name, page]);
+  }, [active, identifier, page]);
 
-  const followedResource = useResource<{ following: string[] }>("/api/notebook/people", {
-    enabled: isSignedIn,
-  });
+  const followedResource = useResource<{ following: string[] }>(
+    "/api/notebook/people",
+    {
+      enabled: isSignedIn,
+    },
+  );
   const [followed, setFollowed] = useState<string[] | null>(null);
   const [saveError, setSaveError] = useState("");
   const following =
-    isSignedIn && (followed ?? followedResource.data?.following ?? []).includes(name.toLowerCase());
+    isSignedIn &&
+    Boolean(person) &&
+    (followed ?? followedResource.data?.following ?? []).includes(
+      person?.name.toLowerCase() ?? "",
+    );
 
   const toggleFollow = useCallback(async () => {
+    if (!person) {
+      return;
+    }
+
     const follow = !following;
 
     try {
       const response = await mutateJson<{ following: string[] }>(
         "/api/notebook/people",
-        jsonMutation("POST", { name, follow }),
+        jsonMutation("POST", { name: person.name, follow }),
       );
 
       setFollowed(response.following);
     } catch {
       setSaveError("That did not take.");
     }
-  }, [following, name]);
+  }, [following, person]);
 
   return {
     data: person ? { person, items, shelf, awards } : null,

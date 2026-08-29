@@ -40,7 +40,9 @@ function escapeXml(value: string) {
 function lastModified(value: string | null) {
   const parsed = value ? new Date(value.replace(" ", "T")) : null;
 
-  return parsed && !Number.isNaN(parsed.getTime()) ? parsed.toISOString().slice(0, 10) : null;
+  return parsed && !Number.isNaN(parsed.getTime())
+    ? parsed.toISOString().slice(0, 10)
+    : null;
 }
 
 function missing() {
@@ -61,7 +63,9 @@ function served(body: string, contentType = "application/xml; charset=UTF-8") {
 }
 
 async function countTitles(db: Database) {
-  const row = await db.first<{ total: number }>("SELECT COUNT(*) AS total FROM catalog_titles");
+  const row = await db.first<{ total: number }>(
+    "SELECT COUNT(*) AS total FROM catalog_titles",
+  );
 
   return row?.total ?? 0;
 }
@@ -92,14 +96,19 @@ sitemapRoutes.get("/sitemap.xml", async (context) => {
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const entries = [
     `${origin}/sitemap/pages.xml`,
-    ...Array.from({ length: pages }, (_, index) => `${origin}/sitemap/titles/${index + 1}.xml`),
+    ...Array.from(
+      { length: pages },
+      (_, index) => `${origin}/sitemap/titles/${index + 1}.xml`,
+    ),
   ];
 
   return served(
     [
       '<?xml version="1.0" encoding="UTF-8"?>',
       '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-      ...entries.map((location) => `<sitemap><loc>${escapeXml(location)}</loc></sitemap>`),
+      ...entries.map(
+        (location) => `<sitemap><loc>${escapeXml(location)}</loc></sitemap>`,
+      ),
       "</sitemapindex>",
     ].join(""),
   );
@@ -136,15 +145,15 @@ function urlset(entries: string[]) {
 
 sitemapRoutes.get("/sitemap/people.xml", async (context) => {
   const origin = canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN);
-  const { rows: results } = await context.env.DB.query<{ name: string }>(
-    `SELECT name FROM catalog_people WHERE titles > 0 ORDER BY titles DESC LIMIT $1`,
+  const { rows: results } = await context.env.DB.query<{ personId: number }>(
+    `SELECT person_id AS "personId" FROM catalog_people WHERE titles > 0 ORDER BY titles DESC LIMIT $1`,
     [PAGE_SIZE],
   );
 
   return urlset(
     results.map(
       (row) =>
-        `<url><loc>${escapeXml(`${origin}/person/${encodeURIComponent(row.name)}`)}</loc>` +
+        `<url><loc>${escapeXml(`${origin}/person/${row.personId}`)}</loc>` +
         "<changefreq>weekly</changefreq></url>",
     ),
   );
@@ -171,10 +180,12 @@ sitemapRoutes.get("/sitemap/collections.xml", async (context) => {
 
 sitemapRoutes.get("/sitemap/revival.xml", async (context) => {
   const origin = canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN);
-  const { rows: results } = await context.env.DB.query<{ id: string; title: string }>(
-    `SELECT id, title FROM revival_works WHERE status = 'approved' LIMIT $1`,
-    [PAGE_SIZE],
-  );
+  const { rows: results } = await context.env.DB.query<{
+    id: string;
+    title: string;
+  }>(`SELECT id, title FROM revival_works WHERE status = 'approved' LIMIT $1`, [
+    PAGE_SIZE,
+  ]);
 
   return urlset(
     results.map(

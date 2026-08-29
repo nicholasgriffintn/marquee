@@ -23,7 +23,10 @@ const CREDIT_COLUMNS = `c.person_id AS "personId", p.name, p.profile_path AS "pr
        c.season_number AS "seasonNumber", c.episode_number AS "episodeNumber",
        c.episode_count AS "episodeCount"`;
 
-function scopeClause(scope: CreditScope): { where: string; binds: DatabaseValue[] } {
+function scopeClause(scope: CreditScope): {
+  where: string;
+  binds: DatabaseValue[];
+} {
   if (scope.season === undefined || scope.season === null) {
     return { where: "c.season_number IS NULL", binds: [] };
   }
@@ -66,7 +69,10 @@ async function creditPage(
 
 async function creditTotals(db: Database, titleId: string, scope: CreditScope) {
   const { where, binds } = scopeClause(scope);
-  const row = await db.first<{ castTotal: number | null; crewTotal: number | null }>(
+  const row = await db.first<{
+    castTotal: number | null;
+    crewTotal: number | null;
+  }>(
     `SELECT
          sum(CASE WHEN c.department = 'Acting' THEN 1 ELSE 0 END) AS "castTotal",
          sum(CASE WHEN c.department <> 'Acting' THEN 1 ELSE 0 END) AS "crewTotal"
@@ -102,7 +108,11 @@ export async function readTitleCredits(
 }
 
 export async function readCreditSeasons(db: Database, titleId: string) {
-  const rows = await db.query<{ season: number; credits: number; episodes: number }>(
+  const rows = await db.query<{
+    season: number;
+    credits: number;
+    episodes: number;
+  }>(
     `SELECT season_number AS season, count(*) AS credits,
               count(DISTINCT episode_number) AS episodes
        FROM catalog_credits
@@ -130,8 +140,32 @@ export async function rebuildPersonTitles(db: Database) {
   return total?.credits ?? 0;
 }
 
-export async function readPerson(db: Database, name: string): Promise<PersonRecord | null> {
-  const term = name.trim().toLowerCase();
+// `identifier` is a person_id when it parses as a positive integer (the canonical,
+// unambiguous lookup used by every link we generate). Otherwise it's a legacy name
+// from an old bookmarked/indexed URL — kept working via the old best-effort match,
+// which silently picks one row when multiple people share a name.
+export async function readPerson(
+  db: Database,
+  identifier: string,
+): Promise<PersonRecord | null> {
+  const personId = Number(identifier);
+
+  if (Number.isInteger(personId) && personId > 0) {
+    try {
+      const row = await db.first<PersonRecord>(
+        `SELECT person_id AS "personId", name, titles FROM catalog_people WHERE person_id = $1`,
+        [personId],
+      );
+
+      return row ?? null;
+    } catch (error) {
+      logError("person_read_failed", error);
+
+      return null;
+    }
+  }
+
+  const term = identifier.trim().toLowerCase();
 
   if (term.length < 2 || term.length > 120) {
     return null;
@@ -192,7 +226,12 @@ export async function listPeople(
   }
 }
 
-export async function readPersonTitleIds(db: Database, personId: number, limit = 48, offset = 0) {
+export async function readPersonTitleIds(
+  db: Database,
+  personId: number,
+  limit = 48,
+  offset = 0,
+) {
   try {
     const rows = await db.query<{ titleId: string }>(
       `SELECT p.title_id AS "titleId"
@@ -213,7 +252,11 @@ export async function readPersonTitleIds(db: Database, personId: number, limit =
   }
 }
 
-export async function readPersonShelf(db: Database, viewerId: string, personId: number) {
+export async function readPersonShelf(
+  db: Database,
+  viewerId: string,
+  personId: number,
+) {
   try {
     const row = await db.first<{ shelved: number; watched: number | null }>(
       `SELECT count(*) AS shelved,

@@ -1,7 +1,18 @@
-import { collectionPath, titlePath, type MediaTitle } from "../../src/domain/catalog.ts";
-import { revivalPath, runtimeLabel, type RevivalWork } from "../../src/domain/revival.ts";
+import {
+  collectionPath,
+  titlePath,
+  type MediaTitle,
+} from "../../src/domain/catalog.ts";
+import {
+  revivalPath,
+  runtimeLabel,
+  type RevivalWork,
+} from "../../src/domain/revival.ts";
 import { sentenceList } from "../../src/lib/string.ts";
-import { readCollectionTitleIds, readItems } from "../repositories/catalog-reader.ts";
+import {
+  readCollectionTitleIds,
+  readItems,
+} from "../repositories/catalog-reader.ts";
 import { readPerson } from "../repositories/people.ts";
 import { readWork } from "../repositories/revival.ts";
 import type { Bindings } from "../types.ts";
@@ -26,7 +37,13 @@ const LISTING_KINDS: Record<string, { one: string; many: string }> = {
   all: { one: "film or TV series", many: "films and TV" },
 };
 
-export const NOINDEX_PATHS = new Set(["/search", "/sign-in", "/shelf", "/admin", "/notebook"]);
+export const NOINDEX_PATHS = new Set([
+  "/search",
+  "/sign-in",
+  "/shelf",
+  "/admin",
+  "/notebook",
+]);
 
 const STATIC_CARDS: Record<string, { title: string; description: string }> = {
   "/": {
@@ -40,16 +57,19 @@ const STATIC_CARDS: Record<string, { title: string; description: string }> = {
       "What lands on your services this week, what comes back, and what the town is reading about. Printed every Monday.",
   },
   "/sources": {
-    title: "Where Marquee's data comes from — every service and source · Marquee",
+    title:
+      "Where Marquee's data comes from — every service and source · Marquee",
     description:
       "Every streaming service Marquee tracks, how much it can see inside each one, and credit to everyone whose data makes it work.",
   },
   "/usher": {
     title: "The Usher — thirty years on the door · Marquee",
-    description: "Who the Usher is, and why he has opinions about what you should watch tonight.",
+    description:
+      "Who the Usher is, and why he has opinions about what you should watch tonight.",
   },
   "/revival": {
-    title: "The revival house — free public domain films to watch online · Marquee",
+    title:
+      "The revival house — free public domain films to watch online · Marquee",
     description:
       "Out-of-copyright films streaming free in the UK. No account, no advert, no ticket — just press play.",
   },
@@ -91,12 +111,14 @@ function breadcrumbs(origin: string, trail: { name: string; item: string }[]) {
   return ldJson({
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
-    itemListElement: [{ name: "Marquee", item: `${origin}/` }, ...trail].map((entry, index) => ({
-      "@type": "ListItem",
-      position: index + 1,
-      name: entry.name,
-      item: entry.item,
-    })),
+    itemListElement: [{ name: "Marquee", item: `${origin}/` }, ...trail].map(
+      (entry, index) => ({
+        "@type": "ListItem",
+        position: index + 1,
+        name: entry.name,
+        item: entry.item,
+      }),
+    ),
   });
 }
 
@@ -108,7 +130,9 @@ function offersFor(title: MediaTitle, url: string) {
       "@type": "Offer",
       availableAtOrFrom: { "@type": "Organization", name: provider.name },
       category: provider.offerTypes[0] ?? "subscription",
-      ...(provider.offerTypes.includes("free") ? { price: 0, priceCurrency: "GBP" } : {}),
+      ...(provider.offerTypes.includes("free")
+        ? { price: 0, priceCurrency: "GBP" }
+        : {}),
     },
   }));
 }
@@ -131,11 +155,19 @@ function titleStructuredData(title: MediaTitle, url: string, origin: string) {
     ...(title.originalTitle && title.originalTitle !== title.title
       ? { alternateName: title.originalTitle }
       : {}),
-    ...(isMovie && title.runtimeMinutes ? { duration: `PT${title.runtimeMinutes}M` } : {}),
-    ...(!isMovie && title.numberOfSeasons ? { numberOfSeasons: title.numberOfSeasons } : {}),
-    ...(!isMovie && title.episodeCount ? { numberOfEpisodes: title.episodeCount } : {}),
+    ...(isMovie && title.runtimeMinutes
+      ? { duration: `PT${title.runtimeMinutes}M` }
+      : {}),
+    ...(!isMovie && title.numberOfSeasons
+      ? { numberOfSeasons: title.numberOfSeasons }
+      : {}),
+    ...(!isMovie && title.episodeCount
+      ? { numberOfEpisodes: title.episodeCount }
+      : {}),
     ...(sameAs.length ? { sameAs } : {}),
-    ...(title.providers.length ? { potentialAction: offersFor(title, url) } : {}),
+    ...(title.providers.length
+      ? { potentialAction: offersFor(title, url) }
+      : {}),
     ...(title.tmdbScore && title.tmdbVoteCount > 0
       ? {
           aggregateRating: {
@@ -151,7 +183,9 @@ function titleStructuredData(title: MediaTitle, url: string, origin: string) {
 }
 
 function titleDescription(title: MediaTitle) {
-  const services = title.providers.map((provider) => provider.name).slice(0, NAMED_SERVICES);
+  const services = title.providers
+    .map((provider) => provider.name)
+    .slice(0, NAMED_SERVICES);
 
   if (services.length) {
     return `Watch ${title.title} on ${sentenceList(services)}. UK streaming, rent and buy prices, cinema showings and free options, checked daily.`;
@@ -160,7 +194,11 @@ function titleDescription(title: MediaTitle) {
   return `${title.title} is not on a UK service right now. Marquee watches every service and lists rent, buy, cinema and free options for this ${kindLabel(title)} as they land.`;
 }
 
-async function titleCard(env: Bindings, titleId: string, origin: string): Promise<PageCard | null> {
+async function titleCard(
+  env: Bindings,
+  titleId: string,
+  origin: string,
+): Promise<PageCard | null> {
   if (!isKnownTitle(titleId)) {
     return null;
   }
@@ -193,15 +231,20 @@ async function titleCard(env: Bindings, titleId: string, origin: string): Promis
   };
 }
 
-async function personCard(env: Bindings, name: string, origin: string): Promise<PageCard | null> {
-  const person = await readPerson(env.DB, name);
+async function personCard(
+  env: Bindings,
+  identifier: string,
+  origin: string,
+): Promise<PageCard | null> {
+  const person = await readPerson(env.DB, identifier);
 
   if (!person) {
     return null;
   }
 
-  const url = `${origin}/person/${encodeURIComponent(person.name)}`;
-  const count = person.titles > 0 ? `${person.titles.toLocaleString("en-GB")} ` : "";
+  const url = `${origin}/person/${person.personId}`;
+  const count =
+    person.titles > 0 ? `${person.titles.toLocaleString("en-GB")} ` : "";
 
   return {
     title: `${person.name} — every film and TV series, and where to stream them · Marquee`,
@@ -273,8 +316,12 @@ function revivalStructuredData(work: RevivalWork, url: string, origin: string) {
     ...(work.synopsis ? { description: work.synopsis } : {}),
     ...(work.stillUrl ? { thumbnailUrl: absolute(work.stillUrl, origin) } : {}),
     ...(work.year ? { datePublished: String(work.year) } : {}),
-    ...(work.director ? { director: { "@type": "Person", name: work.director } } : {}),
-    ...(work.runtimeSeconds ? { duration: `PT${Math.round(work.runtimeSeconds / 60)}M` } : {}),
+    ...(work.director
+      ? { director: { "@type": "Person", name: work.director } }
+      : {}),
+    ...(work.runtimeSeconds
+      ? { duration: `PT${Math.round(work.runtimeSeconds / 60)}M` }
+      : {}),
     isAccessibleForFree: true,
     contentUrl: work.reelUrl,
   });
@@ -328,16 +375,25 @@ function selected(url: URL, key: string) {
     .filter(Boolean);
 }
 
-async function listingsCard(env: Bindings, url: URL, origin: string): Promise<PageCard> {
+async function listingsCard(
+  env: Bindings,
+  url: URL,
+  origin: string,
+): Promise<PageCard> {
   const type = url.searchParams.get("type");
   const genres = selected(url, "genres");
   const providers = selected(url, "providers");
-  const extras = [...url.searchParams.keys()].filter((key) => !FACET_PARAMS.has(key));
+  const extras = [...url.searchParams.keys()].filter(
+    (key) => !FACET_PARAMS.has(key),
+  );
   const kind = LISTING_KINDS[type === "movie" || type === "tv" ? type : "all"];
   const genre = genres.length === 1 ? genres[0] : null;
-  const service = providers.length === 1 ? await providerName(env, providers[0]) : null;
+  const service =
+    providers.length === 1 ? await providerName(env, providers[0]) : null;
   const isFacet =
-    extras.length === 0 && genres.length <= 1 && (providers.length === 0 || Boolean(service));
+    extras.length === 0 &&
+    genres.length <= 1 &&
+    (providers.length === 0 || Boolean(service));
   const facets = new URLSearchParams();
 
   if (type === "movie" || type === "tv") {
@@ -386,7 +442,9 @@ const DIRECTORY_CARDS = {
 
 function directoryCard(url: URL, origin: string): PageCard {
   const collections = url.searchParams.get("tab") === "collections";
-  const copy = collections ? DIRECTORY_CARDS.collections : DIRECTORY_CARDS.people;
+  const copy = collections
+    ? DIRECTORY_CARDS.collections
+    : DIRECTORY_CARDS.people;
   const canonical = `${origin}/directory${collections ? "?tab=collections" : ""}`;
 
   return {
@@ -428,7 +486,11 @@ function staticCard(path: string, origin: string): PageCard | null {
   };
 }
 
-export async function cardFor(env: Bindings, url: URL, origin: string): Promise<PageCard | null> {
+export async function cardFor(
+  env: Bindings,
+  url: URL,
+  origin: string,
+): Promise<PageCard | null> {
   const path = url.pathname;
   const routed = /^\/(movie|tv)\/([1-9][0-9]*)(?:\/|$)/u.exec(path);
 
@@ -493,11 +555,15 @@ export async function withPageMetadata(
           `<meta property="og:title" content="${escapeAttribute(card.title)}">`,
           `<meta property="og:description" content="${escapeAttribute(card.description)}">`,
           `<meta property="og:url" content="${escapeAttribute(card.canonical)}">`,
-          card.image ? `<meta property="og:image" content="${escapeAttribute(card.image)}">` : "",
+          card.image
+            ? `<meta property="og:image" content="${escapeAttribute(card.image)}">`
+            : "",
           `<meta name="twitter:card" content="summary_large_image">`,
           `<meta name="twitter:title" content="${escapeAttribute(card.title)}">`,
           `<meta name="twitter:description" content="${escapeAttribute(card.description)}">`,
-          card.image ? `<meta name="twitter:image" content="${escapeAttribute(card.image)}">` : "",
+          card.image
+            ? `<meta name="twitter:image" content="${escapeAttribute(card.image)}">`
+            : "",
           ...card.structuredData.map(
             (data) => `<script type="application/ld+json">${data}</script>`,
           ),

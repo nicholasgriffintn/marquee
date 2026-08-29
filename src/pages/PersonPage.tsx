@@ -2,12 +2,24 @@ import { useParams } from "react-router-dom";
 
 import { AwardsNote } from "../components/AwardsNote";
 import { ErrorBoundary } from "../components/ErrorBoundary";
-import { LoadMore, ResultsGrid, ResultsSkeleton } from "../components/ResultsGrid";
+import {
+  LoadMore,
+  ResultsGrid,
+  ResultsSkeleton,
+} from "../components/ResultsGrid";
 import { TitleCard } from "../components/TitleCard";
 import { UsherMark } from "../components/usher/UsherMark";
 import type { MediaTitle } from "../domain/catalog";
 import { usePerson } from "../hooks/usePerson";
-import { Button, Callout, EmptyState, Eyebrow, Heading, Page, Text } from "../ui";
+import {
+  Button,
+  Callout,
+  EmptyState,
+  Eyebrow,
+  Heading,
+  Page,
+  Text,
+} from "../ui";
 
 import styles from "./PersonPage.module.css";
 
@@ -27,9 +39,17 @@ export function PersonPage({
   onOpen: (item: MediaTitle) => void;
 }) {
   const params = useParams();
-  const name = decodeURIComponent(params.name ?? "");
-  const { data, following, error, saveError, isLoading, hasMore, loadMore, toggleFollow } =
-    usePerson(name, isSignedIn);
+  const identifier = decodeURIComponent(params.id ?? "");
+  const {
+    data,
+    following,
+    error,
+    saveError,
+    isLoading,
+    hasMore,
+    loadMore,
+    toggleFollow,
+  } = usePerson(identifier, isSignedIn);
 
   if (!data && (error || !isLoading)) {
     return (
@@ -40,8 +60,13 @@ export function PersonPage({
             <Eyebrow tone="accent" tracking="wide" className={styles.eyebrow}>
               On the credits
             </Eyebrow>
-            <Heading level={1} size="heading" family="serif" className={styles.name}>
-              {name}
+            <Heading
+              level={1}
+              size="heading"
+              family="serif"
+              className={styles.name}
+            >
+              {identifier}
             </Heading>
             <Text tone="muted" leading="relaxed" className={styles.lede}>
               {error || "Nobody here by that name."}
@@ -62,13 +87,23 @@ export function PersonPage({
           <Eyebrow tone="accent" tracking="wide" className={styles.eyebrow}>
             On the credits
           </Eyebrow>
-          <Heading level={1} size="heading" family="serif" className={styles.name}>
-            {person?.name ?? name}
+          <Heading
+            level={1}
+            size="heading"
+            family="serif"
+            className={styles.name}
+          >
+            {person?.name ?? identifier}
           </Heading>
           <Text tone="muted" leading="relaxed" className={styles.lede}>
             {person
               ? `${person.titles} title${person.titles === 1 ? "" : "s"} in the catalogue. ${
-                  isSignedIn ? shelfLine(data?.shelf.shelved ?? 0, data?.shelf.watched ?? 0) : ""
+                  isSignedIn
+                    ? shelfLine(
+                        data?.shelf.shelved ?? 0,
+                        data?.shelf.watched ?? 0,
+                      )
+                    : ""
                 }`
               : "Looking them up…"}
           </Text>
@@ -79,7 +114,9 @@ export function PersonPage({
               className={styles.follow}
               onClick={() => void toggleFollow()}
             >
-              {following ? "Stop watching for them" : "Tell me when they turn up"}
+              {following
+                ? "Stop watching for them"
+                : "Tell me when they turn up"}
             </Button>
           )}
           {saveError && <Callout>{saveError}</Callout>}
@@ -99,10 +136,15 @@ export function PersonPage({
         </ErrorBoundary>
       )}
 
-      {isLoading && (!data || data.items.length === 0) && <ResultsSkeleton poster />}
+      {isLoading && (!data || data.items.length === 0) && (
+        <ResultsSkeleton poster />
+      )}
 
       {!isLoading && data && data.items.length === 0 && !error && (
-        <EmptyState heading="Nothing here." description="Nothing of theirs in the catalogue yet." />
+        <EmptyState
+          heading="Nothing here."
+          description="Nothing of theirs in the catalogue yet."
+        />
       )}
 
       {hasMore && <LoadMore isLoading={isLoading} onClick={loadMore} />}
