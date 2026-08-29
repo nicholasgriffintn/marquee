@@ -22,6 +22,8 @@ export const ADMIN_ACTIONS = [
   "providers",
   "sections",
   "working-set",
+  "index-reconcile",
+  "index-rebuild",
   "cinemas",
   "showtimes",
   "alerts-preview",

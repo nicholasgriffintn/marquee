@@ -64,10 +64,12 @@ export const ACTION_GROUPS: {
   },
   {
     title: "Rebuilds",
-    note: "Fast jobs that go straight onto the ingestion queue.",
+    note: "Fast jobs that go straight onto the ingestion queue. Reconciling the search index reprojects whatever the catalogue has marked as drifted; rebuilding marks every title, which the sweeps then drain a bounded batch at a time.",
     actions: [
       { id: "sections", label: "Rebuild homepage" },
       { id: "working-set", label: "Rebuild working set" },
+      { id: "index-reconcile", label: "Reconcile search index" },
+      { id: "index-rebuild", label: "Rebuild search index" },
       { id: "schedule", label: "Refresh air dates" },
       { id: "buzz", label: "Refresh trending" },
       { id: "awards", label: "Read awards" },

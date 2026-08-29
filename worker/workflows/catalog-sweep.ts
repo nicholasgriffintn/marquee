@@ -20,6 +20,11 @@ import { syncBuzz } from "../services/buzz.ts";
 import { queueCinemaDirectories, queueCinemaScreenings } from "../services/cinema-sync.ts";
 import { advanceDiscoverFrontier } from "../services/discover.ts";
 import { syncTitleIdentifiers } from "../services/identifiers.ts";
+import {
+  DEEP_RECONCILE_LIMIT,
+  RECONCILE_LIMIT,
+  reconcileSearchIndex,
+} from "../services/index-readiness.ts";
 import { queueRevivalMirrors } from "../services/revival-mirror.ts";
 import { checkRevivalRights } from "../services/revival-rights.ts";
 import { queueRevivalSources } from "../services/revival.ts";
@@ -105,6 +110,10 @@ export class CatalogSweep extends WorkflowEntrypoint<Bindings, CatalogSweepParam
 
     await step.do("sync filming locations", { retries: RETRIES }, async () =>
       syncTitlePlaces(this.env),
+    );
+
+    await step.do("reconcile search index", { retries: RETRIES }, async () =>
+      reconcileSearchIndex(this.env, deep ? DEEP_RECONCILE_LIMIT : RECONCILE_LIMIT),
     );
 
     await step.do("queue embeddings", { retries: RETRIES }, async () => {

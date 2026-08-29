@@ -33,6 +33,7 @@ import { readCountryMap, writeCountryRows } from "./catalog-countries.ts";
 import { readDetailsMap, writeDetailsRows } from "./catalog-details.ts";
 import { readExternalIdsMap, writeExternalIdsRows } from "./catalog-external-ids.ts";
 import { readGenreMap, writeGenreRows } from "./catalog-genres.ts";
+import { markTitlesForIndexing } from "./catalog-index.ts";
 import { readKeywordMap, writeKeywordRows } from "./catalog-keywords.ts";
 import { readLanguageMap, writeLanguageRows } from "./catalog-languages.ts";
 import { readPersonMap, writePersonRows } from "./catalog-people.ts";
@@ -192,6 +193,11 @@ export async function persistTitleExtensions(db: D1Database, titles: MediaTitle[
     return;
   }
 
+  await markTitlesForIndexing(
+    db,
+    titles.map((title) => title.id),
+    "extensions",
+  );
   await writeGenreRows(db, titles);
   await writeKeywordRows(db, titles);
   await writeStudioRows(db, titles);
