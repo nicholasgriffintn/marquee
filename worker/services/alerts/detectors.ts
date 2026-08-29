@@ -88,12 +88,12 @@ const seasons: Detector = {
             AND s.season BETWEEN 2 AND 60
             AND s.episode = 1
             AND v.status IN ('watchlist', 'watching', 'watched')
-            AND (EXTRACT(EPOCH FROM s.airs_at) / 86400.0) BETWEEN (EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - INTERVAL '2 day')) / 86400.0)
-                                         AND (EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP + CAST($1 AS INTERVAL))) / 86400.0)
+            AND s.airs_at BETWEEN (CURRENT_TIMESTAMP - INTERVAL '2 day')
+                                         AND (CURRENT_TIMESTAMP + CAST($1 AS INTERVAL))
             AND s.season > COALESCE(
                   (SELECT max(p.season) FROM title_schedule AS p
                     WHERE p.title_id = s.title_id
-                      AND (EXTRACT(EPOCH FROM p.airs_at) / 86400.0) < (EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - INTERVAL '30 day')) / 86400.0)), 0)
+                      AND p.airs_at < (CURRENT_TIMESTAMP - INTERVAL '30 day')), 0)
           GROUP BY v.viewer_id, s.title_id, s.show_name, s.season, s.network
           LIMIT 400`,
         [`+${SEASON_HORIZON_DAYS} days`],
@@ -145,8 +145,8 @@ const cinema: Detector = {
            JOIN catalog_titles AS t ON t.id = c.title_id
           WHERE c.title_id IS NOT NULL
             AND v.status IN ('watchlist', 'watching')
-            AND (EXTRACT(EPOCH FROM c.business_day) / 86400.0) BETWEEN (EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) / 86400.0)
-                                             AND (EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP + CAST($1 AS INTERVAL))) / 86400.0)
+            AND c.business_day BETWEEN CURRENT_DATE
+                                             AND (CURRENT_DATE + CAST($1 AS INTERVAL))
           GROUP BY v.viewer_id, c.title_id, t.title, cin.name
           ORDER BY "businessDay"
           LIMIT 200`,
@@ -194,7 +194,7 @@ const people: Detector = {
            JOIN catalog_titles AS t ON t.id = cr.title_id
           WHERE (b.key LIKE 'rule:person:%' OR b.key LIKE 'person:%')
             AND b.revoked_at IS NULL
-            AND (b.suspended_until IS NULL OR (EXTRACT(EPOCH FROM b.suspended_until) / 86400.0) < (EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) / 86400.0))
+            AND (b.suspended_until IS NULL OR b.suspended_until < CURRENT_TIMESTAMP)
             AND COALESCE(t.release_date, DATE '1900-01-01')
                   > CURRENT_DATE + CAST($1 AS INTERVAL)
             AND NOT EXISTS (

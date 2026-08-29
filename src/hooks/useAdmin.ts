@@ -98,6 +98,19 @@ export type AdminQuality = {
     dwellMs: number;
     score: number;
   }[];
+  decisions: {
+    feature: string;
+    decisions: number;
+    served: number;
+    barren: number;
+    failed: number;
+    fellBack: number;
+    candidates: number;
+    latencyMs: number;
+    costUsd: number;
+    followed: number;
+    refused: number;
+  }[];
   fetchedAt: string;
 };
 

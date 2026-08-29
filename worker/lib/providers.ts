@@ -4,13 +4,8 @@ import { isStreamingAvailability, STREAMING_OFFER_TYPES } from "../../src/domain
 const STREAMING_LIST = STREAMING_OFFER_TYPES.map((offer) => `'${offer}'`).join(", ");
 
 export function includesProvider(title: MediaTitle, providerIds: string[]) {
-  return (
-    providerIds.length === 0 ||
-    title.providers.length === 0 ||
-    title.providers.some(
-      (provider) =>
-        providerIds.includes(provider.id) && isStreamingAvailability(provider.offerTypes),
-    )
+  return title.providers.some(
+    (provider) => providerIds.includes(provider.id) && isStreamingAvailability(provider.offerTypes),
   );
 }
 

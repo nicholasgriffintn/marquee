@@ -120,7 +120,7 @@ export async function readBudgetPace(env: Bindings, source: EnrichmentSource) {
             END AS room,
             CASE
               WHEN window_started_at <= (CURRENT_TIMESTAMP + CAST($2 AS INTERVAL)) THEN $3
-              ELSE ((EXTRACT(EPOCH FROM (window_started_at + CAST($4 AS INTERVAL))) / 86400.0) - (EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) / 86400.0)) * 24
+              ELSE EXTRACT(EPOCH FROM ((window_started_at + CAST($4 AS INTERVAL)) - CURRENT_TIMESTAMP)) / 3600.0
             END AS "hoursLeft"
      FROM source_budgets
      WHERE source = $5`,

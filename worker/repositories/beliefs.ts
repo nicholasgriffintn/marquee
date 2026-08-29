@@ -60,7 +60,7 @@ export async function readBeliefs(db: Database, viewerId: string): Promise<Belie
            FROM viewer_beliefs AS b
           WHERE b.viewer_id = $1
             AND b.revoked_at IS NULL
-            AND (b.expires_at IS NULL OR (EXTRACT(EPOCH FROM b.expires_at) / 86400.0) > (EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) / 86400.0))
+            AND (b.expires_at IS NULL OR b.expires_at > CURRENT_TIMESTAMP)
           ORDER BY b.confidence * b.strength DESC`,
       [viewerId],
     );

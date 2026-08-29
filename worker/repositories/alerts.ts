@@ -30,7 +30,7 @@ export async function sentThisWeek(db: Database, viewerId: string, days = 7) {
   try {
     const row = await db.first<{ total: number }>(
       `SELECT count(*) AS total FROM viewer_alerts
-          WHERE viewer_id = $1 AND (EXTRACT(EPOCH FROM sent_at) / 86400.0) > (EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP + CAST($2 AS INTERVAL))) / 86400.0)`,
+          WHERE viewer_id = $1 AND sent_at > (CURRENT_TIMESTAMP + CAST($2 AS INTERVAL))`,
       [viewerId, `-${days} days`],
     );
 
@@ -147,7 +147,7 @@ export async function stageAlertEmail(
 export async function confirmAlertEmail(db: Database, tokenHash: string) {
   const row = await db.first<{ viewerId: string; email: string }>(
     `DELETE FROM alert_email_tokens
-        WHERE token_hash = $1 AND (EXTRACT(EPOCH FROM expires_at) / 86400.0) > (EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) / 86400.0)
+        WHERE token_hash = $1 AND expires_at > CURRENT_TIMESTAMP
         RETURNING viewer_id AS "viewerId", email`,
     [tokenHash],
   );

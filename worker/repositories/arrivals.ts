@@ -64,7 +64,7 @@ export async function confirmedArrivals(db: Database, sinceHours = 72): Promise<
           WHERE s.announced_at IS NULL
             AND s.offer_kind = 'streaming'
             AND s.seen_count >= $1
-            AND (EXTRACT(EPOCH FROM s.last_seen_at) / 86400.0) > (EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP + CAST($2 AS INTERVAL))) / 86400.0)
+            AND s.last_seen_at > (CURRENT_TIMESTAMP + CAST($2 AS INTERVAL))
           LIMIT 200`,
       [CONFIRMATIONS, `-${Math.max(1, sinceHours)} hours`],
     );
@@ -177,7 +177,7 @@ export async function recentAlertCount(db: Database, viewerId: string, days = 7)
   try {
     const row = await db.first<{ total: number }>(
       `SELECT count(*) AS total FROM viewer_alerts
-          WHERE viewer_id = $1 AND (EXTRACT(EPOCH FROM sent_at) / 86400.0) > (EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP + CAST($2 AS INTERVAL))) / 86400.0)`,
+          WHERE viewer_id = $1 AND sent_at > (CURRENT_TIMESTAMP + CAST($2 AS INTERVAL))`,
       [viewerId, `-${days} days`],
     );
 

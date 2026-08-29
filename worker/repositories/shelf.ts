@@ -158,10 +158,10 @@ export async function readLostProperty(
          JOIN catalog_titles AS t ON t.id = e.title_id
         WHERE e.viewer_id = $1
           AND e.status = 'watchlist'
-          AND (EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) / 86400.0) - (EXTRACT(EPOCH FROM e.updated_at) / 86400.0) >= $2
+          AND e.updated_at <= (CURRENT_TIMESTAMP - CAST($2 AS INTERVAL))
         ORDER BY e.updated_at
         LIMIT $3`,
-    [viewerId, staleDays, limit],
+    [viewerId, `${Math.max(0, Math.trunc(staleDays))} days`, limit],
   );
 
   return toRows(db, rows.rows);

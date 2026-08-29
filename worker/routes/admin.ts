@@ -6,6 +6,7 @@ import { runEvaluation } from "../evaluation/runner.ts";
 import { readJsonObject } from "../lib/http.ts";
 import { logError, logEvent } from "../lib/logging.ts";
 import { SOURCE_BUDGETS } from "../repositories/budgets.ts";
+import { readDecisionBoard } from "../repositories/decisions.ts";
 import {
   isRevivalId,
   listForReview,
@@ -213,14 +214,16 @@ adminRoutes.get("/quality", async (context) => {
   try {
     context.header("cache-control", "no-store");
 
-    return context.json({
-      angles: await readAngleBoard(context.env.DB),
-      fetchedAt: new Date().toISOString(),
-    });
+    const [angles, decisions] = await Promise.all([
+      readAngleBoard(context.env.DB),
+      readDecisionBoard(context.env.DB),
+    ]);
+
+    return context.json({ angles, decisions, fetchedAt: new Date().toISOString() });
   } catch (error) {
     logError("admin_quality_failed", error, { area: "admin" });
 
-    return context.json({ error: "Could not read the angle scores" }, 500);
+    return context.json({ error: "Could not read the quality board" }, 500);
   }
 });
 

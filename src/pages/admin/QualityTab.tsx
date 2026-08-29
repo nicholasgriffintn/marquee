@@ -13,6 +13,14 @@ function seconds(value: number) {
   return value > 0 ? `${(value / 1_000).toFixed(1)}s to click` : "no clicks yet";
 }
 
+function share(part: number, whole: number) {
+  return whole > 0 ? PERCENT.format(part / whole) : "no decisions";
+}
+
+function cost(value: number) {
+  return value > 0 ? `$${value.toFixed(2)}` : "no priced calls";
+}
+
 function verdictLabel(verdict: EvaluationVerdict) {
   return verdict === "pass" ? "pass" : verdict === "fail" ? "FAIL" : "skipped";
 }
@@ -71,6 +79,40 @@ export function QualityTab({ revision }: { revision: number }) {
           ) : (
             <p className={styles.empty}>
               No scored angles yet. Run “Rescore shelves” once events have accumulated.
+            </p>
+          )}
+        </Panel>
+
+        <Panel heading="What the recommendations decided">
+          <p className={styles.note}>
+            Every rail, pick, order, digest and curator answer records the candidates it saw and the
+            titles it chose. Followed and refused count the decisions a viewer later acted on,
+            joined back through the signed journey that carried the decision to the client. Over the
+            last twenty-eight days.
+          </p>
+          {quality && quality.decisions.length > 0 ? (
+            <ul className={styles.list}>
+              {quality.decisions.map((entry) => (
+                <li key={entry.feature}>
+                  <strong>{entry.feature}</strong>
+                  <small>
+                    {entry.decisions.toLocaleString()} decisions · {entry.served.toLocaleString()}{" "}
+                    served · {entry.barren.toLocaleString()} empty · {entry.failed.toLocaleString()}{" "}
+                    failed · {entry.fellBack.toLocaleString()} fell back to another model
+                  </small>
+                  <span className={styles.spacer} />
+                  <small>
+                    {Math.round(entry.candidates)} candidates · {Math.round(entry.latencyMs)}ms ·{" "}
+                    {cost(entry.costUsd)} · {share(entry.followed, entry.decisions)} followed ·{" "}
+                    {share(entry.refused, entry.decisions)} refused
+                  </small>
+                  <code>{share(entry.served, entry.decisions)}</code>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className={styles.empty}>
+              No decisions recorded yet. They accumulate as viewers ask for recommendations.
             </p>
           )}
         </Panel>
