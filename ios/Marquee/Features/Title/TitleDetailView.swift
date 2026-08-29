@@ -96,6 +96,7 @@ struct TitleDetailView: View {
     .navigationBarTitleDisplayMode(.inline)
     .toolbar(.hidden, for: .tabBar)
     .task(id: "\(item.id)-\(appState.isSignedIn)") {
+      Telemetry.shared.record(.titleView, titleId: item.id)
       await model.load(item: item, api: appState.api, isSignedIn: appState.isSignedIn)
     }
     .confirmationDialog("Remove this title from your shelf?", isPresented: $confirmRemoval) {

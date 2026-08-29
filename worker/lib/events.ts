@@ -1,3 +1,4 @@
+import type { JourneyMode } from "../../src/domain/journeys.ts";
 import type { Bindings } from "../types.ts";
 
 export type MarqueeEvent = {
@@ -32,7 +33,9 @@ export type MarqueeEvent = {
   value?: number;
   journeyId?: string;
   source?: string;
-  position?: number;
+  mode?: JourneyMode;
+  rank?: number;
+  latencyMs?: number;
   providerId?: string;
   monetization?: string;
 };
@@ -54,8 +57,9 @@ export function recordEvent(env: Bindings, event: MarqueeEvent) {
         event.source ?? "",
         event.providerId ?? "",
         event.monetization ?? "",
+        event.mode ?? "",
       ],
-      doubles: [event.value ?? 1, event.position ?? -1],
+      doubles: [event.value ?? 1, event.rank ?? -1, event.latencyMs ?? -1],
     });
   } catch {
     return;

@@ -2,6 +2,7 @@ import { Hono } from "hono";
 
 import { ADMIN_ACTIONS, isAdminAction } from "../../src/domain/admin.ts";
 import { requireAdmin, type AuthVariables } from "../auth/session.ts";
+import { runEvaluation } from "../evaluation/runner.ts";
 import { readJsonObject } from "../lib/http.ts";
 import { logError, logEvent } from "../lib/logging.ts";
 import { SOURCE_BUDGETS } from "../repositories/budgets.ts";
@@ -22,6 +23,7 @@ import {
   readAdminPipeline,
   runAdminAction,
 } from "../services/admin.ts";
+import { readAngleBoard } from "../services/angle-scores.ts";
 import type { Bindings, EnrichmentSource } from "../types.ts";
 
 export const adminRoutes = new Hono<{
@@ -204,6 +206,33 @@ adminRoutes.post("/revival/:workId/:decision", async (context) => {
     });
 
     return context.json({ error: "That decision did not stick" }, 500);
+  }
+});
+
+adminRoutes.get("/quality", async (context) => {
+  try {
+    context.header("cache-control", "no-store");
+
+    return context.json({
+      angles: await readAngleBoard(context.env.DB),
+      fetchedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    logError("admin_quality_failed", error, { area: "admin" });
+
+    return context.json({ error: "Could not read the angle scores" }, 500);
+  }
+});
+
+adminRoutes.post("/quality/evaluate", async (context) => {
+  try {
+    context.header("cache-control", "no-store");
+
+    return context.json(await runEvaluation(context.env));
+  } catch (error) {
+    logError("admin_evaluation_failed", error, { area: "admin" });
+
+    return context.json({ error: "The fixture run did not finish" }, 500);
   }
 });
 

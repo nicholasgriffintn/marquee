@@ -10,6 +10,7 @@ import {
 } from "../auth/session.ts";
 import { recordEvent } from "../lib/events.ts";
 import { jsonResponse, readJsonObject } from "../lib/http.ts";
+import { ticketSections } from "../lib/journeys.ts";
 import { logError } from "../lib/logging.ts";
 import { isKnownTitle, validProviderIds } from "../lib/validation.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
@@ -114,16 +115,21 @@ curatorRoutes.get("/rails", requireViewer, async (context) => {
   try {
     context.header("cache-control", "no-store");
 
+    const startedAt = Date.now();
     const { sections, isFresh } = await getAiRails(context.env, user.id);
 
     if (isFresh) {
+      const ticketed = await ticketSections(context.env, sections, "ai-rail");
+
       recordEvent(context.env, {
         name: "rails_served",
         viewerId: user.id,
-        value: sections.length,
+        mode: "ai-rail",
+        value: ticketed.length,
+        latencyMs: Date.now() - startedAt,
       });
 
-      return jsonResponse({ sections, status: "ready" });
+      return jsonResponse({ sections: ticketed, status: "ready" });
     }
 
     if (context.req.query("generate") === "1") {
