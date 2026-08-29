@@ -19,11 +19,11 @@ const MAX_THOUGHTS_LENGTH = 2_000;
 
 type ProfileUpdateResult = { ok: true; payload: unknown } | { ok: false; error: string };
 
-export async function getProfile(db: D1Database, viewerId: string) {
+export async function getProfile(db: Database, viewerId: string) {
   return readProfileSummary(db, viewerId);
 }
 
-export async function getViewingEntry(db: D1Database, viewerId: string, titleId: string) {
+export async function getViewingEntry(db: Database, viewerId: string, titleId: string) {
   if (!isKnownTitle(titleId)) {
     return null;
   }
@@ -35,7 +35,7 @@ const LOST_AFTER_DAYS = 180;
 const LOST_LIMIT = 8;
 
 export async function getShelf(
-  db: D1Database,
+  db: Database,
   viewerId: string,
   query: ShelfPageQuery,
 ): Promise<ShelfResponse> {
@@ -60,7 +60,7 @@ export async function getShelf(
 }
 
 export async function updateProfile(
-  db: D1Database,
+  db: Database,
   viewerId: string,
   input: Record<string, unknown>,
 ): Promise<ProfileUpdateResult> {
@@ -90,14 +90,14 @@ export async function updateProfile(
   return { ok: true, payload: { entry } };
 }
 
-export async function getProviderPreferences(db: D1Database, viewerId: string) {
+export async function getProviderPreferences(db: Database, viewerId: string) {
   const selectedProviderIds = await readProviderPreferences(db, viewerId);
 
   return { selectedProviderIds: selectedProviderIds ?? [], isSaved: selectedProviderIds !== null };
 }
 
 export async function updateProviderPreferences(
-  db: D1Database,
+  db: Database,
   viewerId: string,
   input: Record<string, unknown>,
 ) {
@@ -108,7 +108,7 @@ export async function updateProviderPreferences(
   return { selectedProviderIds, isSaved: true };
 }
 
-export async function removeFromProfile(db: D1Database, viewerId: string, titleId: string) {
+export async function removeFromProfile(db: Database, viewerId: string, titleId: string) {
   if (!isKnownTitle(titleId)) {
     return false;
   }

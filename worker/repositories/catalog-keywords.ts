@@ -6,11 +6,11 @@ const FIELD: SimpleArrayField = {
   column: "keyword",
 };
 
-export function readKeywordMap(db: D1Database, ids: string[]) {
+export function readKeywordMap(db: Database, ids: string[]) {
   return readSimpleArray(db, FIELD, ids);
 }
 
-export function writeKeywordRows(db: D1Database, titles: MediaTitle[]) {
+export function writeKeywordRows(db: Database, titles: MediaTitle[]) {
   return writeSimpleArray(
     db,
     FIELD,

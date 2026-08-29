@@ -3,30 +3,26 @@ import { parseStoredProviders } from "../lib/catalog-payload.ts";
 
 type ProviderRow = { payload: string };
 
-export async function storeProviders(db: D1Database, providers: ProvidersResponse) {
-  await db
-    .prepare(
-      `INSERT INTO provider_snapshots (region, payload, source_updated_at)
-       VALUES (?, ?, ?)
+export async function storeProviders(db: Database, providers: ProvidersResponse) {
+  await db.execute(
+    `INSERT INTO provider_snapshots (region, payload, source_updated_at)
+       VALUES ($1, $2, $3)
        ON CONFLICT(region) DO UPDATE SET
          payload = excluded.payload,
          source_updated_at = excluded.source_updated_at,
          updated_at = CURRENT_TIMESTAMP`,
-    )
-    .bind(providers.region, JSON.stringify(providers), providers.fetchedAt)
-    .run();
+    [providers.region, JSON.stringify(providers), providers.fetchedAt],
+  );
 }
 
-export async function readProviders(db: D1Database) {
-  const row = await db
-    .prepare(
-      `SELECT payload
+export async function readProviders(db: Database) {
+  const row = await db.first<ProviderRow>(
+    `SELECT payload
        FROM provider_snapshots
-       WHERE region = ?
+       WHERE region = $1
        LIMIT 1`,
-    )
-    .bind("GB")
-    .first<ProviderRow>();
+    ["GB"],
+  );
 
   return row ? parseStoredProviders(row.payload) : null;
 }

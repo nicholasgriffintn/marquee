@@ -16,7 +16,7 @@ function normalise(value: string) {
     .trim();
 }
 
-async function matchRow(db: D1Database, row: DiaryRow) {
+async function matchRow(db: Database, row: DiaryRow) {
   const candidates = await searchCatalogue(db, {
     query: row.name,
     scope: "title",
@@ -53,7 +53,7 @@ export async function importDiary(
   viewerId: string,
   rows: DiaryRow[],
 ): Promise<ImportOutcome> {
-  const statements: D1PreparedStatement[] = [];
+  const matched: { titleId: string; rating: number | null; watchedAt: string }[] = [];
   const titleIds: string[] = [];
   const unmatched: DiaryRow[] = [];
 
@@ -68,27 +68,34 @@ export async function importDiary(
     }
 
     titleIds.push(titleId);
-    statements.push(
-      env.DB.prepare(
+    matched.push({
+      titleId,
+      rating: row.rating,
+      watchedAt: row.watchedAt ? `${row.watchedAt} 12:00:00` : new Date().toISOString(),
+    });
+  }
+
+  if (matched.length) {
+    try {
+      await env.DB.transaction(async (transaction) => {
+        for (const entry of matched) {
+          await transaction.execute(
         `INSERT INTO viewing_entries (id, viewer_id, title_id, status, rating, thoughts, updated_at)
-         VALUES (?1, ?2, ?3, 'watched', ?4, '', ?5)
+         VALUES ($1, $2, $3, 'watched', $4, '', $5)
          ON CONFLICT(viewer_id, title_id) DO UPDATE SET
            status = 'watched',
            rating = COALESCE(excluded.rating, viewing_entries.rating),
            updated_at = excluded.updated_at`,
-      ).bind(
-        crypto.randomUUID(),
-        viewerId,
-        titleId,
-        row.rating,
-        row.watchedAt ? `${row.watchedAt} 12:00:00` : new Date().toISOString(),
-      ),
-    );
-  }
-
-  if (statements.length) {
-    try {
-      await env.DB.batch(statements);
+        [
+          crypto.randomUUID(),
+          viewerId,
+          entry.titleId,
+          entry.rating,
+          entry.watchedAt,
+        ],
+          );
+        }
+      });
     } catch (error) {
       logError("letterboxd_import_failed", error);
 

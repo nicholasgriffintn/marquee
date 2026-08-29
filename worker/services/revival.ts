@@ -482,7 +482,7 @@ export function shelfSelector(id: string): ShelfSelector | null {
   return null;
 }
 
-async function planShelves(db: D1Database): Promise<ShelfPlan[]> {
+async function planShelves(db: Database): Promise<ShelfPlan[]> {
   const [rawGenres, rawSubjects, people, countries, decades] = await Promise.all([
     readTagGroups(db, "genre", GENRE_SHELVES * 2, SHELF_MIN),
     readTagGroups(db, "subject", SUBJECT_SHELVES * 3, SHELF_MIN),
@@ -587,7 +587,7 @@ async function planShelves(db: D1Database): Promise<ShelfPlan[]> {
   ];
 }
 
-async function readShelves(db: D1Database) {
+async function readShelves(db: Database) {
   const plans = await planShelves(db);
   const filled = await Promise.all(
     plans.map(async (plan) => ({
@@ -652,7 +652,7 @@ const BILL: BillSlot[] = [
   },
 ];
 
-export async function drawBill(db: D1Database, day: string) {
+export async function drawBill(db: Database, day: string) {
   const next = shuffler(seedFrom(day));
   const taken = new Set<string>();
   const sizes = new Map<string, number>();
@@ -703,17 +703,17 @@ export async function drawBill(db: D1Database, day: string) {
   return drawn.map((entry) => ({ ...entry, work: toCard(entry.work) }));
 }
 
-export async function getBill(db: D1Database) {
+export async function getBill(db: Database) {
   const day = billDay();
 
   return { bill: await drawBill(db, day), billDate: day, fetchedAt: new Date().toISOString() };
 }
 
-export async function getShelves(db: D1Database) {
+export async function getShelves(db: Database) {
   return { shelves: await readShelves(db), fetchedAt: new Date().toISOString() };
 }
 
-export async function getResumeShelf(db: D1Database, viewerId: string) {
+export async function getResumeShelf(db: Database, viewerId: string) {
   const progress = await readViewerProgress(db, viewerId);
   const works = await readWorksByIds(
     db,

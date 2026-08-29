@@ -5,8 +5,8 @@ import type { Bindings, IngestionJob } from "../types.ts";
 import {
   completeIngestionRun,
   failIngestionRun,
-  ingestionRunStartStatement,
   jobSubject,
+  startIngestionRun,
 } from "./ingestion-runs.ts";
 import { executeIngestionJob } from "./ingestion.ts";
 
@@ -67,7 +67,11 @@ export async function consumeIngestion(batch: MessageBatch<unknown>, env: Bindin
 
   if (runs.length) {
     try {
-      await env.DB.batch(runs.map(({ job, runId }) => ingestionRunStartStatement(env, runId, job)));
+      await env.DB.transaction(async (transaction) => {
+        for (const { job, runId } of runs) {
+          await startIngestionRun(transaction, runId, job);
+        }
+      });
     } catch (error) {
       for (const { message, job } of runs) {
         handleIngestionFailure(message, job, error);
@@ -104,36 +108,37 @@ export async function consumeIngestion(batch: MessageBatch<unknown>, env: Bindin
 }
 
 export async function consumeDeadLetters(batch: MessageBatch<unknown>, env: Bindings) {
-  const statements = batch.messages.map((message) => {
-    const job: IngestionJob | null = isIngestionJob(message.body) ? message.body : null;
-
-    return env.DB.prepare(
-      `INSERT INTO ingestion_runs (id, job_type, subject_id, status, error, completed_at)
-       VALUES (?, ?, ?, 'failed', ?, CURRENT_TIMESTAMP)`,
-    ).bind(
-      crypto.randomUUID(),
-      `dead-letter:${job?.type ?? "unknown"}`,
-      job ? jobSubject(job) : null,
-      `Gave up after ${message.attempts} attempt${message.attempts === 1 ? "" : "s"}`,
-    );
-  });
-
   try {
-    if (statements.length) {
-      await env.DB.batch(statements);
+    if (batch.messages.length) {
+      await env.DB.transaction(async (transaction) => {
+        for (const message of batch.messages) {
+          const job: IngestionJob | null = isIngestionJob(message.body) ? message.body : null;
+
+          await transaction.execute(
+            `INSERT INTO ingestion_runs (id, job_type, subject_id, status, error, completed_at)
+             VALUES ($1, $2, $3, 'failed', $4, CURRENT_TIMESTAMP)`,
+            [
+              crypto.randomUUID(),
+              `dead-letter:${job?.type ?? "unknown"}`,
+              job ? jobSubject(job) : null,
+              `Gave up after ${message.attempts} attempt${message.attempts === 1 ? "" : "s"}`,
+            ],
+          );
+        }
+      });
     }
 
     console.error(
       JSON.stringify({
         event: "dead_letters_recorded",
-        count: statements.length,
+        count: batch.messages.length,
       }),
     );
   } catch (error) {
     console.error(
       JSON.stringify({
         event: "dead_letters_record_failed",
-        count: statements.length,
+        count: batch.messages.length,
         detail: error instanceof Error ? error.message.slice(0, 300) : String(error).slice(0, 300),
       }),
     );

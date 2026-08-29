@@ -45,19 +45,19 @@ type CountRow = Record<string, number>;
 
 async function catalogueStats(env: Bindings) {
   const [row, working] = await Promise.all([
-    env.DB.prepare(
+    env.DB.first<CountRow>(
       `SELECT
          tt.titles, tt.movies, tt.shows, tt.posters, tt.animeIds, tt.animeDetails,
          (SELECT count(*) FROM title_embeddings
-           WHERE content_hash IS NOT NULL AND model = ?1) AS embeddings,
+           WHERE content_hash IS NOT NULL AND model = $1) AS embeddings,
          (SELECT count(*) FROM title_buzz WHERE article <> '') AS buzz,
-         (SELECT count(*) FROM title_schedule WHERE airs_at >= datetime('now')) AS upcoming,
+         (SELECT count(*) FROM title_schedule WHERE airs_at >= CURRENT_TIMESTAMP) AS upcoming,
          (SELECT count(*) FROM catalog_sections) AS sections,
          cc.cinemas, cc.cinemasPlaced,
-         (SELECT count(*) FROM cinema_films) AS cinemaFilms,
-         (SELECT count(*) FROM cinema_screenings WHERE business_day >= date('now')) AS screenings,
-         (SELECT count(*) FROM cinema_interest WHERE last_seen_at > datetime('now', '-30 days')) AS interestCells,
-         (SELECT count(*) FROM viewing_entries) AS shelfEntries,
+         (SELECT count(*) FROM cinema_films) AS "cinemaFilms",
+         (SELECT count(*) FROM cinema_screenings WHERE business_day >= CURRENT_DATE) AS screenings,
+         (SELECT count(*) FROM cinema_interest WHERE last_seen_at > (CURRENT_TIMESTAMP - INTERVAL '30 day')) AS "interestCells",
+         (SELECT count(*) FROM viewing_entries) AS "shelfEntries",
          uu.users, uu.alertReady,
          va.alertsSent, va.alertsWeek,
          (SELECT count(*) FROM viewer_signals) AS signals,
@@ -65,47 +65,46 @@ async function catalogueStats(env: Bindings) {
          (SELECT count(*) FROM catalog_people) AS people,
          (SELECT count(*) FROM catalog_seasons) AS seasons,
          (SELECT count(*) FROM title_insights) AS insights,
-         (SELECT count(DISTINCT title_id) FROM title_awards) AS titleAwards,
-         (SELECT count(DISTINCT person_id) FROM person_awards) AS personAwards,
-         (SELECT count(DISTINCT title_id) FROM title_visual_format) AS visualFormat,
-         (SELECT count(DISTINCT title_id) FROM catalog_title_places) AS placedTitles,
-         (SELECT count(DISTINCT title_id) FROM title_source_works) AS adaptedTitles,
-         (SELECT count(DISTINCT title_id) FROM title_language_buzz) AS worldBoards,
+         (SELECT count(DISTINCT title_id) FROM title_awards) AS "titleAwards",
+         (SELECT count(DISTINCT person_id) FROM person_awards) AS "personAwards",
+         (SELECT count(DISTINCT title_id) FROM title_visual_format) AS "visualFormat",
+         (SELECT count(DISTINCT title_id) FROM catalog_title_places) AS "placedTitles",
+         (SELECT count(DISTINCT title_id) FROM title_source_works) AS "adaptedTitles",
+         (SELECT count(DISTINCT title_id) FROM title_language_buzz) AS "worldBoards",
          (SELECT count(*) FROM catalog_title_external_ids WHERE letterboxd_id IS NOT NULL)
-           AS letterboxdIds,
+           AS "letterboxdIds",
          rv.revivalWorks, rv.revivalApproved, rv.revivalMirrored, rv.revivalPending,
-         (SELECT count(*) FROM ai_rails) AS railSets,
-         (SELECT count(*) FROM pinned_shelves) AS pinnedShelves
+         (SELECT count(*) FROM ai_rails) AS "railSets",
+         (SELECT count(*) FROM pinned_shelves) AS "pinnedShelves"
        FROM
          (SELECT
             count(*) AS titles,
             sum(CASE WHEN media_type = 'movie' THEN 1 ELSE 0 END) AS movies,
             sum(CASE WHEN media_type = 'tv' THEN 1 ELSE 0 END) AS shows,
             sum(CASE WHEN poster_key IS NOT NULL THEN 1 ELSE 0 END) AS posters,
-            sum(CASE WHEN mal_id IS NOT NULL THEN 1 ELSE 0 END) AS animeIds,
-            (SELECT count(*) FROM catalog_title_anime) AS animeDetails
+            sum(CASE WHEN mal_id IS NOT NULL THEN 1 ELSE 0 END) AS "animeIds",
+            (SELECT count(*) FROM catalog_title_anime) AS "animeDetails"
           FROM catalog_titles) AS tt,
          (SELECT
             count(*) AS cinemas,
-            sum(CASE WHEN latitude IS NOT NULL THEN 1 ELSE 0 END) AS cinemasPlaced
+            sum(CASE WHEN latitude IS NOT NULL THEN 1 ELSE 0 END) AS "cinemasPlaced"
           FROM cinemas) AS cc,
          (SELECT
             count(*) AS users,
-            sum(CASE WHEN alert_email_verified_at IS NOT NULL THEN 1 ELSE 0 END) AS alertReady
+            sum(CASE WHEN alert_email_verified_at IS NOT NULL THEN 1 ELSE 0 END) AS "alertReady"
           FROM users) AS uu,
          (SELECT
-            count(*) AS alertsSent,
-            sum(CASE WHEN julianday(sent_at) > julianday('now', '-7 days') THEN 1 ELSE 0 END) AS alertsWeek
+            count(*) AS "alertsSent",
+            sum(CASE WHEN (EXTRACT(EPOCH FROM sent_at) / 86400.0) > (EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - INTERVAL '7 day')) / 86400.0) THEN 1 ELSE 0 END) AS "alertsWeek"
           FROM viewer_alerts) AS va,
          (SELECT
-            count(*) AS revivalWorks,
-            sum(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) AS revivalApproved,
-            sum(CASE WHEN mirror_state = 'mirrored' THEN 1 ELSE 0 END) AS revivalMirrored,
-            sum(CASE WHEN status = 'candidate' THEN 1 ELSE 0 END) AS revivalPending
+            count(*) AS "revivalWorks",
+            sum(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) AS "revivalApproved",
+            sum(CASE WHEN mirror_state = 'mirrored' THEN 1 ELSE 0 END) AS "revivalMirrored",
+            sum(CASE WHEN status = 'candidate' THEN 1 ELSE 0 END) AS "revivalPending"
           FROM revival_works) AS rv`,
-    )
-      .bind(EMBEDDING_MODEL)
-      .first<CountRow>(),
+      [EMBEDDING_MODEL],
+    ),
     readWorkingSetStats(env.DB),
   ]);
 
@@ -148,24 +147,21 @@ const JOB_TYPE_SOURCE: Record<string, string> = {
 
 async function enrichmentStats(env: Bindings) {
   const [enriched, justwatch, attempted, recent, recentJustwatch] = await Promise.all([
-    env.DB.prepare(
-      `SELECT source,
+    env.DB.query<{
+      source: string;
+      titles: number;
+      misses: number;
+      pending: number;
+      newest: string;
+    }>(`SELECT source,
               sum(CASE WHEN miss = 0 THEN 1 ELSE 0 END) AS titles,
               sum(CASE WHEN miss = 1 THEN 1 ELSE 0 END) AS misses,
               sum(CASE WHEN miss = 2 THEN 1 ELSE 0 END) AS pending,
               max(fetched_at) AS newest
        FROM title_enrichment
        GROUP BY source
-       ORDER BY source`,
-    ).all<{
-      source: string;
-      titles: number;
-      misses: number;
-      pending: number;
-      newest: string;
-    }>(),
-    env.DB.prepare(
-      `SELECT
+       ORDER BY source`),
+    env.DB.first<{ titles: number; misses: number; newest: string }>(`SELECT
          sum(CASE WHEN EXISTS (
            SELECT 1 FROM catalog_title_providers WHERE title_id = catalog_titles.id
          ) THEN 1 ELSE 0 END) AS titles,
@@ -174,28 +170,25 @@ async function enrichmentStats(env: Bindings) {
          ) THEN 1 ELSE 0 END) AS misses,
          max(enriched_at) AS newest
        FROM catalog_titles
-       WHERE enriched_at IS NOT NULL`,
-    ).first<{ titles: number; misses: number; newest: string }>(),
-    env.DB.prepare(
-      `SELECT job_type AS jobType, count(*) AS attempted
+       WHERE enriched_at IS NOT NULL`),
+    env.DB.query<{ jobType: string; attempted: number }>(
+      `SELECT job_type AS "jobType", count(*) AS attempted
        FROM ingestion_runs
        WHERE job_type IN ('enrich-anime', 'enrich-anilist', 'enrich-anilist-media', 'enrich-ratings', 'cache-poster', 'enrich-availability')
-         AND started_at > datetime('now', ?)
+         AND started_at > (CURRENT_TIMESTAMP + CAST($1 AS INTERVAL))
        GROUP BY job_type`,
-    )
-      .bind(`-${RUN_WINDOW_HOURS} hours`)
-      .all<{ jobType: string; attempted: number }>(),
-    env.DB.prepare(
+      [`-${RUN_WINDOW_HOURS} hours`],
+    ),
+    env.DB.query<{ source: string; titles: number; misses: number }>(
       `SELECT source,
               sum(CASE WHEN miss = 0 THEN 1 ELSE 0 END) AS titles,
               sum(CASE WHEN miss = 1 THEN 1 ELSE 0 END) AS misses
        FROM title_enrichment
-       WHERE fetched_at > datetime('now', ?)
+       WHERE fetched_at > (CURRENT_TIMESTAMP + CAST($1 AS INTERVAL))
        GROUP BY source`,
-    )
-      .bind(`-${RUN_WINDOW_HOURS} hours`)
-      .all<{ source: string; titles: number; misses: number }>(),
-    env.DB.prepare(
+      [`-${RUN_WINDOW_HOURS} hours`],
+    ),
+    env.DB.first<{ titles: number; misses: number }>(
       `SELECT
          sum(CASE WHEN EXISTS (
            SELECT 1 FROM catalog_title_providers WHERE title_id = catalog_titles.id
@@ -204,15 +197,14 @@ async function enrichmentStats(env: Bindings) {
            SELECT 1 FROM catalog_title_providers WHERE title_id = catalog_titles.id
          ) THEN 1 ELSE 0 END) AS misses
        FROM catalog_titles
-       WHERE enriched_at > datetime('now', ?)`,
-    )
-      .bind(`-${RUN_WINDOW_HOURS} hours`)
-      .first<{ titles: number; misses: number }>(),
+       WHERE enriched_at > (CURRENT_TIMESTAMP + CAST($1 AS INTERVAL))`,
+      [`-${RUN_WINDOW_HOURS} hours`],
+    ),
   ]);
 
   const attemptedBySource = new Map<string, number>();
 
-  for (const row of attempted.results) {
+  for (const row of attempted.rows) {
     const source = JOB_TYPE_SOURCE[row.jobType];
 
     if (source) {
@@ -220,7 +212,7 @@ async function enrichmentStats(env: Bindings) {
     }
   }
 
-  const recentBySource = new Map(recent.results.map((row) => [row.source, row]));
+  const recentBySource = new Map(recent.rows.map((row) => [row.source, row]));
 
   if (recentJustwatch) {
     recentBySource.set("justwatch", {
@@ -258,7 +250,7 @@ async function enrichmentStats(env: Bindings) {
       ]
     : [];
 
-  return [...enriched.results.map(withAttempts), ...justwatchRow].toSorted((left, right) =>
+  return [...enriched.rows.map(withAttempts), ...justwatchRow].toSorted((left, right) =>
     left.source.localeCompare(right.source),
   );
 }
@@ -282,42 +274,39 @@ export async function readAdminPipeline(env: Bindings) {
   const [enrichment, readiness, failures, lastRuns] = await Promise.all([
     enrichmentStats(env),
     readIndexReadiness(env),
-    env.DB.prepare(
-      `SELECT job_type AS jobType, subject_id AS subjectId, error, started_at AS startedAt
-         FROM ingestion_runs
-         WHERE status = 'failed'
-         ORDER BY started_at DESC
-         LIMIT 15`,
-    ).all<{
+    env.DB.query<{
       jobType: string;
       subjectId: string | null;
       error: string | null;
       startedAt: string;
-    }>(),
-    env.DB.prepare(
-      `SELECT job_type AS jobType, status, max(started_at) AS lastRunAt,
+    }>(`SELECT job_type AS "jobType", subject_id AS "subjectId", error, started_at AS "startedAt"
+         FROM ingestion_runs
+         WHERE status = 'failed'
+         ORDER BY started_at DESC
+         LIMIT 15`),
+    env.DB.query<{
+      jobType: string;
+      status: string;
+      lastRunAt: string;
+      runs: number;
+      subjects: number;
+    }>(
+      `SELECT job_type AS "jobType", status, max(started_at) AS "lastRunAt",
                 count(*) AS runs, count(DISTINCT subject_id) AS subjects
          FROM ingestion_runs
-         WHERE started_at > datetime('now', ?)
+         WHERE started_at > (CURRENT_TIMESTAMP + CAST($1 AS INTERVAL))
          GROUP BY job_type, status
          ORDER BY lastRunAt DESC
          LIMIT 20`,
-    )
-      .bind(`-${RUN_WINDOW_HOURS} hours`)
-      .all<{
-        jobType: string;
-        status: string;
-        lastRunAt: string;
-        runs: number;
-        subjects: number;
-      }>(),
+      [`-${RUN_WINDOW_HOURS} hours`],
+    ),
   ]);
 
   return {
     enrichment,
     readiness,
-    failures: failures.results,
-    lastRuns: lastRuns.results,
+    failures: failures.rows,
+    lastRuns: lastRuns.rows,
     runWindowHours: RUN_WINDOW_HOURS,
     fetchedAt: new Date().toISOString(),
   };
@@ -326,16 +315,19 @@ export async function readAdminPipeline(env: Bindings) {
 export async function readAdminListings(env: Bindings) {
   const [cinemas, sections] = await Promise.all([
     readCinemaCoverage(env.DB),
-    env.DB.prepare(
-      `SELECT id, title, json_array_length(title_ids) AS titles, source_updated_at AS builtAt
+    env.DB.query<{
+      id: string;
+      title: string;
+      titles: number;
+      builtAt: string;
+    }>(`SELECT id, title, jsonb_array_length(title_ids::jsonb) AS titles, source_updated_at AS "builtAt"
          FROM catalog_sections
-         ORDER BY rowid`,
-    ).all<{ id: string; title: string; titles: number; builtAt: string }>(),
+         ORDER BY position, id`),
   ]);
 
   return {
     cinemas,
-    sections: sections.results,
+    sections: sections.rows,
     fetchedAt: new Date().toISOString(),
   };
 }
@@ -554,13 +546,7 @@ export async function clearSourcePause(env: Bindings, source: EnrichmentSource) 
 }
 
 export async function listAdminUsers(env: Bindings) {
-  const rows = await env.DB.prepare(
-    `SELECT u.id, u.name, u.github_login AS login, u.avatar_url AS avatarUrl, u.role,
-            u.created_at AS createdAt,
-            (SELECT count(*) FROM viewing_entries WHERE viewer_id = u.id) AS shelfEntries
-     FROM users AS u
-     ORDER BY u.created_at`,
-  ).all<{
+  const rows = await env.DB.query<{
     id: string;
     name: string;
     login: string;
@@ -568,9 +554,13 @@ export async function listAdminUsers(env: Bindings) {
     role: string;
     createdAt: string;
     shelfEntries: number;
-  }>();
+  }>(`SELECT u.id, u.name, u.github_login AS login, u.avatar_url AS "avatarUrl", u.role,
+            u.created_at AS "createdAt",
+            (SELECT count(*) FROM viewing_entries WHERE viewer_id = u.id) AS "shelfEntries"
+     FROM users AS u
+     ORDER BY u.created_at`);
 
-  return rows.results.map((row) => {
+  return rows.rows.map((row) => {
     const role: UserRole = row.role === "admin" ? "admin" : "viewer";
 
     return {

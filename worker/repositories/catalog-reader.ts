@@ -36,46 +36,42 @@ const MIN_VISIBLE_ITEMS = 3;
 const SECTION_ITEMS = 14;
 const MAX_VISIBLE_SECTIONS = 18;
 
-async function matchingTitleIds(db: D1Database, ids: string[], providerIds: string[]) {
+async function matchingTitleIds(db: Database, ids: string[], providerIds: string[]) {
   const uniqueIds = [...new Set(ids.filter(isKnownTitle))];
 
   if (providerIds.length === 0 || uniqueIds.length === 0) {
     return new Set(uniqueIds);
   }
 
-  const rows = await db
-    .prepare(
-      `SELECT id FROM catalog_titles
-        WHERE id IN (SELECT value FROM json_each(?))
-          AND ${availabilityCondition("catalog_titles", "confirmed-or-unknown")}`,
-    )
-    .bind(JSON.stringify(uniqueIds), JSON.stringify(providerIds))
-    .all<{ id: string }>();
+  const rows = await db.query<{ id: string }>(
+    `SELECT id FROM catalog_titles
+        WHERE id IN (SELECT value FROM jsonb_array_elements_text(CAST($1 AS jsonb)) AS entries(value))
+          AND ${availabilityCondition("catalog_titles", "$2", "confirmed-or-unknown")}`,
+    [JSON.stringify(uniqueIds), JSON.stringify(providerIds)],
+  );
 
-  return new Set(rows.results.map((row) => row.id));
+  return new Set(rows.rows.map((row) => row.id));
 }
 
-async function servedTitles(db: D1Database, rows: CatalogTitleRow[]): Promise<MediaTitle[]> {
+async function servedTitles(db: Database, rows: CatalogTitleRow[]): Promise<MediaTitle[]> {
   const hydrated = await hydrateTitleRows(db, rows);
 
   return hydrated.map((title, index) => withStoredPoster(title, rows[index]?.poster_key));
 }
 
-export async function readRawItems(db: D1Database, ids: string[]) {
+export async function readRawItems(db: Database, ids: string[]) {
   const uniqueIds = [...new Set(ids.filter(isKnownTitle))];
   const rows: CatalogTitleRow[] = [];
 
   for (let index = 0; index < uniqueIds.length; index += READ_CHUNK) {
     const wave = uniqueIds.slice(index, index + READ_CHUNK);
     // oxlint-disable-next-line no-await-in-loop
-    const result = await db
-      .prepare(
-        `SELECT ${CATALOG_TITLE_COLUMNS} FROM catalog_titles WHERE id IN (${wave.map(() => "?").join(",")})`,
-      )
-      .bind(...wave)
-      .all<CatalogTitleRow>();
+    const result = await db.query<CatalogTitleRow>(
+      `SELECT ${CATALOG_TITLE_COLUMNS} FROM catalog_titles WHERE id IN (${wave.map((_, index) => `$${index + 1}`).join(",")})`,
+      [...wave],
+    );
 
-    rows.push(...result.results);
+    rows.push(...result.rows);
   }
 
   const hydrated = await hydrateTitleRows(db, rows);
@@ -83,7 +79,7 @@ export async function readRawItems(db: D1Database, ids: string[]) {
   return new Map(hydrated.map((title) => [title.id, title]));
 }
 
-export async function readItems(db: D1Database, ids: string[], limit = 30) {
+export async function readItems(db: Database, ids: string[], limit = 30) {
   const uniqueIds = [...new Set(ids.filter(isKnownTitle))].slice(0, Math.min(limit, 400));
 
   if (uniqueIds.length === 0) {
@@ -95,15 +91,13 @@ export async function readItems(db: D1Database, ids: string[], limit = 30) {
   for (let index = 0; index < uniqueIds.length; index += READ_CHUNK) {
     const wave = uniqueIds.slice(index, index + READ_CHUNK);
     // oxlint-disable-next-line no-await-in-loop
-    const result = await db
-      .prepare(
-        `SELECT ${CATALOG_TITLE_COLUMNS}
-         FROM catalog_titles WHERE id IN (${wave.map(() => "?").join(",")})`,
-      )
-      .bind(...wave)
-      .all<CatalogTitleRow>();
+    const result = await db.query<CatalogTitleRow>(
+      `SELECT ${CATALOG_TITLE_COLUMNS}
+         FROM catalog_titles WHERE id IN (${wave.map((_, index) => `$${index + 1}`).join(",")})`,
+      [...wave],
+    );
 
-    rows.push(...result.results);
+    rows.push(...result.rows);
   }
 
   const titlesById = new Map((await servedTitles(db, rows)).map((title) => [title.id, title]));
@@ -115,7 +109,7 @@ export async function readItems(db: D1Database, ids: string[], limit = 30) {
   });
 }
 
-export async function readTitlesByMalId(db: D1Database, malIds: number[]) {
+export async function readTitlesByMalId(db: Database, malIds: number[]) {
   const unique = [...new Set(malIds.filter((id) => Number.isInteger(id) && id > 0))].slice(0, 40);
   const found = new Map<number, MediaTitle>();
 
@@ -123,19 +117,17 @@ export async function readTitlesByMalId(db: D1Database, malIds: number[]) {
     return found;
   }
 
-  const result = await db
-    .prepare(
-      `SELECT ${CATALOG_TITLE_COLUMNS}, mal_id AS malId
+  const result = await db.query<CatalogTitleRow & { malId: number }>(
+    `SELECT ${CATALOG_TITLE_COLUMNS}, mal_id AS "malId"
        FROM catalog_titles
-       WHERE mal_id IN (${unique.map(() => "?").join(",")})`,
-    )
-    .bind(...unique)
-    .all<CatalogTitleRow & { malId: number }>();
+       WHERE mal_id IN (${unique.map((_, index) => `$${index + 1}`).join(",")})`,
+    [...unique],
+  );
 
-  const hydrated = await servedTitles(db, result.results);
+  const hydrated = await servedTitles(db, result.rows);
 
   hydrated.forEach((title, index) => {
-    const row = result.results[index];
+    const row = result.rows[index];
 
     if (row) {
       found.set(row.malId, title);
@@ -145,31 +137,27 @@ export async function readTitlesByMalId(db: D1Database, malIds: number[]) {
   return found;
 }
 
-export async function readCatalog(db: D1Database, query: string, providerIds: string[]) {
+export async function readCatalog(db: Database, query: string, providerIds: string[]) {
   if (query) {
     return readSearchResults(db, query, providerIds);
   }
 
-  const rows = await db
-    .prepare(
-      `SELECT
+  const rows = await db.query<SectionRow>(`SELECT
          id,
          title,
          description,
-         title_ids AS titleIds,
-         source_updated_at AS sourceUpdatedAt,
+         title_ids AS "titleIds",
+         source_updated_at AS "sourceUpdatedAt",
          audience
        FROM catalog_sections
-       ORDER BY rowid`,
-    )
-    .all<SectionRow>();
+       ORDER BY position, id`);
 
-  if (rows.results.length === 0) {
+  if (rows.rows.length === 0) {
     return null;
   }
 
   const mine = new Set(providerIds);
-  const eligible = rows.results.filter((section) => reaches(section.audience, mine));
+  const eligible = rows.rows.filter((section) => reaches(section.audience, mine));
   const watchable = await matchingTitleIds(
     db,
     eligible.flatMap((section) => parseStoredTitleIds(section.titleIds)),
@@ -211,7 +199,7 @@ export async function readCatalog(db: D1Database, query: string, providerIds: st
       };
     })
     .filter((section) => section.items.length >= MIN_VISIBLE_ITEMS);
-  const fetchedAt = rows.results.reduce(
+  const fetchedAt = rows.rows.reduce(
     (latest, section) => (section.sourceUpdatedAt > latest ? section.sourceUpdatedAt : latest),
     "",
   );
@@ -224,22 +212,22 @@ export async function readCatalog(db: D1Database, query: string, providerIds: st
   } satisfies CatalogResponse;
 }
 
-export async function readAvailability(db: D1Database, titleId: string) {
+export async function readAvailability(db: Database, titleId: string) {
   const [title] = await readItems(db, [titleId]);
 
   if (!title) {
     return null;
   }
 
-  const row = await db
-    .prepare(`SELECT enriched_at AS enrichedAt FROM catalog_titles WHERE id = ?`)
-    .bind(titleId)
-    .first<{ enrichedAt: string | null }>();
+  const row = await db.first<{ enrichedAt: string | null }>(
+    `SELECT enriched_at AS "enrichedAt" FROM catalog_titles WHERE id = $1`,
+    [titleId],
+  );
 
   return { providers: title.providers, checked: Boolean(row?.enrichedAt) };
 }
 
-async function readSearchResults(db: D1Database, query: string, providerIds: string[]) {
+async function readSearchResults(db: Database, query: string, providerIds: string[]) {
   const items = await searchTitlesFirst(db, {
     query,
     providerIds,
@@ -265,7 +253,7 @@ async function readSearchResults(db: D1Database, query: string, providerIds: str
 export type CollectionRecord = { id: number; name: string; titles: number };
 
 export async function listCollections(
-  db: D1Database,
+  db: Database,
   query: string,
   limit = 60,
   offset = 0,
@@ -274,48 +262,42 @@ export async function listCollections(
   const size = clamp(limit, 1, 120);
   const skip = Math.max(0, offset);
   const rows = term
-    ? await db
-        .prepare(
-          `SELECT collection_id AS id, max(collection_name) AS name, count(*) AS titles
+    ? await db.query<CollectionRecord>(
+        `SELECT collection_id AS id, max(collection_name) AS name, count(*) AS titles
              FROM catalog_titles
-            WHERE collection_id IS NOT NULL AND lower(collection_name) LIKE ?1
+            WHERE collection_id IS NOT NULL AND lower(collection_name) LIKE $1
             GROUP BY collection_id
             ORDER BY titles DESC, name
-            LIMIT ?2 OFFSET ?3`,
-        )
-        .bind(`%${term}%`, size, skip)
-        .all<CollectionRecord>()
-    : await db
-        .prepare(
-          `SELECT collection_id AS id, max(collection_name) AS name, count(*) AS titles
+            LIMIT $2 OFFSET $3`,
+        [`%${term}%`, size, skip],
+      )
+    : await db.query<CollectionRecord>(
+        `SELECT collection_id AS id, max(collection_name) AS name, count(*) AS titles
              FROM catalog_titles
             WHERE collection_id IS NOT NULL
             GROUP BY collection_id
             ORDER BY titles DESC, name
-            LIMIT ?1 OFFSET ?2`,
-        )
-        .bind(size, skip)
-        .all<CollectionRecord>();
+            LIMIT $1 OFFSET $2`,
+        [size, skip],
+      );
 
-  return rows.results.filter((row) => Boolean(row.name));
+  return rows.rows.filter((row) => Boolean(row.name));
 }
 
 export async function readCollectionTitleIds(
-  db: D1Database,
+  db: Database,
   collectionId: number,
   limit = 24,
   offset = 0,
 ) {
-  const rows = await db
-    .prepare(
-      `SELECT id
+  const rows = await db.query<{ id: string }>(
+    `SELECT id
        FROM catalog_titles
-       WHERE collection_id = ?1
+       WHERE collection_id = $1
        ORDER BY COALESCE(release_date, '9999-12-31'), popularity DESC
-       LIMIT ?2 OFFSET ?3`,
-    )
-    .bind(collectionId, clamp(limit, 1, 48), Math.max(0, offset))
-    .all<{ id: string }>();
+       LIMIT $2 OFFSET $3`,
+    [collectionId, clamp(limit, 1, 48), Math.max(0, offset)],
+  );
 
-  return rows.results.map((row) => row.id);
+  return rows.rows.map((row) => row.id);
 }

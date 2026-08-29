@@ -6,11 +6,11 @@ const FIELD: SimpleArrayField = {
   column: "person",
 };
 
-export function readPersonMap(db: D1Database, ids: string[]) {
+export function readPersonMap(db: Database, ids: string[]) {
   return readSimpleArray(db, FIELD, ids);
 }
 
-export function writePersonRows(db: D1Database, titles: MediaTitle[]) {
+export function writePersonRows(db: Database, titles: MediaTitle[]) {
   return writeSimpleArray(
     db,
     FIELD,

@@ -97,9 +97,10 @@ export async function getSeasonIndex(env: Bindings, titleId: string) {
 }
 
 async function imdbIdOf(env: Bindings, titleId: string) {
-  const row = await env.DB.prepare(`SELECT imdb_id AS imdbId FROM catalog_titles WHERE id = ?`)
-    .bind(titleId)
-    .first<{ imdbId: string | null }>();
+  const row = await env.DB.first<{ imdbId: string | null }>(
+    `SELECT imdb_id AS "imdbId" FROM catalog_titles WHERE id = $1`,
+    [titleId],
+  );
 
   return row?.imdbId ?? null;
 }
@@ -228,7 +229,7 @@ function slotKey(slot: { season: number; episode: number }) {
 }
 
 export async function getShowProgress(
-  db: D1Database,
+  db: Database,
   viewerId: string,
   titleId: string,
 ): Promise<ShowProgress> {
@@ -280,7 +281,7 @@ export async function getShowProgress(
   };
 }
 
-async function syncShelfProgress(db: D1Database, viewerId: string, titleId: string) {
+async function syncShelfProgress(db: Database, viewerId: string, titleId: string) {
   const [watched, stored] = await Promise.all([
     readWatchedEpisodes(db, viewerId, titleId),
     readStoredSeasons(db, titleId),
@@ -292,26 +293,20 @@ async function syncShelfProgress(db: D1Database, viewerId: string, titleId: stri
   const isComplete = aired > 0 && counted.length >= aired;
   const status = counted.length === 0 ? "watchlist" : isComplete ? "watched" : "watching";
 
-  await db
-    .prepare(
-      `INSERT INTO viewing_entries (id, viewer_id, title_id, status)
-       VALUES (?, ?, ?, ?)
+  await db.execute(
+    `INSERT INTO viewing_entries (id, viewer_id, title_id, status)
+       VALUES ($1, $2, $3, $4)
        ON CONFLICT(viewer_id, title_id) DO UPDATE SET
          status = CASE
            WHEN viewing_entries.status IN ('watchlist', 'watching') THEN excluded.status
            ELSE viewing_entries.status
          END,
          updated_at = CURRENT_TIMESTAMP`,
-    )
-    .bind(crypto.randomUUID(), viewerId, titleId, status)
-    .run();
+    [crypto.randomUUID(), viewerId, titleId, status],
+  );
 }
 
-export async function recordEpisodeEntry(
-  db: D1Database,
-  viewerId: string,
-  input: EpisodeEntryInput,
-) {
+export async function recordEpisodeEntry(db: Database, viewerId: string, input: EpisodeEntryInput) {
   const entry = await saveEpisodeEntry(db, viewerId, input);
 
   await syncShelfProgress(db, viewerId, input.titleId);
@@ -347,7 +342,7 @@ export async function markEpisodes(
 }
 
 export async function readViewerEpisodes(
-  db: D1Database,
+  db: Database,
   viewerId: string,
   titleId: string,
 ): Promise<{ entries: EpisodeEntry[]; progress: ShowProgress }> {

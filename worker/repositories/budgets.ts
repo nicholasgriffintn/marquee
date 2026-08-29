@@ -36,46 +36,53 @@ function windowExpression(windowKind: "day" | "month") {
   return windowKind === "day" ? "-1 day" : "-1 month";
 }
 
-function seedBudget(env: Bindings, source: BudgetSource) {
+function seedBudget(transaction: DatabaseTransaction, source: BudgetSource) {
   const configured = SOURCE_BUDGETS[source];
 
-  return env.DB.prepare(
+  return transaction.execute(
     `INSERT INTO source_budgets (source, window_kind, call_limit)
-     VALUES (?, ?, ?)
+     VALUES ($1, $2, $3)
      ON CONFLICT(source) DO NOTHING`,
-  ).bind(source, configured.windowKind, configured.callLimit);
+    [source, configured.windowKind, configured.callLimit],
+  );
 }
 
 export async function ensureBudgets(env: Bindings) {
   const sources = Object.keys(SOURCE_BUDGETS) as BudgetSource[];
-  const results = await env.DB.batch(
-    sources.map((source) => {
+  const reconciled = await env.DB.transaction(async (transaction) => {
+    let changes = 0;
+
+    for (const source of sources) {
       const configured = SOURCE_BUDGETS[source];
 
-      return env.DB.prepare(
+      // oxlint-disable-next-line no-await-in-loop
+      const result = await transaction.execute(
         `INSERT INTO source_budgets (source, window_kind, call_limit)
-         VALUES (?, ?, ?)
+         VALUES ($1, $2, $3)
          ON CONFLICT(source) DO UPDATE SET
            window_kind = excluded.window_kind,
            call_limit = excluded.call_limit,
            updated_at = CURRENT_TIMESTAMP
          WHERE source_budgets.window_kind <> excluded.window_kind
             OR source_budgets.call_limit <> excluded.call_limit`,
-      ).bind(source, configured.windowKind, configured.callLimit);
-    }),
-  );
-  const reconciled = results.reduce((total, result) => total + (result.meta.changes ?? 0), 0);
-  const dropped = await env.DB.prepare(
+        [source, configured.windowKind, configured.callLimit],
+      );
+
+      changes += result.rowCount;
+    }
+
+    return changes;
+  });
+  const dropped = await env.DB.execute(
     `DELETE FROM source_budgets
-     WHERE source NOT IN (${sources.map(() => "?").join(",")})`,
-  )
-    .bind(...sources)
-    .run();
+     WHERE source NOT IN (${sources.map((_, index) => `$${index + 1}`).join(",")})`,
+    [...sources],
+  );
 
   logEvent("budgets_reconciled", {
     sources: sources.length,
     reconciled,
-    dropped: dropped.meta.changes,
+    dropped: dropped.rowCount,
   });
 
   return reconciled;
@@ -84,17 +91,16 @@ export async function ensureBudgets(env: Bindings) {
 export async function readBudgetRoom(env: Bindings, source: EnrichmentSource) {
   const resolved = budgetSource(source);
   const configured = SOURCE_BUDGETS[resolved];
-  const row = await env.DB.prepare(
+  const row = await env.DB.first<{ room: number }>(
     `SELECT CASE
               WHEN paused_until IS NOT NULL AND paused_until > CURRENT_TIMESTAMP THEN 0
-              WHEN window_started_at <= datetime('now', ?) THEN call_limit
-              ELSE max(0, call_limit - used)
+              WHEN window_started_at <= (CURRENT_TIMESTAMP + CAST($1 AS INTERVAL)) THEN call_limit
+              ELSE GREATEST(0, call_limit - used)
             END AS room
      FROM source_budgets
-     WHERE source = ?`,
-  )
-    .bind(windowExpression(configured.windowKind), resolved)
-    .first<{ room: number }>();
+     WHERE source = $2`,
+    [windowExpression(configured.windowKind), resolved],
+  );
 
   return row ? row.room : configured.callLimit;
 }
@@ -106,27 +112,26 @@ export async function readBudgetPace(env: Bindings, source: EnrichmentSource) {
   const configured = SOURCE_BUDGETS[resolved];
   const expression = windowExpression(configured.windowKind);
   const windowHours = configured.windowKind === "day" ? 24 : 24 * 30;
-  const row = await env.DB.prepare(
+  const row = await env.DB.first<{ room: number; hoursLeft: number }>(
     `SELECT CASE
               WHEN paused_until IS NOT NULL AND paused_until > CURRENT_TIMESTAMP THEN 0
-              WHEN window_started_at <= datetime('now', ?) THEN call_limit
-              ELSE max(0, call_limit - used)
+              WHEN window_started_at <= (CURRENT_TIMESTAMP + CAST($1 AS INTERVAL)) THEN call_limit
+              ELSE GREATEST(0, call_limit - used)
             END AS room,
             CASE
-              WHEN window_started_at <= datetime('now', ?) THEN ?
-              ELSE (julianday(window_started_at, ?) - julianday('now')) * 24
-            END AS hoursLeft
+              WHEN window_started_at <= (CURRENT_TIMESTAMP + CAST($2 AS INTERVAL)) THEN $3
+              ELSE ((EXTRACT(EPOCH FROM (window_started_at + CAST($4 AS INTERVAL))) / 86400.0) - (EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) / 86400.0)) * 24
+            END AS "hoursLeft"
      FROM source_budgets
-     WHERE source = ?`,
-  )
-    .bind(
+     WHERE source = $5`,
+    [
       expression,
       expression,
       windowHours,
       configured.windowKind === "day" ? "+1 day" : "+1 month",
       resolved,
-    )
-    .first<{ room: number; hoursLeft: number }>();
+    ],
+  );
 
   if (!row) {
     return Math.floor(configured.callLimit / Math.ceil(windowHours / SWEEP_HOURS));
@@ -142,85 +147,72 @@ export async function claimBudget(env: Bindings, source: EnrichmentSource, reser
   const expression = windowExpression(SOURCE_BUDGETS[resolved].windowKind);
   const protectedCalls = Math.max(0, Math.trunc(reserve));
   const claim = () =>
-    env.DB.prepare(
+    env.DB.execute(
       `UPDATE source_budgets
-       SET used = CASE WHEN window_started_at <= datetime('now', ?) THEN 1 ELSE used + 1 END,
+       SET used = CASE WHEN window_started_at <= (CURRENT_TIMESTAMP + CAST($1 AS INTERVAL)) THEN 1 ELSE used + 1 END,
            window_started_at = CASE
-             WHEN window_started_at <= datetime('now', ?) THEN CURRENT_TIMESTAMP
+             WHEN window_started_at <= (CURRENT_TIMESTAMP + CAST($2 AS INTERVAL)) THEN CURRENT_TIMESTAMP
              ELSE window_started_at
            END,
            updated_at = CURRENT_TIMESTAMP
-       WHERE source = ?
+       WHERE source = $3
          AND (paused_until IS NULL OR paused_until <= CURRENT_TIMESTAMP)
          AND (
-           (window_started_at <= datetime('now', ?) AND call_limit > ?)
-           OR (window_started_at > datetime('now', ?) AND used < max(0, call_limit - ?))
+           (window_started_at <= (CURRENT_TIMESTAMP + CAST($4 AS INTERVAL)) AND call_limit > $5)
+           OR (window_started_at > (CURRENT_TIMESTAMP + CAST($6 AS INTERVAL)) AND used < GREATEST(0, call_limit - $7))
          )`,
-    )
-      .bind(
-        expression,
-        expression,
-        resolved,
-        expression,
-        protectedCalls,
-        expression,
-        protectedCalls,
-      )
-      .run();
+      [expression, expression, resolved, expression, protectedCalls, expression, protectedCalls],
+    );
   const claimed = await claim();
 
-  if (claimed.meta.changes > 0) {
+  if (claimed.rowCount > 0) {
     return true;
   }
 
-  const seeded = await seedBudget(env, resolved).run();
+  const seeded = await seedBudget(env.DB, resolved);
 
-  if (seeded.meta.changes === 0) {
+  if (seeded.rowCount === 0) {
     return false;
   }
 
-  return (await claim()).meta.changes > 0;
+  return (await claim()).rowCount > 0;
 }
 
 export async function pauseSource(env: Bindings, source: EnrichmentSource, policy: BackoffPolicy) {
   const resolved = budgetSource(source);
-  const current = await env.DB.prepare(
-    `SELECT consecutive_pauses AS consecutivePauses FROM source_budgets WHERE source = ?`,
-  )
-    .bind(resolved)
-    .first<{ consecutivePauses: number }>();
+  const current = await env.DB.first<{ consecutivePauses: number }>(
+    `SELECT consecutive_pauses AS "consecutivePauses" FROM source_budgets WHERE source = $1`,
+    [resolved],
+  );
   const consecutive = current?.consecutivePauses ?? 0;
   const minutes = escalate(policy, consecutive);
 
-  await env.DB.prepare(
+  await env.DB.execute(
     `UPDATE source_budgets
-     SET paused_until = datetime('now', ?),
+     SET paused_until = (CURRENT_TIMESTAMP + CAST($1 AS INTERVAL)),
          consecutive_pauses = consecutive_pauses + 1,
          updated_at = CURRENT_TIMESTAMP
-     WHERE source = ?`,
-  )
-    .bind(`+${Math.max(1, Math.trunc(minutes))} minutes`, resolved)
-    .run();
+     WHERE source = $2`,
+    [`+${Math.max(1, Math.trunc(minutes))} minutes`, resolved],
+  );
 
   logEvent("source_paused", { source, minutes, consecutive: consecutive + 1 });
 }
 
 export async function resetBackoff(env: Bindings, source: EnrichmentSource) {
-  await env.DB.prepare(
-    `UPDATE source_budgets SET consecutive_pauses = 0 WHERE source = ? AND consecutive_pauses <> 0`,
-  )
-    .bind(budgetSource(source))
-    .run();
+  await env.DB.execute(
+    `UPDATE source_budgets SET consecutive_pauses = 0 WHERE source = $1 AND consecutive_pauses <> 0`,
+    [budgetSource(source)],
+  );
 }
 
 export async function resumeSource(env: Bindings, source: EnrichmentSource) {
-  await env.DB.prepare(
+  await env.DB.execute(
     `UPDATE source_budgets
      SET paused_until = NULL, updated_at = CURRENT_TIMESTAMP
-     WHERE source = ?`,
-  )
-    .bind(budgetSource(source))
-    .run();
+     WHERE source = $1`,
+    [budgetSource(source)],
+  );
 }
 
 function statusOf(error: unknown) {
@@ -245,17 +237,16 @@ export function isRefused(error: unknown) {
 
 export async function readBudgets(env: Bindings) {
   const configured = Object.keys(SOURCE_BUDGETS);
-  const rows = await env.DB.prepare(
-    `SELECT source, window_kind AS windowKind, call_limit AS callLimit, used,
-            window_started_at AS windowStartedAt, paused_until AS pausedUntil,
-            consecutive_pauses AS consecutivePauses
+  const rows = await env.DB.query<BudgetRow & { source: string }>(
+    `SELECT source, window_kind AS "windowKind", call_limit AS "callLimit", used,
+            window_started_at AS "windowStartedAt", paused_until AS "pausedUntil",
+            consecutive_pauses AS "consecutivePauses"
      FROM source_budgets
-     WHERE source IN (${configured.map(() => "?").join(",")})
+     WHERE source IN (${configured.map((_, index) => `$${index + 1}`).join(",")})
      ORDER BY source`,
-  )
-    .bind(...configured)
-    .all<BudgetRow & { source: string }>();
-  const seen = new Set(rows.results.map((row) => row.source));
+    [...configured],
+  );
+  const seen = new Set(rows.rows.map((row) => row.source));
   const missing = configured
     .filter((source) => !seen.has(source))
     .map((source) => ({
@@ -268,7 +259,7 @@ export async function readBudgets(env: Bindings) {
       consecutivePauses: 0,
     }));
 
-  return [...rows.results, ...missing].toSorted((left, right) =>
+  return [...rows.rows, ...missing].toSorted((left, right) =>
     left.source.localeCompare(right.source),
   );
 }

@@ -66,10 +66,10 @@ export async function embedQuery(env: Bindings, text: string) {
 const RETRY_MINUTES = 30;
 const MAX_RETRY_MINUTES = 24 * 60;
 
-function markEmbedded(env: Bindings, titleId: string, hash: string) {
-  return env.DB.prepare(
+function markEmbedded(db: DatabaseTransaction, titleId: string, hash: string) {
+  return db.execute(
     `INSERT INTO title_embeddings (title_id, model, content_hash, embedded_at)
-     VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+     VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
      ON CONFLICT(title_id) DO UPDATE SET
        model = excluded.model,
        content_hash = excluded.content_hash,
@@ -77,42 +77,46 @@ function markEmbedded(env: Bindings, titleId: string, hash: string) {
        attempts = 0,
        next_attempt_at = NULL,
        error = NULL`,
-  ).bind(titleId, EMBEDDING_MODEL, hash);
+    [titleId, EMBEDDING_MODEL, hash],
+  );
 }
 
 // A failed title keeps a marker so the next selection can step over it instead of
 // re-reading the same head of the popularity queue on every sweep.
-function markEmbeddingFailure(env: Bindings, titleId: string, reason: string) {
-  return env.DB.prepare(
+function markEmbeddingFailure(db: DatabaseTransaction, titleId: string, reason: string) {
+  return db.execute(
     `INSERT INTO title_embeddings
        (title_id, model, content_hash, attempts, next_attempt_at, error)
-     VALUES (?1, ?2, NULL, 1, datetime('now', '+${RETRY_MINUTES} minutes'), ?3)
+     VALUES ($1, $2, NULL, 1, (CURRENT_TIMESTAMP + INTERVAL '${RETRY_MINUTES} minute'), $3)
      ON CONFLICT(title_id) DO UPDATE SET
        model = excluded.model,
        content_hash = NULL,
        attempts = title_embeddings.attempts + 1,
-       next_attempt_at = datetime(
-         'now',
-         '+' || min(${MAX_RETRY_MINUTES}, ${RETRY_MINUTES} * (title_embeddings.attempts + 1)) || ' minutes'
-       ),
+       next_attempt_at = CURRENT_TIMESTAMP
+         + LEAST(${MAX_RETRY_MINUTES}, ${RETRY_MINUTES} * (title_embeddings.attempts + 1))
+           * INTERVAL '1 minute',
        error = excluded.error`,
-  ).bind(titleId, EMBEDDING_MODEL, reason.slice(0, 200));
+    [titleId, EMBEDDING_MODEL, reason.slice(0, 200)],
+  );
 }
 
 function recordFailures(env: Bindings, titles: MediaTitle[], reason: string) {
-  return env.DB.batch(titles.map((title) => markEmbeddingFailure(env, title.id, reason)));
+  return env.DB.transaction(async (transaction) => {
+    for (const title of titles) {
+      await markEmbeddingFailure(transaction, title.id, reason);
+    }
+  });
 }
 
 async function storedHashes(env: Bindings, titleIds: string[]) {
-  const rows = await env.DB.prepare(
-    `SELECT title_id AS titleId, content_hash AS contentHash
+  const rows = await env.DB.query<{ titleId: string; contentHash: string | null }>(
+    `SELECT title_id AS "titleId", content_hash AS "contentHash"
      FROM title_embeddings
-     WHERE model = ? AND title_id IN (${titleIds.map(() => "?").join(", ")})`,
-  )
-    .bind(EMBEDDING_MODEL, ...titleIds)
-    .all<{ titleId: string; contentHash: string | null }>();
+     WHERE model = $1 AND title_id IN (${titleIds.map((_, index) => `$${index + 2}`).join(", ")})`,
+    [EMBEDDING_MODEL, ...titleIds],
+  );
 
-  return new Map(rows.results.map((row) => [row.titleId, row.contentHash]));
+  return new Map(rows.rows.map((row) => [row.titleId, row.contentHash]));
 }
 
 export async function embedTitles(
@@ -160,9 +164,11 @@ export async function embedTitles(
       );
 
       // oxlint-disable-next-line no-await-in-loop
-      await env.DB.batch(
-        wave.map((title) => markEmbedded(env, title.id, hashById.get(title.id) as string)),
-      );
+      await env.DB.transaction(async (transaction) => {
+        for (const title of wave) {
+          await markEmbedded(transaction, title.id, hashById.get(title.id) as string);
+        }
+      });
 
       stored += wave.length;
     } catch (error) {
@@ -174,9 +180,11 @@ export async function embedTitles(
   }
 
   if (unchanged.length) {
-    await env.DB.batch(
-      unchanged.map((title) => markEmbedded(env, title.id, hashById.get(title.id) as string)),
-    );
+    await env.DB.transaction(async (transaction) => {
+      for (const title of unchanged) {
+        await markEmbedded(transaction, title.id, hashById.get(title.id) as string);
+      }
+    });
   }
 
   logEvent("titles_embedded", { count: stored, skipped: unchanged.length, failed });
@@ -219,22 +227,21 @@ const OUTSTANDING = `(
   OR e.embedded_at < t.updated_at
 )`;
 
-const OFF_BACKOFF = `(e.next_attempt_at IS NULL OR e.next_attempt_at <= datetime('now'))`;
+const OFF_BACKOFF = `(e.next_attempt_at IS NULL OR e.next_attempt_at <= CURRENT_TIMESTAMP)`;
 
 const REINDEX_BATCH = 25;
 
 async function selectEmbeddedAfter(env: Bindings, after: string, limit: number) {
-  const rows = await env.DB.prepare(
-    `SELECT title_id AS titleId
+  const rows = await env.DB.query<{ titleId: string }>(
+    `SELECT title_id AS "titleId"
      FROM title_embeddings
-     WHERE model = ? AND title_id > ?
+     WHERE model = $1 AND title_id > $2
      ORDER BY title_id
-     LIMIT ?`,
-  )
-    .bind(EMBEDDING_MODEL, after, clamp(limit, 1, 100))
-    .all<{ titleId: string }>();
+     LIMIT $3`,
+    [EMBEDDING_MODEL, after, clamp(limit, 1, 100)],
+  );
 
-  return rows.results.map((row) => row.titleId);
+  return rows.rows.map((row) => row.titleId);
 }
 
 export async function reindexVectorMetadata(env: Bindings, after: string) {
@@ -263,18 +270,17 @@ export async function reindexVectorMetadata(env: Bindings, after: string) {
 }
 
 export async function selectUnembedded(env: Bindings, limit: number) {
-  const rows = await env.DB.prepare(
-    `SELECT t.id AS titleId
+  const rows = await env.DB.query<{ titleId: string }>(
+    `SELECT t.id AS "titleId"
      FROM catalog_titles AS t
-     LEFT JOIN title_embeddings AS e ON e.title_id = t.id AND e.model = ?
+     LEFT JOIN title_embeddings AS e ON e.title_id = t.id AND e.model = $1
      WHERE ${OUTSTANDING} AND ${OFF_BACKOFF}
      ORDER BY COALESCE(e.attempts, 0), t.popularity DESC
-     LIMIT ?`,
-  )
-    .bind(EMBEDDING_MODEL, clamp(limit, 1, 5_000))
-    .all<{ titleId: string }>();
+     LIMIT $2`,
+    [EMBEDDING_MODEL, clamp(limit, 1, 5_000)],
+  );
 
-  return rows.results.map((row) => row.titleId);
+  return rows.rows.map((row) => row.titleId);
 }
 
 export type EmbeddingCoverage = {
@@ -288,23 +294,22 @@ export type EmbeddingCoverage = {
 };
 
 export async function readEmbeddingCoverage(env: Bindings): Promise<EmbeddingCoverage> {
-  const row = await env.DB.prepare(
+  const row = await env.DB.first<Omit<EmbeddingCoverage, "model">>(
     `SELECT
        (SELECT count(*) FROM catalog_titles) AS titles,
-       (SELECT count(*) FROM title_embeddings WHERE model = ?1 AND content_hash IS NOT NULL)
+       (SELECT count(*) FROM title_embeddings WHERE model = $1 AND content_hash IS NOT NULL)
          AS embedded,
-       (SELECT count(*) FROM title_embeddings WHERE model <> ?1) AS otherModels,
+       (SELECT count(*) FROM title_embeddings WHERE model <> $1) AS "otherModels",
        (SELECT count(*) FROM title_embeddings
-         WHERE model = ?1 AND content_hash IS NULL AND attempts > 0) AS retrying,
-       (SELECT max(embedded_at) FROM title_embeddings WHERE model = ?1 AND content_hash IS NOT NULL)
+         WHERE model = $1 AND content_hash IS NULL AND attempts > 0) AS retrying,
+       (SELECT max(embedded_at) FROM title_embeddings WHERE model = $1 AND content_hash IS NOT NULL)
          AS newest,
        (SELECT count(*)
           FROM catalog_titles AS t
-          LEFT JOIN title_embeddings AS e ON e.title_id = t.id AND e.model = ?1
+          LEFT JOIN title_embeddings AS e ON e.title_id = t.id AND e.model = $1
          WHERE ${OUTSTANDING}) AS outstanding`,
-  )
-    .bind(EMBEDDING_MODEL)
-    .first<Omit<EmbeddingCoverage, "model">>();
+    [EMBEDDING_MODEL],
+  );
 
   return {
     model: EMBEDDING_MODEL,

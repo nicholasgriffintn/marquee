@@ -11,11 +11,11 @@ const FIELD: KindArrayField = {
   ],
 };
 
-export function readCountryMap(db: D1Database, ids: string[]) {
+export function readCountryMap(db: Database, ids: string[]) {
   return readKindArray(db, FIELD, ids);
 }
 
-export function writeCountryRows(db: D1Database, titles: MediaTitle[]) {
+export function writeCountryRows(db: Database, titles: MediaTitle[]) {
   return writeKindArray(
     db,
     FIELD,

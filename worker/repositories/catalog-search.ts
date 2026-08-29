@@ -27,8 +27,6 @@ const BLENDED_RATING = "t.blended_rating";
 
 const BUZZ_SCORE = buzzScoreSql("t.id");
 
-const RELEVANCE = `bm25(catalog_search, 12.0, 8.0, 1.0, 4.0, 3.0, 0.0)`;
-
 export type CatalogueSearch = {
   query?: string;
   minVotes?: number;
@@ -54,7 +52,6 @@ export type CatalogueSearch = {
 
 type Eligibility = {
   conditions: string[];
-  bindings: unknown[];
   includedIds: string[] | null;
   impossible: boolean;
 };
@@ -63,22 +60,24 @@ function hasProviders(alias: string) {
   return `EXISTS (SELECT 1 FROM catalog_title_providers AS p WHERE p.title_id = ${alias}.id)`;
 }
 
-export function availabilityCondition(alias: string, availability: AvailabilityRule = "confirmed") {
-  const confirmedOrUnknown = providerFilterSql(`${alias}.id`);
+export function availabilityCondition(
+  alias: string,
+  providerIdsParameter: string,
+  availability: AvailabilityRule = "confirmed",
+) {
+  const confirmedOrUnknown = providerFilterSql(`${alias}.id`, providerIdsParameter);
 
   return availability === "confirmed-or-unknown"
     ? confirmedOrUnknown
     : `(${hasProviders(alias)} AND ${confirmedOrUnknown})`;
 }
 
-const TITLE_EXACTNESS = `(CASE WHEN lower(t.title) = ? OR lower(t.original_title) = ? THEN 0 ELSE 1 END)`;
-
 const ORDER_BY: Record<CatalogueSort, string> = {
   trending: `${BUZZ_SCORE} DESC, t.popularity DESC`,
   popularity: "t.popularity DESC",
   score: `${WEIGHTED_RATING} DESC, t.popularity DESC`,
   recent: "COALESCE(t.year, 0) DESC, t.popularity DESC",
-  relevance: `${RELEVANCE}, t.popularity DESC`,
+  relevance: "t.popularity DESC",
   given: "t.popularity DESC",
 };
 
@@ -89,9 +88,7 @@ function ftsMatchQuery(raw: string, scope: SearchScope = "everything", matchAny 
     return null;
   }
 
-  const expression = tokens.map((token) => `"${token}"*`).join(matchAny ? " OR " : " AND ");
-
-  return scope === "title" ? `{title original_title} : (${expression})` : expression;
+  return tokens.map((token) => `${token}:*`).join(matchAny ? " | " : " & ");
 }
 
 function lowered(values: string[] | undefined, limit: number) {
@@ -101,25 +98,24 @@ function lowered(values: string[] | undefined, limit: number) {
     .slice(0, limit);
 }
 
-function tagCondition(table: string, column: string, values: string[]) {
+function tagCondition(table: string, column: string, parameters: string[]) {
   return `EXISTS (
          SELECT 1 FROM ${table} AS x
-         WHERE x.title_id = t.id AND lower(x.${column}) IN (${values.map(() => "?").join(", ")})
+         WHERE x.title_id = t.id AND lower(x.${column}) IN (${parameters.join(", ")})
        )`;
 }
 
-function placeCondition(places: string[]) {
+function placeCondition(parameters: string[]) {
   return `EXISTS (
          SELECT 1 FROM catalog_title_places AS tp
          JOIN catalog_places AS cp ON cp.entity_id = tp.place_id
          WHERE tp.title_id = t.id AND tp.kind = 'filming'
-           AND lower(cp.label) IN (${places.map(() => "?").join(", ")})
+           AND lower(cp.label) IN (${parameters.join(", ")})
        )`;
 }
 
-function eligibilityClause(search: CatalogueSearch): Eligibility {
+function eligibilityClause(search: CatalogueSearch, bindings: DatabaseValue[]): Eligibility {
   const conditions: string[] = [];
-  const bindings: unknown[] = [];
   const genres = lowered(search.genres, 10);
   const places = lowered(search.places, 6);
   const keywords = lowered(search.keywords, 6);
@@ -131,53 +127,64 @@ function eligibilityClause(search: CatalogueSearch): Eligibility {
   );
 
   if (search.mediaType === "movie" || search.mediaType === "tv") {
-    conditions.push("t.media_type = ?");
-    bindings.push(search.mediaType);
+    conditions.push(`t.media_type = $${bindings.push(search.mediaType)}`);
   }
 
   if (genres.length) {
-    conditions.push(tagCondition("catalog_title_genres", "genre", genres));
-    bindings.push(...genres);
+    conditions.push(
+      tagCondition(
+        "catalog_title_genres",
+        "genre",
+        genres.map((genre) => `$${bindings.push(genre)}`),
+      ),
+    );
   }
 
   if (places.length) {
-    conditions.push(placeCondition(places));
-    bindings.push(...places);
+    conditions.push(placeCondition(places.map((place) => `$${bindings.push(place)}`)));
   }
 
   if (keywords.length) {
-    conditions.push(tagCondition("catalog_title_keywords", "keyword", keywords));
-    bindings.push(...keywords);
+    conditions.push(
+      tagCondition(
+        "catalog_title_keywords",
+        "keyword",
+        keywords.map((keyword) => `$${bindings.push(keyword)}`),
+      ),
+    );
   }
 
   if (providerIds.length) {
-    conditions.push(availabilityCondition("t", search.availability));
-    bindings.push(JSON.stringify(providerIds));
+    conditions.push(
+      availabilityCondition(
+        "t",
+        `$${bindings.push(JSON.stringify(providerIds))}`,
+        search.availability,
+      ),
+    );
   }
 
   if (excludeGenres.length) {
     conditions.push(
       `NOT EXISTS (
          SELECT 1 FROM catalog_title_genres AS bg
-         WHERE bg.title_id = t.id AND lower(bg.genre) IN (${excludeGenres.map(() => "?").join(", ")})
+         WHERE bg.title_id = t.id AND lower(bg.genre) IN (${excludeGenres.map((genre) => `$${bindings.push(genre)}`).join(", ")})
        )`,
     );
-    bindings.push(...excludeGenres);
   }
 
   if (Number.isFinite(search.minScore)) {
-    conditions.push(`${BLENDED_RATING} >= ?`);
-    bindings.push(clamp(search.minScore ?? 0, 0, 10));
+    conditions.push(`${BLENDED_RATING} >= $${bindings.push(clamp(search.minScore ?? 0, 0, 10))}`);
   }
 
   if (Number.isFinite(search.minVotes) && (search.minVotes ?? 0) > 0) {
-    conditions.push("t.vote_count >= ?");
-    bindings.push(Math.trunc(search.minVotes ?? 0));
+    conditions.push(`t.vote_count >= $${bindings.push(Math.trunc(search.minVotes ?? 0))}`);
   }
 
   if (Number.isFinite(search.maxRuntime)) {
-    conditions.push(`(t.runtime_minutes IS NOT NULL AND t.runtime_minutes <= ?)`);
-    bindings.push(clamp(Math.trunc(search.maxRuntime ?? 600), 30, 600));
+    conditions.push(
+      `(t.runtime_minutes IS NOT NULL AND t.runtime_minutes <= $${bindings.push(clamp(Math.trunc(search.maxRuntime ?? 600), 30, 600))})`,
+    );
   }
 
   const certifications = (search.certifications ?? []).filter(Boolean).slice(0, 60);
@@ -185,25 +192,26 @@ function eligibilityClause(search: CatalogueSearch): Eligibility {
   if (certifications.length) {
     conditions.push(
       `NOT EXISTS (
-         SELECT 1 FROM json_each(?) AS rated
+         SELECT 1 FROM jsonb_array_elements_text(CAST($${bindings.push(JSON.stringify(certifications))} AS jsonb)) AS rated(value)
          WHERE t.certification = rated.value OR t.certification LIKE '% ' || rated.value
        )`,
     );
-    bindings.push(JSON.stringify(certifications));
   }
 
   if (Number.isFinite(search.releasedAfter)) {
-    conditions.push("COALESCE(t.year, 0) >= ?");
-    bindings.push(clamp(Math.trunc(search.releasedAfter ?? 0), 1900, 2100));
+    conditions.push(
+      `COALESCE(t.year, 0) >= $${bindings.push(clamp(Math.trunc(search.releasedAfter ?? 0), 1900, 2100))}`,
+    );
   }
 
   if (excludedIds.length) {
-    conditions.push(`t.id NOT IN (SELECT value FROM json_each(?))`);
-    bindings.push(JSON.stringify(excludedIds));
+    conditions.push(
+      `t.id NOT IN (SELECT value FROM jsonb_array_elements_text(CAST($${bindings.push(JSON.stringify(excludedIds))} AS jsonb)) AS entries(value))`,
+    );
   }
 
   if (!search.includeIds) {
-    return { conditions, bindings, includedIds: null, impossible: false };
+    return { conditions, includedIds: null, impossible: false };
   }
 
   const includedIds = [...new Set(search.includeIds.filter(isKnownTitle))].slice(
@@ -211,10 +219,11 @@ function eligibilityClause(search: CatalogueSearch): Eligibility {
     INCLUDE_ID_LIMIT,
   );
 
-  conditions.push(`t.id IN (SELECT value FROM json_each(?))`);
-  bindings.push(JSON.stringify(includedIds));
+  conditions.push(
+    `t.id IN (SELECT value FROM jsonb_array_elements_text(CAST($${bindings.push(JSON.stringify(includedIds))} AS jsonb)) AS entries(value))`,
+  );
 
-  return { conditions, bindings, includedIds, impossible: includedIds.length === 0 };
+  return { conditions, includedIds, impossible: includedIds.length === 0 };
 }
 
 function requiredVotes(search: CatalogueSearch, sort: CatalogueSort) {
@@ -225,62 +234,74 @@ function requiredVotes(search: CatalogueSearch, sort: CatalogueSort) {
   return sort === "score" || Number.isFinite(search.minScore) ? SCORE_SORT_MIN_VOTES : 0;
 }
 
-async function hydrate(db: D1Database, rows: CatalogTitleRow[]): Promise<MediaTitle[]> {
+async function hydrate(db: Database, rows: CatalogTitleRow[]): Promise<MediaTitle[]> {
   const hydrated = await hydrateTitleRows(db, rows);
 
   return hydrated.map((title, index) => withStoredPoster(title, rows[index]?.poster_key));
 }
 
-export async function searchCatalogue(db: D1Database, search: CatalogueSearch) {
+export async function searchCatalogue(db: Database, search: CatalogueSearch) {
   const match = search.query?.trim()
     ? ftsMatchQuery(search.query.trim().slice(0, 120), search.scope, search.matchAny)
     : null;
   const limit = clamp(Math.floor(search.limit ?? 12), 1, 60);
   const offset = clamp(Math.floor(search.offset ?? 0), 0, 2_000);
   const sort = search.sort ?? (match ? "relevance" : "popularity");
-  const eligibility = eligibilityClause({ ...search, minVotes: requiredVotes(search, sort) });
+  const bindings: DatabaseValue[] = [];
+  const conditions = match
+    ? [`catalog_search.${search.scope === "title" ? "title_document" : "document"} @@ to_tsquery('simple', $${bindings.push(match)})`]
+    : [];
+  const eligibility = eligibilityClause(
+    { ...search, minVotes: requiredVotes(search, sort) },
+    bindings,
+  );
+
+  conditions.push(...eligibility.conditions);
 
   if (eligibility.impossible) {
     return [];
   }
 
-  const orderBindings: unknown[] = [];
   let orderBy = ORDER_BY[match ? sort : sort === "relevance" ? "popularity" : sort];
+  const searchDocument = search.scope === "title" ? "title_document" : "document";
+
+  if (match && sort === "relevance" && search.scope !== "title") {
+    orderBy = `ts_rank_cd(catalog_search.${searchDocument}, to_tsquery('simple', $${bindings.push(match)}), 32) DESC,
+      t.popularity DESC`;
+  }
 
   if (sort === "given" && eligibility.includedIds) {
-    orderBy = `(SELECT key FROM json_each(?) WHERE value = t.id)`;
-    orderBindings.push(JSON.stringify(eligibility.includedIds));
+    orderBy = `(SELECT position
+                  FROM jsonb_array_elements_text(CAST($${bindings.push(JSON.stringify(eligibility.includedIds))} AS jsonb))
+                    WITH ORDINALITY AS entries(value, position)
+                 WHERE value = t.id)`;
   }
 
   if (match && search.scope === "title" && sort === "relevance") {
     const needle = (search.query ?? "").trim().toLowerCase().slice(0, 120);
 
-    orderBy = `${TITLE_EXACTNESS}, t.popularity DESC`;
-    orderBindings.push(needle, needle);
+    const titleParameter = `$${bindings.push(needle)}`;
+    const originalTitleParameter = `$${bindings.push(needle)}`;
+
+    orderBy = `(CASE WHEN lower(t.title) = ${titleParameter} OR lower(t.original_title) = ${originalTitleParameter} THEN 0 ELSE 1 END), t.popularity DESC`;
   }
 
-  const conditions = match
-    ? ["catalog_search MATCH ?", ...eligibility.conditions]
-    : eligibility.conditions;
-  const bindings = match ? [match, ...eligibility.bindings] : eligibility.bindings;
   const from = match
-    ? "catalog_search JOIN catalog_titles AS t ON t.rowid = catalog_search.rowid"
+    ? "catalog_search JOIN catalog_titles AS t ON t.id = catalog_search.title_id"
     : "catalog_titles AS t";
-  const rows = await db
-    .prepare(
-      `SELECT ${catalogTitleColumns("t")}
+  const rows = await db.query<CatalogTitleRow>(
+    `SELECT ${catalogTitleColumns("t")}
        FROM ${from}
        ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
        ORDER BY ${orderBy}
-       LIMIT ? OFFSET ?`,
-    )
-    .bind(...bindings, ...orderBindings, limit, offset)
-    .all<CatalogTitleRow>();
+       LIMIT $${bindings.push(limit)} OFFSET $${bindings.push(offset)}`,
+    bindings,
+  );
 
-  return hydrate(db, rows.results);
+  return hydrate(db, rows.rows);
 }
 
-export async function searchTitlesFirst(db: D1Database, search: CatalogueSearch) {
+export async function searchTitlesFirst(db: Database, search: CatalogueSearch) {
   const limit = clamp(Math.floor(search.limit ?? 12), 1, 60);
 
   if (!search.query?.trim()) {
@@ -318,29 +339,28 @@ export type BrowseTrendingFilter = {
   minVotes: number;
 };
 
-async function trendingCandidates(db: D1Database, filter: BrowseTrendingFilter) {
-  const eligibility = eligibilityClause(filter);
+async function trendingCandidates(db: Database, filter: BrowseTrendingFilter) {
+  const bindings: DatabaseValue[] = [];
+  const eligibility = eligibilityClause(filter, bindings);
   const conditions = [
     `b.article <> ''`,
     `b.views >= ${MIN_TRENDING_VIEWS}`,
     ...eligibility.conditions,
   ];
-  const rows = await db
-    .prepare(
-      `SELECT ${catalogTitleColumns("t")}
+  const rows = await db.query<CatalogTitleRow>(
+    `SELECT ${catalogTitleColumns("t")}
        FROM title_buzz AS b
        JOIN catalog_titles AS t ON t.id = b.title_id
        WHERE ${conditions.join(" AND ")}
        ORDER BY b.score DESC, t.popularity DESC`,
-    )
-    .bind(...eligibility.bindings)
-    .all<CatalogTitleRow>();
+    bindings,
+  );
 
-  return rows.results;
+  return rows.rows;
 }
 
 export async function browseTrending(
-  db: D1Database,
+  db: Database,
   filter: BrowseTrendingFilter,
   limit: number,
   offset: number,
@@ -369,22 +389,20 @@ export async function browseTrending(
   return [...(await hydrate(db, page)), ...rest];
 }
 
-export async function readRanked(db: D1Database, ids: string[]) {
+export async function readRanked(db: Database, ids: string[]) {
   const uniqueIds = [...new Set(ids.filter(isKnownTitle))].slice(0, 100);
 
   if (uniqueIds.length === 0) {
     return [];
   }
 
-  const rows = await db
-    .prepare(
-      `SELECT ${CATALOG_TITLE_COLUMNS}
+  const rows = await db.query<CatalogTitleRow>(
+    `SELECT ${CATALOG_TITLE_COLUMNS}
        FROM catalog_titles
-       WHERE id IN (SELECT value FROM json_each(?))`,
-    )
-    .bind(JSON.stringify(uniqueIds))
-    .all<CatalogTitleRow>();
-  const byId = new Map((await hydrate(db, rows.results)).map((title) => [title.id, title]));
+       WHERE id IN (SELECT value FROM jsonb_array_elements_text(CAST($1 AS jsonb)) AS entries(value))`,
+    [JSON.stringify(uniqueIds)],
+  );
+  const byId = new Map((await hydrate(db, rows.rows)).map((title) => [title.id, title]));
 
   return uniqueIds.flatMap((id) => {
     const title = byId.get(id);
@@ -393,56 +411,50 @@ export async function readRanked(db: D1Database, ids: string[]) {
   });
 }
 
-export async function readGenres(db: D1Database, limit = 100) {
-  const rows = await db
-    .prepare(
-      `SELECT genre, count(*) AS titles
+export async function readGenres(db: Database, limit = 100) {
+  const rows = await db.query<{ genre: string; titles: number }>(
+    `SELECT genre, count(*) AS titles
        FROM catalog_title_genres
        GROUP BY genre
        HAVING titles >= 5
        ORDER BY titles DESC
-       LIMIT ?`,
-    )
-    .bind(clamp(limit, 1, 200))
-    .all<{ genre: string; titles: number }>();
+       LIMIT $1`,
+    [clamp(limit, 1, 200)],
+  );
 
-  return rows.results
+  return rows.rows
     .filter((row) => typeof row.genre === "string" && row.genre.length > 0)
     .map((row) => row.genre);
 }
 
-export async function readKeywords(db: D1Database, limit = 120) {
-  const rows = await db
-    .prepare(
-      `SELECT keyword, count(*) AS titles
+export async function readKeywords(db: Database, limit = 120) {
+  const rows = await db.query<{ keyword: string; titles: number }>(
+    `SELECT keyword, count(*) AS titles
        FROM catalog_title_keywords
        GROUP BY keyword
        HAVING titles >= 8
        ORDER BY titles DESC
-       LIMIT ?`,
-    )
-    .bind(clamp(limit, 1, 400))
-    .all<{ keyword: string; titles: number }>();
+       LIMIT $1`,
+    [clamp(limit, 1, 400)],
+  );
 
-  return rows.results
+  return rows.rows
     .filter((row) => typeof row.keyword === "string" && row.keyword.length > 0)
     .map((row) => row.keyword);
 }
 
-export async function readFilmingPlaces(db: D1Database, limit = 80) {
-  const rows = await db
-    .prepare(
-      `SELECT cp.label, count(DISTINCT tp.title_id) AS titles
+export async function readFilmingPlaces(db: Database, limit = 80) {
+  const rows = await db.query<{ label: string; titles: number }>(
+    `SELECT cp.label, count(DISTINCT tp.title_id) AS titles
        FROM catalog_title_places AS tp
        JOIN catalog_places AS cp ON cp.entity_id = tp.place_id
        WHERE tp.kind = 'filming'
        GROUP BY cp.label
        HAVING titles >= 4
        ORDER BY titles DESC
-       LIMIT ?`,
-    )
-    .bind(clamp(limit, 1, 300))
-    .all<{ label: string; titles: number }>();
+       LIMIT $1`,
+    [clamp(limit, 1, 300)],
+  );
 
-  return rows.results.map((row) => row.label);
+  return rows.rows.map((row) => row.label);
 }

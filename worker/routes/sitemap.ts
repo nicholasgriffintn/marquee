@@ -60,10 +60,8 @@ function served(body: string, contentType = "application/xml; charset=UTF-8") {
   });
 }
 
-async function countTitles(db: D1Database) {
-  const row = await db
-    .prepare("SELECT COUNT(*) AS total FROM catalog_titles")
-    .first<{ total: number }>();
+async function countTitles(db: Database) {
+  const row = await db.first<{ total: number }>("SELECT COUNT(*) AS total FROM catalog_titles");
 
   return row?.total ?? 0;
 }
@@ -138,11 +136,10 @@ function urlset(entries: string[]) {
 
 sitemapRoutes.get("/sitemap/people.xml", async (context) => {
   const origin = canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN);
-  const { results } = await context.env.DB.prepare(
-    `SELECT name FROM catalog_people WHERE titles > 0 ORDER BY titles DESC LIMIT ?1`,
-  )
-    .bind(PAGE_SIZE)
-    .all<{ name: string }>();
+  const { rows: results } = await context.env.DB.query<{ name: string }>(
+    `SELECT name FROM catalog_people WHERE titles > 0 ORDER BY titles DESC LIMIT $1`,
+    [PAGE_SIZE],
+  );
 
   return urlset(
     results.map(
@@ -155,14 +152,13 @@ sitemapRoutes.get("/sitemap/people.xml", async (context) => {
 
 sitemapRoutes.get("/sitemap/collections.xml", async (context) => {
   const origin = canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN);
-  const { results } = await context.env.DB.prepare(
+  const { rows: results } = await context.env.DB.query<{ id: number }>(
     `SELECT DISTINCT collection_id AS id
        FROM catalog_titles
       WHERE collection_id IS NOT NULL
-      LIMIT ?1`,
-  )
-    .bind(PAGE_SIZE)
-    .all<{ id: number }>();
+      LIMIT $1`,
+    [PAGE_SIZE],
+  );
 
   return urlset(
     results.map(
@@ -175,11 +171,10 @@ sitemapRoutes.get("/sitemap/collections.xml", async (context) => {
 
 sitemapRoutes.get("/sitemap/revival.xml", async (context) => {
   const origin = canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN);
-  const { results } = await context.env.DB.prepare(
-    `SELECT id, title FROM revival_works WHERE status = 'approved' LIMIT ?1`,
-  )
-    .bind(PAGE_SIZE)
-    .all<{ id: string; title: string }>();
+  const { rows: results } = await context.env.DB.query<{ id: string; title: string }>(
+    `SELECT id, title FROM revival_works WHERE status = 'approved' LIMIT $1`,
+    [PAGE_SIZE],
+  );
 
   return urlset(
     results.map(
@@ -199,14 +194,13 @@ sitemapRoutes.get("/sitemap/titles/:file", async (context) => {
   }
 
   const origin = canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN);
-  const { results } = await context.env.DB.prepare(
+  const { rows: results } = await context.env.DB.query<TitleRow>(
     `SELECT media_type, tmdb_id, title, updated_at
        FROM catalog_titles
       ORDER BY popularity DESC, id
-      LIMIT ?1 OFFSET ?2`,
-  )
-    .bind(PAGE_SIZE, (page - 1) * PAGE_SIZE)
-    .all<TitleRow>();
+      LIMIT $1 OFFSET $2`,
+    [PAGE_SIZE, (page - 1) * PAGE_SIZE],
+  );
 
   if (results.length === 0) {
     return missing();

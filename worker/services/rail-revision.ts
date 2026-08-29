@@ -12,29 +12,27 @@ type RevisionRow = {
   beliefs: string | null;
 };
 
-export async function readRailRevision(db: D1Database, viewerId: string) {
+export async function readRailRevision(db: Database, viewerId: string) {
   try {
-    const row = await db
-      .prepare(
-        `SELECT
+    const row = await db.first<RevisionRow>(
+      `SELECT
            (SELECT count(*) || ':' || coalesce(max(updated_at), '')
-              FROM viewing_entries WHERE viewer_id = ?1) AS shelf,
+              FROM viewing_entries WHERE viewer_id = $1) AS shelf,
            (SELECT count(*) || ':' || coalesce(max(created_at), '')
-              FROM rail_feedback WHERE viewer_id = ?1) AS feedback,
+              FROM rail_feedback WHERE viewer_id = $1) AS feedback,
            (SELECT count(*) || ':' || coalesce(max(created_at), '')
               FROM viewer_signals
-             WHERE viewer_id = ?1
-               AND (expires_at IS NULL OR expires_at > datetime('now'))) AS signals,
+             WHERE viewer_id = $1
+               AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)) AS signals,
            (SELECT count(*) || ':' || coalesce(max(answered_at), '')
-              FROM viewer_answers WHERE viewer_id = ?1) AS answers,
+              FROM viewer_answers WHERE viewer_id = $1) AS answers,
            (SELECT selected_provider_ids || ':' || updated_at
-              FROM viewer_preferences WHERE viewer_id = ?1) AS providers,
+              FROM viewer_preferences WHERE viewer_id = $1) AS providers,
            (SELECT count(*) || ':' || coalesce(max(updated_at), '')
               FROM viewer_beliefs
-             WHERE viewer_id = ?1 AND revoked_at IS NULL) AS beliefs`,
-      )
-      .bind(viewerId)
-      .first<RevisionRow>();
+             WHERE viewer_id = $1 AND revoked_at IS NULL) AS beliefs`,
+      [viewerId],
+    );
     const parts = [
       row?.shelf ?? "",
       row?.feedback ?? "",

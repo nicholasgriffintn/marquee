@@ -43,19 +43,18 @@ export type Digest = {
 
 async function weekNumbers(env: Bindings, viewerId: string): Promise<DigestNumbers> {
   const [shelf, catalogue] = await Promise.all([
-    env.DB.prepare(
+    env.DB.first<{ added: number; finished: number; shelved: number }>(
       `SELECT
-         sum(CASE WHEN created_at >= datetime('now', '-7 days') THEN 1 ELSE 0 END) AS added,
+         sum(CASE WHEN created_at >= (CURRENT_TIMESTAMP - INTERVAL '7 day') THEN 1 ELSE 0 END) AS added,
          sum(CASE WHEN status = 'watched'
-                   AND updated_at >= datetime('now', '-7 days') THEN 1 ELSE 0 END) AS finished,
+                   AND updated_at >= (CURRENT_TIMESTAMP - INTERVAL '7 day') THEN 1 ELSE 0 END) AS finished,
          count(*) AS shelved
-       FROM viewing_entries WHERE viewer_id = ?`,
-    )
-      .bind(viewerId)
-      .first<{ added: number; finished: number; shelved: number }>(),
-    env.DB.prepare(`SELECT count(*) AS catalogue FROM catalog_titles`).first<{
+       FROM viewing_entries WHERE viewer_id = $1`,
+      [viewerId],
+    ),
+    env.DB.first<{
       catalogue: number;
-    }>(),
+    }>(`SELECT count(*) AS catalogue FROM catalog_titles`),
   ]);
 
   return {
@@ -179,15 +178,14 @@ export async function buildDigest(env: Bindings, viewerId: string) {
 
   await decision.settle("served");
 
-  await env.DB.prepare(
+  await env.DB.execute(
     `INSERT INTO viewer_digests (viewer_id, payload)
-     VALUES (?, ?)
+     VALUES ($1, $2)
      ON CONFLICT(viewer_id) DO UPDATE SET
        payload = excluded.payload,
        created_at = CURRENT_TIMESTAMP`,
-  )
-    .bind(viewerId, JSON.stringify(digest))
-    .run();
+    [viewerId, JSON.stringify(digest)],
+  );
 
   logEvent("digest_built", {
     fresh: fresh.titleIds.length,
@@ -198,9 +196,10 @@ export async function buildDigest(env: Bindings, viewerId: string) {
 }
 
 export async function readDigest(env: Bindings, viewerId: string) {
-  const row = await env.DB.prepare(`SELECT payload FROM viewer_digests WHERE viewer_id = ?`)
-    .bind(viewerId)
-    .first<{ payload: string }>();
+  const row = await env.DB.first<{ payload: string }>(
+    `SELECT payload FROM viewer_digests WHERE viewer_id = $1`,
+    [viewerId],
+  );
 
   if (!row) {
     return null;
@@ -268,16 +267,15 @@ export async function viewersWithShelves(env: Bindings) {
 
   for (let page = 0; ; page += 1) {
     // oxlint-disable-next-line no-await-in-loop
-    const rows = await env.DB.prepare(
-      `SELECT DISTINCT viewer_id AS viewerId FROM viewing_entries
-        ORDER BY viewer_id LIMIT ?1 OFFSET ?2`,
-    )
-      .bind(VIEWER_PAGE, page * VIEWER_PAGE)
-      .all<{ viewerId: string }>();
+    const rows = await env.DB.query<{ viewerId: string }>(
+      `SELECT DISTINCT viewer_id AS "viewerId" FROM viewing_entries
+        ORDER BY viewer_id LIMIT $1 OFFSET $2`,
+      [VIEWER_PAGE, page * VIEWER_PAGE],
+    );
 
-    viewers.push(...rows.results.map((row) => row.viewerId));
+    viewers.push(...rows.rows.map((row) => row.viewerId));
 
-    if (rows.results.length < VIEWER_PAGE || page > 40) {
+    if (rows.rows.length < VIEWER_PAGE || page > 40) {
       break;
     }
   }

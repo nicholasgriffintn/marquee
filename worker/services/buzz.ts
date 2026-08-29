@@ -73,30 +73,29 @@ function toBuzz(row: BuzzReadRow): TitleBuzz {
 }
 
 async function candidates(env: Bindings) {
-  const rows = await env.DB.prepare(
-    `SELECT t.id AS titleId, t.title, t.original_title AS originalTitle, t.year,
-            t.media_type AS mediaType, t.tmdb_id AS tmdbId, b.article, b.source
+  const rows = await env.DB.query<{
+    titleId: string;
+    title: string;
+    originalTitle: string | null;
+    year: number | null;
+    mediaType: MediaType;
+    tmdbId: number;
+    article: string | null;
+    source: string | null;
+  }>(
+    `SELECT t.id AS "titleId", t.title, t.original_title AS "originalTitle", t.year,
+            t.media_type AS "mediaType", t.tmdb_id AS "tmdbId", b.article, b.source
      FROM catalog_titles AS t
      LEFT JOIN title_buzz AS b ON b.title_id = t.id
      WHERE b.title_id IS NULL
-        OR (b.article <> '' AND b.measured_at < datetime('now', ?))
-        OR (b.article = '' AND b.measured_at < datetime('now', ?))
+        OR (b.article <> '' AND b.measured_at < (CURRENT_TIMESTAMP + CAST($1 AS INTERVAL)))
+        OR (b.article = '' AND b.measured_at < (CURRENT_TIMESTAMP + CAST($2 AS INTERVAL)))
      ORDER BY t.popularity DESC
-     LIMIT ?`,
-  )
-    .bind(`-${REFRESH_DAYS} days`, `-${RETRY_DAYS} days`, SAMPLE_SIZE)
-    .all<{
-      titleId: string;
-      title: string;
-      originalTitle: string | null;
-      year: number | null;
-      mediaType: MediaType;
-      tmdbId: number;
-      article: string | null;
-      source: string | null;
-    }>();
+     LIMIT $3`,
+    [`-${REFRESH_DAYS} days`, `-${RETRY_DAYS} days`, SAMPLE_SIZE],
+  );
 
-  return rows.results.map((row): BuzzCandidate => ({
+  return rows.rows.map((row): BuzzCandidate => ({
     titleId: row.titleId,
     title: row.title,
     originalTitle: row.originalTitle,
@@ -178,18 +177,25 @@ async function measure(
 }
 
 async function storeEntityIds(env: Bindings, entities: Map<string, TitleEntity>) {
-  const updates = [...entities].map(([titleId, entity]) =>
-    env.DB.prepare(
-      `UPDATE catalog_titles SET wikidata_id = ? WHERE id = ? AND wikidata_id IS NULL`,
-    ).bind(entity.entityId, titleId),
-  );
+  const updates = [...entities];
   let written = 0;
 
   for (let index = 0; index < updates.length; index += 50) {
     // oxlint-disable-next-line no-await-in-loop
-    const results = await env.DB.batch(updates.slice(index, index + 50));
+    written += await env.DB.transaction(async (transaction) => {
+      let waveWritten = 0;
 
-    written += results.reduce((total, result) => total + result.meta.changes, 0);
+      for (const [titleId, entity] of updates.slice(index, index + 50)) {
+        const result = await transaction.execute(
+          `UPDATE catalog_titles SET wikidata_id = $1 WHERE id = $2 AND wikidata_id IS NULL`,
+          [entity.entityId, titleId],
+        );
+
+        waveWritten += result.rowCount;
+      }
+
+      return waveWritten;
+    });
   }
 
   return written;
@@ -236,13 +242,13 @@ export async function syncBuzz(env: Bindings) {
 
   for (let index = 0; index < measured.length; index += 50) {
     // oxlint-disable-next-line no-await-in-loop
-    await env.DB.batch(
-      measured.slice(index, index + 50).map((row) =>
-        env.DB.prepare(
+    await env.DB.transaction(async (transaction) => {
+      for (const row of measured.slice(index, index + 50)) {
+        await transaction.execute(
           `INSERT INTO title_buzz
              (title_id, article, source, views, previous_views, delta, score, measured_at,
               world_views, world_previous_views, world_score)
-           VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP, $8, $9, $10)
            ON CONFLICT(title_id) DO UPDATE SET
              article = excluded.article,
              source = excluded.source,
@@ -254,20 +260,21 @@ export async function syncBuzz(env: Bindings) {
              world_views = excluded.world_views,
              world_previous_views = excluded.world_previous_views,
              world_score = excluded.world_score`,
-        ).bind(
-          row.titleId,
-          row.article,
-          row.match,
-          row.views,
-          row.previousViews,
-          (row.views - row.previousViews) / Math.max(1, row.previousViews),
-          buzzScore(row.views, row.previousViews),
-          row.views,
-          row.previousViews,
-          buzzScore(row.views, row.previousViews),
-        ),
-      ),
-    );
+          [
+            row.titleId,
+            row.article,
+            row.match,
+            row.views,
+            row.previousViews,
+            (row.views - row.previousViews) / Math.max(1, row.previousViews),
+            buzzScore(row.views, row.previousViews),
+            row.views,
+            row.previousViews,
+            buzzScore(row.views, row.previousViews),
+          ],
+        );
+      }
+    });
   }
 
   const expanded = await syncWorldBoard(env).catch((error: unknown) => {
@@ -297,35 +304,32 @@ export async function buzzBoosts(env: Bindings, titleIds: string[]) {
     return new Map<string, number>();
   }
 
-  const rows = await env.DB.prepare(
-    `SELECT title_id AS titleId, delta
+  const rows = await env.DB.query<{ titleId: string; delta: number }>(
+    `SELECT title_id AS "titleId", delta
      FROM title_buzz
-     WHERE title_id IN (SELECT value FROM json_each(?))`,
-  )
-    .bind(JSON.stringify(unique))
-    .all<{ titleId: string; delta: number }>();
+     WHERE title_id IN (SELECT value FROM jsonb_array_elements_text(CAST($1 AS jsonb)) AS entries(value))`,
+    [JSON.stringify(unique)],
+  );
 
-  return new Map(rows.results.map((row) => [row.titleId, clamp(row.delta, 0, MAX_BOOST) * 0.15]));
+  return new Map(rows.rows.map((row) => [row.titleId, clamp(row.delta, 0, MAX_BOOST) * 0.15]));
 }
 
-export async function readBuzz(db: D1Database, titleIds: string[]) {
+export async function readBuzz(db: Database, titleIds: string[]) {
   const unique = [...new Set(titleIds)].slice(0, 400);
 
   if (unique.length === 0) {
     return new Map<string, TitleBuzz>();
   }
 
-  const rows = await db
-    .prepare(
-      `SELECT title_id AS titleId, article, source, views, previous_views AS previousViews,
-              delta, score, measured_at AS measuredAt
+  const rows = await db.query<BuzzReadRow>(
+    `SELECT title_id AS "titleId", article, source, views, previous_views AS "previousViews",
+              delta, score, measured_at AS "measuredAt"
        FROM title_buzz
-       WHERE article <> '' AND views > 0 AND title_id IN (SELECT value FROM json_each(?))`,
-    )
-    .bind(JSON.stringify(unique))
-    .all<BuzzReadRow>();
+       WHERE article <> '' AND views > 0 AND title_id IN (SELECT value FROM jsonb_array_elements_text(CAST($1 AS jsonb)) AS entries(value))`,
+    [JSON.stringify(unique)],
+  );
 
-  return new Map(rows.results.map((row) => [row.titleId, toBuzz(row)]));
+  return new Map(rows.rows.map((row) => [row.titleId, toBuzz(row)]));
 }
 
 export function applyBuzz<Item extends MediaTitle>(items: Item[], buzz: Map<string, TitleBuzz>) {
@@ -337,20 +341,19 @@ export function applyBuzz<Item extends MediaTitle>(items: Item[], buzz: Map<stri
 }
 
 export async function readTrendingBuzz(env: Bindings, limit = 20) {
-  const rows = await env.DB.prepare(
-    `SELECT b.title_id AS titleId, b.article, b.source, b.views,
-            b.previous_views AS previousViews, b.delta, b.score, b.measured_at AS measuredAt
+  const rows = await env.DB.query<BuzzReadRow>(
+    `SELECT b.title_id AS "titleId", b.article, b.source, b.views,
+            b.previous_views AS "previousViews", b.delta, b.score, b.measured_at AS "measuredAt"
      FROM title_buzz AS b
      JOIN catalog_titles AS t ON t.id = b.title_id
      WHERE b.article <> '' AND b.views >= ${MIN_TRENDING_VIEWS}
        AND max(b.world_score, b.score) > 0
      ORDER BY max(b.world_score, b.score) DESC
-     LIMIT ?`,
-  )
-    .bind(clamp(limit, 1, 60))
-    .all<BuzzReadRow>();
+     LIMIT $1`,
+    [clamp(limit, 1, 60)],
+  );
 
-  return rows.results.map((row) => ({ titleId: row.titleId, buzz: toBuzz(row) }));
+  return rows.rows.map((row) => ({ titleId: row.titleId, buzz: toBuzz(row) }));
 }
 
 export async function readTrending(env: Bindings, limit = 20) {

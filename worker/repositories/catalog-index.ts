@@ -13,12 +13,12 @@ export type SearchIndexState = {
 const PROJECT_CHUNK = 100;
 
 const TAGS = `trim(
-  COALESCE((SELECT group_concat(genre, ' ') FROM catalog_title_genres WHERE title_id = t.id), '')
+  COALESCE((SELECT string_agg(genre, ' ' ORDER BY position) FROM catalog_title_genres WHERE title_id = t.id), '')
   || ' ' ||
-  COALESCE((SELECT group_concat(keyword, ' ') FROM catalog_title_keywords WHERE title_id = t.id), '')
+  COALESCE((SELECT string_agg(keyword, ' ' ORDER BY position) FROM catalog_title_keywords WHERE title_id = t.id), '')
 )`;
 
-const PEOPLE = `COALESCE((SELECT group_concat(person, ' ') FROM catalog_title_people WHERE title_id = t.id), '')`;
+const PEOPLE = `COALESCE((SELECT string_agg(person, ' ' ORDER BY position) FROM catalog_title_people WHERE title_id = t.id), '')`;
 
 function chunk(ids: string[]) {
   const waves: string[][] = [];
@@ -34,7 +34,7 @@ function knownTitleIds(titleIds: string[]) {
   return [...new Set(titleIds.filter(isKnownTitle))];
 }
 
-export function markTitlesForIndexing(db: D1Database, titleIds: string[], reason: IndexReason) {
+export function markTitlesForIndexing(db: Database, titleIds: string[], reason: IndexReason) {
   const unique = knownTitleIds(titleIds);
 
   if (unique.length === 0) {
@@ -43,97 +43,93 @@ export function markTitlesForIndexing(db: D1Database, titleIds: string[], reason
 
   return Promise.all(
     chunk(unique).map((wave) =>
-      db
-        .prepare(
-          `INSERT INTO catalog_index_pending (title_id, reason)
-           SELECT value, ?2 FROM json_each(?1)
+      db.execute(
+        `INSERT INTO catalog_index_pending (title_id, reason)
+           SELECT value, $2
+           FROM jsonb_array_elements_text(CAST($1 AS jsonb)) AS entries(value)
            WHERE true
            ON CONFLICT(title_id) DO NOTHING`,
-        )
-        .bind(JSON.stringify(wave), reason)
-        .run(),
+        [JSON.stringify(wave), reason],
+      ),
     ),
   ).then(() => undefined);
 }
 
 // The projection is rebuilt rather than patched: extension rows are written by their own
 // repositories, so the only reliable snapshot is the one taken at reconciliation time.
-export async function projectTitles(db: D1Database, titleIds: string[]) {
+export async function projectTitles(db: Database, titleIds: string[]) {
   const unique = knownTitleIds(titleIds);
 
   for (const wave of chunk(unique)) {
     const ids = JSON.stringify(wave);
 
     // oxlint-disable-next-line no-await-in-loop
-    await db.batch([
-      db
-        .prepare(
+    await db.transaction(async (transaction) => {
+      const results = [];
+
+      results.push(
+        await transaction.execute(
           `DELETE FROM catalog_search
-           WHERE rowid IN (
-             SELECT rowid FROM catalog_titles WHERE id IN (SELECT value FROM json_each(?1))
+           WHERE title_id IN (
+             SELECT value FROM jsonb_array_elements_text(CAST($1 AS jsonb)) AS entries(value)
            )`,
-        )
-        .bind(ids),
-      db
-        .prepare(
-          `INSERT INTO catalog_search (rowid, title, original_title, overview, tags, people, title_id)
-           SELECT t.rowid, t.title, t.original_title, t.overview, ${TAGS}, ${PEOPLE}, t.id
+          [ids],
+        ),
+      );
+      results.push(
+        await transaction.execute(
+          `INSERT INTO catalog_search (title, original_title, overview, tags, people, title_id)
+           SELECT t.title, t.original_title, t.overview, ${TAGS}, ${PEOPLE}, t.id
            FROM catalog_titles AS t
-           WHERE t.id IN (SELECT value FROM json_each(?1))`,
-        )
-        .bind(ids),
-      db
-        .prepare(
-          `DELETE FROM catalog_index_pending WHERE title_id IN (SELECT value FROM json_each(?1))`,
-        )
-        .bind(ids),
-    ]);
+           WHERE t.id IN (SELECT value FROM jsonb_array_elements_text(CAST($1 AS jsonb)) AS entries(value))`,
+          [ids],
+        ),
+      );
+      results.push(
+        await transaction.execute(
+          `DELETE FROM catalog_index_pending WHERE title_id IN (SELECT value FROM jsonb_array_elements_text(CAST($1 AS jsonb)) AS entries(value))`,
+          [ids],
+        ),
+      );
+
+      return results;
+    });
   }
 
   return unique.length;
 }
 
-export async function takePendingTitles(db: D1Database, limit: number) {
-  const rows = await db
-    .prepare(
-      `SELECT title_id AS titleId
+export async function takePendingTitles(db: Database, limit: number) {
+  const rows = await db.query<{ titleId: string }>(
+    `SELECT title_id AS "titleId"
        FROM catalog_index_pending
        ORDER BY queued_at
-       LIMIT ?`,
-    )
-    .bind(clamp(Math.trunc(limit), 1, 20_000))
-    .all<{ titleId: string }>();
+       LIMIT $1`,
+    [clamp(Math.trunc(limit), 1, 20_000)],
+  );
 
-  return rows.results.map((row) => row.titleId);
+  return rows.rows.map((row) => row.titleId);
 }
 
-export async function queueSearchRebuild(db: D1Database) {
-  await db
-    .prepare(
-      `INSERT INTO catalog_index_pending (title_id, reason)
+export async function queueSearchRebuild(db: Database) {
+  await db.execute(`INSERT INTO catalog_index_pending (title_id, reason)
        SELECT id, 'rebuild' FROM catalog_titles
        WHERE true
-       ON CONFLICT(title_id) DO NOTHING`,
-    )
-    .run();
+       ON CONFLICT(title_id) DO NOTHING`);
 
-  const row = await db
-    .prepare(`SELECT count(*) AS pending FROM catalog_index_pending`)
-    .first<{ pending: number }>();
+  const row = await db.first<{ pending: number }>(
+    `SELECT count(*) AS pending FROM catalog_index_pending`,
+  );
 
   return row?.pending ?? 0;
 }
 
-export async function readSearchIndexState(db: D1Database): Promise<SearchIndexState> {
-  const row = await db
-    .prepare(
-      `SELECT
+export async function readSearchIndexState(db: Database): Promise<SearchIndexState> {
+  const row = await db.first<SearchIndexState>(`SELECT
          (SELECT count(*) FROM catalog_titles) AS titles,
          (SELECT count(*) FROM catalog_search) AS indexed,
          (SELECT count(*) FROM catalog_index_pending) AS pending,
-         (SELECT min(queued_at) FROM catalog_index_pending) AS oldestPendingAt`,
-    )
-    .first<SearchIndexState>();
+         (SELECT min(queued_at) FROM catalog_index_pending) AS "oldestPendingAt"`);
 
   return {
     titles: row?.titles ?? 0,

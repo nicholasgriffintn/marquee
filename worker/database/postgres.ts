@@ -1,12 +1,6 @@
-import { Pool, types, type PoolClient, type QueryResultRow } from "pg";
+import { Client, types } from "pg";
 
-import { compileQuery } from "./query.ts";
-import type {
-  Database,
-  DatabaseResult,
-  DatabaseTransaction,
-  DatabaseValue,
-} from "./types.ts";
+import type { Database, DatabaseResult, DatabaseTransaction, DatabaseValue } from "./types.ts";
 
 const POSTGRES_BIGINT = 20;
 const POSTGRES_DATE = 1082;
@@ -18,29 +12,23 @@ types.setTypeParser(POSTGRES_DATE, (value) => value);
 types.setTypeParser(POSTGRES_TIMESTAMP, (value) => value);
 types.setTypeParser(POSTGRES_TIMESTAMPTZ, (value) => value);
 
-type Queryable = Pick<Pool, "query"> | PoolClient;
-
 class PostgresTransaction implements DatabaseTransaction {
-  readonly #queryable: Queryable;
+  readonly #client: Client;
 
-  constructor(queryable: Queryable) {
-    this.#queryable = queryable;
+  constructor(client: Client) {
+    this.#client = client;
   }
 
-  async query<T extends QueryResultRow = Record<string, unknown>>(
+  async query<T extends object = Record<string, unknown>>(
     sql: string,
     values: DatabaseValue[] = [],
   ) {
-    const compiled = compileQuery(sql);
+    const result = await this.#client.query(sql, values);
 
-    validateParameters(compiled.parameterCount, values.length);
-
-    const result = await this.#queryable.query<T>(compiled.text, values);
-
-    return toResult(result.rows, result.rowCount);
+    return toResult<T>(result.rows, result.rowCount);
   }
 
-  async first<T extends QueryResultRow = Record<string, unknown>>(
+  async first<T extends object = Record<string, unknown>>(
     sql: string,
     values: DatabaseValue[] = [],
   ) {
@@ -49,60 +37,47 @@ class PostgresTransaction implements DatabaseTransaction {
     return result.rows[0] ?? null;
   }
 
-  execute<T extends QueryResultRow = Record<string, unknown>>(
-    sql: string,
-    values: DatabaseValue[] = [],
-  ) {
+  execute<T extends object = Record<string, unknown>>(sql: string, values: DatabaseValue[] = []) {
     return this.query<T>(sql, values);
   }
 }
 
 export class PostgresDatabase extends PostgresTransaction implements Database {
-  readonly #pool: Pool;
+  readonly #client: Client;
 
-  constructor(connectionString: string) {
-    const pool = new Pool({ connectionString, max: 5 });
+  private constructor(client: Client) {
+    super(client);
+    this.#client = client;
+  }
 
-    super(pool);
-    this.#pool = pool;
+  static async connect(connectionString: string) {
+    const client = new Client({ connectionString });
+
+    await client.connect();
+
+    return new PostgresDatabase(client);
   }
 
   async transaction<T>(operation: (transaction: DatabaseTransaction) => Promise<T>) {
-    const client = await this.#pool.connect();
-
     try {
-      await client.query("BEGIN");
+      await this.#client.query("BEGIN");
 
-      const result = await operation(new PostgresTransaction(client));
+      const result = await operation(new PostgresTransaction(this.#client));
 
-      await client.query("COMMIT");
+      await this.#client.query("COMMIT");
 
       return result;
     } catch (error) {
-      await client.query("ROLLBACK");
+      await this.#client.query("ROLLBACK");
       throw error;
-    } finally {
-      client.release();
     }
   }
 
   close() {
-    return this.#pool.end();
+    return this.#client.end();
   }
 }
 
-function toResult<T extends Record<string, unknown>>(
-  rows: T[],
-  rowCount: number | null,
-): DatabaseResult<T> {
-  return {
-    rows,
-    rowCount: rowCount ?? 0,
-  };
-}
-
-function validateParameters(expected: number, received: number) {
-  if (expected !== received) {
-    throw new Error(`SQL statement expects ${expected} values, received ${received}`);
-  }
+function toResult<T extends object>(rows: T[], rowCount: number | null): DatabaseResult<T> {
+  return { rows, rowCount: rowCount ?? 0 };
 }

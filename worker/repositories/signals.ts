@@ -52,19 +52,17 @@ function expiryFor(days: number | undefined) {
   return new Date(Date.now() + days * 86_400_000).toISOString();
 }
 
-export async function recordSignal(db: D1Database, viewerId: string, signal: Signal) {
+export async function recordSignal(db: Database, viewerId: string, signal: Signal) {
   if (!viewerId) {
     return;
   }
 
   try {
-    await db
-      .prepare(
-        `INSERT INTO viewer_signals
+    await db.execute(
+      `INSERT INTO viewer_signals
            (id, viewer_id, type, title_id, journey_id, decision_id, context, weight, expires_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)`,
-      )
-      .bind(
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [
         crypto.randomUUID(),
         viewerId,
         signal.type,
@@ -74,15 +72,15 @@ export async function recordSignal(db: D1Database, viewerId: string, signal: Sig
         JSON.stringify(signal.context ?? {}).slice(0, CONTEXT_LIMIT),
         signal.weight ?? 1,
         expiryFor(signal.expiresInDays),
-      )
-      .run();
+      ],
+    );
   } catch (error) {
     logError("signal_write_failed", error, { type: signal.type });
   }
 }
 
 export async function readSignals(
-  db: D1Database,
+  db: Database,
   viewerId: string,
   types: SignalType[],
   limit = 200,
@@ -92,20 +90,18 @@ export async function readSignals(
   }
 
   try {
-    const rows = await db
-      .prepare(
-        `SELECT type, title_id, journey_id, decision_id, context, weight, created_at
+    const rows = await db.query<SignalRow>(
+      `SELECT type, title_id, journey_id, decision_id, context, weight, created_at
            FROM viewer_signals
-          WHERE viewer_id = ?1
-            AND type IN (${types.map(() => "?").join(",")})
-            AND (expires_at IS NULL OR julianday(expires_at) > julianday('now'))
+          WHERE viewer_id = $1
+            AND type IN (${types.map((_, index) => `$${index + 1}`).join(",")})
+            AND (expires_at IS NULL OR (EXTRACT(EPOCH FROM expires_at) / 86400.0) > (EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) / 86400.0))
           ORDER BY created_at DESC
           LIMIT ${clamp(limit, 1, 500)}`,
-      )
-      .bind(viewerId, ...types)
-      .all<SignalRow>();
+      [viewerId, ...types],
+    );
 
-    return rows.results.flatMap((row): StoredSignal[] => {
+    return rows.rows.flatMap((row): StoredSignal[] => {
       if (!isSignalType(row.type)) {
         return [];
       }
@@ -139,7 +135,7 @@ export async function readSignals(
   }
 }
 
-export async function readRefusals(db: D1Database, viewerId: string) {
+export async function readRefusals(db: Database, viewerId: string) {
   const signals = await readSignals(db, viewerId, ["rejection", "never"], 300);
   const titleIds = (type: SignalType) => [
     ...new Set(
@@ -153,18 +149,20 @@ export async function readRefusals(db: D1Database, viewerId: string) {
   return { never: titleIds("never"), rejected: titleIds("rejection") };
 }
 
-export async function recentExitFor(db: D1Database, viewerId: string, titleId: string, days = 45) {
+export async function recentExitFor(db: Database, viewerId: string, titleId: string, days = 45) {
   try {
-    const row = await db
-      .prepare(
-        `SELECT journey_id AS journeyId, decision_id AS decisionId, context
+    const row = await db.first<{
+      journeyId: string | null;
+      decisionId: string | null;
+      context: string;
+    }>(
+      `SELECT journey_id AS "journeyId", decision_id AS "decisionId", context
            FROM viewer_signals
-          WHERE viewer_id = ?1 AND title_id = ?2 AND type = 'provider_exit'
-            AND julianday(created_at) > julianday('now', ?3)
+          WHERE viewer_id = $1 AND title_id = $2 AND type = 'provider_exit'
+            AND (EXTRACT(EPOCH FROM created_at) / 86400.0) > (EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP + CAST($3 AS INTERVAL))) / 86400.0)
           ORDER BY created_at DESC LIMIT 1`,
-      )
-      .bind(viewerId, titleId, `-${days} days`)
-      .first<{ journeyId: string | null; decisionId: string | null; context: string }>();
+      [viewerId, titleId, `-${days} days`],
+    );
 
     if (!row) {
       return null;
@@ -185,14 +183,10 @@ export async function recentExitFor(db: D1Database, viewerId: string, titleId: s
   }
 }
 
-export async function pruneSignals(db: D1Database) {
+export async function pruneSignals(db: Database) {
   try {
-    await db
-      .prepare(
-        `DELETE FROM viewer_signals
-          WHERE expires_at IS NOT NULL AND julianday(expires_at) <= julianday('now')`,
-      )
-      .run();
+    await db.execute(`DELETE FROM viewer_signals
+          WHERE expires_at IS NOT NULL AND (EXTRACT(EPOCH FROM expires_at) / 86400.0) <= (EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) / 86400.0)`);
   } catch (error) {
     logError("signal_prune_failed", error);
   }

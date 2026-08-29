@@ -57,16 +57,15 @@ export async function queueAvailability(env: Bindings, titleIds: string[]) {
   }
 
   const unique = [...new Set(titleIds)];
-  const fresh = await env.DB.prepare(
-    `SELECT id AS titleId
+  const fresh = await env.DB.query<{ titleId: string }>(
+    `SELECT id AS "titleId"
      FROM catalog_titles
-     WHERE id IN (SELECT value FROM json_each(?))
+     WHERE id IN (SELECT value FROM jsonb_array_elements_text(CAST($1 AS jsonb)) AS entries(value))
        AND enriched_at IS NOT NULL
-       AND enriched_at > datetime('now', ?)`,
-  )
-    .bind(JSON.stringify(unique), `-${DEMAND_MAX_AGE_DAYS} days`)
-    .all<{ titleId: string }>();
-  const skip = new Set(fresh.results.map((row) => row.titleId));
+       AND enriched_at > (CURRENT_TIMESTAMP + CAST($2 AS INTERVAL))`,
+    [JSON.stringify(unique), `-${DEMAND_MAX_AGE_DAYS} days`],
+  );
+  const skip = new Set(fresh.rows.map((row) => row.titleId));
 
   await enqueue(
     env.AVAILABILITY_QUEUE,

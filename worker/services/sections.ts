@@ -66,31 +66,28 @@ async function pick(
   used: Set<string>,
   where: string,
   order: string,
-  bindings: unknown[] = [],
+  bindings: DatabaseValue[] = [],
 ) {
-  const rows = await env.DB.prepare(
+  const rows = await env.DB.query<{ id: string }>(
     `SELECT id FROM catalog_titles WHERE ${where} ORDER BY ${order} LIMIT ${OVERFETCH}`,
-  )
-    .bind(...bindings)
-    .all<{ id: string }>();
+    [...bindings],
+  );
 
-  return rows.results
+  return rows.rows
     .map((row) => row.id)
     .filter((id) => isKnownTitle(id) && !used.has(id))
     .slice(0, POOL_SIZE);
 }
 
 async function scheduled(env: Bindings, used: Set<string>) {
-  const rows = await env.DB.prepare(
-    `SELECT DISTINCT s.title_id AS id
+  const rows = await env.DB.query<{ id: string }>(`SELECT DISTINCT s.title_id AS id
      FROM title_schedule AS s
      JOIN catalog_titles AS t ON t.id = s.title_id
-     WHERE s.airs_at BETWEEN datetime('now', '-6 hours') AND datetime('now', '+7 days')
+     WHERE s.airs_at BETWEEN (CURRENT_TIMESTAMP - INTERVAL '6 hour') AND (CURRENT_TIMESTAMP + INTERVAL '7 day')
      ORDER BY t.popularity DESC
-     LIMIT ${OVERFETCH}`,
-  ).all<{ id: string }>();
+     LIMIT ${OVERFETCH}`);
 
-  return rows.results
+  return rows.rows
     .map((row) => row.id)
     .filter((id) => isKnownTitle(id) && !used.has(id))
     .slice(0, POOL_SIZE);
@@ -98,16 +95,15 @@ async function scheduled(env: Bindings, used: Set<string>) {
 
 async function anniversaries(env: Bindings, used: Set<string>) {
   const query = anniversaryQuery(new Date());
-  const rows = await env.DB.prepare(
+  const rows = await env.DB.query<{ id: string; year: number }>(
     `SELECT id, year FROM catalog_titles
      WHERE ${query.where} AND ${SCORE} >= 6.2 AND ${VOTES} >= 60
      ORDER BY ${query.order}, ${SCORE} DESC
      LIMIT ${OVERFETCH}`,
-  )
-    .bind(...query.binds)
-    .all<{ id: string; year: number }>();
+    [...query.binds],
+  );
 
-  const picked = rows.results
+  const picked = rows.rows
     .filter((row) => isKnownTitle(row.id) && !used.has(row.id))
     .slice(0, POOL_SIZE);
 
@@ -124,24 +120,23 @@ async function topValues(
   minimum: number,
   limit: number,
 ) {
-  const rows = await env.DB.prepare(
+  const rows = await env.DB.query<{ value: unknown; uses: number }>(
     `SELECT ${column} AS value, count(*) AS uses
      FROM ${table}
      GROUP BY ${column}
-     HAVING uses >= ?
+     HAVING uses >= $1
      ORDER BY uses DESC
-     LIMIT ?`,
-  )
-    .bind(minimum, limit)
-    .all<{ value: unknown; uses: number }>();
+     LIMIT $2`,
+    [minimum, limit],
+  );
 
-  return rows.results
+  return rows.rows
     .map((row) => row.value)
     .filter((value): value is string => typeof value === "string" && value.length > 1);
 }
 
 async function topStudios(env: Bindings, limit: number): Promise<string[]> {
-  const rows = await env.DB.prepare(
+  const rows = await env.DB.query<{ value: string }>(
     `SELECT s.studio AS value, count(*) AS uses
      FROM catalog_title_studios AS s
      JOIN catalog_titles AS t ON t.id = s.title_id
@@ -149,12 +144,11 @@ async function topStudios(env: Bindings, limit: number): Promise<string[]> {
      GROUP BY s.studio
      HAVING uses BETWEEN 8 AND 400
      ORDER BY uses DESC
-     LIMIT ?`,
-  )
-    .bind(limit)
-    .all<{ value: string }>();
+     LIMIT $1`,
+    [limit],
+  );
 
-  return rows.results.map((row) => String(row.value)).filter((value) => value.length > 1);
+  return rows.rows.map((row) => String(row.value)).filter((value) => value.length > 1);
 }
 
 async function cachedFacet<T>(
@@ -163,11 +157,10 @@ async function cachedFacet<T>(
   generation: number,
   compute: () => Promise<T>,
 ): Promise<T> {
-  const cached = await env.DB.prepare(
-    `SELECT generation, payload FROM catalog_section_facet_cache WHERE kind = ?`,
-  )
-    .bind(kind)
-    .first<{ generation: number; payload: string }>();
+  const cached = await env.DB.first<{ generation: number; payload: string }>(
+    `SELECT generation, payload FROM catalog_section_facet_cache WHERE kind = $1`,
+    [kind],
+  );
 
   if (cached && cached.generation === generation) {
     return JSON.parse(cached.payload) as T;
@@ -175,16 +168,15 @@ async function cachedFacet<T>(
 
   const value = await compute();
 
-  await env.DB.prepare(
+  await env.DB.execute(
     `INSERT INTO catalog_section_facet_cache (kind, generation, payload, computed_at)
-     VALUES (?, ?, ?, ?)
+     VALUES ($1, $2, $3, $4)
      ON CONFLICT(kind) DO UPDATE SET
        generation = excluded.generation,
        payload = excluded.payload,
        computed_at = excluded.computed_at`,
-  )
-    .bind(kind, generation, JSON.stringify(value), new Date().toISOString())
-    .run();
+    [kind, generation, JSON.stringify(value), new Date().toISOString()],
+  );
 
   return value;
 }
@@ -192,19 +184,18 @@ async function cachedFacet<T>(
 const PROVIDER_NAMES = new Map(providerRegistry.map((provider) => [provider.id, provider.name]));
 
 async function topServices(env: Bindings, limit: number) {
-  const rows = await env.DB.prepare(
-    `SELECT provider_id AS providerId, count(DISTINCT title_id) AS uses
+  const rows = await env.DB.query<{ providerId: string; uses: number }>(
+    `SELECT provider_id AS "providerId", count(DISTINCT title_id) AS uses
      FROM catalog_title_provider_offers
      WHERE offer_type = 'Subscription'
      GROUP BY provider_id
      HAVING uses >= 40
      ORDER BY uses DESC
-     LIMIT ?`,
-  )
-    .bind(limit)
-    .all<{ providerId: string; uses: number }>();
+     LIMIT $1`,
+    [limit],
+  );
 
-  return rows.results.flatMap((row) => {
+  return rows.rows.flatMap((row) => {
     const name = PROVIDER_NAMES.get(row.providerId);
 
     return name ? [{ id: row.providerId, name }] : [];
@@ -250,7 +241,7 @@ export async function buildSections(env: Bindings) {
     id: "fresh",
     title: "New this year",
     description: `Released in ${year}, most talked about first`,
-    titleIds: await pick(env, used, `year >= ? AND ${VOTES} >= 40`, "popularity DESC", [year]),
+    titleIds: await pick(env, used, `year >= $1 AND ${VOTES} >= 40`, "popularity DESC", [year]),
   });
 
   const anniversary = await anniversaries(env, used);
@@ -317,7 +308,7 @@ export async function buildSections(env: Bindings) {
     titleIds: await pick(
       env,
       used,
-      `id IN (SELECT title_id FROM title_visual_format WHERE kind = 'colour' AND value = ?)
+      `id IN (SELECT title_id FROM title_visual_format WHERE kind = 'colour' AND value = $1)
        AND ${SCORE} >= 6.5 AND ${VOTES} >= 60`,
       `${SCORE} DESC`,
       [BLACK_AND_WHITE],
@@ -331,7 +322,7 @@ export async function buildSections(env: Bindings) {
     titleIds: await pick(
       env,
       used,
-      `id IN (SELECT title_id FROM title_visual_format WHERE kind = 'aspect_ratio' AND value = ?)
+      `id IN (SELECT title_id FROM title_visual_format WHERE kind = 'aspect_ratio' AND value = $1)
        AND ${VOTES} >= 40`,
       `${SCORE} DESC`,
       [ACADEMY_RATIO],
@@ -457,9 +448,9 @@ export async function buildSections(env: Bindings) {
        AND EXISTS (
          SELECT 1 FROM title_provider_state AS state
           WHERE state.title_id = catalog_titles.id
-            AND state.provider_id = ?
+            AND state.provider_id = $1
             AND state.offer_kind = 'streaming'
-            AND julianday(state.first_seen_at) > julianday('now', '-45 days')
+            AND (EXTRACT(EPOCH FROM state.first_seen_at) / 86400.0) > (EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - INTERVAL '45 day')) / 86400.0)
        )`,
       "popularity DESC",
       [service.id],
@@ -479,7 +470,7 @@ export async function buildSections(env: Bindings) {
       used,
       `${SCORE} >= 6.8 AND ${VOTES} >= 120
        AND EXISTS (SELECT 1 FROM catalog_title_providers
-                   WHERE title_id = catalog_titles.id AND provider_id = ?)`,
+                   WHERE title_id = catalog_titles.id AND provider_id = $1)`,
       "popularity DESC",
       [service.id],
     );
@@ -502,7 +493,7 @@ export async function buildSections(env: Bindings) {
       used,
       `${SCORE} >= 6.8 AND ${VOTES} >= 100
        AND EXISTS (SELECT 1 FROM catalog_title_studios
-                   WHERE title_id = catalog_titles.id AND studio = ?)`,
+                   WHERE title_id = catalog_titles.id AND studio = $1)`,
       `${SCORE} DESC`,
       [studio],
     );
@@ -526,7 +517,7 @@ export async function buildSections(env: Bindings) {
       used,
       `${SCORE} >= 6.8 AND ${VOTES} >= 200
        AND EXISTS (SELECT 1 FROM catalog_title_genres
-                   WHERE title_id = catalog_titles.id AND genre = ?)`,
+                   WHERE title_id = catalog_titles.id AND genre = $1)`,
       "popularity DESC",
       [genre],
     );
@@ -552,7 +543,7 @@ export async function buildSections(env: Bindings) {
       used,
       `${SCORE} >= 6.5 AND ${VOTES} >= 120
        AND EXISTS (SELECT 1 FROM catalog_title_keywords
-                   WHERE title_id = catalog_titles.id AND keyword = ?)`,
+                   WHERE title_id = catalog_titles.id AND keyword = $1)`,
       `${SCORE} DESC`,
       [mood],
     );
@@ -574,23 +565,25 @@ export async function buildSections(env: Bindings) {
   const chosen = sections.slice(0, MAX_SECTIONS);
   const fetchedAt = new Date().toISOString();
 
-  await env.DB.batch([
-    env.DB.prepare(`DELETE FROM catalog_sections`),
-    ...chosen.map((section) =>
-      env.DB.prepare(
+  await env.DB.transaction(async (transaction) => {
+    await transaction.execute(`DELETE FROM catalog_sections`);
+
+    for (const section of chosen) {
+      await transaction.execute(
         `INSERT INTO catalog_sections
            (id, title, description, title_ids, source_updated_at, audience)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-      ).bind(
-        section.id,
-        section.title,
-        section.description,
-        JSON.stringify(section.titleIds),
-        fetchedAt,
-        JSON.stringify(section.audience ?? {}),
-      ),
-    ),
-  ]);
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          section.id,
+          section.title,
+          section.description,
+          JSON.stringify(section.titleIds),
+          fetchedAt,
+          JSON.stringify(section.audience ?? {}),
+        ],
+      );
+    }
+  });
 
   logEvent("sections_built", {
     sections: chosen.length,

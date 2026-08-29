@@ -41,24 +41,23 @@ function languagesFor(candidate: Candidate) {
 }
 
 async function candidates(env: Bindings) {
-  const rows = await env.DB.prepare(
-    `SELECT b.title_id AS titleId, t.wikidata_id AS entityId,
-            t.original_language AS originalLanguage
+  const rows = await env.DB.query<Candidate>(
+    `SELECT b.title_id AS "titleId", t.wikidata_id AS "entityId",
+            t.original_language AS "originalLanguage"
      FROM title_buzz AS b
      JOIN catalog_titles AS t ON t.id = b.title_id
      WHERE b.article <> '' AND b.views >= ${MIN_TRENDING_VIEWS}
        AND t.wikidata_id IS NOT NULL
        AND NOT EXISTS (
          SELECT 1 FROM title_language_buzz AS l
-         WHERE l.title_id = b.title_id AND l.measured_at > datetime('now', ?1)
+         WHERE l.title_id = b.title_id AND l.measured_at > (CURRENT_TIMESTAMP + CAST($1 AS INTERVAL))
        )
      ORDER BY b.views DESC
-     LIMIT ?2`,
-  )
-    .bind(`-${REFRESH_DAYS} days`, SAMPLE_SIZE)
-    .all<Candidate>();
+     LIMIT $2`,
+    [`-${REFRESH_DAYS} days`, SAMPLE_SIZE],
+  );
 
-  return rows.results;
+  return rows.rows;
 }
 
 async function projectVolumes(env: Bindings, languages: string[]) {
@@ -169,7 +168,7 @@ export async function syncWorldBoard(env: Bindings) {
   const { readings, requested } = await measureAll(pending, sitelinks);
   const grouped = groupByTitle(readings);
   const rows: LanguageBuzzRow[] = [];
-  const updates: D1PreparedStatement[] = [];
+  const updates: { titleId: string; views: number; previousViews: number; score: number }[] = [];
 
   for (const candidate of pending) {
     const measured = grouped.get(candidate.titleId) ?? [];
@@ -187,18 +186,12 @@ export async function syncWorldBoard(env: Bindings) {
     }
 
     if (world.views > 0) {
-      updates.push(
-        env.DB.prepare(
-          `UPDATE title_buzz
-           SET world_views = ?, world_previous_views = ?, world_score = ?
-           WHERE title_id = ?`,
-        ).bind(
-          world.views,
-          world.previousViews,
-          buzzScore(world.views, world.previousViews),
-          candidate.titleId,
-        ),
-      );
+      updates.push({
+        titleId: candidate.titleId,
+        views: world.views,
+        previousViews: world.previousViews,
+        score: buzzScore(world.views, world.previousViews),
+      });
     }
   }
 
@@ -209,7 +202,16 @@ export async function syncWorldBoard(env: Bindings) {
   );
 
   if (updates.length > 0) {
-    await env.DB.batch(updates);
+    await env.DB.transaction(async (transaction) => {
+      for (const update of updates) {
+        await transaction.execute(
+          `UPDATE title_buzz
+           SET world_views = $1, world_previous_views = $2, world_score = $3
+           WHERE title_id = $4`,
+          [update.views, update.previousViews, update.score, update.titleId],
+        );
+      }
+    });
   }
 
   logEvent("world_board_synced", {

@@ -102,7 +102,7 @@ export async function syncAdaptations(env: Bindings) {
 }
 
 export async function getTitleAdaptations(
-  db: D1Database,
+  db: Database,
   titleId: string,
 ): Promise<TitleAdaptations> {
   if (!isKnownTitle(titleId)) {

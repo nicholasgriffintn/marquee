@@ -14,25 +14,23 @@ import type { OAuthStateRecord, OAuthStateStore } from "@ngriffin_uk/auth-oauth2
 import { boundedString, parseJson } from "../lib/values.ts";
 import { mapUser, type MarqueeUser, type UserRow } from "./model.ts";
 
-export function createD1Auth(db: D1Database) {
+export function createDatabaseAuth(db: Database) {
   return createAuth({
     users: createUserStore(db),
     sessions: createSessionStore(db),
     identities: createIdentityStore(db),
-    challenges: createD1ChallengeStore(db),
+    challenges: createDatabaseChallengeStore(db),
   });
 }
 
-export function createD1ChallengeStore(db: D1Database): ChallengeStore {
+export function createDatabaseChallengeStore(db: Database): ChallengeStore {
   return {
     async create(challenge) {
-      await db
-        .prepare(
-          `INSERT INTO auth_challenges
+      await db.execute(
+        `INSERT INTO auth_challenges
              (token_hash, provider, kind, payload, attempts, created_at, expires_at)
-           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`,
-        )
-        .bind(
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
           challenge.tokenHash,
           challenge.provider,
           challenge.kind,
@@ -40,35 +38,33 @@ export function createD1ChallengeStore(db: D1Database): ChallengeStore {
           challenge.attempts,
           challenge.createdAt.toISOString(),
           challenge.expiresAt.toISOString(),
-        )
-        .run();
+        ],
+      );
     },
     async findByTokenHash(tokenHash) {
-      const row = await db
-        .prepare(`SELECT * FROM auth_challenges WHERE token_hash = ?1`)
-        .bind(tokenHash)
-        .first<ChallengeRow>();
+      const row = await db.first<ChallengeRow>(
+        `SELECT * FROM auth_challenges WHERE token_hash = $1`,
+        [tokenHash],
+      );
 
       return row ? mapChallenge(row) : null;
     },
     async consumeByTokenHash(tokenHash) {
-      const row = await db
-        .prepare(`DELETE FROM auth_challenges WHERE token_hash = ?1 RETURNING *`)
-        .bind(tokenHash)
-        .first<ChallengeRow>();
+      const row = await db.first<ChallengeRow>(
+        `DELETE FROM auth_challenges WHERE token_hash = $1 RETURNING *`,
+        [tokenHash],
+      );
 
       return row ? mapChallenge(row) : null;
     },
     async incrementAttempts(tokenHash, expectedAttempts) {
-      const result = await db
-        .prepare(
-          `UPDATE auth_challenges SET attempts = attempts + 1
-           WHERE token_hash = ?1 AND attempts = ?2`,
-        )
-        .bind(tokenHash, expectedAttempts)
-        .run();
+      const result = await db.execute(
+        `UPDATE auth_challenges SET attempts = attempts + 1
+           WHERE token_hash = $1 AND attempts = $2`,
+        [tokenHash, expectedAttempts],
+      );
 
-      return (result.meta.changes ?? 0) > 0;
+      return (result.rowCount ?? 0) > 0;
     },
   };
 }
@@ -97,11 +93,8 @@ function mapChallenge(row: ChallengeRow): AuthChallengeRecord {
   };
 }
 
-export async function findOrCreateByEmail(db: D1Database, email: string) {
-  const existing = await db
-    .prepare("SELECT * FROM users WHERE email = ?1")
-    .bind(email)
-    .first<UserRow>();
+export async function findOrCreateByEmail(db: Database, email: string) {
+  const existing = await db.first<UserRow>("SELECT * FROM users WHERE email = $1", [email]);
 
   if (existing) {
     return mapUser(existing);
@@ -110,40 +103,35 @@ export async function findOrCreateByEmail(db: D1Database, email: string) {
   const id = crypto.randomUUID();
   const name = email.split("@")[0]?.slice(0, 60) || "Guest";
 
-  await db
-    .prepare(
-      `INSERT INTO users (id, name, github_login, avatar_url, email, role)
-       VALUES (?1, ?2, '', NULL, ?3, 'viewer')`,
-    )
-    .bind(id, name, email)
-    .run();
+  await db.execute(
+    `INSERT INTO users (id, name, github_login, avatar_url, email, role)
+       VALUES ($1, $2, '', NULL, $3, 'viewer')`,
+    [id, name, email],
+  );
 
-  const created = await db.prepare("SELECT * FROM users WHERE id = ?1").bind(id).first<UserRow>();
+  const created = await db.first<UserRow>("SELECT * FROM users WHERE id = $1", [id]);
 
   return created ? mapUser(created) : null;
 }
 
-export function createD1OAuthStateStore(db: D1Database): OAuthStateStore {
+export function createDatabaseOAuthStateStore(db: Database): OAuthStateStore {
   return {
     create: (state) => storeOAuthState(db, state),
     consumeByStateHash: (stateHash) => consumeOAuthState(db, stateHash),
   };
 }
 
-function createUserStore(db: D1Database): UserStore<MarqueeUser> {
+function createUserStore(db: Database): UserStore<MarqueeUser> {
   return {
     async findById(userId) {
-      const row = await db
-        .prepare("SELECT * FROM users WHERE id = ?1")
-        .bind(userId)
-        .first<UserRow>();
+      const row = await db.first<UserRow>("SELECT * FROM users WHERE id = $1", [userId]);
 
       return row ? mapUser(row) : null;
     },
   };
 }
 
-function createSessionStore(db: D1Database): SessionStore {
+function createSessionStore(db: Database): SessionStore {
   return {
     create: (session) => storeSession(db, session),
     findByTokenHash: (tokenHash) => findSession(db, tokenHash),
@@ -152,34 +140,34 @@ function createSessionStore(db: D1Database): SessionStore {
   };
 }
 
-function createIdentityStore(db: D1Database): IdentityStore<MarqueeUser> {
+function createIdentityStore(db: Database): IdentityStore<MarqueeUser> {
   return {
     findUser: (provider, subject) => findIdentity(db, provider, subject),
     resolve: (identity) => resolveIdentity(db, identity),
   };
 }
 
-async function storeSession(db: D1Database, session: AuthSessionRecord) {
-  await db
-    .prepare(
-      "INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES (?1, ?2, ?3, ?4)",
-    )
-    .bind(
+async function storeSession(db: Database, session: AuthSessionRecord) {
+  await db.execute(
+    "INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES ($1, $2, $3, $4)",
+    [
       session.tokenHash,
       session.userId,
       session.createdAt.toISOString(),
       session.expiresAt.toISOString(),
-    )
-    .run();
+    ],
+  );
 }
 
-async function findSession(db: D1Database, tokenHash: string): Promise<AuthSessionRecord | null> {
-  const row = await db
-    .prepare(
-      "SELECT * FROM sessions WHERE token_hash = ?1 AND julianday(expires_at) > julianday('now')",
-    )
-    .bind(tokenHash)
-    .first<{ token_hash: string; user_id: string; created_at: string; expires_at: string }>();
+async function findSession(db: Database, tokenHash: string): Promise<AuthSessionRecord | null> {
+  const row = await db.first<{
+    token_hash: string;
+    user_id: string;
+    created_at: string;
+    expires_at: string;
+  }>("SELECT * FROM sessions WHERE token_hash = $1 AND expires_at > CURRENT_TIMESTAMP", [
+    tokenHash,
+  ]);
 
   return row
     ? {
@@ -191,28 +179,26 @@ async function findSession(db: D1Database, tokenHash: string): Promise<AuthSessi
     : null;
 }
 
-async function deleteSession(db: D1Database, tokenHash: string) {
-  await db.prepare("DELETE FROM sessions WHERE token_hash = ?1").bind(tokenHash).run();
+async function deleteSession(db: Database, tokenHash: string) {
+  await db.execute("DELETE FROM sessions WHERE token_hash = $1", [tokenHash]);
 }
 
-async function deleteUserSessions(db: D1Database, userId: string) {
-  await db.prepare("DELETE FROM sessions WHERE user_id = ?1").bind(userId).run();
+async function deleteUserSessions(db: Database, userId: string) {
+  await db.execute("DELETE FROM sessions WHERE user_id = $1", [userId]);
 }
 
-async function findIdentity(db: D1Database, provider: string, subject: string) {
-  const row = await db
-    .prepare(
-      `SELECT users.* FROM identities
+async function findIdentity(db: Database, provider: string, subject: string) {
+  const row = await db.first<UserRow>(
+    `SELECT users.* FROM identities
        JOIN users ON users.id = identities.user_id
-       WHERE identities.provider = ?1 AND identities.provider_subject = ?2`,
-    )
-    .bind(provider, subject)
-    .first<UserRow>();
+       WHERE identities.provider = $1 AND identities.provider_subject = $2`,
+    [provider, subject],
+  );
 
   return row ? mapUser(row) : null;
 }
 
-async function resolveIdentity(db: D1Database, identity: ExternalIdentity) {
+async function resolveIdentity(db: Database, identity: ExternalIdentity) {
   if (identity.provider !== "github") {
     throw new AuthError("identity_conflict");
   }
@@ -228,13 +214,11 @@ async function resolveIdentity(db: D1Database, identity: ExternalIdentity) {
   const existing = await findIdentity(db, identity.provider, identity.providerSubject);
 
   if (existing) {
-    await db
-      .prepare(
-        `UPDATE users SET name = ?1, github_login = ?2, avatar_url = ?3
-         WHERE id = ?4`,
-      )
-      .bind(name, login, avatarUrl, existing.id)
-      .run();
+    await db.execute(
+      `UPDATE users SET name = $1, github_login = $2, avatar_url = $3
+         WHERE id = $4`,
+      [name, login, avatarUrl, existing.id],
+    );
 
     return {
       ...existing,
@@ -246,21 +230,27 @@ async function resolveIdentity(db: D1Database, identity: ExternalIdentity) {
 
   const userId = crypto.randomUUID();
 
-  await db.batch([
-    db
-      .prepare(
-        "INSERT INTO users (id, name, github_login, avatar_url, role) VALUES (?1, ?2, ?3, ?4, 'viewer')",
-      )
-      .bind(userId, name, login, avatarUrl),
-    db
-      .prepare(
-        `INSERT INTO identities (provider, provider_subject, user_id, claims_json)
-         VALUES (?1, ?2, ?3, ?4)`,
-      )
-      .bind("github", identity.providerSubject, userId, JSON.stringify(identity.claims)),
-  ]);
+  await db.transaction(async (transaction) => {
+    const results = [];
 
-  const row = await db.prepare("SELECT * FROM users WHERE id = ?1").bind(userId).first<UserRow>();
+    results.push(
+      await transaction.execute(
+        "INSERT INTO users (id, name, github_login, avatar_url, role) VALUES ($1, $2, $3, $4, 'viewer')",
+        [userId, name, login, avatarUrl],
+      ),
+    );
+    results.push(
+      await transaction.execute(
+        `INSERT INTO identities (provider, provider_subject, user_id, claims_json)
+         VALUES ($1, $2, $3, $4)`,
+        ["github", identity.providerSubject, userId, JSON.stringify(identity.claims)],
+      ),
+    );
+
+    return results;
+  });
+
+  const row = await db.first<UserRow>("SELECT * FROM users WHERE id = $1", [userId]);
 
   if (!row) {
     throw new AuthError("provider_error");
@@ -269,14 +259,12 @@ async function resolveIdentity(db: D1Database, identity: ExternalIdentity) {
   return mapUser(row);
 }
 
-async function storeOAuthState(db: D1Database, state: OAuthStateRecord) {
-  await db
-    .prepare(
-      `INSERT INTO oauth_states
+async function storeOAuthState(db: Database, state: OAuthStateRecord) {
+  await db.execute(
+    `INSERT INTO oauth_states
          (state_hash, provider, code_verifier, nonce, redirect_uri, context_json, created_at, expires_at)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)`,
-    )
-    .bind(
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    [
       state.stateHash,
       state.provider,
       state.codeVerifier ?? null,
@@ -285,31 +273,29 @@ async function storeOAuthState(db: D1Database, state: OAuthStateRecord) {
       JSON.stringify(state.context ?? {}),
       state.createdAt.toISOString(),
       state.expiresAt.toISOString(),
-    )
-    .run();
+    ],
+  );
 }
 
 async function consumeOAuthState(
-  db: D1Database,
+  db: Database,
   stateHash: string,
 ): Promise<OAuthStateRecord | null> {
-  const row = await db
-    .prepare(
-      `DELETE FROM oauth_states
-       WHERE state_hash = ?1 AND julianday(expires_at) > julianday('now')
+  const row = await db.first<{
+    state_hash: string;
+    provider: string;
+    code_verifier: string | null;
+    nonce: string | null;
+    redirect_uri: string | null;
+    context_json: string;
+    created_at: string;
+    expires_at: string;
+  }>(
+    `DELETE FROM oauth_states
+       WHERE state_hash = $1 AND (EXTRACT(EPOCH FROM expires_at) / 86400.0) > (EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) / 86400.0)
        RETURNING *`,
-    )
-    .bind(stateHash)
-    .first<{
-      state_hash: string;
-      provider: string;
-      code_verifier: string | null;
-      nonce: string | null;
-      redirect_uri: string | null;
-      context_json: string;
-      created_at: string;
-      expires_at: string;
-    }>();
+    [stateHash],
+  );
 
   if (!row) {
     return null;

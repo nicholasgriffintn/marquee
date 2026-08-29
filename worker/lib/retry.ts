@@ -1,5 +1,5 @@
 const TRANSIENT =
-  /internal error|failed to parse body as json|network connection lost|storage caused object to be reset|d1_error/iu;
+  /internal error|failed to parse body as json|network connection lost|storage caused object to be reset|connection (?:reset|terminated unexpectedly)|server closed the connection unexpectedly/iu;
 
 function isTransient(error: unknown) {
   return error instanceof Error && TRANSIENT.test(error.message);

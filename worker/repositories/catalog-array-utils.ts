@@ -33,24 +33,35 @@ export function groupBy<T>(rows: T[], key: (row: T) => string): Map<string, T[]>
   return map;
 }
 
-export async function deleteByTitleIds(db: D1Database, table: string, titleIds: string[]) {
+export function rowPlaceholders(rows: number, columns: number) {
+  return Array.from({ length: rows }, (_unusedRow, row) => {
+    const values = Array.from(
+      { length: columns },
+      (_unusedColumn, column) => `$${row * columns + column + 1}`,
+    );
+
+    return `(${values.join(", ")})`;
+  }).join(", ");
+}
+
+export async function deleteByTitleIds(db: Database, table: string, titleIds: string[]) {
   for (let index = 0; index < titleIds.length; index += READ_CHUNK) {
     const wave = titleIds.slice(index, index + READ_CHUNK);
 
     // oxlint-disable-next-line no-await-in-loop
-    await db
-      .prepare(`DELETE FROM ${table} WHERE title_id IN (${wave.map(() => "?").join(",")})`)
-      .bind(...wave)
-      .run();
+    await db.execute(
+      `DELETE FROM ${table} WHERE title_id IN (${wave.map((_, offset) => `$${offset + 1}`).join(",")})`,
+      [...wave],
+    );
   }
 }
 
 export async function insertRows(
-  db: D1Database,
+  db: Database,
   columns: number,
   rowsPerStatement: number,
-  rows: unknown[][],
-  statement: (chunk: unknown[][]) => string,
+  rows: DatabaseValue[][],
+  statement: (chunk: DatabaseValue[][]) => string,
 ) {
   if (rows.some((row) => row.length !== columns)) {
     throw new Error(`insertRows: expected every row to have ${columns} columns`);
@@ -61,33 +72,32 @@ export async function insertRows(
 
   for (let index = 0; index < rows.length; index += rowChunk) {
     const batchRows = rows.slice(index, index + rowChunk);
-    const statements = [];
-
-    for (let offset = 0; offset < batchRows.length; offset += rowsPerStatement) {
-      const chunk = batchRows.slice(offset, offset + rowsPerStatement);
-
-      statements.push(db.prepare(statement(chunk)).bind(...chunk.flat()));
-    }
 
     // oxlint-disable-next-line no-await-in-loop
-    await db.batch(statements);
+    await db.transaction(async (transaction) => {
+      for (let offset = 0; offset < batchRows.length; offset += rowsPerStatement) {
+        const chunk = batchRows.slice(offset, offset + rowsPerStatement);
+
+        // oxlint-disable-next-line no-await-in-loop
+        await transaction.execute(statement(chunk), chunk.flat());
+      }
+    });
   }
 }
 
 export type SimpleArrayField = { table: string; column: string };
 
-export async function readSimpleArray(db: D1Database, entry: SimpleArrayField, ids: string[]) {
+export async function readSimpleArray(db: Database, entry: SimpleArrayField, ids: string[]) {
   const rows = await queryChunked(ids, (wave) =>
     db
-      .prepare(
-        `SELECT title_id AS titleId, ${entry.column} AS value
+      .query<{ titleId: string; value: string }>(
+        `SELECT title_id AS "titleId", ${entry.column} AS value
          FROM ${entry.table}
-         WHERE title_id IN (${wave.map(() => "?").join(",")})
+         WHERE title_id IN (${wave.map((_, index) => `$${index + 1}`).join(",")})
          ORDER BY title_id, position`,
+        [...wave],
       )
-      .bind(...wave)
-      .all<{ titleId: string; value: string }>()
-      .then((result) => result.results),
+      .then((result) => result.rows),
   );
 
   const grouped = groupBy(rows, (row) => row.titleId);
@@ -104,7 +114,7 @@ export async function readSimpleArray(db: D1Database, entry: SimpleArrayField, i
 }
 
 export async function writeSimpleArray(
-  db: D1Database,
+  db: Database,
   entry: SimpleArrayField,
   titles: { titleId: string; values: string[] }[],
 ) {
@@ -115,7 +125,7 @@ export async function writeSimpleArray(
   );
 
   const rows = titles.flatMap(({ titleId, values }) =>
-    [...new Set(values)].map((value, position): unknown[] => [titleId, value, position]),
+    [...new Set(values)].map((value, position): DatabaseValue[] => [titleId, value, position]),
   );
 
   await insertRows(
@@ -125,7 +135,7 @@ export async function writeSimpleArray(
     rows,
     (chunk) =>
       `INSERT INTO ${entry.table} (title_id, ${entry.column}, position)
-       VALUES ${chunk.map(() => "(?, ?, ?)").join(", ")}
+       VALUES ${rowPlaceholders(chunk.length, 3)}
        ON CONFLICT (title_id, ${entry.column}) DO UPDATE SET position = excluded.position`,
   );
 }
@@ -136,18 +146,17 @@ export type KindArrayField = {
   kinds: { kind: string; field: string }[];
 };
 
-export async function readKindArray(db: D1Database, entry: KindArrayField, ids: string[]) {
+export async function readKindArray(db: Database, entry: KindArrayField, ids: string[]) {
   const rows = await queryChunked(ids, (wave) =>
     db
-      .prepare(
-        `SELECT title_id AS titleId, kind, ${entry.column} AS value
+      .query<{ titleId: string; kind: string; value: string }>(
+        `SELECT title_id AS "titleId", kind, ${entry.column} AS value
          FROM ${entry.table}
-         WHERE title_id IN (${wave.map(() => "?").join(",")})
+         WHERE title_id IN (${wave.map((_, index) => `$${index + 1}`).join(",")})
          ORDER BY title_id, kind, position`,
+        [...wave],
       )
-      .bind(...wave)
-      .all<{ titleId: string; kind: string; value: string }>()
-      .then((result) => result.results),
+      .then((result) => result.rows),
   );
   const byField = new Map<string, Map<string, string[]>>();
 
@@ -181,7 +190,7 @@ export async function readKindArray(db: D1Database, entry: KindArrayField, ids: 
 }
 
 export async function writeKindArray(
-  db: D1Database,
+  db: Database,
   entry: KindArrayField,
   titles: { titleId: string; values: Record<string, string[]> }[],
 ) {
@@ -193,7 +202,7 @@ export async function writeKindArray(
 
   const rows = titles.flatMap(({ titleId, values }) =>
     entry.kinds.flatMap(({ kind, field }) =>
-      [...new Set(values[field] ?? [])].map((value, position): unknown[] => [
+      [...new Set(values[field] ?? [])].map((value, position): DatabaseValue[] => [
         titleId,
         kind,
         value,
@@ -209,7 +218,7 @@ export async function writeKindArray(
     rows,
     (chunk) =>
       `INSERT INTO ${entry.table} (title_id, kind, ${entry.column}, position)
-       VALUES ${chunk.map(() => "(?, ?, ?, ?)").join(", ")}
+       VALUES ${rowPlaceholders(chunk.length, 4)}
        ON CONFLICT (title_id, kind, ${entry.column}) DO UPDATE SET position = excluded.position`,
   );
 }

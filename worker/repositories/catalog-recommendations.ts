@@ -6,11 +6,11 @@ const FIELD: SimpleArrayField = {
   column: "recommended_id",
 };
 
-export function readRecommendationMap(db: D1Database, ids: string[]) {
+export function readRecommendationMap(db: Database, ids: string[]) {
   return readSimpleArray(db, FIELD, ids);
 }
 
-export function writeRecommendationRows(db: D1Database, titles: MediaTitle[]) {
+export function writeRecommendationRows(db: Database, titles: MediaTitle[]) {
   return writeSimpleArray(
     db,
     FIELD,

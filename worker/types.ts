@@ -1,9 +1,9 @@
 import type { ExternalIds } from "../src/domain/catalog.ts";
 import type { EntryStatus } from "../src/domain/entries.ts";
+import type { DatabaseBinding, WithDatabase } from "./database/runtime.ts";
 
-export type Bindings = {
+export type WorkerBindings = DatabaseBinding & {
   ASSETS: Fetcher;
-  DB: D1Database;
   AUTH_RATE_LIMITER: RateLimit;
   CURATOR_RATE_LIMITER: RateLimit;
   CURATOR_FREE_RATE_LIMITER: RateLimit;
@@ -53,6 +53,8 @@ export type Bindings = {
   MAL_CLIENT_ID?: string;
   TOKEN_ENCRYPTION_KEY?: string;
 };
+
+export type Bindings = WithDatabase<WorkerBindings>;
 
 export type CatalogSweepParameters = { deep?: boolean };
 

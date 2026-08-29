@@ -312,11 +312,10 @@ async function revivalWorkCard(
 }
 
 async function providerName(env: Bindings, providerId: string) {
-  const row = await env.DB.prepare(
-    "SELECT name FROM catalog_title_providers WHERE provider_id = ?1 LIMIT 1",
-  )
-    .bind(providerId)
-    .first<{ name: string }>();
+  const row = await env.DB.first<{ name: string }>(
+    "SELECT name FROM catalog_title_providers WHERE provider_id = $1 LIMIT 1",
+    [providerId],
+  );
 
   return row?.name ?? null;
 }

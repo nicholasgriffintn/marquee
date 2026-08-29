@@ -24,15 +24,16 @@
       "bucket_name": "marquee-media"
     }
   ],
-  "d1_databases": [
+  "hyperdrive": [
     {
-      "binding": "DB",
-      "database_name": "marquee",
-      "database_id": "4bdf8e03-0ac3-496c-8e69-c8dedd116976",
-      "migrations_dir": "./migrations",
-      "remote": false
+      "binding": "HYPERDRIVE",
+      "id": "9fbbf09c8e8340e293bce78de6c65f95",
+      "localConnectionString": "postgresql://postgres:postgres@localhost:5432/marquee"
     }
   ],
+  "placement": {
+    "region": "aws:eu-west-1"
+  },
   "ratelimits": [
     {
       "name": "AUTH_RATE_LIMITER",
@@ -261,9 +262,6 @@
         "max_concurrency": 1
       }
     ]
-  },
-  "placement": {
-    "mode": "smart"
   },
   "images": {
     "binding": "IMAGES"

@@ -3,8 +3,6 @@ import { placePin } from "../../src/domain/places.ts";
 import type { PlaceRecord, TitlePlaceRow } from "../clients/wikidata-places.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 
-const WRITE_CHUNK = 40;
-
 type PlaceRow = {
   entityId: string;
   label: string;
@@ -17,8 +15,8 @@ type PlaceRow = {
 
 type TitlePlaceReadRow = PlaceRow & { titleId: string; kind: string };
 
-const PLACE_COLUMNS = `p.entity_id AS entityId, p.label, p.latitude, p.longitude,
-       p.precision_degrees AS precisionDegrees, p.country_id AS countryId,
+const PLACE_COLUMNS = `p.entity_id AS "entityId", p.label, p.latitude, p.longitude,
+       p.precision_degrees AS "precisionDegrees", p.country_id AS "countryId",
        c.label AS country`;
 
 function toPlace(row: TitlePlaceReadRow): TitlePlace {
@@ -37,7 +35,7 @@ function toPlace(row: TitlePlaceReadRow): TitlePlace {
 export const PLACE_SOURCE = "wikidata";
 
 export async function writeTitlePlaces(
-  db: D1Database,
+  db: Database,
   titleIds: string[],
   rows: TitlePlaceRow[],
   countries: PlaceRecord[],
@@ -54,13 +52,14 @@ export async function writeTitlePlaces(
   }
 
   const known = new Set(places.keys());
-  const statements = [
-    ...[...places.values()].map((place) =>
-      db
-        .prepare(
-          `INSERT INTO catalog_places
+
+  await db.transaction(async (transaction) => {
+    for (const place of places.values()) {
+      // oxlint-disable-next-line no-await-in-loop
+      await transaction.execute(
+        `INSERT INTO catalog_places
              (entity_id, label, latitude, longitude, precision_degrees, country_id, fetched_at)
-           VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+           VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
            ON CONFLICT(entity_id) DO UPDATE SET
              label = excluded.label,
              latitude = excluded.latitude,
@@ -68,63 +67,62 @@ export async function writeTitlePlaces(
              precision_degrees = excluded.precision_degrees,
              country_id = excluded.country_id,
              fetched_at = CURRENT_TIMESTAMP`,
-        )
-        .bind(
+        [
           place.entityId,
           place.label,
           place.latitude,
           place.longitude,
           place.precisionDegrees,
           place.countryId && known.has(place.countryId) ? place.countryId : null,
-        ),
-    ),
-    ...titleIds.map((titleId) =>
-      db
-        .prepare(`DELETE FROM catalog_title_places WHERE title_id = ? AND source = ?`)
-        .bind(titleId, source),
-    ),
-    ...rows.map((row) =>
-      db
-        .prepare(
-          `INSERT OR REPLACE INTO catalog_title_places (title_id, kind, place_id, source)
-           VALUES (?, ?, ?, ?)`,
-        )
-        .bind(row.key, row.kind, row.place.entityId, source),
-    ),
-    ...titleIds.map((titleId) =>
-      db
-        .prepare(
-          `INSERT INTO catalog_title_place_sync (title_id, source, places, synced_at)
-           VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+        ],
+      );
+    }
+
+    for (const titleId of titleIds) {
+      // oxlint-disable-next-line no-await-in-loop
+      await transaction.execute(
+        `DELETE FROM catalog_title_places WHERE title_id = $1 AND source = $2`,
+        [titleId, source],
+      );
+    }
+
+    for (const row of rows) {
+      // oxlint-disable-next-line no-await-in-loop
+      await transaction.execute(
+        `INSERT INTO catalog_title_places (title_id, kind, place_id, source)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT DO NOTHING`,
+        [row.key, row.kind, row.place.entityId, source],
+      );
+    }
+
+    for (const titleId of titleIds) {
+      // oxlint-disable-next-line no-await-in-loop
+      await transaction.execute(
+        `INSERT INTO catalog_title_place_sync (title_id, source, places, synced_at)
+           VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
            ON CONFLICT(title_id, source) DO UPDATE SET
              places = excluded.places,
-             synced_at = CURRENT_TIMESTAMP`,
-        )
-        .bind(titleId, source, rows.filter((row) => row.key === titleId).length),
-    ),
-  ];
-
-  for (let index = 0; index < statements.length; index += WRITE_CHUNK) {
-    // oxlint-disable-next-line no-await-in-loop
-    await db.batch(statements.slice(index, index + WRITE_CHUNK));
-  }
+           synced_at = CURRENT_TIMESTAMP`,
+        [titleId, source, rows.filter((row) => row.key === titleId).length],
+      );
+    }
+  });
 
   return rows.length;
 }
 
-export async function readPlacesForTitle(db: D1Database, titleId: string): Promise<TitlePlaces> {
-  const rows = await db
-    .prepare(
-      `SELECT DISTINCT tp.title_id AS titleId, tp.kind, ${PLACE_COLUMNS}
+export async function readPlacesForTitle(db: Database, titleId: string): Promise<TitlePlaces> {
+  const rows = await db.query<TitlePlaceReadRow>(
+    `SELECT DISTINCT tp.title_id AS "titleId", tp.kind, ${PLACE_COLUMNS}
        FROM catalog_title_places AS tp
        JOIN catalog_places AS p ON p.entity_id = tp.place_id
        LEFT JOIN catalog_places AS c ON c.entity_id = p.country_id
-       WHERE tp.title_id = ?
+       WHERE tp.title_id = $1
        ORDER BY p.precision_degrees, p.label`,
-    )
-    .bind(titleId)
-    .all<TitlePlaceReadRow>();
-  const places = rows.results.map(toPlace);
+    [titleId],
+  );
+  const places = rows.rows.map(toPlace);
 
   return {
     filming: places.filter((place) => place.kind === "filming"),
@@ -133,31 +131,29 @@ export async function readPlacesForTitle(db: D1Database, titleId: string): Promi
 }
 
 export async function readPlaceCandidates(
-  db: D1Database,
+  db: Database,
   limit: number,
   refreshDays: number,
   retryDays: number,
 ) {
-  const rows = await db
-    .prepare(
-      `SELECT t.id AS titleId, t.media_type AS mediaType, t.tmdb_id AS tmdbId,
-              t.wikidata_id AS wikidataId
+  const rows = await db.query<{
+    titleId: string;
+    mediaType: "movie" | "tv";
+    tmdbId: number;
+    wikidataId: string | null;
+  }>(
+    `SELECT t.id AS "titleId", t.media_type AS "mediaType", t.tmdb_id AS "tmdbId",
+              t.wikidata_id AS "wikidataId"
        FROM title_working_set AS w
        JOIN catalog_titles AS t ON t.id = w.title_id
-       LEFT JOIN catalog_title_place_sync AS s ON s.title_id = t.id AND s.source = ?4
+       LEFT JOIN catalog_title_place_sync AS s ON s.title_id = t.id AND s.source = $4
        WHERE s.title_id IS NULL
-          OR (s.places > 0 AND s.synced_at < datetime('now', ?1))
-          OR (s.places = 0 AND s.synced_at < datetime('now', ?2))
+          OR (s.places > 0 AND s.synced_at < (CURRENT_TIMESTAMP + CAST($1 AS INTERVAL)))
+          OR (s.places = 0 AND s.synced_at < (CURRENT_TIMESTAMP + CAST($2 AS INTERVAL)))
        ORDER BY w.demand DESC, t.popularity DESC
-       LIMIT ?3`,
-    )
-    .bind(`-${refreshDays} days`, `-${retryDays} days`, limit, PLACE_SOURCE)
-    .all<{
-      titleId: string;
-      mediaType: "movie" | "tv";
-      tmdbId: number;
-      wikidataId: string | null;
-    }>();
+       LIMIT $3`,
+    [`-${refreshDays} days`, `-${retryDays} days`, limit, PLACE_SOURCE],
+  );
 
-  return rows.results.filter((row) => isKnownTitle(row.titleId));
+  return rows.rows.filter((row) => isKnownTitle(row.titleId));
 }

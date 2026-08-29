@@ -92,21 +92,20 @@ async function cinemaRail(
 }
 
 async function broadcastRail(env: Bindings): Promise<DeliveredRail | null> {
-  const rows = await env.DB.prepare(
+  const rows = await env.DB.query<{ id: string }>(
     `SELECT DISTINCT s.title_id AS id
        FROM title_schedule AS s
        JOIN catalog_titles AS t ON t.id = s.title_id
-      WHERE s.airs_at BETWEEN datetime('now') AND datetime('now', ?1)
+      WHERE s.airs_at BETWEEN CURRENT_TIMESTAMP AND (CURRENT_TIMESTAMP + CAST($1 AS INTERVAL))
         AND s.network IS NOT NULL
       ORDER BY t.popularity DESC
-      LIMIT ?2`,
-  )
-    .bind(`+${BROADCAST_HORIZON_DAYS} days`, RAIL_SIZE * 2)
-    .all<{ id: string }>();
+      LIMIT $2`,
+    [`+${BROADCAST_HORIZON_DAYS} days`, RAIL_SIZE * 2],
+  );
   const items = (
     await readItems(
       env.DB,
-      rows.results.map((row) => row.id),
+      rows.rows.map((row) => row.id),
       RAIL_SIZE,
     )
   ).slice(0, RAIL_SIZE);

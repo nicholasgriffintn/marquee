@@ -10,11 +10,11 @@ const FIELD: KindArrayField = {
   ],
 };
 
-export function readLanguageMap(db: D1Database, ids: string[]) {
+export function readLanguageMap(db: Database, ids: string[]) {
   return readKindArray(db, FIELD, ids);
 }
 
-export function writeLanguageRows(db: D1Database, titles: MediaTitle[]) {
+export function writeLanguageRows(db: Database, titles: MediaTitle[]) {
   return writeKindArray(
     db,
     FIELD,

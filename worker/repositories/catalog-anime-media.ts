@@ -1,16 +1,15 @@
 import type { AnimeStream, AnimeTheme, AnimeVideo, MediaTitle } from "../../src/domain/catalog.ts";
 import { deleteByTitleIds, groupBy, insertRows, queryChunked } from "./catalog-array-utils.ts";
 
-export async function readAnimeStreamMap(db: D1Database, ids: string[]) {
+export async function readAnimeStreamMap(db: Database, ids: string[]) {
   const rows = await queryChunked(ids, (wave) =>
     db
-      .prepare(
-        `SELECT title_id AS titleId, site, url FROM catalog_title_anime_streams
-         WHERE title_id IN (${wave.map(() => "?").join(",")}) ORDER BY title_id, position`,
+      .query<AnimeStream & { titleId: string }>(
+        `SELECT title_id AS "titleId", site, url FROM catalog_title_anime_streams
+         WHERE title_id IN (${wave.map((_, index) => `$${index + 1}`).join(",")}) ORDER BY title_id, position`,
+        [...wave],
       )
-      .bind(...wave)
-      .all<AnimeStream & { titleId: string }>()
-      .then((r) => r.results),
+      .then((r) => r.rows),
   );
   const grouped = groupBy(rows, (r) => r.titleId);
   const values = new Map<string, AnimeStream[]>();
@@ -25,7 +24,7 @@ export async function readAnimeStreamMap(db: D1Database, ids: string[]) {
   return values;
 }
 
-export async function writeAnimeStreamRows(db: D1Database, titles: MediaTitle[]) {
+export async function writeAnimeStreamRows(db: Database, titles: MediaTitle[]) {
   await deleteByTitleIds(
     db,
     "catalog_title_anime_streams",
@@ -33,7 +32,7 @@ export async function writeAnimeStreamRows(db: D1Database, titles: MediaTitle[])
   );
 
   const rows = titles.flatMap((title) =>
-    (title.anime?.streams ?? []).map((stream, position): unknown[] => [
+    (title.anime?.streams ?? []).map((stream, position): DatabaseValue[] => [
       title.id,
       stream.site,
       stream.url,
@@ -47,24 +46,24 @@ export async function writeAnimeStreamRows(db: D1Database, titles: MediaTitle[])
     22,
     rows,
     (chunk) =>
-      `INSERT OR IGNORE INTO catalog_title_anime_streams (title_id, site, url, position)
-       VALUES ${chunk.map(() => "(?, ?, ?, ?)").join(", ")}`,
+      `INSERT INTO catalog_title_anime_streams (title_id, site, url, position)
+       VALUES ${chunk.map(() => "(?, ?, ?, ?)").join(", ")}
+       ON CONFLICT DO NOTHING`,
   );
 }
 
 type ThemeRow = AnimeTheme & { titleId: string; kind: "opening" | "ending" };
 
-export async function readAnimeThemeMap(db: D1Database, ids: string[]) {
+export async function readAnimeThemeMap(db: Database, ids: string[]) {
   const rows = await queryChunked(ids, (wave) =>
     db
-      .prepare(
-        `SELECT title_id AS titleId, kind, title, artist, episodes
+      .query<ThemeRow>(
+        `SELECT title_id AS "titleId", kind, title, artist, episodes
          FROM catalog_title_anime_themes
-         WHERE title_id IN (${wave.map(() => "?").join(",")}) ORDER BY title_id, kind, position`,
+         WHERE title_id IN (${wave.map((_, index) => `$${index + 1}`).join(",")}) ORDER BY title_id, kind, position`,
+        [...wave],
       )
-      .bind(...wave)
-      .all<ThemeRow>()
-      .then((r) => r.results),
+      .then((r) => r.rows),
   );
   const grouped = groupBy(rows, (r) => r.titleId);
   const values = new Map<string, { openings: AnimeTheme[]; endings: AnimeTheme[] }>();
@@ -83,7 +82,7 @@ export async function readAnimeThemeMap(db: D1Database, ids: string[]) {
   return values;
 }
 
-export async function writeAnimeThemeRows(db: D1Database, titles: MediaTitle[]) {
+export async function writeAnimeThemeRows(db: Database, titles: MediaTitle[]) {
   await deleteByTitleIds(
     db,
     "catalog_title_anime_themes",
@@ -91,7 +90,7 @@ export async function writeAnimeThemeRows(db: D1Database, titles: MediaTitle[]) 
   );
 
   const rows = titles.flatMap((title) => [
-    ...(title.anime?.openings ?? []).map((theme, position): unknown[] => [
+    ...(title.anime?.openings ?? []).map((theme, position): DatabaseValue[] => [
       title.id,
       "opening",
       theme.title,
@@ -99,7 +98,7 @@ export async function writeAnimeThemeRows(db: D1Database, titles: MediaTitle[]) 
       theme.episodes,
       position,
     ]),
-    ...(title.anime?.endings ?? []).map((theme, position): unknown[] => [
+    ...(title.anime?.endings ?? []).map((theme, position): DatabaseValue[] => [
       title.id,
       "ending",
       theme.title,
@@ -115,21 +114,21 @@ export async function writeAnimeThemeRows(db: D1Database, titles: MediaTitle[]) 
     15,
     rows,
     (chunk) =>
-      `INSERT OR IGNORE INTO catalog_title_anime_themes (title_id, kind, title, artist, episodes, position)
-       VALUES ${chunk.map(() => "(?, ?, ?, ?, ?, ?)").join(", ")}`,
+      `INSERT INTO catalog_title_anime_themes (title_id, kind, title, artist, episodes, position)
+       VALUES ${chunk.map(() => "(?, ?, ?, ?, ?, ?)").join(", ")}
+       ON CONFLICT DO NOTHING`,
   );
 }
 
-export async function readAnimeVideoMap(db: D1Database, ids: string[]) {
+export async function readAnimeVideoMap(db: Database, ids: string[]) {
   const rows = await queryChunked(ids, (wave) =>
     db
-      .prepare(
-        `SELECT title_id AS titleId, video_key AS key, name FROM catalog_title_anime_videos
-         WHERE title_id IN (${wave.map(() => "?").join(",")}) ORDER BY title_id, position`,
+      .query<AnimeVideo & { titleId: string }>(
+        `SELECT title_id AS "titleId", video_key AS key, name FROM catalog_title_anime_videos
+         WHERE title_id IN (${wave.map((_, index) => `$${index + 1}`).join(",")}) ORDER BY title_id, position`,
+        [...wave],
       )
-      .bind(...wave)
-      .all<AnimeVideo & { titleId: string }>()
-      .then((r) => r.results),
+      .then((r) => r.rows),
   );
   const grouped = groupBy(rows, (r) => r.titleId);
   const values = new Map<string, AnimeVideo[]>();
@@ -144,7 +143,7 @@ export async function readAnimeVideoMap(db: D1Database, ids: string[]) {
   return values;
 }
 
-export async function writeAnimeVideoRows(db: D1Database, titles: MediaTitle[]) {
+export async function writeAnimeVideoRows(db: Database, titles: MediaTitle[]) {
   await deleteByTitleIds(
     db,
     "catalog_title_anime_videos",
@@ -152,7 +151,7 @@ export async function writeAnimeVideoRows(db: D1Database, titles: MediaTitle[]) 
   );
 
   const rows = titles.flatMap((title) =>
-    (title.anime?.videos ?? []).map((video, position): unknown[] => [
+    (title.anime?.videos ?? []).map((video, position): DatabaseValue[] => [
       title.id,
       video.key,
       video.name,
@@ -166,7 +165,8 @@ export async function writeAnimeVideoRows(db: D1Database, titles: MediaTitle[]) 
     22,
     rows,
     (chunk) =>
-      `INSERT OR IGNORE INTO catalog_title_anime_videos (title_id, video_key, name, position)
-       VALUES ${chunk.map(() => "(?, ?, ?, ?)").join(", ")}`,
+      `INSERT INTO catalog_title_anime_videos (title_id, video_key, name, position)
+       VALUES ${chunk.map(() => "(?, ?, ?, ?)").join(", ")}
+       ON CONFLICT DO NOTHING`,
   );
 }

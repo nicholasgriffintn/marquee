@@ -27,15 +27,14 @@ async function titleIdsByImdb(env: Bindings, imdbIds: string[]) {
   for (let index = 0; index < unique.length; index += 100) {
     const wave = unique.slice(index, index + 100);
     // oxlint-disable-next-line no-await-in-loop
-    const rows = await env.DB.prepare(
-      `SELECT id, imdb_id AS imdbId
+    const rows = await env.DB.query<{ id: string; imdbId: string }>(
+      `SELECT id, imdb_id AS "imdbId"
        FROM catalog_titles
-       WHERE imdb_id IN (${wave.map(() => "?").join(", ")})`,
-    )
-      .bind(...wave)
-      .all<{ id: string; imdbId: string }>();
+       WHERE imdb_id IN (${wave.map((_, index) => `$${index + 1}`).join(", ")})`,
+      [...wave],
+    );
 
-    for (const row of rows.results) {
+    for (const row of rows.rows) {
       matched.set(row.imdbId, row.id);
     }
   }
@@ -72,20 +71,20 @@ export async function syncSchedule(env: Bindings) {
   );
   const known = entries.filter((episode) => episode.imdbId && byImdb.has(episode.imdbId));
 
-  await env.DB.prepare(`DELETE FROM title_schedule WHERE airs_at < datetime('now', ?)`)
-    .bind(`-${RETENTION_DAYS} days`)
-    .run();
+  await env.DB.execute(`DELETE FROM title_schedule WHERE airs_at < (CURRENT_TIMESTAMP + CAST($1 AS INTERVAL))`, [
+    `-${RETENTION_DAYS} days`,
+  ]);
 
   for (let index = 0; index < known.length; index += 50) {
     const wave = known.slice(index, index + 50);
 
     // oxlint-disable-next-line no-await-in-loop
-    await env.DB.batch(
-      wave.map((episode) =>
-        env.DB.prepare(
+    await env.DB.transaction(async (transaction) => {
+      for (const episode of wave) {
+        await transaction.execute(
           `INSERT INTO title_schedule
              (id, title_id, imdb_id, show_name, season, episode, episode_name, airs_at, network)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
            ON CONFLICT(id) DO UPDATE SET
              title_id = excluded.title_id,
              season = excluded.season,
@@ -94,19 +93,20 @@ export async function syncSchedule(env: Bindings) {
              airs_at = excluded.airs_at,
              network = excluded.network,
              fetched_at = CURRENT_TIMESTAMP`,
-        ).bind(
-          episode.id,
-          byImdb.get(episode.imdbId as string) ?? null,
-          episode.imdbId,
-          episode.showName,
-          episode.season,
-          episode.episode,
-          episode.episodeName,
-          episode.airsAt,
-          episode.network,
-        ),
-      ),
-    );
+          [
+            episode.id,
+            byImdb.get(episode.imdbId as string) ?? null,
+            episode.imdbId,
+            episode.showName,
+            episode.season,
+            episode.episode,
+            episode.episodeName,
+            episode.airsAt,
+            episode.network,
+          ],
+        );
+      }
+    });
   }
 
   logEvent("schedule_synced", {
@@ -127,22 +127,22 @@ export type ScheduleRow = {
   network: string | null;
 };
 
-const VIEWER_QUERY = `SELECT s.title_id AS titleId, s.show_name AS showName, s.season, s.episode,
-                s.episode_name AS episodeName, s.airs_at AS airsAt, s.network
+const VIEWER_QUERY = `SELECT s.title_id AS "titleId", s.show_name AS "showName", s.season, s.episode,
+                s.episode_name AS "episodeName", s.airs_at AS "airsAt", s.network
          FROM title_schedule AS s
          JOIN viewing_entries AS v
-           ON v.title_id = s.title_id AND v.viewer_id = ? AND v.status IN ('watching', 'watchlist')
-         WHERE s.airs_at BETWEEN datetime('now', '-6 hours') AND datetime('now', ?)
+           ON v.title_id = s.title_id AND v.viewer_id = $1 AND v.status IN ('watching', 'watchlist')
+         WHERE s.airs_at BETWEEN (CURRENT_TIMESTAMP - INTERVAL '6 hour') AND (CURRENT_TIMESTAMP + CAST($2 AS INTERVAL))
          ORDER BY s.airs_at
-         LIMIT ?`;
+         LIMIT $3`;
 
-const POPULAR_QUERY = `SELECT s.title_id AS titleId, s.show_name AS showName, s.season, s.episode,
-                s.episode_name AS episodeName, s.airs_at AS airsAt, s.network
+const POPULAR_QUERY = `SELECT s.title_id AS "titleId", s.show_name AS "showName", s.season, s.episode,
+                s.episode_name AS "episodeName", s.airs_at AS "airsAt", s.network
          FROM title_schedule AS s
          JOIN catalog_titles AS t ON t.id = s.title_id
-         WHERE s.airs_at BETWEEN datetime('now', '-6 hours') AND datetime('now', ?)
+         WHERE s.airs_at BETWEEN (CURRENT_TIMESTAMP - INTERVAL '6 hour') AND (CURRENT_TIMESTAMP + CAST($1 AS INTERVAL))
          ORDER BY t.popularity DESC, s.airs_at
-         LIMIT ?`;
+         LIMIT $2`;
 
 export async function readTonight(
   env: Bindings,
@@ -152,11 +152,11 @@ export async function readTonight(
 ) {
   const window = `+${hours} hours`;
   let rows = viewerId
-    ? (await env.DB.prepare(VIEWER_QUERY).bind(viewerId, window, limit).all<ScheduleRow>()).results
+    ? (await env.DB.query<ScheduleRow>(VIEWER_QUERY, [viewerId, window, limit])).rows
     : [];
 
   if (rows.length === 0) {
-    rows = (await env.DB.prepare(POPULAR_QUERY).bind(window, limit).all<ScheduleRow>()).results;
+    rows = (await env.DB.query<ScheduleRow>(POPULAR_QUERY, [window, limit])).rows;
   }
 
   const titles = await readItems(
@@ -174,19 +174,18 @@ export async function readTonight(
 }
 
 export async function readNextEpisode(env: Bindings, titleId: string) {
-  return env.DB.prepare(
-    `SELECT season, episode, episode_name AS episodeName, airs_at AS airsAt, network
+  return env.DB.first<{
+    season: number | null;
+    episode: number | null;
+    episodeName: string | null;
+    airsAt: string;
+    network: string | null;
+  }>(
+    `SELECT season, episode, episode_name AS "episodeName", airs_at AS "airsAt", network
      FROM title_schedule
-     WHERE title_id = ? AND airs_at >= datetime('now', '-3 hours')
+     WHERE title_id = $1 AND airs_at >= (CURRENT_TIMESTAMP - INTERVAL '3 hour')
      ORDER BY airs_at
      LIMIT 1`,
-  )
-    .bind(titleId)
-    .first<{
-      season: number | null;
-      episode: number | null;
-      episodeName: string | null;
-      airsAt: string;
-      network: string | null;
-    }>();
+    [titleId],
+  );
 }

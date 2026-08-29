@@ -1,5 +1,5 @@
 import type { JourneyMode } from "../../src/domain/journeys.ts";
-import type { Bindings } from "../types.ts";
+import type { WorkerBindings } from "../types.ts";
 
 export type MarqueeEvent = {
   name:
@@ -41,7 +41,7 @@ export type MarqueeEvent = {
   monetization?: string;
 };
 
-export function recordEvent(env: Bindings, event: MarqueeEvent) {
+export function recordEvent(env: Pick<WorkerBindings, "EVENTS">, event: MarqueeEvent) {
   if (!env.EVENTS) {
     return;
   }

@@ -14,7 +14,7 @@ export function includesProvider(title: MediaTitle, providerIds: string[]) {
   );
 }
 
-export function providerFilterSql(titleIdExpression: string) {
+export function providerFilterSql(titleIdExpression: string, providerIdsParameter: string) {
   return `(
     NOT EXISTS (
       SELECT 1 FROM catalog_title_providers AS ap WHERE ap.title_id = ${titleIdExpression}
@@ -22,7 +22,7 @@ export function providerFilterSql(titleIdExpression: string) {
     OR EXISTS (
       SELECT 1 FROM catalog_title_providers AS mp
        WHERE mp.title_id = ${titleIdExpression}
-         AND mp.provider_id IN (SELECT value FROM json_each(?))
+         AND mp.provider_id IN (SELECT value FROM jsonb_array_elements_text(CAST(${providerIdsParameter} AS jsonb)) AS entries(value))
          AND (
            NOT EXISTS (
              SELECT 1 FROM catalog_title_provider_offers AS ao

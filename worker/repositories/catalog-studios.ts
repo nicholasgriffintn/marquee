@@ -6,11 +6,11 @@ const FIELD: SimpleArrayField = {
   column: "studio",
 };
 
-export function readStudioMap(db: D1Database, ids: string[]) {
+export function readStudioMap(db: Database, ids: string[]) {
   return readSimpleArray(db, FIELD, ids);
 }
 
-export function writeStudioRows(db: D1Database, titles: MediaTitle[]) {
+export function writeStudioRows(db: Database, titles: MediaTitle[]) {
   return writeSimpleArray(
     db,
     FIELD,

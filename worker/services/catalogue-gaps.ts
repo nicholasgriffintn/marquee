@@ -77,7 +77,7 @@ async function searchUpstream(env: Bindings, query: string) {
   return [...found.values()];
 }
 
-async function heldImdbIds(db: D1Database, results: OmdbSearchResult[], known: MediaTitle[]) {
+async function heldImdbIds(db: Database, results: OmdbSearchResult[], known: MediaTitle[]) {
   const held = await readCatalogueImdbIds(
     db,
     results.map((result) => result.imdbId),
@@ -94,7 +94,7 @@ async function heldImdbIds(db: D1Database, results: OmdbSearchResult[], known: M
   return held;
 }
 
-async function queueRoom(db: D1Database) {
+async function queueRoom(db: Database) {
   const queued = await countRecentGapTitles(db, 1);
 
   return Math.min(GAP_DISCOVERY.queuePerLookup, GAP_DISCOVERY.queuePerHour - queued);

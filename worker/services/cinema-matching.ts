@@ -96,7 +96,7 @@ export function scoreCandidate(film: UnmatchedFilm, candidate: CandidateRow) {
 
 export const MATCH_THRESHOLD = 0.62;
 
-export async function findTitleForFilm(db: D1Database, film: UnmatchedFilm) {
+export async function findTitleForFilm(db: Database, film: UnmatchedFilm) {
   const cleaned = cleanFilmTitle(film.sourceTitle);
   const searchTokens = tokens(cleaned);
 
@@ -104,25 +104,23 @@ export async function findTitleForFilm(db: D1Database, film: UnmatchedFilm) {
     return { titleId: null, confidence: 0 };
   }
 
-  const expression = searchTokens.map((token) => `"${token}"*`).join(" OR ");
-  const rows = await db
-    .prepare(
-      `SELECT t.id, t.title, t.original_title AS originalTitle, t.year,
-              t.runtime_minutes AS runtimeMinutes,
+  const expression = searchTokens.map((token) => `${token}:*`).join(" | ");
+  const rows = await db.query<CandidateRow>(
+    `SELECT t.id, t.title, t.original_title AS "originalTitle", t.year,
+              t.runtime_minutes AS "runtimeMinutes",
               t.popularity
        FROM catalog_search AS s
        JOIN catalog_titles AS t ON t.id = s.title_id
-       WHERE catalog_search MATCH ?
+       WHERE s.title_document @@ to_tsquery('simple', $1)
          AND t.media_type = 'movie'
-       ORDER BY bm25(catalog_search, 12.0, 8.0, 1.0, 4.0, 3.0, 0.0)
+       ORDER BY ts_rank_cd(s.title_document, to_tsquery('simple', $2), 32) DESC
        LIMIT 25`,
-    )
-    .bind(`{title original_title} : (${expression})`)
-    .all<CandidateRow>();
+    [expression, expression],
+  );
 
   let best: { titleId: string; confidence: number } | null = null;
 
-  for (const candidate of rows.results) {
+  for (const candidate of rows.rows) {
     const confidence = scoreCandidate(film, candidate);
 
     if (!best || confidence > best.confidence) {

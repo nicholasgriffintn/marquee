@@ -33,31 +33,29 @@ export async function storeApiToken(
   label: string,
   scopes: readonly ApiScope[],
 ) {
-  await env.DB.prepare(
-    `INSERT INTO api_tokens (token_hash, user_id, label, scopes) VALUES (?, ?, ?, ?)`,
-  )
-    .bind(await hashState(token), userId, label.slice(0, 60) || "Untitled", serialiseScopes(scopes))
-    .run();
+  await env.DB.execute(
+    `INSERT INTO api_tokens (token_hash, user_id, label, scopes) VALUES ($1, $2, $3, $4)`,
+    [await hashState(token), userId, label.slice(0, 60) || "Untitled", serialiseScopes(scopes)],
+  );
 }
 
 export async function listApiTokens(env: Bindings, userId: string) {
-  const rows = await env.DB.prepare(
-    `SELECT substr(token_hash, 1, 8) AS id, label, scopes, created_at AS createdAt,
-            last_used_at AS lastUsedAt
+  const rows = await env.DB.query<{
+    id: string;
+    label: string;
+    scopes: string;
+    createdAt: string;
+    lastUsedAt: string | null;
+  }>(
+    `SELECT substr(token_hash, 1, 8) AS id, label, scopes, created_at AS "createdAt",
+            last_used_at AS "lastUsedAt"
      FROM api_tokens
-     WHERE user_id = ?
+     WHERE user_id = $1
      ORDER BY created_at DESC`,
-  )
-    .bind(userId)
-    .all<{
-      id: string;
-      label: string;
-      scopes: string;
-      createdAt: string;
-      lastUsedAt: string | null;
-    }>();
+    [userId],
+  );
 
-  return rows.results.map((row) => {
+  return rows.rows.map((row) => {
     const scopes = parseScopes(row.scopes);
 
     return {
@@ -72,13 +70,12 @@ export async function listApiTokens(env: Bindings, userId: string) {
 }
 
 export async function revokeApiToken(env: Bindings, userId: string, id: string) {
-  const result = await env.DB.prepare(
-    `DELETE FROM api_tokens WHERE user_id = ? AND substr(token_hash, 1, 8) = ?`,
-  )
-    .bind(userId, id)
-    .run();
+  const result = await env.DB.execute(
+    `DELETE FROM api_tokens WHERE user_id = $1 AND substr(token_hash, 1, 8) = $2`,
+    [userId, id],
+  );
 
-  return result.meta.changes > 0;
+  return result.rowCount > 0;
 }
 
 export type BearerIdentity = { user: MarqueeUser; scopes: ApiScope[] };
@@ -94,33 +91,31 @@ export async function bearerIdentity(
   }
 
   const tokenHash = await hashState(token);
-  const row = await env.DB.prepare(
-    `SELECT u.id, u.name, u.github_login AS githubLogin, u.email, u.avatar_url AS avatarUrl,
+  const row = await env.DB.first<{
+    id: string;
+    name: string;
+    githubLogin: string;
+    email?: string | null;
+    avatarUrl: string | null;
+    role: string | null;
+    scopes: string;
+  }>(
+    `SELECT u.id, u.name, u.github_login AS "githubLogin", u.email, u.avatar_url AS "avatarUrl",
             u.role, t.scopes
      FROM api_tokens AS t
      JOIN users AS u ON u.id = t.user_id
-     WHERE t.token_hash = ?`,
-  )
-    .bind(tokenHash)
-    .first<{
-      id: string;
-      name: string;
-      githubLogin: string;
-      email?: string | null;
-      avatarUrl: string | null;
-      role: string | null;
-      scopes: string;
-    }>();
+     WHERE t.token_hash = $1`,
+    [tokenHash],
+  );
 
   if (!row) {
     return null;
   }
 
-  await env.DB.prepare(
-    `UPDATE api_tokens SET last_used_at = CURRENT_TIMESTAMP WHERE token_hash = ?`,
-  )
-    .bind(tokenHash)
-    .run();
+  await env.DB.execute(
+    `UPDATE api_tokens SET last_used_at = CURRENT_TIMESTAMP WHERE token_hash = $1`,
+    [tokenHash],
+  );
 
   return {
     user: {
@@ -143,9 +138,9 @@ export async function revokeBearerToken(env: Bindings, request: Request) {
     return false;
   }
 
-  const result = await env.DB.prepare(`DELETE FROM api_tokens WHERE token_hash = ?`)
-    .bind(await hashState(token))
-    .run();
+  const result = await env.DB.execute(`DELETE FROM api_tokens WHERE token_hash = $1`, [
+    await hashState(token),
+  ]);
 
-  return result.meta.changes > 0;
+  return result.rowCount > 0;
 }

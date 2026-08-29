@@ -79,28 +79,27 @@ const seasons: Detector = {
   priority: 1,
   async find(env, _options) {
     try {
-      const rows = await env.DB.prepare(
-        `SELECT v.viewer_id AS viewerId, s.title_id AS titleId, s.show_name AS showName,
-                s.season AS season, min(s.airs_at) AS airsAt, s.network AS network
+      const rows = await env.DB.query<SeasonRow>(
+        `SELECT v.viewer_id AS "viewerId", s.title_id AS "titleId", s.show_name AS "showName",
+                s.season AS season, min(s.airs_at) AS "airsAt", s.network AS network
            FROM title_schedule AS s
            JOIN viewing_entries AS v ON v.title_id = s.title_id
           WHERE s.season IS NOT NULL
             AND s.season BETWEEN 2 AND 60
             AND s.episode = 1
             AND v.status IN ('watchlist', 'watching', 'watched')
-            AND julianday(s.airs_at) BETWEEN julianday('now', '-2 days')
-                                         AND julianday('now', ?1)
+            AND (EXTRACT(EPOCH FROM s.airs_at) / 86400.0) BETWEEN (EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - INTERVAL '2 day')) / 86400.0)
+                                         AND (EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP + CAST($1 AS INTERVAL))) / 86400.0)
             AND s.season > COALESCE(
                   (SELECT max(p.season) FROM title_schedule AS p
                     WHERE p.title_id = s.title_id
-                      AND julianday(p.airs_at) < julianday('now', '-30 days')), 0)
+                      AND (EXTRACT(EPOCH FROM p.airs_at) / 86400.0) < (EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - INTERVAL '30 day')) / 86400.0)), 0)
           GROUP BY v.viewer_id, s.title_id, s.season
           LIMIT 400`,
-      )
-        .bind(`+${SEASON_HORIZON_DAYS} days`)
-        .all<SeasonRow>();
+        [`+${SEASON_HORIZON_DAYS} days`],
+      );
 
-      return rows.results.map((row): AlertCandidate => {
+      return rows.rows.map((row): AlertCandidate => {
         const when = new Date(row.airsAt);
         const day = Number.isNaN(when.getTime())
           ? "soon"
@@ -137,25 +136,24 @@ const cinema: Detector = {
   priority: 0,
   async find(env, _options) {
     try {
-      const rows = await env.DB.prepare(
-        `SELECT v.viewer_id AS viewerId, c.title_id AS titleId, t.title AS title,
-                cin.name AS cinemaName, min(c.business_day) AS businessDay
+      const rows = await env.DB.query<CinemaRow>(
+        `SELECT v.viewer_id AS "viewerId", c.title_id AS "titleId", t.title AS title,
+                cin.name AS "cinemaName", min(c.business_day) AS "businessDay"
            FROM cinema_screenings AS c
            JOIN cinemas AS cin ON cin.id = c.cinema_id
            JOIN viewing_entries AS v ON v.title_id = c.title_id
            JOIN catalog_titles AS t ON t.id = c.title_id
           WHERE c.title_id IS NOT NULL
             AND v.status IN ('watchlist', 'watching')
-            AND julianday(c.business_day) BETWEEN julianday('now')
-                                             AND julianday('now', ?1)
+            AND (EXTRACT(EPOCH FROM c.business_day) / 86400.0) BETWEEN (EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) / 86400.0)
+                                             AND (EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP + CAST($1 AS INTERVAL))) / 86400.0)
           GROUP BY v.viewer_id, c.title_id
           ORDER BY businessDay
           LIMIT 200`,
-      )
-        .bind(`+${CINEMA_HORIZON_DAYS} days`)
-        .all<CinemaRow>();
+        [`+${CINEMA_HORIZON_DAYS} days`],
+      );
 
-      return rows.results.map((row): AlertCandidate => {
+      return rows.rows.map((row): AlertCandidate => {
         const when = new Date(row.businessDay);
         const day = Number.isNaN(when.getTime())
           ? "this week"
@@ -186,8 +184,8 @@ const people: Detector = {
   priority: 3,
   async find(env, _options) {
     try {
-      const rows = await env.DB.prepare(
-        `SELECT DISTINCT b.viewer_id AS viewerId, t.id AS titleId, t.title AS title,
+      const rows = await env.DB.query<PersonRow>(
+        `SELECT DISTINCT b.viewer_id AS "viewerId", t.id AS "titleId", t.title AS title,
                 cp.name AS person
            FROM viewer_beliefs AS b
            JOIN catalog_people AS cp
@@ -196,19 +194,18 @@ const people: Detector = {
            JOIN catalog_titles AS t ON t.id = cr.title_id
           WHERE (b.key LIKE 'rule:person:%' OR b.key LIKE 'person:%')
             AND b.revoked_at IS NULL
-            AND (b.suspended_until IS NULL OR julianday(b.suspended_until) < julianday('now'))
-            AND julianday(COALESCE(t.release_date, '1900-01-01'))
-                  > julianday('now', ?1)
+            AND (b.suspended_until IS NULL OR (EXTRACT(EPOCH FROM b.suspended_until) / 86400.0) < (EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) / 86400.0))
+            AND COALESCE(t.release_date, DATE '1900-01-01')
+                  > CURRENT_DATE + CAST($1 AS INTERVAL)
             AND NOT EXISTS (
                   SELECT 1 FROM viewing_entries AS v
                    WHERE v.viewer_id = b.viewer_id AND v.title_id = t.id
                 )
           LIMIT 120`,
-      )
-        .bind(`-${PERSON_WINDOW_DAYS} days`)
-        .all<PersonRow>();
+        [`-${PERSON_WINDOW_DAYS} days`],
+      );
 
-      return rows.results.map((row): AlertCandidate => {
+      return rows.rows.map((row): AlertCandidate => {
         const name = row.person.replaceAll(/\b\w/gu, (letter) => letter.toUpperCase());
 
         return {

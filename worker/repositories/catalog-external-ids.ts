@@ -17,36 +17,35 @@ type ExternalIdsRow = TitleIdentifiers & {
   animeCountdownId: number | null;
 };
 
-export async function readExternalIdsMap(db: D1Database, ids: string[]) {
+export async function readExternalIdsMap(db: Database, ids: string[]) {
   const rows = await queryChunked(ids, (wave) =>
     db
-      .prepare(
-        `SELECT title_id AS titleId, tvdb_id AS tvdbId, facebook_id AS facebookId,
-                instagram_id AS instagramId, twitter_id AS twitterId, anidb_id AS anidbId,
-                kitsu_id AS kitsuId, ani_search_id AS aniSearchId, anime_planet_id AS animePlanetId,
-                livechart_id AS livechartId, animenewsnetwork_id AS animeNewsNetworkId,
-                animecountdown_id AS animeCountdownId, letterboxd_id AS letterboxdId,
-                rotten_tomatoes_id AS rottenTomatoesId, metacritic_id AS metacriticId,
-                trakt_id AS traktId
+      .query<ExternalIdsRow>(
+        `SELECT title_id AS "titleId", tvdb_id AS "tvdbId", facebook_id AS "facebookId",
+                instagram_id AS "instagramId", twitter_id AS "twitterId", anidb_id AS "anidbId",
+                kitsu_id AS "kitsuId", ani_search_id AS "aniSearchId", anime_planet_id AS "animePlanetId",
+                livechart_id AS "livechartId", animenewsnetwork_id AS "animeNewsNetworkId",
+                animecountdown_id AS "animeCountdownId", letterboxd_id AS "letterboxdId",
+                rotten_tomatoes_id AS "rottenTomatoesId", metacritic_id AS "metacriticId",
+                trakt_id AS "traktId"
          FROM catalog_title_external_ids
-         WHERE title_id IN (${wave.map(() => "?").join(",")})`,
+         WHERE title_id IN (${wave.map((_, index) => `$${index + 1}`).join(",")})`,
+        [...wave],
       )
-      .bind(...wave)
-      .all<ExternalIdsRow>()
-      .then((result) => result.results),
+      .then((result) => result.rows),
   );
 
   return new Map(rows.map(({ titleId, ...rest }) => [titleId, rest]));
 }
 
-export async function writeExternalIdsRows(db: D1Database, titles: MediaTitle[]) {
+export async function writeExternalIdsRows(db: Database, titles: MediaTitle[]) {
   await deleteByTitleIds(
     db,
     "catalog_title_external_ids",
     titles.map((title) => title.id),
   );
 
-  const rows = titles.flatMap((title): unknown[][] => {
+  const rows = titles.flatMap((title): DatabaseValue[][] => {
     const ids = title.externalIds;
 
     return ids
@@ -97,14 +96,14 @@ export async function writeExternalIdsRows(db: D1Database, titles: MediaTitle[])
 }
 
 export async function writeTitleIdentifierRows(
-  db: D1Database,
+  db: Database,
   entries: { titleId: string; identifiers: TitleIdentifiers }[],
 ) {
   await insertRows(
     db,
     5,
     18,
-    entries.map(({ titleId, identifiers }): unknown[] => [
+    entries.map(({ titleId, identifiers }): DatabaseValue[] => [
       titleId,
       identifiers.letterboxdId,
       identifiers.rottenTomatoesId,

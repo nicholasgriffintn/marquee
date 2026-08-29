@@ -16,7 +16,7 @@ function streamingKind(provider: ProviderAvailability) {
 }
 
 export async function recordProviderState(
-  db: D1Database,
+  db: Database,
   titleId: string,
   providers: ProviderAvailability[],
   baseline: boolean,
@@ -36,42 +36,40 @@ export async function recordProviderState(
   }
 
   try {
-    await db.batch(
-      [...seen.entries()].map(([providerId, kind]) =>
-        db
-          .prepare(
-            `INSERT INTO title_provider_state (title_id, provider_id, offer_kind, announced_at)
-             VALUES (?1, ?2, ?3, ${baseline ? "CURRENT_TIMESTAMP" : "NULL"})
+    await db.transaction(async (transaction) => {
+      for (const [providerId, kind] of seen) {
+        // oxlint-disable-next-line no-await-in-loop
+        await transaction.execute(
+          `INSERT INTO title_provider_state (title_id, provider_id, offer_kind, announced_at)
+             VALUES ($1, $2, $3, ${baseline ? "CURRENT_TIMESTAMP" : "NULL"})
              ON CONFLICT (title_id, provider_id) DO UPDATE SET
                seen_count = seen_count + 1,
                offer_kind = excluded.offer_kind,
                last_seen_at = CURRENT_TIMESTAMP`,
-          )
-          .bind(titleId, providerId, kind),
-      ),
-    );
+          [titleId, providerId, kind],
+        );
+      }
+    });
   } catch (error) {
     logError("provider_state_failed", error, { titleId });
   }
 }
 
-export async function confirmedArrivals(db: D1Database, sinceHours = 72): Promise<Arrival[]> {
+export async function confirmedArrivals(db: Database, sinceHours = 72): Promise<Arrival[]> {
   try {
-    const rows = await db
-      .prepare(
-        `SELECT s.title_id AS titleId, s.provider_id AS providerId, t.title AS title
+    const rows = await db.query<{ titleId: string; providerId: string; title: string }>(
+      `SELECT s.title_id AS "titleId", s.provider_id AS "providerId", t.title AS title
            FROM title_provider_state AS s
            JOIN catalog_titles AS t ON t.id = s.title_id
           WHERE s.announced_at IS NULL
             AND s.offer_kind = 'streaming'
-            AND s.seen_count >= ?1
-            AND julianday(s.last_seen_at) > julianday('now', ?2)
+            AND s.seen_count >= $1
+            AND (EXTRACT(EPOCH FROM s.last_seen_at) / 86400.0) > (EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP + CAST($2 AS INTERVAL))) / 86400.0)
           LIMIT 200`,
-      )
-      .bind(CONFIRMATIONS, `-${Math.max(1, sinceHours)} hours`)
-      .all<{ titleId: string; providerId: string; title: string }>();
+      [CONFIRMATIONS, `-${Math.max(1, sinceHours)} hours`],
+    );
 
-    return rows.results.map((row) => ({
+    return rows.rows.map((row) => ({
       titleId: row.titleId,
       title: row.title,
       providerId: row.providerId,
@@ -84,18 +82,18 @@ export async function confirmedArrivals(db: D1Database, sinceHours = 72): Promis
   }
 }
 
-export async function settleAnnounced(db: D1Database, arrivals: Arrival[]) {
+export async function settleAnnounced(db: Database, arrivals: Arrival[]) {
   if (arrivals.length === 0) {
     return;
   }
 
   try {
-    await db.batch(
-      arrivals.map((arrival) =>
-        db
-          .prepare(
-            `UPDATE title_provider_state SET announced_at = CURRENT_TIMESTAMP
-              WHERE title_id = ?1 AND provider_id = ?2
+    await db.transaction(async (transaction) => {
+      for (const arrival of arrivals) {
+        // oxlint-disable-next-line no-await-in-loop
+        await transaction.execute(
+          `UPDATE title_provider_state SET announced_at = CURRENT_TIMESTAMP
+              WHERE title_id = $1 AND provider_id = $2
                 AND announced_at IS NULL
                 AND NOT EXISTS (
                   SELECT 1 FROM viewing_entries AS v
@@ -113,35 +111,33 @@ export async function settleAnnounced(db: D1Database, arrivals: Arrival[]) {
                           AND a.kind = 'arrival'
                           AND a.alert_key = title_provider_state.title_id
                                             || ':' || title_provider_state.provider_id))`,
-          )
-          .bind(arrival.titleId, arrival.providerId),
-      ),
-    );
+          [arrival.titleId, arrival.providerId],
+        );
+      }
+    });
   } catch (error) {
     logError("arrivals_settle_failed", error);
   }
 }
 
-export async function waitingViewers(db: D1Database, titleIds: string[]) {
+export async function waitingViewers(db: Database, titleIds: string[]) {
   if (titleIds.length === 0) {
     return new Map<string, { viewerId: string; email: string; name: string }[]>();
   }
 
   try {
-    const rows = await db
-      .prepare(
-        `SELECT v.title_id AS titleId, v.viewer_id AS viewerId, u.email AS email, u.name AS name
+    const rows = await db.query<{ titleId: string; viewerId: string; email: string; name: string }>(
+      `SELECT v.title_id AS "titleId", v.viewer_id AS "viewerId", u.email AS email, u.name AS name
            FROM viewing_entries AS v
            JOIN users AS u ON u.id = v.viewer_id
           WHERE v.status IN ('watchlist', 'watching')
             AND u.email IS NOT NULL AND u.email != ''
-            AND v.title_id IN (${titleIds.map(() => "?").join(",")})`,
-      )
-      .bind(...titleIds)
-      .all<{ titleId: string; viewerId: string; email: string; name: string }>();
+            AND v.title_id IN (${titleIds.map((_, index) => `$${index + 1}`).join(",")})`,
+      [...titleIds],
+    );
     const byTitle = new Map<string, { viewerId: string; email: string; name: string }[]>();
 
-    for (const row of rows.results) {
+    for (const row of rows.rows) {
       byTitle.set(row.titleId, [
         ...(byTitle.get(row.titleId) ?? []),
         { viewerId: row.viewerId, email: row.email, name: row.name },
@@ -156,22 +152,20 @@ export async function waitingViewers(db: D1Database, titleIds: string[]) {
   }
 }
 
-export async function alreadyAlerted(db: D1Database, viewerId: string, titleIds: string[]) {
+export async function alreadyAlerted(db: Database, viewerId: string, titleIds: string[]) {
   if (titleIds.length === 0) {
     return new Set<string>();
   }
 
   try {
-    const rows = await db
-      .prepare(
-        `SELECT title_id AS titleId FROM viewer_alerts
-          WHERE viewer_id = ?1 AND kind = 'arrival'
-            AND title_id IN (${titleIds.map(() => "?").join(",")})`,
-      )
-      .bind(viewerId, ...titleIds)
-      .all<{ titleId: string }>();
+    const rows = await db.query<{ titleId: string }>(
+      `SELECT title_id AS "titleId" FROM viewer_alerts
+          WHERE viewer_id = $1 AND kind = 'arrival'
+            AND title_id IN (${titleIds.map((_, index) => `$${index + 2}`).join(",")})`,
+      [viewerId, ...titleIds],
+    );
 
-    return new Set(rows.results.map((row) => row.titleId));
+    return new Set(rows.rows.map((row) => row.titleId));
   } catch (error) {
     logError("alert_history_failed", error);
 
@@ -179,15 +173,13 @@ export async function alreadyAlerted(db: D1Database, viewerId: string, titleIds:
   }
 }
 
-export async function recentAlertCount(db: D1Database, viewerId: string, days = 7) {
+export async function recentAlertCount(db: Database, viewerId: string, days = 7) {
   try {
-    const row = await db
-      .prepare(
-        `SELECT count(*) AS total FROM viewer_alerts
-          WHERE viewer_id = ?1 AND julianday(sent_at) > julianday('now', ?2)`,
-      )
-      .bind(viewerId, `-${days} days`)
-      .first<{ total: number }>();
+    const row = await db.first<{ total: number }>(
+      `SELECT count(*) AS total FROM viewer_alerts
+          WHERE viewer_id = $1 AND (EXTRACT(EPOCH FROM sent_at) / 86400.0) > (EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP + CAST($2 AS INTERVAL))) / 86400.0)`,
+      [viewerId, `-${days} days`],
+    );
 
     return row?.total ?? 0;
   } catch {
@@ -195,22 +187,23 @@ export async function recentAlertCount(db: D1Database, viewerId: string, days = 
   }
 }
 
-export async function noteAlert(db: D1Database, viewerId: string, titleIds: string[]) {
+export async function noteAlert(db: Database, viewerId: string, titleIds: string[]) {
   if (titleIds.length === 0) {
     return;
   }
 
   try {
-    await db.batch(
-      titleIds.map((titleId) =>
-        db
-          .prepare(
-            `INSERT OR IGNORE INTO viewer_alerts (viewer_id, title_id, kind)
-             VALUES (?1, ?2, 'arrival')`,
-          )
-          .bind(viewerId, titleId),
-      ),
-    );
+    await db.transaction(async (transaction) => {
+      for (const titleId of titleIds) {
+        // oxlint-disable-next-line no-await-in-loop
+        await transaction.execute(
+          `INSERT INTO viewer_alerts (viewer_id, title_id, kind)
+             VALUES ($1, $2, 'arrival')
+             ON CONFLICT DO NOTHING`,
+          [viewerId, titleId],
+        );
+      }
+    });
   } catch (error) {
     logError("alert_note_failed", error);
   }

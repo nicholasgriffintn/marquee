@@ -34,17 +34,16 @@ async function storeNativeAuthCode(
   code: string,
   challenge?: string,
 ) {
-  await env.DB.prepare(`DELETE FROM native_auth_codes WHERE expires_at <= CURRENT_TIMESTAMP`).run();
-  await env.DB.prepare(
+  await env.DB.execute(`DELETE FROM native_auth_codes WHERE expires_at <= CURRENT_TIMESTAMP`);
+  await env.DB.execute(
     `INSERT INTO native_auth_codes (code_hash, user_id, expires_at)
-     VALUES (?, ?, datetime('now', ?))`,
-  )
-    .bind(
+     VALUES ($1, $2, (CURRENT_TIMESTAMP + CAST($3 AS INTERVAL)))`,
+    [
       await hashState(challenge ? `${code}:${challenge}` : code),
       userId,
       `+${NATIVE_CODE_TTL_MINUTES} minutes`,
-    )
-    .run();
+    ],
+  );
 }
 
 async function consumeNativeAuthCode(env: Bindings, code: string, verifier?: string) {
@@ -52,13 +51,12 @@ async function consumeNativeAuthCode(env: Bindings, code: string, verifier?: str
     return null;
   }
 
-  const row = await env.DB.prepare(
+  const row = await env.DB.first<{ userId: string }>(
     `DELETE FROM native_auth_codes
-     WHERE code_hash = ? AND expires_at > CURRENT_TIMESTAMP
-     RETURNING user_id AS userId`,
-  )
-    .bind(await hashState(verifier ? `${code}:${await hashState(verifier)}` : code))
-    .first<{ userId: string }>();
+     WHERE code_hash = $1 AND expires_at > CURRENT_TIMESTAMP
+     RETURNING user_id AS "userId"`,
+    [await hashState(verifier ? `${code}:${await hashState(verifier)}` : code)],
+  );
 
   return row?.userId ?? null;
 }

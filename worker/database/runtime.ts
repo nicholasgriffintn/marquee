@@ -13,9 +13,22 @@ export type WithDatabase<Environment extends DatabaseBinding> = Environment & {
   DB: Database;
 };
 
-export function openDatabase<Environment extends DatabaseBinding>(env: Environment) {
-  const database = new PostgresDatabase(env.HYPERDRIVE.connectionString);
+export async function openDatabase<Environment extends DatabaseBinding>(env: Environment) {
+  const database = await PostgresDatabase.connect(env.HYPERDRIVE.connectionString);
   const runtime: WithDatabase<Environment> = { ...env, DB: database };
 
   return { database, runtime };
+}
+
+export async function withDatabase<Environment extends DatabaseBinding, Result>(
+  env: Environment,
+  operation: (runtime: WithDatabase<Environment>) => Promise<Result>,
+) {
+  const { database, runtime } = await openDatabase(env);
+
+  try {
+    return await operation(runtime);
+  } finally {
+    await database.close();
+  }
 }

@@ -1,16 +1,15 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
 import { deleteByTitleIds, groupBy, insertRows, queryChunked } from "./catalog-array-utils.ts";
 
-export async function readAnimeSynonymMap(db: D1Database, ids: string[]) {
+export async function readAnimeSynonymMap(db: Database, ids: string[]) {
   const rows = await queryChunked(ids, (wave) =>
     db
-      .prepare(
-        `SELECT title_id AS titleId, synonym AS value FROM catalog_title_anime_synonyms
-         WHERE title_id IN (${wave.map(() => "?").join(",")}) ORDER BY title_id, position`,
+      .query<{ titleId: string; value: string }>(
+        `SELECT title_id AS "titleId", synonym AS value FROM catalog_title_anime_synonyms
+         WHERE title_id IN (${wave.map((_, index) => `$${index + 1}`).join(",")}) ORDER BY title_id, position`,
+        [...wave],
       )
-      .bind(...wave)
-      .all<{ titleId: string; value: string }>()
-      .then((r) => r.results),
+      .then((r) => r.rows),
   );
   const grouped = groupBy(rows, (r) => r.titleId);
   const values = new Map<string, string[]>();
@@ -25,7 +24,7 @@ export async function readAnimeSynonymMap(db: D1Database, ids: string[]) {
   return values;
 }
 
-export async function writeAnimeSynonymRows(db: D1Database, titles: MediaTitle[]) {
+export async function writeAnimeSynonymRows(db: Database, titles: MediaTitle[]) {
   await deleteByTitleIds(
     db,
     "catalog_title_anime_synonyms",
@@ -33,7 +32,11 @@ export async function writeAnimeSynonymRows(db: D1Database, titles: MediaTitle[]
   );
 
   const rows = titles.flatMap((title) =>
-    (title.anime?.synonyms ?? []).map((value, position): unknown[] => [title.id, value, position]),
+    (title.anime?.synonyms ?? []).map((value, position): DatabaseValue[] => [
+      title.id,
+      value,
+      position,
+    ]),
   );
 
   await insertRows(
@@ -42,8 +45,9 @@ export async function writeAnimeSynonymRows(db: D1Database, titles: MediaTitle[]
     30,
     rows,
     (chunk) =>
-      `INSERT OR IGNORE INTO catalog_title_anime_synonyms (title_id, synonym, position)
-       VALUES ${chunk.map(() => "(?, ?, ?)").join(", ")}`,
+      `INSERT INTO catalog_title_anime_synonyms (title_id, synonym, position)
+       VALUES ${chunk.map(() => "(?, ?, ?)").join(", ")}
+       ON CONFLICT DO NOTHING`,
   );
 }
 
@@ -53,16 +57,15 @@ type CompanyRow = {
   name: string;
 };
 
-export async function readAnimeCompanyMap(db: D1Database, ids: string[]) {
+export async function readAnimeCompanyMap(db: Database, ids: string[]) {
   const rows = await queryChunked(ids, (wave) =>
     db
-      .prepare(
-        `SELECT title_id AS titleId, kind, name FROM catalog_title_anime_companies
-         WHERE title_id IN (${wave.map(() => "?").join(",")}) ORDER BY title_id, kind, position`,
+      .query<CompanyRow>(
+        `SELECT title_id AS "titleId", kind, name FROM catalog_title_anime_companies
+         WHERE title_id IN (${wave.map((_, index) => `$${index + 1}`).join(",")}) ORDER BY title_id, kind, position`,
+        [...wave],
       )
-      .bind(...wave)
-      .all<CompanyRow>()
-      .then((r) => r.results),
+      .then((r) => r.rows),
   );
   const grouped = groupBy(rows, (r) => r.titleId);
   const values = new Map<string, { licensors: string[]; producers: string[] }>();
@@ -77,7 +80,7 @@ export async function readAnimeCompanyMap(db: D1Database, ids: string[]) {
   return values;
 }
 
-export async function writeAnimeCompanyRows(db: D1Database, titles: MediaTitle[]) {
+export async function writeAnimeCompanyRows(db: Database, titles: MediaTitle[]) {
   await deleteByTitleIds(
     db,
     "catalog_title_anime_companies",
@@ -85,13 +88,13 @@ export async function writeAnimeCompanyRows(db: D1Database, titles: MediaTitle[]
   );
 
   const rows = titles.flatMap((title) => [
-    ...(title.anime?.licensors ?? []).map((name, position): unknown[] => [
+    ...(title.anime?.licensors ?? []).map((name, position): DatabaseValue[] => [
       title.id,
       "licensor",
       name,
       position,
     ]),
-    ...(title.anime?.producers ?? []).map((name, position): unknown[] => [
+    ...(title.anime?.producers ?? []).map((name, position): DatabaseValue[] => [
       title.id,
       "producer",
       name,
@@ -105,7 +108,8 @@ export async function writeAnimeCompanyRows(db: D1Database, titles: MediaTitle[]
     22,
     rows,
     (chunk) =>
-      `INSERT OR IGNORE INTO catalog_title_anime_companies (title_id, kind, name, position)
-       VALUES ${chunk.map(() => "(?, ?, ?, ?)").join(", ")}`,
+      `INSERT INTO catalog_title_anime_companies (title_id, kind, name, position)
+       VALUES ${chunk.map(() => "(?, ?, ?, ?)").join(", ")}
+       ON CONFLICT DO NOTHING`,
   );
 }

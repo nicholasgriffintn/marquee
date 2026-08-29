@@ -31,20 +31,18 @@ const NO_RECORD: RailRecord = {
 };
 
 export async function readRailRecord(
-  db: D1Database,
+  db: Database,
   viewerId: string,
   revision: string,
 ): Promise<RailRecord> {
-  const row = await db
-    .prepare(
-      `SELECT payload, revision, generation_id AS generationId,
-              attempted_revision AS attemptedRevision,
-              (julianday('now') - julianday(created_at)) * 24 AS ageHours,
-              (julianday('now') - julianday(attempted_at)) * 24 AS attemptAgeHours
-         FROM ai_rails WHERE viewer_id = ?`,
-    )
-    .bind(viewerId)
-    .first<RailRow>();
+  const row = await db.first<RailRow>(
+    `SELECT payload, revision, generation_id AS "generationId",
+              attempted_revision AS "attemptedRevision",
+              ((EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) / 86400.0) - (EXTRACT(EPOCH FROM created_at) / 86400.0)) * 24 AS "ageHours",
+              ((EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) / 86400.0) - (EXTRACT(EPOCH FROM attempted_at) / 86400.0)) * 24 AS "attemptAgeHours"
+         FROM ai_rails WHERE viewer_id = $1`,
+    [viewerId],
+  );
 
   if (!row) {
     return NO_RECORD;
@@ -64,50 +62,44 @@ export async function readRailRecord(
   };
 }
 
-async function claimGeneration(db: D1Database, viewerId: string, revision: string) {
-  const result = await db
-    .prepare(
-      `INSERT INTO ai_rails (viewer_id, claim_revision, claimed_at)
-       VALUES (?1, ?2, datetime('now'))
+async function claimGeneration(db: Database, viewerId: string, revision: string) {
+  const result = await db.execute(
+    `INSERT INTO ai_rails (viewer_id, claim_revision, claimed_at)
+       VALUES ($1, $2, CURRENT_TIMESTAMP)
        ON CONFLICT(viewer_id) DO UPDATE SET
          claim_revision = excluded.claim_revision,
          claimed_at = excluded.claimed_at
        WHERE ai_rails.claimed_at IS NULL
           OR ai_rails.claim_revision IS NOT excluded.claim_revision
-          OR ai_rails.claimed_at < datetime('now', ?3)`,
-    )
-    .bind(viewerId, revision, `-${LEASE_MINUTES} minutes`)
-    .run();
+          OR ai_rails.claimed_at < (CURRENT_TIMESTAMP + CAST($3 AS INTERVAL))`,
+    [viewerId, revision, `-${LEASE_MINUTES} minutes`],
+  );
 
-  return (result.meta.changes ?? 0) > 0;
+  return (result.rowCount ?? 0) > 0;
 }
 
-export async function releaseGeneration(db: D1Database, viewerId: string, revision: string) {
-  await db
-    .prepare(
-      `UPDATE ai_rails SET claim_revision = NULL, claimed_at = NULL
-        WHERE viewer_id = ?1 AND claim_revision = ?2`,
-    )
-    .bind(viewerId, revision)
-    .run();
+export async function releaseGeneration(db: Database, viewerId: string, revision: string) {
+  await db.execute(
+    `UPDATE ai_rails SET claim_revision = NULL, claimed_at = NULL
+        WHERE viewer_id = $1 AND claim_revision = $2`,
+    [viewerId, revision],
+  );
 }
 
-async function markAttempt(db: D1Database, viewerId: string, revision: string) {
-  const result = await db
-    .prepare(
-      `UPDATE ai_rails
-          SET attempted_revision = ?2, attempted_at = datetime('now'),
+async function markAttempt(db: Database, viewerId: string, revision: string) {
+  const result = await db.execute(
+    `UPDATE ai_rails
+          SET attempted_revision = $2, attempted_at = CURRENT_TIMESTAMP,
               claim_revision = NULL, claimed_at = NULL
-        WHERE viewer_id = ?1 AND claim_revision = ?2`,
-    )
-    .bind(viewerId, revision)
-    .run();
+        WHERE viewer_id = $1 AND claim_revision = $2`,
+    [viewerId, revision],
+  );
 
-  return (result.meta.changes ?? 0) > 0;
+  return (result.rowCount ?? 0) > 0;
 }
 
 export async function persistRails(
-  db: D1Database,
+  db: Database,
   viewerId: string,
   revision: string,
   generationId: string,
@@ -124,11 +116,10 @@ export async function persistRails(
     return persisted;
   }
 
-  const result = await db
-    .prepare(
-      `INSERT INTO ai_rails (viewer_id, revision, generation_id, payload, created_at,
+  const result = await db.execute(
+    `INSERT INTO ai_rails (viewer_id, revision, generation_id, payload, created_at,
                              attempted_revision, attempted_at)
-       VALUES (?1, ?2, ?3, ?4, CURRENT_TIMESTAMP, ?2, datetime('now'))
+       VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, $2, CURRENT_TIMESTAMP)
        ON CONFLICT(viewer_id) DO UPDATE SET
          revision = excluded.revision,
          generation_id = excluded.generation_id,
@@ -139,10 +130,9 @@ export async function persistRails(
          claim_revision = NULL,
          claimed_at = NULL
        WHERE ai_rails.claim_revision = excluded.revision`,
-    )
-    .bind(viewerId, revision, generationId, JSON.stringify(rails))
-    .run();
-  const persisted = (result.meta.changes ?? 0) > 0;
+    [viewerId, revision, generationId, JSON.stringify(rails)],
+  );
+  const persisted = (result.rowCount ?? 0) > 0;
 
   logEvent(persisted ? "ai_rails_generated" : "ai_rails_superseded", {
     rails: rails.length,

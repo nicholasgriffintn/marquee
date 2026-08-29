@@ -127,12 +127,11 @@ async function hydrateMissing(env: Bindings, titleIds: string[]) {
     return;
   }
 
-  const known = await env.DB.prepare(
-    `SELECT id FROM catalog_titles WHERE id IN (SELECT value FROM json_each(?))`,
-  )
-    .bind(JSON.stringify(titleIds))
-    .all<{ id: string }>();
-  const have = new Set(known.results.map((row) => row.id));
+  const known = await env.DB.query<{ id: string }>(
+    `SELECT id FROM catalog_titles WHERE id IN (SELECT value FROM jsonb_array_elements_text(CAST($1 AS jsonb)) AS entries(value))`,
+    [JSON.stringify(titleIds)],
+  );
+  const have = new Set(known.rows.map((row) => row.id));
   const missing = titleIds.filter((titleId) => !have.has(titleId)).slice(0, HYDRATE_LIMIT);
 
   if (missing.length === 0) {
@@ -171,18 +170,19 @@ export async function importTraktHistory(env: Bindings, viewerId: string, origin
     return 0;
   }
 
-  await env.DB.batch(
-    planned.map((entry) =>
-      env.DB.prepare(
+  await env.DB.transaction(async (transaction) => {
+    for (const entry of planned) {
+      await transaction.execute(
         `INSERT INTO viewing_entries (id, viewer_id, title_id, status, rating, thoughts)
-         VALUES (?, ?, ?, ?, ?, '')
+         VALUES ($1, $2, $3, $4, $5, '')
          ON CONFLICT(viewer_id, title_id) DO UPDATE SET
            status = excluded.status,
            rating = COALESCE(excluded.rating, viewing_entries.rating),
            updated_at = CURRENT_TIMESTAMP`,
-      ).bind(crypto.randomUUID(), viewerId, entry.titleId, entry.status, entry.rating),
-    ),
-  );
+        [crypto.randomUUID(), viewerId, entry.titleId, entry.status, entry.rating],
+      );
+    }
+  });
 
   await markLinkSynced(env, viewerId, "trakt");
 
@@ -254,17 +254,16 @@ export async function exportTraktShelf(env: Bindings, viewerId: string, origin: 
   }
 
   const pushedAt = await readPushedAt(env, viewerId, "trakt");
-  const rows = await env.DB.prepare(
-    `SELECT title_id AS titleId, status, rating, updated_at AS updatedAt
+  const rows = await env.DB.query<ShelfRow>(
+    `SELECT title_id AS "titleId", status, rating, updated_at AS "updatedAt"
        FROM viewing_entries
-      WHERE viewer_id = ?1
-        AND (?2 IS NULL OR updated_at > ?2)
+      WHERE viewer_id = $1
+        AND ($2 IS NULL OR updated_at > $2)
       ORDER BY updated_at, id
       LIMIT ${PUSH_LIMIT}`,
-  )
-    .bind(viewerId, pushedAt)
-    .all<ShelfRow>();
-  const page = rows.results;
+    [viewerId, pushedAt],
+  );
+  const page = rows.rows;
   const boundary = page.at(-1)?.updatedAt;
   const trimmed =
     page.length === PUSH_LIMIT && boundary
@@ -308,25 +307,24 @@ export async function exportTraktShelf(env: Bindings, viewerId: string, origin: 
 
   logEvent("trakt_shelf_pushed", { watched, rated, listed });
 
-  return { watched, rated, listed, considered: rows.results.length };
+  return { watched, rated, listed, considered: rows.rows.length };
 }
 
 export async function traktPushPreview(env: Bindings, viewerId: string) {
   const pushedAt = await readPushedAt(env, viewerId, "trakt");
-  const row = await env.DB.prepare(
+  const row = await env.DB.first<{
+    watched: number | null;
+    listed: number | null;
+    rated: number | null;
+  }>(
     `SELECT
        sum(CASE WHEN status = 'watched' THEN 1 ELSE 0 END) AS watched,
        sum(CASE WHEN status IN ('watchlist', 'watching') THEN 1 ELSE 0 END) AS listed,
        sum(CASE WHEN rating IS NOT NULL THEN 1 ELSE 0 END) AS rated
      FROM viewing_entries
-     WHERE viewer_id = ?1 AND (?2 IS NULL OR updated_at > ?2)`,
-  )
-    .bind(viewerId, pushedAt)
-    .first<{
-      watched: number | null;
-      listed: number | null;
-      rated: number | null;
-    }>();
+     WHERE viewer_id = $1 AND ($2 IS NULL OR updated_at > $2)`,
+    [viewerId, pushedAt],
+  );
 
   return {
     pushedAt,

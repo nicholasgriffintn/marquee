@@ -247,13 +247,12 @@ async function staleWatchlistMoment(
   viewerId: string,
   titleId: string,
 ): Promise<UsherMoment | null> {
-  const row = await env.DB.prepare(
-    `SELECT (julianday('now') - julianday(updated_at)) AS age
+  const row = await env.DB.first<{ age: number }>(
+    `SELECT ((EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) / 86400.0) - (EXTRACT(EPOCH FROM updated_at) / 86400.0)) AS age
      FROM viewing_entries
-     WHERE viewer_id = ? AND title_id = ? AND status = 'watchlist'`,
-  )
-    .bind(viewerId, titleId)
-    .first<{ age: number }>();
+     WHERE viewer_id = $1 AND title_id = $2 AND status = 'watchlist'`,
+    [viewerId, titleId],
+  );
 
   if (!row || row.age < STALE_WATCHLIST_DAYS) {
     return null;
@@ -399,7 +398,7 @@ export async function markPrompted(env: Bindings, viewerId: string, moment: Ushe
   });
 }
 
-async function mirrorProviderPreferences(db: D1Database, viewerId: string, providerIds: string[]) {
+async function mirrorProviderPreferences(db: Database, viewerId: string, providerIds: string[]) {
   try {
     const saved = await readProviderPreferences(db, viewerId);
 
@@ -456,17 +455,18 @@ async function titlesAnswer(env: Bindings, viewerId: string, value: unknown) {
   const titleIds = [...new Set(value.filter(isKnownTitle))].slice(0, MAX_SEEN);
 
   if (titleIds.length) {
-    await env.DB.batch(
-      titleIds.map((titleId) =>
-        env.DB.prepare(
+    await env.DB.transaction(async (transaction) => {
+      for (const titleId of titleIds) {
+        await transaction.execute(
           `INSERT INTO viewing_entries (id, viewer_id, title_id, status, rating, thoughts)
-           VALUES (?, ?, ?, 'watched', NULL, '')
+           VALUES ($1, $2, $3, 'watched', NULL, '')
            ON CONFLICT(viewer_id, title_id) DO UPDATE SET
              status = 'watched',
              updated_at = CURRENT_TIMESTAMP`,
-        ).bind(crypto.randomUUID(), viewerId, titleId),
-      ),
-    );
+          [crypto.randomUUID(), viewerId, titleId],
+        );
+      }
+    });
   }
 
   return titleIds;
@@ -633,7 +633,7 @@ export const NO_PREFERENCES: ViewerPreferences = {
 };
 
 export async function readViewerPreferences(
-  db: D1Database,
+  db: Database,
   viewerId: string,
 ): Promise<ViewerPreferences> {
   if (!viewerId) {

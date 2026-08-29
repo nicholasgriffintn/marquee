@@ -10,31 +10,29 @@ type ProviderRow = {
 };
 type OfferRow = { titleId: string; providerId: string; offerType: string };
 
-export async function readProviderMap(db: D1Database, ids: string[]) {
+export async function readProviderMap(db: Database, ids: string[]) {
   const [providerRows, offerRows] = await Promise.all([
     queryChunked(ids, (wave) =>
       db
-        .prepare(
-          `SELECT title_id AS titleId, provider_id AS id, name, web_url AS webUrl, source
+        .query<ProviderRow>(
+          `SELECT title_id AS "titleId", provider_id AS id, name, web_url AS "webUrl", source
            FROM catalog_title_providers
-           WHERE title_id IN (${wave.map(() => "?").join(",")})
+           WHERE title_id IN (${wave.map((_, index) => `$${index + 1}`).join(",")})
            ORDER BY title_id, position`,
+          [...wave],
         )
-        .bind(...wave)
-        .all<ProviderRow>()
-        .then((result) => result.results),
+        .then((result) => result.rows),
     ),
     queryChunked(ids, (wave) =>
       db
-        .prepare(
-          `SELECT title_id AS titleId, provider_id AS providerId, offer_type AS offerType
+        .query<OfferRow>(
+          `SELECT title_id AS "titleId", provider_id AS "providerId", offer_type AS "offerType"
            FROM catalog_title_provider_offers
-           WHERE title_id IN (${wave.map(() => "?").join(",")})
+           WHERE title_id IN (${wave.map((_, index) => `$${index + 1}`).join(",")})
            ORDER BY title_id, provider_id, position`,
+          [...wave],
         )
-        .bind(...wave)
-        .all<OfferRow>()
-        .then((result) => result.results),
+        .then((result) => result.rows),
     ),
   ]);
 
@@ -70,7 +68,7 @@ export async function readProviderMap(db: D1Database, ids: string[]) {
   return values;
 }
 
-export async function writeProviderRows(db: D1Database, titles: MediaTitle[]) {
+export async function writeProviderRows(db: Database, titles: MediaTitle[]) {
   await deleteByTitleIds(
     db,
     "catalog_title_providers",
@@ -83,7 +81,7 @@ export async function writeProviderRows(db: D1Database, titles: MediaTitle[]) {
   );
 
   const providerRows = titles.flatMap((title) =>
-    title.providers.map((provider, position): unknown[] => [
+    title.providers.map((provider, position): DatabaseValue[] => [
       title.id,
       provider.id,
       provider.name,
@@ -108,7 +106,7 @@ export async function writeProviderRows(db: D1Database, titles: MediaTitle[]) {
 
   const offerRows = titles.flatMap((title) =>
     title.providers.flatMap((provider) =>
-      [...new Set(provider.offerTypes)].map((offerType, position): unknown[] => [
+      [...new Set(provider.offerTypes)].map((offerType, position): DatabaseValue[] => [
         title.id,
         provider.id,
         offerType,
@@ -123,8 +121,9 @@ export async function writeProviderRows(db: D1Database, titles: MediaTitle[]) {
     22,
     offerRows,
     (chunk) =>
-      `INSERT OR IGNORE INTO catalog_title_provider_offers
+      `INSERT INTO catalog_title_provider_offers
          (title_id, provider_id, offer_type, position)
-       VALUES ${chunk.map(() => "(?, ?, ?, ?)").join(", ")}`,
+       VALUES ${chunk.map(() => "(?, ?, ?, ?)").join(", ")}
+       ON CONFLICT DO NOTHING`,
   );
 }

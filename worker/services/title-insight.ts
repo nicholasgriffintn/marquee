@@ -96,12 +96,11 @@ export async function getTitleInsight(
   options: { generate?: boolean } = {},
 ) {
   const generate = options.generate ?? true;
-  const cached = await env.DB.prepare(
-    `SELECT payload, julianday('now') - julianday(created_at) AS ageDays
-     FROM title_insights WHERE title_id = ?`,
-  )
-    .bind(titleId)
-    .first<InsightRow>();
+  const cached = await env.DB.first<InsightRow>(
+    `SELECT payload, (EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) / 86400.0) - (EXTRACT(EPOCH FROM created_at) / 86400.0) AS "ageDays"
+     FROM title_insights WHERE title_id = $1`,
+    [titleId],
+  );
 
   if (cached && (!generate || cached.ageDays < MAX_AGE_DAYS)) {
     return JSON.parse(cached.payload) as TitleInsight;
@@ -161,15 +160,14 @@ export async function getTitleInsight(
   decision.select(insight.pairs.map((pair) => pair.titleId));
   await decision.settle(insight.pairs.length ? "served" : "empty");
 
-  await env.DB.prepare(
+  await env.DB.execute(
     `INSERT INTO title_insights (title_id, payload)
-     VALUES (?, ?)
+     VALUES ($1, $2)
      ON CONFLICT(title_id) DO UPDATE SET
        payload = excluded.payload,
        created_at = CURRENT_TIMESTAMP`,
-  )
-    .bind(titleId, JSON.stringify(insight))
-    .run();
+    [titleId, JSON.stringify(insight)],
+  );
 
   return insight;
 }

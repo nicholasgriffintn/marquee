@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { hasBearerCredential } from "./auth/api-tokens.ts";
 import { authRoutes } from "./auth/routes.ts";
 import { CuratorSession } from "./durable/curator-session.ts";
+import { openDatabase, withDatabase } from "./database/runtime.ts";
 import { consumeDeadLetters, consumeIngestion } from "./jobs/ingestion-consumer.ts";
 import { scheduleIngestion } from "./jobs/ingestion-scheduler.ts";
 import { automatedSyncAllowed } from "./lib/environment.ts";
@@ -30,7 +31,7 @@ import { sitemapRoutes } from "./routes/sitemap.ts";
 import { usherRoutes } from "./routes/usher.ts";
 import { bearerScopeGuard } from "./security/bearer-scopes.ts";
 import { apiGuard } from "./security/guard.ts";
-import type { Bindings, IngestionJob } from "./types.ts";
+import type { Bindings, IngestionJob, WorkerBindings } from "./types.ts";
 import { CatalogSweep } from "./workflows/catalog-sweep.ts";
 import { DigestWorkflow } from "./workflows/digest.ts";
 import { RailsWorkflow } from "./workflows/rails.ts";
@@ -147,7 +148,15 @@ app.onError((error, context) => {
 export { CatalogSweep, CuratorSession, DigestWorkflow, RailsWorkflow };
 
 export default {
-  fetch: app.fetch,
+  async fetch(request, env, context) {
+    const { database, runtime } = await openDatabase(env);
+
+    try {
+      return await app.fetch(request, runtime, context);
+    } finally {
+      context.waitUntil(database.close());
+    }
+  },
   scheduled(controller, env, context) {
     if (!automatedSyncAllowed(env)) {
       logEvent("scheduled_skipped_local_dev", { cron: controller.cron });
@@ -156,20 +165,24 @@ export default {
     }
 
     context.waitUntil(
-      logRejection(scheduleIngestion(env, controller.cron), "scheduled_run_failed", {
-        cron: controller.cron,
-      }),
+      logRejection(
+        withDatabase(env, (runtime) => scheduleIngestion(runtime, controller.cron)),
+        "scheduled_run_failed",
+        { cron: controller.cron },
+      ),
     );
   },
   queue(batch, env, context) {
     context.waitUntil(
       logRejection(
-        batch.queue === "marquee-ingestion-dead-letter"
-          ? consumeDeadLetters(batch, env)
-          : consumeIngestion(batch, env),
+        withDatabase(env, (runtime) =>
+          batch.queue === "marquee-ingestion-dead-letter"
+            ? consumeDeadLetters(batch, runtime)
+            : consumeIngestion(batch, runtime),
+        ),
         "queue_batch_failed",
         { queue: batch.queue, batchSize: batch.messages.length },
       ),
     );
   },
-} satisfies ExportedHandler<Bindings, IngestionJob>;
+} satisfies ExportedHandler<WorkerBindings, IngestionJob>;

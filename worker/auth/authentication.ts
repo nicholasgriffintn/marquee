@@ -5,7 +5,11 @@ import { createGitHubAuth } from "@ngriffin_uk/auth-provider-github";
 
 import { sendSignInEmail } from "../clients/email.ts";
 import type { Bindings } from "../types.ts";
-import { createD1Auth, createD1OAuthStateStore, findOrCreateByEmail } from "./d1-adapter.ts";
+import {
+  createDatabaseAuth,
+  createDatabaseOAuthStateStore,
+  findOrCreateByEmail,
+} from "./database-adapter.ts";
 import { resolveGitHubIdentity } from "./github-profile.ts";
 import type { MarqueeUser } from "./model.ts";
 
@@ -20,12 +24,8 @@ export interface Authentication {
 
 export type MagicLinkDestination = { kind: "web" } | { kind: "native"; challenge: string };
 
-export function createAuthentication(
-  db: D1Database,
-  env: Bindings,
-  origin: string,
-): Authentication {
-  const auth = createD1Auth(db);
+export function createAuthentication(db: Database, env: Bindings, origin: string): Authentication {
+  const auth = createDatabaseAuth(db);
   const github = () =>
     auth.use(
       createGitHubAuth<MarqueeUser>({
@@ -33,7 +33,7 @@ export function createAuthentication(
         clientSecret: requiredSecret(env.GITHUB_CLIENT_SECRET),
         redirectUri: `${origin}/api/auth/callback/github`,
         scopes: ["read:user"],
-        stateStore: createD1OAuthStateStore(db),
+        stateStore: createDatabaseOAuthStateStore(db),
         resolveIdentity: resolveGitHubIdentity,
       }),
     ).providers.github;

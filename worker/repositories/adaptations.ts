@@ -2,8 +2,6 @@ import type { MediaType } from "../../src/domain/catalog.ts";
 import type { SourceWorkRecord } from "../clients/wikidata-adaptations.ts";
 import { clamp } from "../lib/numbers.ts";
 
-const WRITE_CHUNK = 50;
-
 export type AdaptationCandidate = { titleId: string; mediaType: MediaType; tmdbId: number };
 
 export type ScannedTitle = { titleId: string; works: SourceWorkRecord[] };
@@ -18,129 +16,128 @@ export type StoredSourceWork = {
 };
 
 export async function selectAdaptationCandidates(
-  db: D1Database,
+  db: Database,
   limit: number,
   refreshDays: number,
   retryDays: number,
 ) {
-  const rows = await db
-    .prepare(
-      `SELECT t.id AS titleId, t.media_type AS mediaType, t.tmdb_id AS tmdbId
+  const rows = await db.query<AdaptationCandidate>(
+    `SELECT t.id AS "titleId", t.media_type AS "mediaType", t.tmdb_id AS "tmdbId"
        FROM title_working_set AS w
        JOIN catalog_titles AS t ON t.id = w.title_id
        LEFT JOIN title_adaptation_scans AS s ON s.title_id = t.id
        WHERE s.title_id IS NULL
-          OR s.scanned_at < datetime('now', CASE WHEN s.works > 0 THEN ?1 ELSE ?2 END)
+          OR s.scanned_at < CURRENT_TIMESTAMP
+            + CAST(CASE WHEN s.works > 0 THEN $1 ELSE $2 END AS INTERVAL)
        ORDER BY w.demand DESC, t.popularity DESC
-       LIMIT ?3`,
-    )
-    .bind(`-${refreshDays} days`, `-${retryDays} days`, limit)
-    .all<AdaptationCandidate>();
+       LIMIT $3`,
+    [`-${refreshDays} days`, `-${retryDays} days`, limit],
+  );
 
-  return rows.results;
+  return rows.rows;
 }
 
-export async function storeAdaptations(db: D1Database, source: string, scanned: ScannedTitle[]) {
-  const statements: D1PreparedStatement[] = [];
+export async function storeAdaptations(db: Database, source: string, scanned: ScannedTitle[]) {
+  let written = 0;
 
   for (const entry of scanned) {
-    statements.push(
-      db
-        .prepare(`DELETE FROM title_source_works WHERE title_id = ? AND source = ?`)
-        .bind(entry.titleId, source),
-    );
+    // oxlint-disable-next-line no-await-in-loop
+    written += await db.transaction(async (transaction) => {
+      let statements = 1;
 
-    for (const work of entry.works) {
-      statements.push(
-        db
-          .prepare(
-            `INSERT INTO source_works
+      await transaction.execute(
+        `DELETE FROM title_source_works WHERE title_id = $1 AND source = $2`,
+        [entry.titleId, source],
+      );
+
+      for (const work of entry.works) {
+        // oxlint-disable-next-line no-await-in-loop
+        await transaction.execute(
+          `INSERT INTO source_works
                (work_id, label, work_type, published_year, wikidata_id, updated_at)
-             VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+             VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
              ON CONFLICT(work_id) DO UPDATE SET
                label = excluded.label,
                work_type = excluded.work_type,
                published_year = excluded.published_year,
                wikidata_id = COALESCE(excluded.wikidata_id, source_works.wikidata_id),
                updated_at = CURRENT_TIMESTAMP`,
-          )
-          .bind(work.workId, work.label, work.workType, work.publishedYear, work.wikidataId),
-        db.prepare(`DELETE FROM source_work_authors WHERE work_id = ?`).bind(work.workId),
-        ...work.authors.map((author) =>
-          db
-            .prepare(
-              `INSERT INTO source_work_authors (work_id, name, wikidata_id)
-               VALUES (?, ?, ?)
-               ON CONFLICT(work_id, name) DO UPDATE SET wikidata_id = excluded.wikidata_id`,
-            )
-            .bind(work.workId, author.name, author.wikidataId),
-        ),
-        db
-          .prepare(
-            `INSERT INTO title_source_works (title_id, work_id, source) VALUES (?, ?, ?)
-             ON CONFLICT(title_id, work_id, source) DO NOTHING`,
-          )
-          .bind(entry.titleId, work.workId, source),
-      );
-    }
+          [work.workId, work.label, work.workType, work.publishedYear, work.wikidataId],
+        );
+        // oxlint-disable-next-line no-await-in-loop
+        await transaction.execute(`DELETE FROM source_work_authors WHERE work_id = $1`, [
+          work.workId,
+        ]);
+        statements += 2;
 
-    statements.push(
-      db
-        .prepare(
-          `INSERT INTO title_adaptation_scans (title_id, source, works, scanned_at)
-           VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+        for (const author of work.authors) {
+          // oxlint-disable-next-line no-await-in-loop
+          await transaction.execute(
+            `INSERT INTO source_work_authors (work_id, name, wikidata_id)
+               VALUES ($1, $2, $3)
+               ON CONFLICT(work_id, name) DO UPDATE SET wikidata_id = excluded.wikidata_id`,
+            [work.workId, author.name, author.wikidataId],
+          );
+          statements += 1;
+        }
+
+        // oxlint-disable-next-line no-await-in-loop
+        await transaction.execute(
+          `INSERT INTO title_source_works (title_id, work_id, source) VALUES ($1, $2, $3)
+             ON CONFLICT(title_id, work_id, source) DO NOTHING`,
+          [entry.titleId, work.workId, source],
+        );
+        statements += 1;
+      }
+
+      await transaction.execute(
+        `INSERT INTO title_adaptation_scans (title_id, source, works, scanned_at)
+           VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
            ON CONFLICT(title_id, source) DO UPDATE SET
              works = excluded.works,
              scanned_at = CURRENT_TIMESTAMP`,
-        )
-        .bind(entry.titleId, source, entry.works.length),
-    );
+        [entry.titleId, source, entry.works.length],
+      );
+
+      return statements + 1;
+    });
   }
 
-  for (let index = 0; index < statements.length; index += WRITE_CHUNK) {
-    // oxlint-disable-next-line no-await-in-loop
-    await db.batch(statements.slice(index, index + WRITE_CHUNK));
-  }
-
-  return statements.length;
+  return written;
 }
 
-export async function readTitleSourceWorks(db: D1Database, titleId: string) {
-  const rows = await db
-    .prepare(
-      `SELECT w.work_id AS workId, w.label, w.work_type AS workType,
-              w.published_year AS publishedYear,
+export async function readTitleSourceWorks(db: Database, titleId: string) {
+  const rows = await db.query<Omit<StoredSourceWork, "authors">>(
+    `SELECT w.work_id AS "workId", w.label, w.work_type AS "workType",
+              w.published_year AS "publishedYear",
               (SELECT count(DISTINCT peer.title_id) FROM title_source_works AS peer
                 WHERE peer.work_id = w.work_id) AS adaptations
        FROM title_source_works AS link
        JOIN source_works AS w ON w.work_id = link.work_id
-       WHERE link.title_id = ?
+       WHERE link.title_id = $1
        ORDER BY adaptations DESC, w.label`,
-    )
-    .bind(titleId)
-    .all<Omit<StoredSourceWork, "authors">>();
+    [titleId],
+  );
 
-  if (rows.results.length === 0) {
+  if (rows.rows.length === 0) {
     return [];
   }
 
-  const authors = await db
-    .prepare(
-      `SELECT work_id AS workId, name
+  const authors = await db.query<{ workId: string; name: string }>(
+    `SELECT work_id AS "workId", name
        FROM source_work_authors
-       WHERE work_id IN (SELECT value FROM json_each(?))
+       WHERE work_id IN (SELECT value FROM jsonb_array_elements_text(CAST($1 AS jsonb)) AS entries(value))
        ORDER BY name`,
-    )
-    .bind(JSON.stringify(rows.results.map((row) => row.workId)))
-    .all<{ workId: string; name: string }>();
+    [JSON.stringify(rows.rows.map((row) => row.workId))],
+  );
 
   const byWork = new Map<string, string[]>();
 
-  for (const author of authors.results) {
+  for (const author of authors.rows) {
     byWork.set(author.workId, [...(byWork.get(author.workId) ?? []), author.name]);
   }
 
-  return rows.results.map((row): StoredSourceWork => ({
+  return rows.rows.map((row): StoredSourceWork => ({
     workId: row.workId,
     label: row.label,
     workType: row.workType,
@@ -150,18 +147,16 @@ export async function readTitleSourceWorks(db: D1Database, titleId: string) {
   }));
 }
 
-export async function readAdaptationTitleIds(db: D1Database, workId: string, limit: number) {
-  const rows = await db
-    .prepare(
-      `SELECT DISTINCT link.title_id AS titleId
+export async function readAdaptationTitleIds(db: Database, workId: string, limit: number) {
+  const rows = await db.query<{ titleId: string }>(
+    `SELECT DISTINCT link.title_id AS "titleId"
        FROM title_source_works AS link
        JOIN catalog_titles AS t ON t.id = link.title_id
-       WHERE link.work_id = ?1
+       WHERE link.work_id = $1
        ORDER BY COALESCE(t.release_date, '9999-12-31'), t.popularity DESC
-       LIMIT ?2`,
-    )
-    .bind(workId, clamp(limit, 1, 48))
-    .all<{ titleId: string }>();
+       LIMIT $2`,
+    [workId, clamp(limit, 1, 48)],
+  );
 
-  return rows.results.map((row) => row.titleId);
+  return rows.rows.map((row) => row.titleId);
 }

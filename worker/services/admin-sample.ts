@@ -8,475 +8,388 @@ export type SampleRow = Record<string, string | number | null>;
 export type SampleResult = { columns: string[]; rows: SampleRow[] };
 
 async function titleSample(
-  db: D1Database,
+  db: Database,
   where: string,
-  params: unknown[] = [],
+  params: DatabaseValue[] = [],
 ): Promise<SampleResult> {
-  const rows = await db
-    .prepare(
-      `SELECT id, title, media_type AS mediaType, year, updated_at AS updatedAt
+  const rows = await db.query<SampleRow>(
+    `SELECT id, title, media_type AS "mediaType", year, updated_at AS "updatedAt"
        FROM catalog_titles
        WHERE ${where}
        ORDER BY updated_at DESC
        LIMIT ${SAMPLE_LIMIT}`,
-    )
-    .bind(...params)
-    .all<SampleRow>();
+    [...params],
+  );
 
   return {
     columns: ["id", "title", "mediaType", "year", "updatedAt"],
-    rows: rows.results,
+    rows: rows.rows,
   };
 }
 
-async function workingSetSample(db: D1Database, freshOnly: boolean): Promise<SampleResult> {
-  const freshWhere = `t.enriched_at IS NOT NULL AND t.enriched_at > datetime('now', '-${DEMAND_MAX_AGE_DAYS} days')`;
-  const rows = await db
-    .prepare(
-      `SELECT t.id AS id, t.title AS title, t.media_type AS mediaType, w.demand AS demand,
-              w.refreshed_at AS refreshedAt
+async function workingSetSample(db: Database, freshOnly: boolean): Promise<SampleResult> {
+  const freshWhere = `t.enriched_at IS NOT NULL AND t.enriched_at > (CURRENT_TIMESTAMP - INTERVAL '${DEMAND_MAX_AGE_DAYS} day')`;
+  const rows =
+    await db.query<SampleRow>(`SELECT t.id AS id, t.title AS title, t.media_type AS "mediaType", w.demand AS demand,
+              w.refreshed_at AS "refreshedAt"
        FROM title_working_set AS w
        JOIN catalog_titles AS t ON t.id = w.title_id
        ${freshOnly ? `WHERE ${freshWhere}` : ""}
        ORDER BY w.refreshed_at DESC
-       LIMIT ${SAMPLE_LIMIT}`,
-    )
-    .all<SampleRow>();
+       LIMIT ${SAMPLE_LIMIT}`);
 
   return {
     columns: ["id", "title", "mediaType", "demand", "refreshedAt"],
-    rows: rows.results,
+    rows: rows.rows,
   };
 }
 
-async function embeddingsSample(db: D1Database): Promise<SampleResult> {
-  const rows = await db
-    .prepare(
-      `SELECT e.title_id AS id, t.title AS title, e.model AS model, e.embedded_at AS embeddedAt
+async function embeddingsSample(db: Database): Promise<SampleResult> {
+  const rows = await db.query<SampleRow>(
+    `SELECT e.title_id AS id, t.title AS title, e.model AS model, e.embedded_at AS "embeddedAt"
        FROM title_embeddings AS e
        JOIN catalog_titles AS t ON t.id = e.title_id
-       WHERE e.content_hash IS NOT NULL AND e.model = ?1
+       WHERE e.content_hash IS NOT NULL AND e.model = $1
        ORDER BY e.embedded_at DESC
        LIMIT ${SAMPLE_LIMIT}`,
-    )
-    .bind(EMBEDDING_MODEL)
-    .all<SampleRow>();
+    [EMBEDDING_MODEL],
+  );
 
   return {
     columns: ["id", "title", "model", "embeddedAt"],
-    rows: rows.results,
+    rows: rows.rows,
   };
 }
 
-async function buzzSample(db: D1Database): Promise<SampleResult> {
-  const rows = await db
-    .prepare(
-      `SELECT b.title_id AS id, t.title AS title, b.views AS views, b.delta AS delta,
-              b.measured_at AS measuredAt
+async function buzzSample(db: Database): Promise<SampleResult> {
+  const rows =
+    await db.query<SampleRow>(`SELECT b.title_id AS id, t.title AS title, b.views AS views, b.delta AS delta,
+              b.measured_at AS "measuredAt"
        FROM title_buzz AS b
        JOIN catalog_titles AS t ON t.id = b.title_id
        WHERE b.article <> ''
        ORDER BY b.measured_at DESC
-       LIMIT ${SAMPLE_LIMIT}`,
-    )
-    .all<SampleRow>();
+       LIMIT ${SAMPLE_LIMIT}`);
 
   return {
     columns: ["id", "title", "views", "delta", "measuredAt"],
-    rows: rows.results,
+    rows: rows.rows,
   };
 }
 
-async function upcomingSample(db: D1Database): Promise<SampleResult> {
-  const rows = await db
-    .prepare(
-      `SELECT id, show_name AS title, season, episode, airs_at AS airsAt
+async function upcomingSample(db: Database): Promise<SampleResult> {
+  const rows =
+    await db.query<SampleRow>(`SELECT id, show_name AS title, season, episode, airs_at AS "airsAt"
        FROM title_schedule
-       WHERE airs_at >= datetime('now')
+       WHERE airs_at >= CURRENT_TIMESTAMP
        ORDER BY airs_at ASC
-       LIMIT ${SAMPLE_LIMIT}`,
-    )
-    .all<SampleRow>();
+       LIMIT ${SAMPLE_LIMIT}`);
 
   return {
     columns: ["id", "title", "season", "episode", "airsAt"],
-    rows: rows.results,
+    rows: rows.rows,
   };
 }
 
-async function sectionsSample(db: D1Database): Promise<SampleResult> {
-  const rows = await db
-    .prepare(
-      `SELECT id, title, json_array_length(title_ids) AS titles, source_updated_at AS builtAt
+async function sectionsSample(db: Database): Promise<SampleResult> {
+  const rows =
+    await db.query<SampleRow>(`SELECT id, title, jsonb_array_length(title_ids::jsonb) AS titles, source_updated_at AS "builtAt"
        FROM catalog_sections
        ORDER BY source_updated_at DESC
-       LIMIT ${SAMPLE_LIMIT}`,
-    )
-    .all<SampleRow>();
+       LIMIT ${SAMPLE_LIMIT}`);
 
-  return { columns: ["id", "title", "titles", "builtAt"], rows: rows.results };
+  return { columns: ["id", "title", "titles", "builtAt"], rows: rows.rows };
 }
 
-async function peopleSample(db: D1Database): Promise<SampleResult> {
-  const rows = await db
-    .prepare(
-      `SELECT name, known_for AS knownFor, titles, popularity
+async function peopleSample(db: Database): Promise<SampleResult> {
+  const rows = await db.query<SampleRow>(`SELECT name, known_for AS "knownFor", titles, popularity
        FROM catalog_people
        ORDER BY popularity DESC
-       LIMIT ${SAMPLE_LIMIT}`,
-    )
-    .all<SampleRow>();
+       LIMIT ${SAMPLE_LIMIT}`);
 
-  return { columns: ["name", "knownFor", "titles", "popularity"], rows: rows.results };
+  return { columns: ["name", "knownFor", "titles", "popularity"], rows: rows.rows };
 }
 
-async function seasonsSample(db: D1Database): Promise<SampleResult> {
-  const rows = await db
-    .prepare(
-      `SELECT s.title_id AS id, t.title AS title, s.season_number AS season, s.name AS name,
-              s.fetched_at AS fetchedAt
+async function seasonsSample(db: Database): Promise<SampleResult> {
+  const rows =
+    await db.query<SampleRow>(`SELECT s.title_id AS id, t.title AS title, s.season_number AS season, s.name AS name,
+              s.fetched_at AS "fetchedAt"
        FROM catalog_seasons AS s
        JOIN catalog_titles AS t ON t.id = s.title_id
        ORDER BY s.fetched_at DESC
-       LIMIT ${SAMPLE_LIMIT}`,
-    )
-    .all<SampleRow>();
+       LIMIT ${SAMPLE_LIMIT}`);
 
   return {
     columns: ["id", "title", "season", "name", "fetchedAt"],
-    rows: rows.results,
+    rows: rows.rows,
   };
 }
 
-async function insightsSample(db: D1Database): Promise<SampleResult> {
-  const rows = await db
-    .prepare(
-      `SELECT i.title_id AS id, t.title AS title, i.created_at AS createdAt
+async function insightsSample(db: Database): Promise<SampleResult> {
+  const rows =
+    await db.query<SampleRow>(`SELECT i.title_id AS id, t.title AS title, i.created_at AS "createdAt"
        FROM title_insights AS i
        JOIN catalog_titles AS t ON t.id = i.title_id
        ORDER BY i.created_at DESC
-       LIMIT ${SAMPLE_LIMIT}`,
-    )
-    .all<SampleRow>();
+       LIMIT ${SAMPLE_LIMIT}`);
 
-  return { columns: ["id", "title", "createdAt"], rows: rows.results };
+  return { columns: ["id", "title", "createdAt"], rows: rows.rows };
 }
 
-async function revivalSample(db: D1Database, where: string): Promise<SampleResult> {
-  const rows = await db
-    .prepare(
-      `SELECT id, title, year, status, mirror_state AS mirrorState, updated_at AS updatedAt
+async function revivalSample(db: Database, where: string): Promise<SampleResult> {
+  const rows =
+    await db.query<SampleRow>(`SELECT id, title, year, status, mirror_state AS "mirrorState", updated_at AS "updatedAt"
        FROM revival_works
        WHERE ${where}
        ORDER BY updated_at DESC
-       LIMIT ${SAMPLE_LIMIT}`,
-    )
-    .all<SampleRow>();
+       LIMIT ${SAMPLE_LIMIT}`);
 
   return {
     columns: ["id", "title", "year", "status", "mirrorState", "updatedAt"],
-    rows: rows.results,
+    rows: rows.rows,
   };
 }
 
-async function railsSample(db: D1Database): Promise<SampleResult> {
-  const rows = await db
-    .prepare(
-      `SELECT viewer_id AS viewerId, signature, created_at AS createdAt
+async function railsSample(db: Database): Promise<SampleResult> {
+  const rows =
+    await db.query<SampleRow>(`SELECT viewer_id AS "viewerId", signature, created_at AS "createdAt"
        FROM ai_rails
        ORDER BY created_at DESC
-       LIMIT ${SAMPLE_LIMIT}`,
-    )
-    .all<SampleRow>();
+       LIMIT ${SAMPLE_LIMIT}`);
 
   return {
     columns: ["viewerId", "signature", "createdAt"],
-    rows: rows.results,
+    rows: rows.rows,
   };
 }
 
-async function pinnedShelvesSample(db: D1Database): Promise<SampleResult> {
-  const rows = await db
-    .prepare(
-      `SELECT id, viewer_id AS viewerId, name, created_at AS createdAt
+async function pinnedShelvesSample(db: Database): Promise<SampleResult> {
+  const rows =
+    await db.query<SampleRow>(`SELECT id, viewer_id AS "viewerId", name, created_at AS "createdAt"
        FROM pinned_shelves
        ORDER BY created_at DESC
-       LIMIT ${SAMPLE_LIMIT}`,
-    )
-    .all<SampleRow>();
+       LIMIT ${SAMPLE_LIMIT}`);
 
   return {
     columns: ["id", "viewerId", "name", "createdAt"],
-    rows: rows.results,
+    rows: rows.rows,
   };
 }
 
-async function cinemasSample(db: D1Database, placedOnly: boolean): Promise<SampleResult> {
-  const rows = await db
-    .prepare(
-      `SELECT id, name, chain, source, updated_at AS updatedAt
+async function cinemasSample(db: Database, placedOnly: boolean): Promise<SampleResult> {
+  const rows = await db.query<SampleRow>(`SELECT id, name, chain, source, updated_at AS "updatedAt"
        FROM cinemas
        ${placedOnly ? "WHERE latitude IS NOT NULL" : ""}
        ORDER BY updated_at DESC
-       LIMIT ${SAMPLE_LIMIT}`,
-    )
-    .all<SampleRow>();
+       LIMIT ${SAMPLE_LIMIT}`);
 
   return {
     columns: ["id", "name", "chain", "source", "updatedAt"],
-    rows: rows.results,
+    rows: rows.rows,
   };
 }
 
-async function cinemaFilmsSample(db: D1Database): Promise<SampleResult> {
-  const rows = await db
-    .prepare(
-      `SELECT source, source_film_id AS sourceFilmId, source_title AS sourceTitle,
-              title_id AS titleId, confidence, matched_at AS matchedAt
+async function cinemaFilmsSample(db: Database): Promise<SampleResult> {
+  const rows =
+    await db.query<SampleRow>(`SELECT source, source_film_id AS "sourceFilmId", source_title AS "sourceTitle",
+              title_id AS "titleId", confidence, matched_at AS "matchedAt"
        FROM cinema_films
        ORDER BY matched_at DESC
-       LIMIT ${SAMPLE_LIMIT}`,
-    )
-    .all<SampleRow>();
+       LIMIT ${SAMPLE_LIMIT}`);
 
   return {
     columns: ["source", "sourceFilmId", "sourceTitle", "titleId", "confidence", "matchedAt"],
-    rows: rows.results,
+    rows: rows.rows,
   };
 }
 
-async function screeningsSample(db: D1Database): Promise<SampleResult> {
-  const rows = await db
-    .prepare(
-      `SELECT id, cinema_id AS cinemaId, title_id AS titleId, business_day AS businessDay,
-              starts_at AS startsAt
+async function screeningsSample(db: Database): Promise<SampleResult> {
+  const rows =
+    await db.query<SampleRow>(`SELECT id, cinema_id AS "cinemaId", title_id AS "titleId", business_day AS "businessDay",
+              starts_at AS "startsAt"
        FROM cinema_screenings
-       WHERE business_day >= date('now')
+       WHERE business_day >= CURRENT_DATE
        ORDER BY business_day ASC
-       LIMIT ${SAMPLE_LIMIT}`,
-    )
-    .all<SampleRow>();
+       LIMIT ${SAMPLE_LIMIT}`);
 
   return {
     columns: ["id", "cinemaId", "titleId", "businessDay", "startsAt"],
-    rows: rows.results,
+    rows: rows.rows,
   };
 }
 
-async function interestCellsSample(db: D1Database): Promise<SampleResult> {
-  const rows = await db
-    .prepare(
-      `SELECT cell, latitude, longitude, hits, last_seen_at AS lastSeenAt
+async function interestCellsSample(db: Database): Promise<SampleResult> {
+  const rows =
+    await db.query<SampleRow>(`SELECT cell, latitude, longitude, hits, last_seen_at AS "lastSeenAt"
        FROM cinema_interest
        ORDER BY last_seen_at DESC
-       LIMIT ${SAMPLE_LIMIT}`,
-    )
-    .all<SampleRow>();
+       LIMIT ${SAMPLE_LIMIT}`);
 
   return {
     columns: ["cell", "latitude", "longitude", "hits", "lastSeenAt"],
-    rows: rows.results,
+    rows: rows.rows,
   };
 }
 
-async function usersSample(db: D1Database): Promise<SampleResult> {
-  const rows = await db
-    .prepare(
-      `SELECT id, name, github_login AS login, created_at AS createdAt
+async function usersSample(db: Database): Promise<SampleResult> {
+  const rows =
+    await db.query<SampleRow>(`SELECT id, name, github_login AS login, created_at AS "createdAt"
        FROM users
        ORDER BY created_at DESC
-       LIMIT ${SAMPLE_LIMIT}`,
-    )
-    .all<SampleRow>();
+       LIMIT ${SAMPLE_LIMIT}`);
 
-  return { columns: ["id", "name", "login", "createdAt"], rows: rows.results };
+  return { columns: ["id", "name", "login", "createdAt"], rows: rows.rows };
 }
 
-async function alertReadySample(db: D1Database): Promise<SampleResult> {
-  const rows = await db
-    .prepare(
-      `SELECT id, name, github_login AS login, alert_email_verified_at AS verifiedAt
+async function alertReadySample(db: Database): Promise<SampleResult> {
+  const rows =
+    await db.query<SampleRow>(`SELECT id, name, github_login AS login, alert_email_verified_at AS "verifiedAt"
        FROM users
        WHERE alert_email_verified_at IS NOT NULL
        ORDER BY alert_email_verified_at DESC
-       LIMIT ${SAMPLE_LIMIT}`,
-    )
-    .all<SampleRow>();
+       LIMIT ${SAMPLE_LIMIT}`);
 
-  return { columns: ["id", "name", "login", "verifiedAt"], rows: rows.results };
+  return { columns: ["id", "name", "login", "verifiedAt"], rows: rows.rows };
 }
 
-async function viewerAlertsSample(db: D1Database, weekOnly: boolean): Promise<SampleResult> {
-  const rows = await db
-    .prepare(
-      `SELECT viewer_id AS viewerId, title_id AS titleId, kind, sent_at AS sentAt
+async function viewerAlertsSample(db: Database, weekOnly: boolean): Promise<SampleResult> {
+  const rows =
+    await db.query<SampleRow>(`SELECT viewer_id AS "viewerId", title_id AS "titleId", kind, sent_at AS "sentAt"
        FROM viewer_alerts
-       ${weekOnly ? "WHERE julianday(sent_at) > julianday('now', '-7 days')" : ""}
+       ${weekOnly ? "WHERE (EXTRACT(EPOCH FROM sent_at) / 86400.0) > (EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - INTERVAL '7 day')) / 86400.0)" : ""}
        ORDER BY sent_at DESC
-       LIMIT ${SAMPLE_LIMIT}`,
-    )
-    .all<SampleRow>();
+       LIMIT ${SAMPLE_LIMIT}`);
 
   return {
     columns: ["viewerId", "titleId", "kind", "sentAt"],
-    rows: rows.results,
+    rows: rows.rows,
   };
 }
 
-async function signalsSample(db: D1Database): Promise<SampleResult> {
-  const rows = await db
-    .prepare(
-      `SELECT id, viewer_id AS viewerId, type, title_id AS titleId, created_at AS createdAt
+async function signalsSample(db: Database): Promise<SampleResult> {
+  const rows =
+    await db.query<SampleRow>(`SELECT id, viewer_id AS "viewerId", type, title_id AS "titleId", created_at AS "createdAt"
        FROM viewer_signals
        ORDER BY created_at DESC
-       LIMIT ${SAMPLE_LIMIT}`,
-    )
-    .all<SampleRow>();
+       LIMIT ${SAMPLE_LIMIT}`);
 
   return {
     columns: ["id", "viewerId", "type", "titleId", "createdAt"],
-    rows: rows.results,
+    rows: rows.rows,
   };
 }
 
-async function beliefsSample(db: D1Database): Promise<SampleResult> {
-  const rows = await db
-    .prepare(
-      `SELECT id, viewer_id AS viewerId, key, value, strength, confidence, updated_at AS updatedAt
+async function beliefsSample(db: Database): Promise<SampleResult> {
+  const rows =
+    await db.query<SampleRow>(`SELECT id, viewer_id AS "viewerId", key, value, strength, confidence, updated_at AS "updatedAt"
        FROM viewer_beliefs
        WHERE revoked_at IS NULL
        ORDER BY updated_at DESC
-       LIMIT ${SAMPLE_LIMIT}`,
-    )
-    .all<SampleRow>();
+       LIMIT ${SAMPLE_LIMIT}`);
 
   return {
     columns: ["id", "viewerId", "key", "value", "strength", "confidence", "updatedAt"],
-    rows: rows.results,
+    rows: rows.rows,
   };
 }
 
-async function titleAwardsSample(db: D1Database): Promise<SampleResult> {
-  const rows = await db
-    .prepare(
-      `SELECT t.title, a.label AS award, link.ceremony_year AS year,
+async function titleAwardsSample(db: Database): Promise<SampleResult> {
+  const rows =
+    await db.query<SampleRow>(`SELECT t.title, a.label AS award, link.ceremony_year AS year,
               link.outcome, link.source
        FROM title_awards AS link
        JOIN awards AS a ON a.award_id = link.award_id
        JOIN catalog_titles AS t ON t.id = link.title_id
        ORDER BY link.ceremony_year DESC, t.title
-       LIMIT ${SAMPLE_LIMIT}`,
-    )
-    .all<SampleRow>();
+       LIMIT ${SAMPLE_LIMIT}`);
 
-  return { columns: ["title", "award", "year", "outcome", "source"], rows: rows.results };
+  return { columns: ["title", "award", "year", "outcome", "source"], rows: rows.rows };
 }
 
-async function personAwardsSample(db: D1Database): Promise<SampleResult> {
-  const rows = await db
-    .prepare(
-      `SELECT p.name, a.label AS award, link.ceremony_year AS year, link.outcome
+async function personAwardsSample(db: Database): Promise<SampleResult> {
+  const rows =
+    await db.query<SampleRow>(`SELECT p.name, a.label AS award, link.ceremony_year AS year, link.outcome
        FROM person_awards AS link
        JOIN awards AS a ON a.award_id = link.award_id
        JOIN catalog_people AS p ON p.person_id = link.person_id
        ORDER BY link.ceremony_year DESC, p.name
-       LIMIT ${SAMPLE_LIMIT}`,
-    )
-    .all<SampleRow>();
+       LIMIT ${SAMPLE_LIMIT}`);
 
-  return { columns: ["name", "award", "year", "outcome"], rows: rows.results };
+  return { columns: ["name", "award", "year", "outcome"], rows: rows.rows };
 }
 
-async function letterboxdSample(db: D1Database): Promise<SampleResult> {
-  const rows = await db
-    .prepare(
-      `SELECT t.title, t.year, e.letterboxd_id AS letterboxdId,
-              e.rotten_tomatoes_id AS rottenTomatoesId, e.trakt_id AS traktId
+async function letterboxdSample(db: Database): Promise<SampleResult> {
+  const rows = await db.query<SampleRow>(`SELECT t.title, t.year, e.letterboxd_id AS "letterboxdId",
+              e.rotten_tomatoes_id AS "rottenTomatoesId", e.trakt_id AS "traktId"
        FROM catalog_title_external_ids AS e
        JOIN catalog_titles AS t ON t.id = e.title_id
        WHERE e.letterboxd_id IS NOT NULL
        ORDER BY t.popularity DESC
-       LIMIT ${SAMPLE_LIMIT}`,
-    )
-    .all<SampleRow>();
+       LIMIT ${SAMPLE_LIMIT}`);
 
   return {
     columns: ["title", "year", "letterboxdId", "rottenTomatoesId", "traktId"],
-    rows: rows.results,
+    rows: rows.rows,
   };
 }
 
-async function visualFormatSample(db: D1Database): Promise<SampleResult> {
-  const rows = await db
-    .prepare(
-      `SELECT t.title, t.year, f.kind, f.value, f.source
+async function visualFormatSample(db: Database): Promise<SampleResult> {
+  const rows = await db.query<SampleRow>(`SELECT t.title, t.year, f.kind, f.value, f.source
        FROM title_visual_format AS f
        JOIN catalog_titles AS t ON t.id = f.title_id
        ORDER BY t.popularity DESC
-       LIMIT ${SAMPLE_LIMIT}`,
-    )
-    .all<SampleRow>();
+       LIMIT ${SAMPLE_LIMIT}`);
 
-  return { columns: ["title", "year", "kind", "value", "source"], rows: rows.results };
+  return { columns: ["title", "year", "kind", "value", "source"], rows: rows.rows };
 }
 
-async function placesSample(db: D1Database): Promise<SampleResult> {
-  const rows = await db
-    .prepare(
-      `SELECT t.title, tp.kind, p.label AS place, p.latitude, p.longitude, tp.source
+async function placesSample(db: Database): Promise<SampleResult> {
+  const rows =
+    await db.query<SampleRow>(`SELECT t.title, tp.kind, p.label AS place, p.latitude, p.longitude, tp.source
        FROM catalog_title_places AS tp
        JOIN catalog_places AS p ON p.entity_id = tp.place_id
        JOIN catalog_titles AS t ON t.id = tp.title_id
        ORDER BY t.popularity DESC
-       LIMIT ${SAMPLE_LIMIT}`,
-    )
-    .all<SampleRow>();
+       LIMIT ${SAMPLE_LIMIT}`);
 
   return {
     columns: ["title", "kind", "place", "latitude", "longitude", "source"],
-    rows: rows.results,
+    rows: rows.rows,
   };
 }
 
-async function adaptationsSample(db: D1Database): Promise<SampleResult> {
-  const rows = await db
-    .prepare(
-      `SELECT t.title, w.label AS sourceWork, w.work_type AS workType,
+async function adaptationsSample(db: Database): Promise<SampleResult> {
+  const rows =
+    await db.query<SampleRow>(`SELECT t.title, w.label AS "sourceWork", w.work_type AS "workType",
               w.published_year AS published, link.source
        FROM title_source_works AS link
        JOIN source_works AS w ON w.work_id = link.work_id
        JOIN catalog_titles AS t ON t.id = link.title_id
        ORDER BY t.popularity DESC
-       LIMIT ${SAMPLE_LIMIT}`,
-    )
-    .all<SampleRow>();
+       LIMIT ${SAMPLE_LIMIT}`);
 
   return {
     columns: ["title", "sourceWork", "workType", "published", "source"],
-    rows: rows.results,
+    rows: rows.rows,
   };
 }
 
-async function worldBoardSample(db: D1Database): Promise<SampleResult> {
-  const rows = await db
-    .prepare(
-      `SELECT t.title, l.language, l.article, l.views,
-              round(l.share * 100, 1) AS sharePercent
+async function worldBoardSample(db: Database): Promise<SampleResult> {
+  const rows = await db.query<SampleRow>(`SELECT t.title, l.language, l.article, l.views,
+              round(l.share * 100, 1) AS "sharePercent"
        FROM title_language_buzz AS l
        JOIN catalog_titles AS t ON t.id = l.title_id
        WHERE l.views > 0
        ORDER BY l.share DESC
-       LIMIT ${SAMPLE_LIMIT}`,
-    )
-    .all<SampleRow>();
+       LIMIT ${SAMPLE_LIMIT}`);
 
   return {
     columns: ["title", "language", "article", "views", "sharePercent"],
-    rows: rows.results,
+    rows: rows.rows,
   };
 }
 
-const COUNT_SAMPLES: Record<string, (db: D1Database) => Promise<SampleResult>> = {
+const COUNT_SAMPLES: Record<string, (db: Database) => Promise<SampleResult>> = {
   titles: (db) => titleSample(db, "1 = 1"),
   movies: (db) => titleSample(db, "media_type = 'movie'"),
   shows: (db) => titleSample(db, "media_type = 'tv'"),
@@ -522,60 +435,52 @@ const COUNT_SAMPLES: Record<string, (db: D1Database) => Promise<SampleResult>> =
   beliefs: beliefsSample,
 };
 
-async function tmdbSample(db: D1Database): Promise<SampleResult> {
-  const rows = await db
-    .prepare(
-      `SELECT id, title, media_type AS mediaType, updated_at AS updatedAt
+async function tmdbSample(db: Database): Promise<SampleResult> {
+  const rows =
+    await db.query<SampleRow>(`SELECT id, title, media_type AS "mediaType", updated_at AS "updatedAt"
        FROM catalog_titles
        ORDER BY updated_at DESC
-       LIMIT ${SAMPLE_LIMIT}`,
-    )
-    .all<SampleRow>();
+       LIMIT ${SAMPLE_LIMIT}`);
 
   return {
     columns: ["id", "title", "mediaType", "updatedAt"],
-    rows: rows.results,
+    rows: rows.rows,
   };
 }
 
-async function justwatchSample(db: D1Database): Promise<SampleResult> {
-  const rows = await db
-    .prepare(
-      `SELECT id, title, media_type AS mediaType, enriched_at AS enrichedAt
+async function justwatchSample(db: Database): Promise<SampleResult> {
+  const rows =
+    await db.query<SampleRow>(`SELECT id, title, media_type AS "mediaType", enriched_at AS "enrichedAt"
        FROM catalog_titles
        WHERE enriched_at IS NOT NULL
        ORDER BY enriched_at DESC
-       LIMIT ${SAMPLE_LIMIT}`,
-    )
-    .all<SampleRow>();
+       LIMIT ${SAMPLE_LIMIT}`);
 
   return {
     columns: ["id", "title", "mediaType", "enrichedAt"],
-    rows: rows.results,
+    rows: rows.rows,
   };
 }
 
-async function enrichmentSourceSample(db: D1Database, source: string): Promise<SampleResult> {
-  const rows = await db
-    .prepare(
-      `SELECT e.title_id AS id, t.title AS title, e.fetched_at AS fetchedAt,
+async function enrichmentSourceSample(db: Database, source: string): Promise<SampleResult> {
+  const rows = await db.query<SampleRow>(
+    `SELECT e.title_id AS id, t.title AS title, e.fetched_at AS "fetchedAt",
               CASE e.miss WHEN 0 THEN 'hit' WHEN 1 THEN 'miss' ELSE 'pending' END AS status
        FROM title_enrichment AS e
        JOIN catalog_titles AS t ON t.id = e.title_id
-       WHERE e.source = ?
+       WHERE e.source = $1
        ORDER BY e.fetched_at DESC
        LIMIT ${SAMPLE_LIMIT}`,
-    )
-    .bind(source)
-    .all<SampleRow>();
+    [source],
+  );
 
   return {
     columns: ["id", "title", "status", "fetchedAt"],
-    rows: rows.results,
+    rows: rows.rows,
   };
 }
 
-const BUDGET_SAMPLES: Record<string, (db: D1Database) => Promise<SampleResult>> = {
+const BUDGET_SAMPLES: Record<string, (db: Database) => Promise<SampleResult>> = {
   tmdb: tmdbSample,
   justwatch: justwatchSample,
   omdb: (db) => enrichmentSourceSample(db, "omdb"),

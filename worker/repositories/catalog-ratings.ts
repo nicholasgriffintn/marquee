@@ -3,32 +3,31 @@ import { deleteByTitleIds, insertRows, queryChunked } from "./catalog-array-util
 
 type RatingsRow = NonNullable<MediaTitle["ratings"]> & { titleId: string };
 
-export async function readRatingsMap(db: D1Database, ids: string[]) {
+export async function readRatingsMap(db: Database, ids: string[]) {
   const rows = await queryChunked(ids, (wave) =>
     db
-      .prepare(
-        `SELECT title_id AS titleId, imdb_score AS imdbScore, imdb_votes AS imdbVotes,
-                rotten_tomatoes AS rottenTomatoes, metascore, awards, award_wins AS awardWins,
-                box_office AS boxOffice, anime_score AS animeScore, anime_votes AS animeVotes
+      .query<RatingsRow>(
+        `SELECT title_id AS "titleId", imdb_score AS "imdbScore", imdb_votes AS "imdbVotes",
+                rotten_tomatoes AS "rottenTomatoes", metascore, awards, award_wins AS "awardWins",
+                box_office AS "boxOffice", anime_score AS "animeScore", anime_votes AS "animeVotes"
          FROM catalog_title_ratings
-         WHERE title_id IN (${wave.map(() => "?").join(",")})`,
+         WHERE title_id IN (${wave.map((_, index) => `$${index + 1}`).join(",")})`,
+        [...wave],
       )
-      .bind(...wave)
-      .all<RatingsRow>()
-      .then((result) => result.results),
+      .then((result) => result.rows),
   );
 
   return new Map(rows.map(({ titleId, ...ratings }) => [titleId, ratings]));
 }
 
-export async function writeRatingsRows(db: D1Database, titles: MediaTitle[]) {
+export async function writeRatingsRows(db: Database, titles: MediaTitle[]) {
   await deleteByTitleIds(
     db,
     "catalog_title_ratings",
     titles.map((title) => title.id),
   );
 
-  const rows = titles.flatMap((title): unknown[][] => {
+  const rows = titles.flatMap((title): DatabaseValue[][] => {
     const ratings = title.ratings;
 
     return ratings

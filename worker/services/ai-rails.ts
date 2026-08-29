@@ -523,11 +523,11 @@ async function titlesInDislikedRails(env: Bindings, viewerId: string, rails: Sto
 }
 
 async function homepageTitleIds(env: Bindings) {
-  const rows = await env.DB.prepare(`SELECT title_ids AS titleIds FROM catalog_sections`).all<{
+  const rows = await env.DB.query<{
     titleIds: string;
-  }>();
+  }>(`SELECT title_ids AS "titleIds" FROM catalog_sections`);
 
-  return rows.results.flatMap((row) => {
+  return rows.rows.flatMap((row) => {
     try {
       const parsed: unknown = JSON.parse(row.titleIds);
 

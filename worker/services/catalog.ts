@@ -26,7 +26,7 @@ import { traktUpcoming } from "./trakt.ts";
 
 const HYBRID_SEARCH_LIMIT = 24;
 
-async function readBuzzFor(db: D1Database, ids: string[]) {
+async function readBuzzFor(db: Database, ids: string[]) {
   try {
     return await readBuzz(db, ids);
   } catch (error) {
@@ -36,7 +36,7 @@ async function readBuzzFor(db: D1Database, ids: string[]) {
   }
 }
 
-async function withBuzz<Item extends MediaTitle>(db: D1Database, items: Item[]) {
+async function withBuzz<Item extends MediaTitle>(db: Database, items: Item[]) {
   return applyBuzz(
     items,
     await readBuzzFor(
@@ -103,7 +103,7 @@ export async function searchCatalogueHybrid(env: Bindings, query: string, provid
   };
 }
 
-export async function getCatalogueItems(db: D1Database, ids: string[]) {
+export async function getCatalogueItems(db: Database, ids: string[]) {
   return {
     items: await withBuzz(db, await readItems(db, ids)),
     source: "Marquee catalogue",
@@ -111,7 +111,7 @@ export async function getCatalogueItems(db: D1Database, ids: string[]) {
   };
 }
 
-export async function getAnimeWatchOrder(db: D1Database, titleId: string) {
+export async function getAnimeWatchOrder(db: Database, titleId: string) {
   const [title] = await readItems(db, [titleId]);
   const relations = title?.anime?.relations ?? [];
 
@@ -148,7 +148,7 @@ export async function getAnimeWatchOrder(db: D1Database, titleId: string) {
   };
 }
 
-export async function getAnimeRecommendations(db: D1Database, titleId: string) {
+export async function getAnimeRecommendations(db: Database, titleId: string) {
   const [title] = await readItems(db, [titleId]);
   const malIds = title?.anime?.recommendations ?? [];
 
@@ -174,7 +174,7 @@ export async function getAnimeRecommendations(db: D1Database, titleId: string) {
   };
 }
 
-export async function getProviderCatalogue(db: D1Database) {
+export async function getProviderCatalogue(db: Database) {
   return readProviders(db);
 }
 

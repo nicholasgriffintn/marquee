@@ -31,18 +31,17 @@ function expiry() {
   return new Date(Date.now() + DECISION_RETENTION_DAYS * 86_400_000).toISOString();
 }
 
-export async function writeDecision(db: D1Database, record: DecisionRecord) {
+export async function writeDecision(db: Database, record: DecisionRecord) {
   const candidates = packCandidates(record.candidates);
 
   try {
-    await db
-      .prepare(
-        `INSERT INTO decisions (
+    await db.execute(
+      `INSERT INTO decisions (
            id, viewer_id, feature, surface, prompt_version, model, fallback_from,
            candidates, candidate_count, selected, latency_ms, input_tokens, output_tokens,
            cost_usd, outcome, expires_at
          )
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
          ON CONFLICT(id) DO UPDATE SET
            model = excluded.model,
            fallback_from = excluded.fallback_from,
@@ -54,8 +53,7 @@ export async function writeDecision(db: D1Database, record: DecisionRecord) {
            output_tokens = excluded.output_tokens,
            cost_usd = excluded.cost_usd,
            outcome = excluded.outcome`,
-      )
-      .bind(
+      [
         record.id,
         record.viewerId || null,
         record.feature,
@@ -72,16 +70,16 @@ export async function writeDecision(db: D1Database, record: DecisionRecord) {
         record.costUsd,
         record.outcome,
         expiry(),
-      )
-      .run();
+      ],
+    );
   } catch (error) {
     logError("decision_write_failed", error, { feature: record.feature });
   }
 }
 
-export async function pruneDecisions(db: D1Database) {
+export async function pruneDecisions(db: Database) {
   try {
-    await db.prepare(`DELETE FROM decisions WHERE julianday(expires_at) <= julianday('now')`).run();
+    await db.execute(`DELETE FROM decisions WHERE (EXTRACT(EPOCH FROM expires_at) / 86400.0) <= (EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) / 86400.0)`);
   } catch (error) {
     logError("decision_prune_failed", error);
   }

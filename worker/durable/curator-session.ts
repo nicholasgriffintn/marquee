@@ -1,9 +1,10 @@
 import { DurableObject } from "cloudflare:workers";
 
+import { withDatabase } from "../database/runtime.ts";
 import { logError } from "../lib/logging.ts";
 import { isRecord } from "../lib/values.ts";
 import { curateStream, type CuratorTurn } from "../services/curator.ts";
-import type { Bindings } from "../types.ts";
+import type { WorkerBindings } from "../types.ts";
 
 const MAX_TURNS = 8;
 const MAX_PROMPT = 1_000;
@@ -52,7 +53,7 @@ async function readAsk(request: Request): Promise<AskRequest | null> {
   };
 }
 
-export class CuratorSession extends DurableObject<Bindings> {
+export class CuratorSession extends DurableObject<WorkerBindings> {
   async fetch(request: Request) {
     const url = new URL(request.url);
 
@@ -76,23 +77,25 @@ export class CuratorSession extends DurableObject<Bindings> {
     this.ctx.waitUntil(
       (async () => {
         try {
-          for await (const event of curateStream(this.env, body.prompt, body.viewerId, turns, {
-            providerIds: body.providerIds ?? [],
-            hour: body.hour,
-            isWeekend: body.isWeekend,
-          })) {
-            if (event.type === "turn") {
-              await this.ctx.storage.transaction(async (txn) => {
-                const latest = (await txn.get<CuratorTurn[]>("turns")) ?? [];
+          await withDatabase(this.env, async (env) => {
+            for await (const event of curateStream(env, body.prompt, body.viewerId, turns, {
+              providerIds: body.providerIds ?? [],
+              hour: body.hour,
+              isWeekend: body.isWeekend,
+            })) {
+              if (event.type === "turn") {
+                await this.ctx.storage.transaction(async (txn) => {
+                  const latest = (await txn.get<CuratorTurn[]>("turns")) ?? [];
 
-                await txn.put("turns", [...latest, event.turn].slice(-MAX_TURNS));
-              });
-              await this.ctx.storage.setAlarm(Date.now() + IDLE_MINUTES * 60_000);
-              continue;
+                  await txn.put("turns", [...latest, event.turn].slice(-MAX_TURNS));
+                });
+                await this.ctx.storage.setAlarm(Date.now() + IDLE_MINUTES * 60_000);
+                continue;
+              }
+
+              await writer.write(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
             }
-
-            await writer.write(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
-          }
+          });
         } catch (error) {
           logError("curator_session_failed", error);
           await writer.write(

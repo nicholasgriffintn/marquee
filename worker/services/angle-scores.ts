@@ -103,11 +103,11 @@ export async function computeAngleScores(env: Bindings) {
   }
 
   try {
-    await env.DB.batch(
-      scores.map((entry) =>
-        env.DB.prepare(
+    await env.DB.transaction(async (transaction) => {
+      for (const entry of scores) {
+        await transaction.execute(
           `INSERT INTO angle_scores (angle, impressions, clicks, views, exits, watched, attrition, dwell_ms, score, computed_at)
-           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, CURRENT_TIMESTAMP)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
            ON CONFLICT (angle) DO UPDATE SET
              impressions = excluded.impressions,
              clicks = excluded.clicks,
@@ -118,19 +118,20 @@ export async function computeAngleScores(env: Bindings) {
              dwell_ms = excluded.dwell_ms,
              score = excluded.score,
              computed_at = CURRENT_TIMESTAMP`,
-        ).bind(
-          entry.angle,
-          entry.impressions,
-          entry.clicks,
-          entry.views,
-          entry.exits,
-          entry.watched,
-          entry.attrition,
-          entry.dwellMs,
-          entry.score,
-        ),
-      ),
-    );
+          [
+            entry.angle,
+            entry.impressions,
+            entry.clicks,
+            entry.views,
+            entry.exits,
+            entry.watched,
+            entry.attrition,
+            entry.dwellMs,
+            entry.score,
+          ],
+        );
+      }
+    });
   } catch (error) {
     logError("angle_scores_write_failed", error);
   }
@@ -140,34 +141,30 @@ export async function computeAngleScores(env: Bindings) {
   return scores;
 }
 
-export async function readAngleScores(db: D1Database) {
+export async function readAngleScores(db: Database) {
   try {
-    const rows = await db
-      .prepare(
-        `SELECT angle, score FROM angle_scores
-          WHERE julianday(computed_at) > julianday('now', '-45 days')`,
-      )
-      .all<{ angle: string; score: number }>();
+    const rows = await db.query<{
+      angle: string;
+      score: number;
+    }>(`SELECT angle, score FROM angle_scores
+          WHERE (EXTRACT(EPOCH FROM computed_at) / 86400.0) > (EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - INTERVAL '45 day')) / 86400.0)`);
 
-    return new Map(rows.results.map((row) => [row.angle, row.score]));
+    return new Map(rows.rows.map((row) => [row.angle, row.score]));
   } catch {
     return new Map<string, number>();
   }
 }
 
-export async function readAngleBoard(db: D1Database, limit = 40): Promise<AngleScore[]> {
+export async function readAngleBoard(db: Database, limit = 40): Promise<AngleScore[]> {
   try {
-    const rows = await db
-      .prepare(
-        `SELECT angle, impressions, clicks, views, exits, watched, attrition, dwell_ms AS dwellMs, score
+    const rows =
+      await db.query<AngleScore>(`SELECT angle, impressions, clicks, views, exits, watched, attrition, dwell_ms AS "dwellMs", score
            FROM angle_scores
-          WHERE julianday(computed_at) > julianday('now', '-45 days')
+          WHERE (EXTRACT(EPOCH FROM computed_at) / 86400.0) > (EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - INTERVAL '45 day')) / 86400.0)
           ORDER BY impressions DESC
-          LIMIT ${clamp(limit, 1, 200)}`,
-      )
-      .all<AngleScore>();
+          LIMIT ${clamp(limit, 1, 200)}`);
 
-    return rows.results;
+    return rows.rows;
   } catch (error) {
     logError("angle_board_read_failed", error);
 

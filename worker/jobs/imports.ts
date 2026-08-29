@@ -81,20 +81,19 @@ export async function importDiaryRow(
     return;
   }
 
-  await env.DB.prepare(
+  await env.DB.execute(
     `INSERT INTO viewing_entries (id, viewer_id, title_id, status, rating, thoughts, updated_at)
-     VALUES (?1, ?2, ?3, 'watched', ?4, '', ?5)
+     VALUES ($1, $2, $3, 'watched', $4, '', $5)
      ON CONFLICT(viewer_id, title_id) DO UPDATE SET
        status = 'watched',
        rating = COALESCE(excluded.rating, viewing_entries.rating),
        updated_at = excluded.updated_at`,
-  )
-    .bind(
+    [
       crypto.randomUUID(),
       job.viewerId,
       titleId,
       job.rating,
       job.watchedAt ? `${job.watchedAt} 12:00:00` : new Date().toISOString(),
-    )
-    .run();
+    ],
+  );
 }

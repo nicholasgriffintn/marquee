@@ -8,6 +8,7 @@ import type {
 } from "../../src/domain/catalog.ts";
 import { EXTERNAL_ID_FIELDS, EXTERNAL_ID_OWNERS } from "../../src/domain/catalog.ts";
 import { computeBlendedRating, computeWeightedRating } from "../lib/ratings.ts";
+import { rowPlaceholders } from "./catalog-array-utils.ts";
 import { persistTitleExtensions } from "./catalog-arrays.ts";
 import { projectTitles } from "./catalog-index.ts";
 import { readRawItems } from "./catalog-reader.ts";
@@ -133,7 +134,7 @@ function mergeWithStored(fresh: MediaTitle, stored: MediaTitle | null): MediaTit
   };
 }
 
-export async function storeCatalog(db: D1Database, catalogue: CatalogResponse) {
+export async function storeCatalog(db: Database, catalogue: CatalogResponse) {
   const titles = [
     ...new Map(
       catalogue.sections.flatMap((section) => section.items).map((title) => [title.id, title]),
@@ -151,8 +152,8 @@ const STATEMENTS_PER_BATCH = 10;
 const PEOPLE_CHUNK = PEOPLE_ROWS_PER_STATEMENT * STATEMENTS_PER_BATCH;
 const CREDIT_CHUNK = CREDIT_ROWS_PER_STATEMENT * STATEMENTS_PER_BATCH;
 
-function upsertPeopleStatement(db: D1Database, who: TitleCredit["person"][]) {
-  const placeholders = who.map(() => "(?, ?, ?, ?, ?, ?, ?)").join(", ");
+function upsertPeople(transaction: DatabaseTransaction, who: TitleCredit["person"][]) {
+  const placeholders = rowPlaceholders(who.length, 7);
   const params = who.flatMap((person) => [
     person.id,
     person.name,
@@ -163,9 +164,8 @@ function upsertPeopleStatement(db: D1Database, who: TitleCredit["person"][]) {
     person.popularity,
   ]);
 
-  return db
-    .prepare(
-      `INSERT INTO catalog_people
+  return transaction.execute(
+    `INSERT INTO catalog_people
          (person_id, name, original_name, known_for, gender, profile_path, popularity)
        VALUES ${placeholders}
        ON CONFLICT(person_id) DO UPDATE SET
@@ -175,18 +175,21 @@ function upsertPeopleStatement(db: D1Database, who: TitleCredit["person"][]) {
          gender = excluded.gender,
          profile_path = excluded.profile_path,
          popularity = excluded.popularity
-       WHERE catalog_people.name IS NOT excluded.name
-          OR catalog_people.original_name IS NOT excluded.original_name
-          OR catalog_people.known_for IS NOT excluded.known_for
-          OR catalog_people.gender IS NOT excluded.gender
-          OR catalog_people.profile_path IS NOT excluded.profile_path
-          OR catalog_people.popularity IS NOT excluded.popularity`,
-    )
-    .bind(...params);
+       WHERE catalog_people.name IS DISTINCT FROM excluded.name
+          OR catalog_people.original_name IS DISTINCT FROM excluded.original_name
+          OR catalog_people.known_for IS DISTINCT FROM excluded.known_for
+          OR catalog_people.gender IS DISTINCT FROM excluded.gender
+          OR catalog_people.profile_path IS DISTINCT FROM excluded.profile_path
+          OR catalog_people.popularity IS DISTINCT FROM excluded.popularity`,
+    [...params],
+  );
 }
 
-function upsertCreditsStatement(db: D1Database, rows: { titleId: string; entry: TitleCredit }[]) {
-  const placeholders = rows.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
+function upsertCredits(
+  transaction: DatabaseTransaction,
+  rows: { titleId: string; entry: TitleCredit }[],
+) {
+  const placeholders = rowPlaceholders(rows.length, 10);
   const params = rows.flatMap(({ titleId, entry }) => [
     entry.creditId,
     titleId,
@@ -200,9 +203,8 @@ function upsertCreditsStatement(db: D1Database, rows: { titleId: string; entry: 
     entry.episodeCount,
   ]);
 
-  return db
-    .prepare(
-      `INSERT INTO catalog_credits
+  return transaction.execute(
+    `INSERT INTO catalog_credits
          (credit_id, title_id, person_id, department, job, character, billing,
           season_number, episode_number, episode_count)
        VALUES ${placeholders}
@@ -216,20 +218,20 @@ function upsertCreditsStatement(db: D1Database, rows: { titleId: string; entry: 
          season_number = excluded.season_number,
          episode_number = excluded.episode_number,
          episode_count = excluded.episode_count
-       WHERE catalog_credits.title_id IS NOT excluded.title_id
-          OR catalog_credits.person_id IS NOT excluded.person_id
-          OR catalog_credits.department IS NOT excluded.department
-          OR catalog_credits.job IS NOT excluded.job
-          OR catalog_credits.character IS NOT excluded.character
-          OR catalog_credits.billing IS NOT excluded.billing
-          OR catalog_credits.season_number IS NOT excluded.season_number
-          OR catalog_credits.episode_number IS NOT excluded.episode_number
-          OR catalog_credits.episode_count IS NOT excluded.episode_count`,
-    )
-    .bind(...params);
+       WHERE catalog_credits.title_id IS DISTINCT FROM excluded.title_id
+          OR catalog_credits.person_id IS DISTINCT FROM excluded.person_id
+          OR catalog_credits.department IS DISTINCT FROM excluded.department
+          OR catalog_credits.job IS DISTINCT FROM excluded.job
+          OR catalog_credits.character IS DISTINCT FROM excluded.character
+          OR catalog_credits.billing IS DISTINCT FROM excluded.billing
+          OR catalog_credits.season_number IS DISTINCT FROM excluded.season_number
+          OR catalog_credits.episode_number IS DISTINCT FROM excluded.episode_number
+          OR catalog_credits.episode_count IS DISTINCT FROM excluded.episode_count`,
+    [...params],
+  );
 }
 
-export async function storeCredits(db: D1Database, credits: TitleCredits[]) {
+export async function storeCredits(db: Database, credits: TitleCredits[]) {
   const entriesByCreditId = new Map<string, { titleId: string; entry: TitleCredit }>();
 
   for (const title of credits) {
@@ -254,36 +256,32 @@ export async function storeCredits(db: D1Database, credits: TitleCredits[]) {
 
   for (let index = 0; index < roster.length; index += PEOPLE_CHUNK) {
     const chunk = roster.slice(index, index + PEOPLE_CHUNK);
-    const statements = [];
-
-    for (let offset = 0; offset < chunk.length; offset += PEOPLE_ROWS_PER_STATEMENT) {
-      statements.push(
-        upsertPeopleStatement(db, chunk.slice(offset, offset + PEOPLE_ROWS_PER_STATEMENT)),
-      );
-    }
 
     // oxlint-disable-next-line no-await-in-loop
-    await db.batch(statements);
+    await db.transaction(async (transaction) => {
+      for (let offset = 0; offset < chunk.length; offset += PEOPLE_ROWS_PER_STATEMENT) {
+        // oxlint-disable-next-line no-await-in-loop
+        await upsertPeople(transaction, chunk.slice(offset, offset + PEOPLE_ROWS_PER_STATEMENT));
+      }
+    });
   }
 
   for (let index = 0; index < entries.length; index += CREDIT_CHUNK) {
     const chunk = entries.slice(index, index + CREDIT_CHUNK);
-    const statements = [];
-
-    for (let offset = 0; offset < chunk.length; offset += CREDIT_ROWS_PER_STATEMENT) {
-      statements.push(
-        upsertCreditsStatement(db, chunk.slice(offset, offset + CREDIT_ROWS_PER_STATEMENT)),
-      );
-    }
 
     // oxlint-disable-next-line no-await-in-loop
-    await db.batch(statements);
+    await db.transaction(async (transaction) => {
+      for (let offset = 0; offset < chunk.length; offset += CREDIT_ROWS_PER_STATEMENT) {
+        // oxlint-disable-next-line no-await-in-loop
+        await upsertCredits(transaction, chunk.slice(offset, offset + CREDIT_ROWS_PER_STATEMENT));
+      }
+    });
   }
 
   return entries.length;
 }
 
-export async function storeItems(db: D1Database, items: MediaTitle[], sourceUpdatedAt: string) {
+export async function storeItems(db: Database, items: MediaTitle[], sourceUpdatedAt: string) {
   if (items.length === 0) {
     return;
   }
@@ -310,7 +308,12 @@ export async function storeItems(db: D1Database, items: MediaTitle[], sourceUpda
     // oxlint-disable-next-line no-await-in-loop
     await persistTitleExtensions(db, wave);
     // oxlint-disable-next-line no-await-in-loop
-    await db.batch(wave.map((title) => upsertTitle(db, title, sourceUpdatedAt)));
+    await db.transaction(async (transaction) => {
+      for (const title of wave) {
+        // oxlint-disable-next-line no-await-in-loop
+        await upsertTitle(transaction, title, sourceUpdatedAt);
+      }
+    });
     // oxlint-disable-next-line no-await-in-loop
     await projectTitles(
       db,
@@ -348,18 +351,17 @@ export function titleScalarColumns(title: MediaTitle) {
   };
 }
 
-function upsertTitle(db: D1Database, title: MediaTitle, sourceUpdatedAt: string) {
+function upsertTitle(transaction: DatabaseTransaction, title: MediaTitle, sourceUpdatedAt: string) {
   const scalars = titleScalarColumns(title);
 
-  return db
-    .prepare(
-      `INSERT INTO catalog_titles
+  return transaction.execute(
+    `INSERT INTO catalog_titles
          (id, media_type, tmdb_id, title, original_title, year, popularity,
           source_updated_at, imdb_id, vote_count, weighted_rating, blended_rating,
           overview, runtime_minutes, number_of_seasons, release_date, certification,
           tmdb_score, poster_url, backdrop_url, watch_link, status, original_language,
           revenue, collection_id, collection_name, mal_id, anilist_id, wikidata_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29)
        ON CONFLICT(id) DO UPDATE SET
          media_type = excluded.media_type,
          tmdb_id = excluded.tmdb_id,
@@ -390,8 +392,7 @@ function upsertTitle(db: D1Database, title: MediaTitle, sourceUpdatedAt: string)
          anilist_id = excluded.anilist_id,
          wikidata_id = excluded.wikidata_id,
          updated_at = CURRENT_TIMESTAMP`,
-    )
-    .bind(
+    [
       title.id,
       title.mediaType,
       title.tmdbId,
@@ -421,5 +422,6 @@ function upsertTitle(db: D1Database, title: MediaTitle, sourceUpdatedAt: string)
       scalars.malId,
       scalars.anilistId,
       scalars.wikidataId,
-    );
+    ],
+  );
 }

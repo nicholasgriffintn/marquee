@@ -52,21 +52,19 @@ export const ENRICHMENT_WINDOWS = {
 
 export type EnrichedSource = keyof typeof ENRICHMENT_WINDOWS;
 
-function updateTitleScalars(db: D1Database, title: MediaTitle) {
+function updateTitleScalars(transaction: DatabaseTransaction, title: MediaTitle) {
   const scalars = titleScalarColumns(title);
 
-  return db
-    .prepare(
-      `UPDATE catalog_titles
-       SET weighted_rating = ?, blended_rating = ?,
-           overview = ?, runtime_minutes = ?, number_of_seasons = ?, release_date = ?,
-           certification = ?, tmdb_score = ?, poster_url = ?, backdrop_url = ?,
-           watch_link = ?, status = ?, original_language = ?, revenue = ?,
-           collection_id = ?, collection_name = ?, mal_id = ?, anilist_id = ?,
-           wikidata_id = ?, updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?`,
-    )
-    .bind(
+  return transaction.execute(
+    `UPDATE catalog_titles
+       SET weighted_rating = $1, blended_rating = $2,
+           overview = $3, runtime_minutes = $4, number_of_seasons = $5, release_date = $6,
+           certification = $7, tmdb_score = $8, poster_url = $9, backdrop_url = $10,
+           watch_link = $11, status = $12, original_language = $13, revenue = $14,
+           collection_id = $15, collection_name = $16, mal_id = $17, anilist_id = $18,
+           wikidata_id = $19, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $20`,
+    [
       computeWeightedRating(title),
       computeBlendedRating(title),
       scalars.overview,
@@ -87,7 +85,8 @@ function updateTitleScalars(db: D1Database, title: MediaTitle) {
       scalars.anilistId,
       scalars.wikidataId,
       title.id,
-    );
+    ],
+  );
 }
 
 export async function storeEnrichment<S extends EnrichedSource>(
@@ -109,19 +108,23 @@ export async function storeEnrichment<S extends EnrichedSource>(
     await persistTitleExtensions(env.DB, [enrichedTitle]);
   }
 
-  await env.DB.batch([
-    ...(enrichedTitle ? [updateTitleScalars(env.DB, enrichedTitle)] : []),
-    env.DB.prepare(
+  await env.DB.transaction(async (transaction) => {
+    if (enrichedTitle) {
+      await updateTitleScalars(transaction, enrichedTitle);
+    }
+
+    await transaction.execute(
       `INSERT INTO title_enrichment (title_id, source, payload, miss, attempts, next_check_at)
-       VALUES (?, ?, ?, 0, 0, datetime('now', '+${maxAgeDays} days'))
+       VALUES ($1, $2, $3, 0, 0, (CURRENT_TIMESTAMP + INTERVAL '${maxAgeDays} day'))
        ON CONFLICT(title_id, source) DO UPDATE SET
          payload = excluded.payload,
          miss = 0,
          attempts = 0,
          fetched_at = CURRENT_TIMESTAMP,
-         next_check_at = datetime('now', '+${maxAgeDays} days')`,
-    ).bind(titleId, source, JSON.stringify(fields)),
-  ]);
+         next_check_at = (CURRENT_TIMESTAMP + INTERVAL '${maxAgeDays} day')`,
+      [titleId, source, JSON.stringify(fields)],
+    );
+  });
 
   return Boolean(enrichedTitle);
 }
@@ -134,21 +137,19 @@ export async function storeEnrichmentMiss(
 ) {
   const { missBackoffDays } = ENRICHMENT_WINDOWS[source];
 
-  await env.DB.prepare(
+  await env.DB.execute(
     `INSERT INTO title_enrichment (title_id, source, payload, miss, attempts, next_check_at)
-     VALUES (?, ?, ?, 1, 1, datetime('now', '+' || min(${missBackoffDays}, ${MISS_BACKOFF_CAP_DAYS}) || ' days'))
+     VALUES ($1, $2, $3, 1, 1, CURRENT_TIMESTAMP + LEAST(${missBackoffDays}, ${MISS_BACKOFF_CAP_DAYS}) * INTERVAL '1 day')
      ON CONFLICT(title_id, source) DO UPDATE SET
        payload = excluded.payload,
        miss = 1,
        attempts = title_enrichment.attempts + 1,
        fetched_at = CURRENT_TIMESTAMP,
-       next_check_at = datetime(
-         'now',
-         '+' || min((title_enrichment.attempts + 1) * ${missBackoffDays}, ${MISS_BACKOFF_CAP_DAYS}) || ' days'
-       )`,
-  )
-    .bind(titleId, source, JSON.stringify({ miss: reason }))
-    .run();
+       next_check_at = CURRENT_TIMESTAMP
+         + LEAST((title_enrichment.attempts + 1) * ${missBackoffDays}, ${MISS_BACKOFF_CAP_DAYS})
+           * INTERVAL '1 day'`,
+    [titleId, source, JSON.stringify({ miss: reason })],
+  );
 }
 
 export async function storeEnrichmentTransient(
@@ -157,84 +158,85 @@ export async function storeEnrichmentTransient(
   source: EnrichedSource,
   reason: string,
 ) {
-  await env.DB.prepare(
+  await env.DB.execute(
     `INSERT INTO title_enrichment (title_id, source, payload, miss, attempts, next_check_at)
      VALUES (
-       ?, ?, ?, 2, 1,
-       datetime('now', '+' || min(${TRANSIENT_RETRY_HOURS}, ${TRANSIENT_RETRY_CAP_HOURS}) || ' hours')
+       $1, $2, $3, 2, 1,
+       CURRENT_TIMESTAMP + LEAST(${TRANSIENT_RETRY_HOURS}, ${TRANSIENT_RETRY_CAP_HOURS}) * INTERVAL '1 hour'
      )
      ON CONFLICT(title_id, source) DO UPDATE SET
        payload = excluded.payload,
        miss = 2,
        attempts = title_enrichment.attempts + 1,
        fetched_at = CURRENT_TIMESTAMP,
-       next_check_at = datetime(
-         'now',
-         '+' || min((title_enrichment.attempts + 1) * ${TRANSIENT_RETRY_HOURS}, ${TRANSIENT_RETRY_CAP_HOURS})
-           || ' hours'
-       )`,
-  )
-    .bind(titleId, source, JSON.stringify({ transient: reason }))
-    .run();
+       next_check_at = CURRENT_TIMESTAMP
+         + LEAST(
+             (title_enrichment.attempts + 1) * ${TRANSIENT_RETRY_HOURS},
+             ${TRANSIENT_RETRY_CAP_HOURS}
+           ) * INTERVAL '1 hour'`,
+    [titleId, source, JSON.stringify({ transient: reason })],
+  );
 }
 
-export async function storeAnimeIds(db: D1Database, mappings: AnimeMapping[]) {
+export async function storeAnimeIds(db: Database, mappings: AnimeMapping[]) {
   if (mappings.length === 0) {
     return 0;
   }
 
-  const titleUpdates = mappings.map((mapping) =>
-    db
-      .prepare(
+  return db.transaction(async (transaction) => {
+    let written = 0;
+
+    for (const mapping of mappings) {
+      // oxlint-disable-next-line no-await-in-loop
+      const titleUpdate = await transaction.execute(
         `UPDATE catalog_titles
-         SET mal_id = COALESCE(?1, mal_id),
-             anilist_id = COALESCE(?2, anilist_id),
-             wikidata_id = COALESCE(?3, wikidata_id),
-             imdb_id = COALESCE(?4, imdb_id),
+         SET mal_id = COALESCE($1, mal_id),
+             anilist_id = COALESCE($2, anilist_id),
+             wikidata_id = COALESCE($3, wikidata_id),
+             imdb_id = COALESCE($4, imdb_id),
              updated_at = CURRENT_TIMESTAMP
-         WHERE id = ?5
-           AND ((?1 IS NOT NULL AND mal_id IS NOT ?1)
-             OR (?2 IS NOT NULL AND anilist_id IS NOT ?2)
-             OR (?3 IS NOT NULL AND wikidata_id IS NOT ?3)
-             OR (?4 IS NOT NULL AND imdb_id IS NOT ?4))`,
-      )
-      .bind(
-        mapping.ids.malId ?? null,
-        mapping.ids.anilistId ?? null,
-        mapping.ids.wikidataId ?? null,
-        mapping.ids.imdbId ?? null,
-        mapping.titleId,
-      ),
-  );
+         WHERE id = $5
+           AND (($1 IS NOT NULL AND mal_id IS DISTINCT FROM $1)
+             OR ($2 IS NOT NULL AND anilist_id IS DISTINCT FROM $2)
+             OR ($3 IS NOT NULL AND wikidata_id IS DISTINCT FROM $3)
+             OR ($4 IS NOT NULL AND imdb_id IS DISTINCT FROM $4))`,
+        [
+          mapping.ids.malId ?? null,
+          mapping.ids.anilistId ?? null,
+          mapping.ids.wikidataId ?? null,
+          mapping.ids.imdbId ?? null,
+          mapping.titleId,
+        ],
+      );
 
-  const extensionUpserts = mappings.flatMap((mapping) => {
-    const ids = mapping.ids;
-    const extras = [
-      ids.tvdbId,
-      ids.facebookId,
-      ids.instagramId,
-      ids.twitterId,
-      ids.anidbId,
-      ids.kitsuId,
-      ids.aniSearchId,
-      ids.animePlanetId,
-      ids.livechartId,
-      ids.animeNewsNetworkId,
-      ids.animeCountdownId,
-    ];
+      written += titleUpdate.rowCount;
 
-    if (extras.every((value) => value === undefined || value === null)) {
-      return [];
-    }
+      const ids = mapping.ids;
+      const extras = [
+        ids.tvdbId,
+        ids.facebookId,
+        ids.instagramId,
+        ids.twitterId,
+        ids.anidbId,
+        ids.kitsuId,
+        ids.aniSearchId,
+        ids.animePlanetId,
+        ids.livechartId,
+        ids.animeNewsNetworkId,
+        ids.animeCountdownId,
+      ];
 
-    return [
-      db
-        .prepare(
-          `INSERT INTO catalog_title_external_ids
+      if (extras.every((value) => value === undefined || value === null)) {
+        continue;
+      }
+
+      // oxlint-disable-next-line no-await-in-loop
+      await transaction.execute(
+        `INSERT INTO catalog_title_external_ids
              (title_id, tvdb_id, facebook_id, instagram_id, twitter_id, anidb_id, kitsu_id,
               ani_search_id, anime_planet_id, livechart_id, animenewsnetwork_id, animecountdown_id)
-           SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12
-             FROM catalog_titles WHERE id = ?1
+           SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
+             FROM catalog_titles WHERE id = $1
            ON CONFLICT (title_id) DO UPDATE SET
              tvdb_id = COALESCE(excluded.tvdb_id, catalog_title_external_ids.tvdb_id),
              facebook_id = COALESCE(excluded.facebook_id, catalog_title_external_ids.facebook_id),
@@ -247,8 +249,7 @@ export async function storeAnimeIds(db: D1Database, mappings: AnimeMapping[]) {
              livechart_id = COALESCE(excluded.livechart_id, catalog_title_external_ids.livechart_id),
              animenewsnetwork_id = COALESCE(excluded.animenewsnetwork_id, catalog_title_external_ids.animenewsnetwork_id),
              animecountdown_id = COALESCE(excluded.animecountdown_id, catalog_title_external_ids.animecountdown_id)`,
-        )
-        .bind(
+        [
           mapping.titleId,
           ids.tvdbId ?? null,
           ids.facebookId ?? null,
@@ -261,15 +262,12 @@ export async function storeAnimeIds(db: D1Database, mappings: AnimeMapping[]) {
           ids.livechartId ?? null,
           ids.animeNewsNetworkId ?? null,
           ids.animeCountdownId ?? null,
-        ),
-    ];
+        ],
+      );
+    }
+
+    return written;
   });
-
-  const written = await db.batch([...titleUpdates, ...extensionUpserts]);
-
-  return written
-    .slice(0, titleUpdates.length)
-    .reduce((sum, result) => sum + (result.meta.changes ?? 0), 0);
 }
 
 type CandidateRow = { titleId: string };
@@ -280,20 +278,19 @@ async function selectNeverEnriched(
   limit: number,
   extraCondition: string,
 ) {
-  const rows = await env.DB.prepare(
-    `SELECT t.id AS titleId
+  const rows = await env.DB.query<CandidateRow>(
+    `SELECT t.id AS "titleId"
      FROM catalog_titles AS t
      WHERE NOT EXISTS (
-       SELECT 1 FROM title_enrichment AS e WHERE e.source = ? AND e.title_id = t.id
+       SELECT 1 FROM title_enrichment AS e WHERE e.source = $1 AND e.title_id = t.id
      )
      ${extraCondition}
      ORDER BY t.popularity DESC
-     LIMIT ?`,
-  )
-    .bind(source, limit)
-    .all<CandidateRow>();
+     LIMIT $2`,
+    [source, limit],
+  );
 
-  return rows.results.map((row) => row.titleId);
+  return rows.rows.map((row) => row.titleId);
 }
 
 async function selectDue(
@@ -302,20 +299,19 @@ async function selectDue(
   limit: number,
   extraCondition: string,
 ) {
-  const rows = await env.DB.prepare(
-    `SELECT t.id AS titleId
+  const rows = await env.DB.query<CandidateRow>(
+    `SELECT t.id AS "titleId"
      FROM title_enrichment AS e
      JOIN catalog_titles AS t ON t.id = e.title_id
-     WHERE e.source = ?
+     WHERE e.source = $1
        AND e.next_check_at <= CURRENT_TIMESTAMP
        ${extraCondition}
      ORDER BY e.next_check_at ASC
-     LIMIT ?`,
-  )
-    .bind(source, limit)
-    .all<CandidateRow>();
+     LIMIT $2`,
+    [source, limit],
+  );
 
-  return rows.results.map((row) => row.titleId);
+  return rows.rows.map((row) => row.titleId);
 }
 
 async function selectCandidates(
@@ -347,11 +343,11 @@ export async function selectUnenriched(env: Bindings, source: EnrichmentSource, 
   return selectCandidates(env, source, limit);
 }
 
-export async function storeImdbId(db: D1Database, titleId: string, imdbId: string) {
-  await db
-    .prepare(`UPDATE catalog_titles SET imdb_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
-    .bind(imdbId, titleId)
-    .run();
+export async function storeImdbId(db: Database, titleId: string, imdbId: string) {
+  await db.execute(
+    `UPDATE catalog_titles SET imdb_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+    [imdbId, titleId],
+  );
 }
 
 export function posterKey(titleId: string) {
@@ -369,23 +365,33 @@ export async function storePoster(
 
   await env.MEDIA.put(key, body, { httpMetadata: { contentType } });
 
-  await env.DB.batch([
-    env.DB.prepare(
-      `UPDATE catalog_titles
-       SET poster_key = ?, updated_at = CURRENT_TIMESTAMP
-       WHERE id = ? AND poster_key IS NOT ?`,
-    ).bind(key, titleId, key),
-    env.DB.prepare(
-      `INSERT INTO title_enrichment (title_id, source, payload, miss, attempts, next_check_at)
-       VALUES (?, 'poster', ?, 0, 0, datetime('now', '+${maxAgeDays} days'))
+  await env.DB.transaction(async (transaction) => {
+    const results = [];
+
+    results.push(
+      await transaction.execute(
+        `UPDATE catalog_titles
+       SET poster_key = $1, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2 AND poster_key IS DISTINCT FROM $3`,
+        [key, titleId, key],
+      ),
+    );
+    results.push(
+      await transaction.execute(
+        `INSERT INTO title_enrichment (title_id, source, payload, miss, attempts, next_check_at)
+       VALUES ($1, 'poster', $2, 0, 0, (CURRENT_TIMESTAMP + INTERVAL '${maxAgeDays} day'))
        ON CONFLICT(title_id, source) DO UPDATE SET
          payload = excluded.payload,
          miss = 0,
          attempts = 0,
          fetched_at = CURRENT_TIMESTAMP,
-         next_check_at = datetime('now', '+${maxAgeDays} days')`,
-    ).bind(titleId, JSON.stringify({ key, contentType })),
-  ]);
+         next_check_at = (CURRENT_TIMESTAMP + INTERVAL '${maxAgeDays} day')`,
+        [titleId, JSON.stringify({ key, contentType })],
+      ),
+    );
+
+    return results;
+  });
 
   return true;
 }

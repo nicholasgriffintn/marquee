@@ -28,15 +28,15 @@ export type EpisodeEntryInput = {
   notes: string;
 };
 
-const SELECT_COLUMNS = `title_id AS titleId,
+const SELECT_COLUMNS = `title_id AS "titleId",
          scope,
          season_number AS season,
          episode_number AS episode,
          watched,
-         watched_at AS watchedAt,
+         watched_at AS "watchedAt",
          rating,
          notes,
-         updated_at AS updatedAt`;
+         updated_at AS "updatedAt"`;
 
 function toEntry(row: EntryRow): EpisodeEntry {
   return {
@@ -52,43 +52,38 @@ function toEntry(row: EntryRow): EpisodeEntry {
   };
 }
 
-export async function readEpisodeEntries(db: D1Database, viewerId: string, titleId: string) {
-  const rows = await db
-    .prepare(
-      `SELECT ${SELECT_COLUMNS}
+export async function readEpisodeEntries(db: Database, viewerId: string, titleId: string) {
+  const rows = await db.query<EntryRow>(
+    `SELECT ${SELECT_COLUMNS}
        FROM viewing_episode_entries
-       WHERE viewer_id = ? AND title_id = ?
+       WHERE viewer_id = $1 AND title_id = $2
        ORDER BY season_number, episode_number`,
-    )
-    .bind(viewerId, titleId)
-    .all<EntryRow>();
+    [viewerId, titleId],
+  );
 
-  return rows.results.map(toEntry);
+  return rows.rows.map(toEntry);
 }
 
-export async function readWatchedEpisodes(db: D1Database, viewerId: string, titleId: string) {
-  const rows = await db
-    .prepare(
-      `SELECT season_number AS season, episode_number AS episode
+export async function readWatchedEpisodes(db: Database, viewerId: string, titleId: string) {
+  const rows = await db.query<{ season: number; episode: number }>(
+    `SELECT season_number AS season, episode_number AS episode
        FROM viewing_episode_entries
-       WHERE viewer_id = ? AND title_id = ? AND scope = 'episode' AND watched = 1
+       WHERE viewer_id = $1 AND title_id = $2 AND scope = 'episode' AND watched = 1
        ORDER BY season_number DESC, episode_number DESC`,
-    )
-    .bind(viewerId, titleId)
-    .all<{ season: number; episode: number }>();
+    [viewerId, titleId],
+  );
 
-  return rows.results;
+  return rows.rows;
 }
 
-function statement(db: D1Database, viewerId: string, entry: EpisodeEntryInput) {
+function upsertEntry(transaction: DatabaseTransaction, viewerId: string, entry: EpisodeEntryInput) {
   const episode = entry.scope === "season" ? SEASON_ENTRY_EPISODE : entry.episode;
 
-  return db
-    .prepare(
-      `INSERT INTO viewing_episode_entries
+  return transaction.execute(
+    `INSERT INTO viewing_episode_entries
          (id, viewer_id, title_id, scope, season_number, episode_number,
           watched, watched_at, rating, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, CASE WHEN ? = 1 THEN CURRENT_TIMESTAMP ELSE NULL END, ?, ?)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, CASE WHEN $8 = 1 THEN CURRENT_TIMESTAMP ELSE NULL END, $9, $10)
        ON CONFLICT(viewer_id, title_id, scope, season_number, episode_number) DO UPDATE SET
          watched = excluded.watched,
          watched_at = CASE
@@ -99,8 +94,7 @@ function statement(db: D1Database, viewerId: string, entry: EpisodeEntryInput) {
          rating = excluded.rating,
          notes = excluded.notes,
          updated_at = CURRENT_TIMESTAMP`,
-    )
-    .bind(
+    [
       crypto.randomUUID(),
       viewerId,
       entry.titleId,
@@ -111,51 +105,49 @@ function statement(db: D1Database, viewerId: string, entry: EpisodeEntryInput) {
       entry.watched ? 1 : 0,
       entry.rating,
       entry.notes,
-    );
+    ],
+  );
 }
 
-function deleteStatement(db: D1Database, viewerId: string, entry: EpisodeEntryInput) {
-  return db
-    .prepare(
-      `DELETE FROM viewing_episode_entries
-       WHERE viewer_id = ? AND title_id = ? AND scope = ? AND season_number = ? AND episode_number = ?`,
-    )
-    .bind(
+function deleteEntry(transaction: DatabaseTransaction, viewerId: string, entry: EpisodeEntryInput) {
+  return transaction.execute(
+    `DELETE FROM viewing_episode_entries
+       WHERE viewer_id = $1 AND title_id = $2 AND scope = $3 AND season_number = $4 AND episode_number = $5`,
+    [
       viewerId,
       entry.titleId,
       entry.scope,
       entry.season,
       entry.scope === "season" ? SEASON_ENTRY_EPISODE : entry.episode,
-    );
+    ],
+  );
 }
 
 function isEmpty(entry: EpisodeEntryInput) {
   return !entry.watched && entry.rating === null && entry.notes.trim().length === 0;
 }
 
-export async function saveEpisodeEntry(db: D1Database, viewerId: string, entry: EpisodeEntryInput) {
+export async function saveEpisodeEntry(db: Database, viewerId: string, entry: EpisodeEntryInput) {
   if (isEmpty(entry)) {
-    await deleteStatement(db, viewerId, entry).run();
+    await deleteEntry(db, viewerId, entry);
 
     return null;
   }
 
-  await statement(db, viewerId, entry).run();
+  await upsertEntry(db, viewerId, entry);
 
-  const row = await db
-    .prepare(
-      `SELECT ${SELECT_COLUMNS}
+  const row = await db.first<EntryRow>(
+    `SELECT ${SELECT_COLUMNS}
        FROM viewing_episode_entries
-       WHERE viewer_id = ? AND title_id = ? AND scope = ? AND season_number = ? AND episode_number = ?`,
-    )
-    .bind(
+       WHERE viewer_id = $1 AND title_id = $2 AND scope = $3 AND season_number = $4 AND episode_number = $5`,
+    [
       viewerId,
       entry.titleId,
       entry.scope,
       entry.season,
       entry.scope === "season" ? SEASON_ENTRY_EPISODE : entry.episode,
-    )
-    .first<EntryRow>();
+    ],
+  );
 
   return row ? toEntry(row) : null;
 }
@@ -163,7 +155,7 @@ export async function saveEpisodeEntry(db: D1Database, viewerId: string, entry: 
 const WRITE_CHUNK = 40;
 
 export async function setEpisodesWatched(
-  db: D1Database,
+  db: Database,
   viewerId: string,
   titleId: string,
   season: number,
@@ -184,50 +176,50 @@ export async function setEpisodesWatched(
     const wave = inputs.slice(index, index + WRITE_CHUNK);
 
     // oxlint-disable-next-line no-await-in-loop
-    await db.batch(
-      wave.map((entry) =>
-        watched
-          ? db
-              .prepare(
-                `INSERT INTO viewing_episode_entries
+    await db.transaction(async (transaction) => {
+      for (const entry of wave) {
+        if (watched) {
+          // oxlint-disable-next-line no-await-in-loop
+          await transaction.execute(
+            `INSERT INTO viewing_episode_entries
                    (id, viewer_id, title_id, scope, season_number, episode_number, watched, watched_at)
-                 VALUES (?, ?, ?, 'episode', ?, ?, 1, CURRENT_TIMESTAMP)
+                 VALUES ($1, $2, $3, 'episode', $4, $5, 1, CURRENT_TIMESTAMP)
                  ON CONFLICT(viewer_id, title_id, scope, season_number, episode_number) DO UPDATE SET
                    watched = 1,
                    watched_at = COALESCE(viewing_episode_entries.watched_at, CURRENT_TIMESTAMP),
                    updated_at = CURRENT_TIMESTAMP`,
-              )
-              .bind(crypto.randomUUID(), viewerId, titleId, entry.season, entry.episode)
-          : db
-              .prepare(
-                `UPDATE viewing_episode_entries
+            [crypto.randomUUID(), viewerId, titleId, entry.season, entry.episode],
+          );
+        } else {
+          // oxlint-disable-next-line no-await-in-loop
+          await transaction.execute(
+            `UPDATE viewing_episode_entries
                  SET watched = 0, watched_at = NULL, updated_at = CURRENT_TIMESTAMP
-                 WHERE viewer_id = ? AND title_id = ? AND scope = 'episode'
-                   AND season_number = ? AND episode_number = ?`,
-              )
-              .bind(viewerId, titleId, entry.season, entry.episode),
-      ),
-    );
+                 WHERE viewer_id = $1 AND title_id = $2 AND scope = 'episode'
+                   AND season_number = $3 AND episode_number = $4`,
+            [viewerId, titleId, entry.season, entry.episode],
+          );
+        }
+      }
+    });
   }
 
-  await db
-    .prepare(
-      `DELETE FROM viewing_episode_entries
-       WHERE viewer_id = ? AND title_id = ? AND scope = 'episode'
+  await db.execute(
+    `DELETE FROM viewing_episode_entries
+       WHERE viewer_id = $1 AND title_id = $2 AND scope = 'episode'
          AND watched = 0 AND rating IS NULL AND trim(notes) = ''`,
-    )
-    .bind(viewerId, titleId)
-    .run();
+    [viewerId, titleId],
+  );
 }
 
-export async function deleteEpisodeEntries(db: D1Database, viewerId: string, titleId: string) {
-  await db
-    .prepare(`DELETE FROM viewing_episode_entries WHERE viewer_id = ? AND title_id = ?`)
-    .bind(viewerId, titleId)
-    .run();
+export async function deleteEpisodeEntries(db: Database, viewerId: string, titleId: string) {
+  await db.execute(`DELETE FROM viewing_episode_entries WHERE viewer_id = $1 AND title_id = $2`, [
+    viewerId,
+    titleId,
+  ]);
 }
 
-export async function readWatchedEpisodeKeys(db: D1Database, viewerId: string, titleIds: string[]) {
+export async function readWatchedEpisodeKeys(db: Database, viewerId: string, titleIds: string[]) {
   const unique = [...new Set(titleIds)];
 
   if (unique.length === 0) {
@@ -239,17 +231,15 @@ export async function readWatchedEpisodeKeys(db: D1Database, viewerId: string, t
   for (let index = 0; index < unique.length; index += WATCHED_KEY_CHUNK) {
     const wave = unique.slice(index, index + WATCHED_KEY_CHUNK);
     // oxlint-disable-next-line no-await-in-loop
-    const rows = await db
-      .prepare(
-        `SELECT title_id AS titleId, season_number AS season, episode_number AS episode
+    const rows = await db.query<{ titleId: string; season: number; episode: number }>(
+      `SELECT title_id AS "titleId", season_number AS season, episode_number AS episode
            FROM viewing_episode_entries
-          WHERE viewer_id = ? AND scope = 'episode' AND watched = 1
-            AND title_id IN (${wave.map(() => "?").join(",")})`,
-      )
-      .bind(viewerId, ...wave)
-      .all<{ titleId: string; season: number; episode: number }>();
+          WHERE viewer_id = $1 AND scope = 'episode' AND watched = 1
+            AND title_id IN (${wave.map((_, offset) => `$${offset + 2}`).join(",")})`,
+      [viewerId, ...wave],
+    );
 
-    for (const row of rows.results) {
+    for (const row of rows.rows) {
       keys.add(`${row.titleId}:${row.season}:${row.episode}`);
     }
   }

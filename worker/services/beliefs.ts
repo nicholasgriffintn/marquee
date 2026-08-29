@@ -41,14 +41,13 @@ type TitleFacts = {
 
 type FactRow = { id: string; genres: string | null; people: string | null; runtime: number | null };
 
-async function factsFor(db: D1Database, titleIds: string[]): Promise<TitleFacts[]> {
+async function factsFor(db: Database, titleIds: string[]): Promise<TitleFacts[]> {
   if (titleIds.length === 0) {
     return [];
   }
 
-  const rows = await db
-    .prepare(
-      `SELECT id,
+  const rows = await db.query<FactRow>(
+    `SELECT id,
               (SELECT json_group_array(genre) FROM
                 (SELECT genre FROM catalog_title_genres
                   WHERE title_id = catalog_titles.id ORDER BY position)) AS genres,
@@ -57,12 +56,11 @@ async function factsFor(db: D1Database, titleIds: string[]): Promise<TitleFacts[
                   WHERE title_id = catalog_titles.id ORDER BY position)) AS people,
               runtime_minutes AS runtime
          FROM catalog_titles
-        WHERE id IN (${titleIds.map(() => "?").join(",")})`,
-    )
-    .bind(...titleIds)
-    .all<FactRow>();
+        WHERE id IN (${titleIds.map((_, index) => `$${index + 1}`).join(",")})`,
+    [...titleIds],
+  );
 
-  return rows.results.map((row) => ({
+  return rows.rows.map((row) => ({
     titleId: row.id,
     genres: canonicalGenres(jsonStringList(row.genres)),
     people: jsonStringList(row.people),
@@ -244,7 +242,7 @@ function derivedDrafts(
 const MOOD_WINDOW_DAYS = 30;
 const MOOD_EXPIRY_DAYS = 21;
 
-async function moodDrafts(db: D1Database, viewerId: string): Promise<BeliefDraft[]> {
+async function moodDrafts(db: Database, viewerId: string): Promise<BeliefDraft[]> {
   const rejections = await readSignals(db, viewerId, ["rejection"], 120);
   const recent = rejections.filter(
     (signal) => Date.now() - Date.parse(signal.createdAt) < MOOD_WINDOW_DAYS * 86_400_000,
@@ -279,7 +277,7 @@ async function moodDrafts(db: D1Database, viewerId: string): Promise<BeliefDraft
     }));
 }
 
-async function serviceDrafts(db: D1Database, viewerId: string): Promise<BeliefDraft[]> {
+async function serviceDrafts(db: Database, viewerId: string): Promise<BeliefDraft[]> {
   const exits = await readSignals(db, viewerId, ["provider_exit"], 200);
   const totals = new Map<string, string[]>();
 

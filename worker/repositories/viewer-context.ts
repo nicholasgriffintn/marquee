@@ -9,18 +9,13 @@ type EntryRow = {
   updatedAt: string;
 };
 
-export async function readViewerEntries(
-  db: D1Database,
-  viewerId: string,
-): Promise<ViewingContext[]> {
-  const entriesResult = await db
-    .prepare(
-      `SELECT title_id AS titleId, status, rating, thoughts, updated_at AS updatedAt FROM viewing_entries WHERE viewer_id = ? ORDER BY updated_at DESC LIMIT 100`,
-    )
-    .bind(viewerId)
-    .all<EntryRow>();
+export async function readViewerEntries(db: Database, viewerId: string): Promise<ViewingContext[]> {
+  const entriesResult = await db.query<EntryRow>(
+    `SELECT title_id AS "titleId", status, rating, thoughts, updated_at AS "updatedAt" FROM viewing_entries WHERE viewer_id = $1 ORDER BY updated_at DESC LIMIT 100`,
+    [viewerId],
+  );
 
-  return entriesResult.results.map((entry) => ({
+  return entriesResult.rows.map((entry) => ({
     titleId: entry.titleId,
     status: entry.status,
     rating: entry.rating,
@@ -38,30 +33,28 @@ function toAffinityValues(rows: AffinityRow[]) {
 }
 
 async function affinityForTable(
-  db: D1Database,
+  db: Database,
   viewerId: string,
   table: "catalog_title_genres" | "catalog_title_keywords" | "catalog_title_people",
   column: "genre" | "keyword" | "person",
   limit: number,
 ) {
-  const rows = await db
-    .prepare(
-      `SELECT f.${column} AS value, sum(${AFFINITY_WEIGHT}) AS weight
+  const rows = await db.query<AffinityRow>(
+    `SELECT f.${column} AS value, sum(${AFFINITY_WEIGHT}) AS weight
        FROM viewing_entries AS v
        JOIN ${table} AS f ON f.title_id = v.title_id
-       WHERE v.viewer_id = ?
+       WHERE v.viewer_id = $1
        GROUP BY f.${column}
        HAVING sum(${AFFINITY_WEIGHT}) > 0
        ORDER BY weight DESC
-       LIMIT ?`,
-    )
-    .bind(viewerId, limit)
-    .all<AffinityRow>();
+       LIMIT $2`,
+    [viewerId, limit],
+  );
 
-  return toAffinityValues(rows.results);
+  return toAffinityValues(rows.rows);
 }
 
-export async function readViewerAffinity(db: D1Database, viewerId: string) {
+export async function readViewerAffinity(db: Database, viewerId: string) {
   const [genres, keywords, people] = await Promise.all([
     affinityForTable(db, viewerId, "catalog_title_genres", "genre", 6),
     affinityForTable(db, viewerId, "catalog_title_keywords", "keyword", 12),
@@ -71,28 +64,26 @@ export async function readViewerAffinity(db: D1Database, viewerId: string) {
   return { genres, keywords, people };
 }
 
-export async function readShelfDetail(db: D1Database, viewerId: string, limit = 20) {
-  const rows = await db
-    .prepare(
-      `SELECT t.title, t.year, v.status, v.rating, v.thoughts,
+export async function readShelfDetail(db: Database, viewerId: string, limit = 20) {
+  const rows = await db.query<{
+    title: string;
+    year: number | null;
+    status: string;
+    rating: number | null;
+    thoughts: string;
+    genres: string | null;
+  }>(
+    `SELECT t.title, t.year, v.status, v.rating, v.thoughts,
               (SELECT json_group_array(genre) FROM
                 (SELECT genre FROM catalog_title_genres
                   WHERE title_id = t.id ORDER BY position)) AS genres
        FROM viewing_entries AS v
        JOIN catalog_titles AS t ON t.id = v.title_id
-       WHERE v.viewer_id = ?
+       WHERE v.viewer_id = $1
        ORDER BY v.rating DESC NULLS LAST, v.updated_at DESC
-       LIMIT ?`,
-    )
-    .bind(viewerId, limit)
-    .all<{
-      title: string;
-      year: number | null;
-      status: string;
-      rating: number | null;
-      thoughts: string;
-      genres: string | null;
-    }>();
+       LIMIT $2`,
+    [viewerId, limit],
+  );
 
-  return rows.results;
+  return rows.rows;
 }

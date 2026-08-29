@@ -44,7 +44,7 @@ import { readStudioMap, writeStudioRows } from "./catalog-studios.ts";
 import { readVideoMap, writeVideoRows } from "./catalog-videos.ts";
 import { readVisualFormatMap } from "./title-visual-format.ts";
 
-async function attachAnime(db: D1Database, ids: string[]) {
+async function attachAnime(db: Database, ids: string[]) {
   const core = await readAnimeCoreMap(db, ids);
 
   if (core.size === 0) {
@@ -92,7 +92,7 @@ async function attachAnime(db: D1Database, ids: string[]) {
   return result;
 }
 
-async function persistAnime(db: D1Database, titles: MediaTitle[]) {
+async function persistAnime(db: Database, titles: MediaTitle[]) {
   await writeAnimeCoreRows(db, titles);
   await writeAnimeSynonymRows(db, titles);
   await writeAnimeCompanyRows(db, titles);
@@ -107,7 +107,7 @@ async function persistAnime(db: D1Database, titles: MediaTitle[]) {
 }
 
 export async function attachTitleExtensions<T extends MediaTitle>(
-  db: D1Database,
+  db: Database,
   titles: T[],
 ): Promise<T[]> {
   if (titles.length === 0) {
@@ -181,14 +181,14 @@ export async function attachTitleExtensions<T extends MediaTitle>(
   });
 }
 
-export function hydrateTitleRows(db: D1Database, rows: CatalogTitleRow[]) {
+export function hydrateTitleRows(db: Database, rows: CatalogTitleRow[]) {
   return attachTitleExtensions(
     db,
     rows.map((row) => buildTitleFromRow(row)),
   );
 }
 
-export async function persistTitleExtensions(db: D1Database, titles: MediaTitle[]) {
+export async function persistTitleExtensions(db: Database, titles: MediaTitle[]) {
   if (titles.length === 0) {
     return;
   }

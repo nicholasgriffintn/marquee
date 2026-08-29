@@ -52,51 +52,53 @@ export function jobSubject(job: IngestionJob) {
   return null;
 }
 
-export function ingestionRunStartStatement(env: Bindings, runId: string, job: IngestionJob) {
-  return env.DB.prepare(
+export function startIngestionRun(
+  transaction: DatabaseTransaction,
+  runId: string,
+  job: IngestionJob,
+) {
+  return transaction.execute(
     `INSERT INTO ingestion_runs (id, job_type, subject_id, status)
-     VALUES (?, ?, ?, 'running')`,
-  ).bind(runId, job.type, jobSubject(job));
+     VALUES ($1, $2, $3, 'running')`,
+    [runId, job.type, jobSubject(job)],
+  );
 }
 
 export async function completeIngestionRun(env: Bindings, runId: string) {
-  await env.DB.prepare(
+  await env.DB.execute(
     `UPDATE ingestion_runs
      SET status = 'completed', completed_at = CURRENT_TIMESTAMP
-     WHERE id = ?`,
-  )
-    .bind(runId)
-    .run();
+     WHERE id = $1`,
+    [runId],
+  );
 }
 
 export async function failIngestionRun(env: Bindings, runId: string, error: unknown) {
   const detail = error instanceof Error ? error.message.slice(0, 500) : "Unknown ingestion error";
 
-  await env.DB.prepare(
+  await env.DB.execute(
     `UPDATE ingestion_runs
-     SET status = 'failed', error = ?, completed_at = CURRENT_TIMESTAMP
-     WHERE id = ?`,
-  )
-    .bind(detail, runId)
-    .run();
+     SET status = 'failed', error = $1, completed_at = CURRENT_TIMESTAMP
+     WHERE id = $2`,
+    [detail, runId],
+  );
 }
 
 const RUN_RETENTION_DAYS = 7;
 const RUN_PRUNE_LIMIT = 20_000;
 
 export async function pruneIngestionRuns(env: Bindings) {
-  const result = await env.DB.prepare(
+  const result = await env.DB.execute(
     `DELETE FROM ingestion_runs
      WHERE id IN (
        SELECT id FROM ingestion_runs
-       WHERE started_at < datetime('now', ?)
-       LIMIT ?
+       WHERE started_at < (CURRENT_TIMESTAMP + CAST($1 AS INTERVAL))
+       LIMIT $2
      )`,
-  )
-    .bind(`-${RUN_RETENTION_DAYS} days`, RUN_PRUNE_LIMIT)
-    .run();
+    [`-${RUN_RETENTION_DAYS} days`, RUN_PRUNE_LIMIT],
+  );
 
-  logEvent("ingestion_runs_pruned", { removed: result.meta.changes });
+  logEvent("ingestion_runs_pruned", { removed: result.rowCount });
 
-  return result.meta.changes;
+  return result.rowCount;
 }

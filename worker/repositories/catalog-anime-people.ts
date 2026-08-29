@@ -1,17 +1,16 @@
 import type { AnimeCharacter, AnimeStaffMember, MediaTitle } from "../../src/domain/catalog.ts";
 import { deleteByTitleIds, groupBy, insertRows, queryChunked } from "./catalog-array-utils.ts";
 
-export async function readAnimeCharacterMap(db: D1Database, ids: string[]) {
+export async function readAnimeCharacterMap(db: Database, ids: string[]) {
   const rows = await queryChunked(ids, (wave) =>
     db
-      .prepare(
-        `SELECT title_id AS titleId, name, role, voice_actor AS voiceActor
+      .query<AnimeCharacter & { titleId: string }>(
+        `SELECT title_id AS "titleId", name, role, voice_actor AS "voiceActor"
          FROM catalog_title_anime_characters
-         WHERE title_id IN (${wave.map(() => "?").join(",")}) ORDER BY title_id, position`,
+         WHERE title_id IN (${wave.map((_, index) => `$${index + 1}`).join(",")}) ORDER BY title_id, position`,
+        [...wave],
       )
-      .bind(...wave)
-      .all<AnimeCharacter & { titleId: string }>()
-      .then((r) => r.results),
+      .then((r) => r.rows),
   );
   const grouped = groupBy(rows, (r) => r.titleId);
   const values = new Map<string, AnimeCharacter[]>();
@@ -26,7 +25,7 @@ export async function readAnimeCharacterMap(db: D1Database, ids: string[]) {
   return values;
 }
 
-export async function writeAnimeCharacterRows(db: D1Database, titles: MediaTitle[]) {
+export async function writeAnimeCharacterRows(db: Database, titles: MediaTitle[]) {
   await deleteByTitleIds(
     db,
     "catalog_title_anime_characters",
@@ -34,7 +33,7 @@ export async function writeAnimeCharacterRows(db: D1Database, titles: MediaTitle
   );
 
   const rows = titles.flatMap((title) =>
-    (title.anime?.characters ?? []).map((character, position): unknown[] => [
+    (title.anime?.characters ?? []).map((character, position): DatabaseValue[] => [
       title.id,
       character.name,
       character.role,
@@ -49,21 +48,21 @@ export async function writeAnimeCharacterRows(db: D1Database, titles: MediaTitle
     18,
     rows,
     (chunk) =>
-      `INSERT OR IGNORE INTO catalog_title_anime_characters (title_id, name, role, voice_actor, position)
-       VALUES ${chunk.map(() => "(?, ?, ?, ?, ?)").join(", ")}`,
+      `INSERT INTO catalog_title_anime_characters (title_id, name, role, voice_actor, position)
+       VALUES ${chunk.map(() => "(?, ?, ?, ?, ?)").join(", ")}
+       ON CONFLICT DO NOTHING`,
   );
 }
 
-export async function readAnimeStaffMap(db: D1Database, ids: string[]) {
+export async function readAnimeStaffMap(db: Database, ids: string[]) {
   const rows = await queryChunked(ids, (wave) =>
     db
-      .prepare(
-        `SELECT title_id AS titleId, name, role FROM catalog_title_anime_staff
-         WHERE title_id IN (${wave.map(() => "?").join(",")}) ORDER BY title_id, position`,
+      .query<AnimeStaffMember & { titleId: string }>(
+        `SELECT title_id AS "titleId", name, role FROM catalog_title_anime_staff
+         WHERE title_id IN (${wave.map((_, index) => `$${index + 1}`).join(",")}) ORDER BY title_id, position`,
+        [...wave],
       )
-      .bind(...wave)
-      .all<AnimeStaffMember & { titleId: string }>()
-      .then((r) => r.results),
+      .then((r) => r.rows),
   );
   const grouped = groupBy(rows, (r) => r.titleId);
   const values = new Map<string, AnimeStaffMember[]>();
@@ -78,7 +77,7 @@ export async function readAnimeStaffMap(db: D1Database, ids: string[]) {
   return values;
 }
 
-export async function writeAnimeStaffRows(db: D1Database, titles: MediaTitle[]) {
+export async function writeAnimeStaffRows(db: Database, titles: MediaTitle[]) {
   await deleteByTitleIds(
     db,
     "catalog_title_anime_staff",
@@ -86,7 +85,7 @@ export async function writeAnimeStaffRows(db: D1Database, titles: MediaTitle[]) 
   );
 
   const rows = titles.flatMap((title) =>
-    (title.anime?.staff ?? []).map((member, position): unknown[] => [
+    (title.anime?.staff ?? []).map((member, position): DatabaseValue[] => [
       title.id,
       member.name,
       member.role,
@@ -100,7 +99,8 @@ export async function writeAnimeStaffRows(db: D1Database, titles: MediaTitle[]) 
     22,
     rows,
     (chunk) =>
-      `INSERT OR IGNORE INTO catalog_title_anime_staff (title_id, name, role, position)
-       VALUES ${chunk.map(() => "(?, ?, ?, ?)").join(", ")}`,
+      `INSERT INTO catalog_title_anime_staff (title_id, name, role, position)
+       VALUES ${chunk.map(() => "(?, ?, ?, ?)").join(", ")}
+       ON CONFLICT DO NOTHING`,
   );
 }

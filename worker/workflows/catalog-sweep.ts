@@ -1,5 +1,6 @@
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from "cloudflare:workers";
 
+import { withDatabase } from "../database/runtime.ts";
 import { pruneIngestionRuns } from "../jobs/ingestion-runs.ts";
 import {
   queueAvailability,
@@ -34,11 +35,11 @@ import { syncSchedule } from "../services/schedule.ts";
 import { buildSections } from "../services/sections.ts";
 import { syncTitlePlaces } from "../services/title-places.ts";
 import { syncVisualFormat } from "../services/visual-format.ts";
-import type { Bindings, CatalogSweepParameters } from "../types.ts";
+import type { CatalogSweepParameters, WorkerBindings } from "../types.ts";
 
 const RETRIES = { limit: 4, delay: "30 seconds", backoff: "exponential" } as const;
 
-export class CatalogSweep extends WorkflowEntrypoint<Bindings, CatalogSweepParameters> {
+export class CatalogSweep extends WorkflowEntrypoint<WorkerBindings, CatalogSweepParameters> {
   async run(event: Readonly<WorkflowEvent<CatalogSweepParameters>>, step: WorkflowStep) {
     const deep = event.payload?.deep === true;
 
@@ -50,97 +51,111 @@ export class CatalogSweep extends WorkflowEntrypoint<Bindings, CatalogSweepParam
       });
 
       await step.do("sync providers", { retries: RETRIES }, async () => {
-        const providers = await getProviderLedger(this.env);
+        const providers = await withDatabase(this.env, async (env) => {
+          const ledger = await getProviderLedger(env);
 
-        await storeProviders(this.env.DB, providers);
+          await storeProviders(env.DB, ledger);
+
+          return ledger;
+        });
 
         return providers.providers.length;
       });
     }
 
-    await step.do("reconcile budgets", { retries: RETRIES }, async () => ensureBudgets(this.env));
+    await step.do("reconcile budgets", { retries: RETRIES }, () =>
+      withDatabase(this.env, ensureBudgets),
+    );
 
     const titleIds = await step.do("sync catalogue head", { retries: RETRIES }, async () =>
-      syncCatalogHead(this.env),
+      withDatabase(this.env, syncCatalogHead),
     );
 
     await step.do("advance discover frontier", { retries: RETRIES }, async () =>
-      advanceDiscoverFrontier(this.env),
+      withDatabase(this.env, advanceDiscoverFrontier),
     );
 
     await step.do("queue availability", { retries: RETRIES }, async () => {
-      await queueAvailability(this.env, titleIds);
+      await withDatabase(this.env, (env) => queueAvailability(env, titleIds));
 
       return titleIds.length;
     });
 
     await step.do("queue enrichment", { retries: RETRIES }, async () => {
-      await queueEnrichment(this.env);
+      await withDatabase(this.env, queueEnrichment);
 
       return true;
     });
 
     if (deep) {
       await step.do("sync cinema directories", { retries: RETRIES }, async () =>
-        queueCinemaDirectories(this.env),
+        withDatabase(this.env, queueCinemaDirectories),
       );
     }
 
     await step.do("queue cinema screenings", { retries: RETRIES }, async () =>
-      queueCinemaScreenings(this.env),
+      withDatabase(this.env, queueCinemaScreenings),
     );
 
     await step.do("prune past screenings", { retries: RETRIES }, async () =>
-      pruneScreenings(this.env.DB),
+      withDatabase(this.env, (env) => pruneScreenings(env.DB)),
     );
 
-    await step.do("sync schedule", { retries: RETRIES }, async () => syncSchedule(this.env));
+    await step.do("sync schedule", { retries: RETRIES }, () =>
+      withDatabase(this.env, syncSchedule),
+    );
 
-    await step.do("sync buzz", { retries: RETRIES }, async () => syncBuzz(this.env));
+    await step.do("sync buzz", { retries: RETRIES }, () => withDatabase(this.env, syncBuzz));
 
-    await step.do("sync awards", { retries: RETRIES }, async () => syncAwards(this.env));
+    await step.do("sync awards", { retries: RETRIES }, () => withDatabase(this.env, syncAwards));
 
     await step.do("sync visual format", { retries: RETRIES }, async () =>
-      syncVisualFormat(this.env),
+      withDatabase(this.env, syncVisualFormat),
     );
 
-    await step.do("sync adaptations", { retries: RETRIES }, async () => syncAdaptations(this.env));
+    await step.do("sync adaptations", { retries: RETRIES }, () =>
+      withDatabase(this.env, syncAdaptations),
+    );
 
     await step.do("sync title identifiers", { retries: RETRIES }, async () =>
-      syncTitleIdentifiers(this.env),
+      withDatabase(this.env, syncTitleIdentifiers),
     );
 
     await step.do("sync filming locations", { retries: RETRIES }, async () =>
-      syncTitlePlaces(this.env),
+      withDatabase(this.env, syncTitlePlaces),
     );
 
     await step.do("reconcile search index", { retries: RETRIES }, async () =>
-      reconcileSearchIndex(this.env, deep ? DEEP_RECONCILE_LIMIT : RECONCILE_LIMIT),
+      withDatabase(this.env, (env) =>
+        reconcileSearchIndex(env, deep ? DEEP_RECONCILE_LIMIT : RECONCILE_LIMIT),
+      ),
     );
 
     await step.do("queue embeddings", { retries: RETRIES }, async () => {
-      await queueEmbeddings(this.env);
+      await withDatabase(this.env, queueEmbeddings);
 
       return true;
     });
 
-    await step.do("build sections", { retries: RETRIES }, async () => buildSections(this.env));
+    await step.do("build sections", { retries: RETRIES }, () =>
+      withDatabase(this.env, buildSections),
+    );
 
     await step.do("rebuild working set", { retries: RETRIES }, async () =>
-      rebuildWorkingSet(this.env.DB),
+      withDatabase(this.env, (env) => rebuildWorkingSet(env.DB)),
     );
 
     await step.do("queue stale availability", { retries: RETRIES }, async () =>
-      queueStaleAvailability(this.env, titleIds),
+      withDatabase(this.env, (env) => queueStaleAvailability(env, titleIds)),
     );
 
     await step.do("index people", { retries: RETRIES }, async () =>
-      rebuildPeopleIndex(this.env.DB),
+      withDatabase(this.env, (env) => rebuildPeopleIndex(env.DB)),
     );
 
     if (deep) {
       await step.do("sweep public domain sources", { retries: RETRIES }, async () =>
-        queueRevivalSources(this.env),
+        withDatabase(this.env, queueRevivalSources),
       );
     }
 
@@ -163,7 +178,7 @@ export class CatalogSweep extends WorkflowEntrypoint<Bindings, CatalogSweepParam
     });
 
     await step.do("check public domain rights", { retries: RETRIES }, async () =>
-      checkRevivalRights(this.env),
+      withDatabase(this.env, checkRevivalRights),
     );
 
     await step.do("recheck print suitability", { retries: RETRIES }, async () => {
@@ -173,13 +188,15 @@ export class CatalogSweep extends WorkflowEntrypoint<Bindings, CatalogSweepParam
     });
 
     await step.do("queue reel mirrors", { retries: RETRIES }, async () =>
-      queueRevivalMirrors(this.env),
+      withDatabase(this.env, queueRevivalMirrors),
     );
 
-    await step.do("prune run log", { retries: RETRIES }, async () => pruneIngestionRuns(this.env));
+    await step.do("prune run log", { retries: RETRIES }, () =>
+      withDatabase(this.env, pruneIngestionRuns),
+    );
 
     await step.do("prune catalogue gaps", { retries: RETRIES }, async () =>
-      pruneCatalogueGaps(this.env.DB, GAP_DISCOVERY.retentionDays),
+      withDatabase(this.env, (env) => pruneCatalogueGaps(env.DB, GAP_DISCOVERY.retentionDays)),
     );
 
     return { titles: titleIds.length, deep };

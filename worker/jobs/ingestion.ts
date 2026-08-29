@@ -44,16 +44,15 @@ const SAVED_TITLE_SAMPLE = 100;
 export async function syncCatalogHead(env: Bindings) {
   const catalogue = await getCatalog(env, "", []);
   const catalogueTitles = await storeCatalog(env.DB, catalogue);
-  const savedTitles = await env.DB.prepare(
-    `SELECT DISTINCT title_id AS titleId
+  const savedTitles = await env.DB.query<{ titleId: string }>(
+    `SELECT DISTINCT title_id AS "titleId"
      FROM viewing_entries
      ORDER BY updated_at DESC
-     LIMIT ?`,
-  )
-    .bind(SAVED_TITLE_SAMPLE)
-    .all<{ titleId: string }>();
+     LIMIT $1`,
+    [SAVED_TITLE_SAMPLE],
+  );
   const catalogueIds = new Set(catalogueTitles.map((title) => title.id));
-  const missingSavedIds = savedTitles.results
+  const missingSavedIds = savedTitles.rows
     .map((row) => row.titleId)
     .filter((id) => isKnownTitle(id) && !catalogueIds.has(id));
   const missingSavedTitles = await getItems(env, missingSavedIds);
@@ -62,7 +61,7 @@ export async function syncCatalogHead(env: Bindings) {
 
   return [
     ...catalogueTitles.map((title) => title.id),
-    ...savedTitles.results.map((row) => row.titleId).filter(isKnownTitle),
+    ...savedTitles.rows.map((row) => row.titleId).filter(isKnownTitle),
   ];
 }
 

@@ -3,18 +3,17 @@ import { deleteByTitleIds, groupBy, insertRows, queryChunked } from "./catalog-a
 
 type VideoRow = { titleId: string; key: string; name: string; type: string };
 
-export async function readVideoMap(db: D1Database, ids: string[]) {
+export async function readVideoMap(db: Database, ids: string[]) {
   const rows = await queryChunked(ids, (wave) =>
     db
-      .prepare(
-        `SELECT title_id AS titleId, video_key AS key, name, type
+      .query<VideoRow>(
+        `SELECT title_id AS "titleId", video_key AS key, name, type
          FROM catalog_title_videos
-         WHERE title_id IN (${wave.map(() => "?").join(",")})
+         WHERE title_id IN (${wave.map((_, index) => `$${index + 1}`).join(",")})
          ORDER BY title_id, position`,
+        [...wave],
       )
-      .bind(...wave)
-      .all<VideoRow>()
-      .then((result) => result.results),
+      .then((result) => result.rows),
   );
 
   const grouped = groupBy(rows, (row) => row.titleId);
@@ -30,7 +29,7 @@ export async function readVideoMap(db: D1Database, ids: string[]) {
   return values;
 }
 
-export async function writeVideoRows(db: D1Database, titles: MediaTitle[]) {
+export async function writeVideoRows(db: Database, titles: MediaTitle[]) {
   await deleteByTitleIds(
     db,
     "catalog_title_videos",
@@ -38,7 +37,7 @@ export async function writeVideoRows(db: D1Database, titles: MediaTitle[]) {
   );
 
   const rows = titles.flatMap((title) =>
-    (title.videos ?? []).map((video, position): unknown[] => [
+    (title.videos ?? []).map((video, position): DatabaseValue[] => [
       title.id,
       video.key,
       video.name,

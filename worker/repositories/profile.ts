@@ -9,33 +9,31 @@ const FURTHEST_EPISODE = `viewing_episode_entries
 const PROGRESS_COLUMNS = `(SELECT season_number FROM ${FURTHEST_EPISODE}) AS season,
          (SELECT episode_number FROM ${FURTHEST_EPISODE}) AS episode`;
 
-export async function readProfile(db: D1Database, viewerId: string) {
-  const entriesResult = await db
-    .prepare(
-      `SELECT
+export async function readProfile(db: Database, viewerId: string) {
+  const entriesResult = await db.query(
+    `SELECT
          id,
-         title_id AS titleId,
+         title_id AS "titleId",
          status,
          rating,
          thoughts,
          ${PROGRESS_COLUMNS},
-         updated_at AS updatedAt
+         updated_at AS "updatedAt"
        FROM viewing_entries
-       WHERE viewer_id = ?
+       WHERE viewer_id = $1
        ORDER BY updated_at DESC`,
-    )
-    .bind(viewerId)
-    .all();
+    [viewerId],
+  );
 
   return {
-    entries: entriesResult.results.filter(
+    entries: entriesResult.rows.filter(
       (entry) => isRecord(entry) && typeof entry.titleId === "string",
     ),
   };
 }
 
 export async function saveViewingEntry(
-  db: D1Database,
+  db: Database,
   viewerId: string,
   entry: {
     titleId: string;
@@ -44,58 +42,50 @@ export async function saveViewingEntry(
     thoughts: string;
   },
 ) {
-  await db
-    .prepare(
-      `INSERT INTO viewing_entries
+  await db.execute(
+    `INSERT INTO viewing_entries
          (id, viewer_id, title_id, status, rating, thoughts)
-       VALUES (?, ?, ?, ?, ?, ?)
+       VALUES ($1, $2, $3, $4, $5, $6)
        ON CONFLICT(viewer_id, title_id) DO UPDATE SET
          status = excluded.status,
          rating = excluded.rating,
          thoughts = excluded.thoughts,
          updated_at = CURRENT_TIMESTAMP`,
-    )
-    .bind(crypto.randomUUID(), viewerId, entry.titleId, entry.status, entry.rating, entry.thoughts)
-    .run();
+    [crypto.randomUUID(), viewerId, entry.titleId, entry.status, entry.rating, entry.thoughts],
+  );
 
-  return db
-    .prepare(
-      `SELECT
+  return db.first(
+    `SELECT
          id,
-         title_id AS titleId,
+         title_id AS "titleId",
          status,
          rating,
          thoughts,
          ${PROGRESS_COLUMNS},
-         updated_at AS updatedAt
+         updated_at AS "updatedAt"
        FROM viewing_entries
-       WHERE viewer_id = ? AND title_id = ?`,
-    )
-    .bind(viewerId, entry.titleId)
-    .first();
+       WHERE viewer_id = $1 AND title_id = $2`,
+    [viewerId, entry.titleId],
+  );
 }
 
-export async function deleteViewingEntry(db: D1Database, viewerId: string, titleId: string) {
-  await db
-    .prepare(
-      `DELETE FROM viewing_entries
-       WHERE viewer_id = ? AND title_id = ?`,
-    )
-    .bind(viewerId, titleId)
-    .run();
+export async function deleteViewingEntry(db: Database, viewerId: string, titleId: string) {
+  await db.execute(
+    `DELETE FROM viewing_entries
+       WHERE viewer_id = $1 AND title_id = $2`,
+    [viewerId, titleId],
+  );
 }
 
-export async function readProfileSummary(db: D1Database, viewerId: string) {
-  const row = await db
-    .prepare(
-      `SELECT count(*) AS shelved,
+export async function readProfileSummary(db: Database, viewerId: string) {
+  const row = await db.first<{ shelved: number; unrated: number | null; updatedAt: string }>(
+    `SELECT count(*) AS shelved,
               sum(CASE WHEN rating IS NULL THEN 1 ELSE 0 END) AS unrated,
-              COALESCE(max(updated_at), '') AS updatedAt
+              COALESCE(max(updated_at), '') AS "updatedAt"
          FROM viewing_entries
-        WHERE viewer_id = ?`,
-    )
-    .bind(viewerId)
-    .first<{ shelved: number; unrated: number | null; updatedAt: string }>();
+        WHERE viewer_id = $1`,
+    [viewerId],
+  );
 
   return {
     shelved: row?.shelved ?? 0,
@@ -104,13 +94,11 @@ export async function readProfileSummary(db: D1Database, viewerId: string) {
   };
 }
 
-export async function readProviderPreferences(db: D1Database, viewerId: string) {
-  const row = await db
-    .prepare(
-      `SELECT selected_provider_ids AS selectedProviderIds FROM viewer_preferences WHERE viewer_id = ?`,
-    )
-    .bind(viewerId)
-    .first<{ selectedProviderIds: string }>();
+export async function readProviderPreferences(db: Database, viewerId: string) {
+  const row = await db.first<{ selectedProviderIds: string }>(
+    `SELECT selected_provider_ids AS "selectedProviderIds" FROM viewer_preferences WHERE viewer_id = $1`,
+    [viewerId],
+  );
 
   if (!row) {
     return null;
@@ -126,32 +114,28 @@ export async function readProviderPreferences(db: D1Database, viewerId: string) 
 }
 
 export async function saveProviderPreferences(
-  db: D1Database,
+  db: Database,
   viewerId: string,
   providerIds: string[],
 ) {
-  await db
-    .prepare(
-      `INSERT INTO viewer_preferences (viewer_id, selected_provider_ids)
-       VALUES (?, ?)
+  await db.execute(
+    `INSERT INTO viewer_preferences (viewer_id, selected_provider_ids)
+       VALUES ($1, $2)
        ON CONFLICT(viewer_id) DO UPDATE SET
          selected_provider_ids = excluded.selected_provider_ids,
          updated_at = CURRENT_TIMESTAMP`,
-    )
-    .bind(viewerId, JSON.stringify(providerIds))
-    .run();
+    [viewerId, JSON.stringify(providerIds)],
+  );
 }
 
-export async function readViewingEntry(db: D1Database, viewerId: string, titleId: string) {
-  const row = await db
-    .prepare(
-      `SELECT id, title_id AS titleId, status, rating, thoughts, ${PROGRESS_COLUMNS},
-              updated_at AS updatedAt
+export async function readViewingEntry(db: Database, viewerId: string, titleId: string) {
+  const row = await db.first(
+    `SELECT id, title_id AS "titleId", status, rating, thoughts, ${PROGRESS_COLUMNS},
+              updated_at AS "updatedAt"
          FROM viewing_entries
-        WHERE viewer_id = ?1 AND title_id = ?2`,
-    )
-    .bind(viewerId, titleId)
-    .first();
+        WHERE viewer_id = $1 AND title_id = $2`,
+    [viewerId, titleId],
+  );
 
   return isRecord(row) && typeof row.titleId === "string" ? row : null;
 }

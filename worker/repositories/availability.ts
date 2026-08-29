@@ -4,49 +4,44 @@ import { writeProviderRows } from "./catalog-providers.ts";
 import { readRawItems } from "./catalog-reader.ts";
 import { EXTERNAL_PROVIDER_SOURCES } from "./catalog-writer.ts";
 
-export async function markAvailabilityChecked(db: D1Database, titleId: string) {
-  await db
-    .prepare(
-      `UPDATE catalog_titles
+export async function markAvailabilityChecked(db: Database, titleId: string) {
+  await db.execute(
+    `UPDATE catalog_titles
        SET enriched_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?`,
-    )
-    .bind(titleId)
-    .run();
+       WHERE id = $1`,
+    [titleId],
+  );
 }
 
-export async function claimAvailabilityRefresh(db: D1Database, titleId: string) {
-  const result = await db
-    .prepare(
-      `UPDATE catalog_titles
+export async function claimAvailabilityRefresh(db: Database, titleId: string) {
+  const result = await db.execute(
+    `UPDATE catalog_titles
        SET availability_claimed_at = CURRENT_TIMESTAMP
-       WHERE id = ?
-         AND (availability_claimed_at IS NULL OR availability_claimed_at < datetime('now', '-30 seconds'))`,
-    )
-    .bind(titleId)
-    .run();
+       WHERE id = $1
+         AND (availability_claimed_at IS NULL OR availability_claimed_at < (CURRENT_TIMESTAMP - INTERVAL '30 second'))`,
+    [titleId],
+  );
 
-  return result.meta.changes > 0;
+  return result.rowCount > 0;
 }
 
-export async function releaseAvailabilityClaim(db: D1Database, titleId: string) {
-  await db
-    .prepare(`UPDATE catalog_titles SET availability_claimed_at = NULL WHERE id = ?`)
-    .bind(titleId)
-    .run();
+export async function releaseAvailabilityClaim(db: Database, titleId: string) {
+  await db.execute(`UPDATE catalog_titles SET availability_claimed_at = NULL WHERE id = $1`, [
+    titleId,
+  ]);
 }
 
 export async function enrichAvailability(
-  db: D1Database,
+  db: Database,
   titleId: string,
   availability: ProviderAvailability[],
 ) {
   const [title, previous] = await Promise.all([
     readRawItems(db, [titleId]).then((titles) => titles.get(titleId)),
-    db
-      .prepare(`SELECT enriched_at AS enrichedAt FROM catalog_titles WHERE id = ?`)
-      .bind(titleId)
-      .first<{ enrichedAt: string | null }>(),
+    db.first<{ enrichedAt: string | null }>(
+      `SELECT enriched_at AS "enrichedAt" FROM catalog_titles WHERE id = $1`,
+      [titleId],
+    ),
   ]);
 
   if (!title) {
@@ -72,14 +67,12 @@ export async function enrichAvailability(
   } satisfies MediaTitle;
 
   await writeProviderRows(db, [enrichedTitle]);
-  await db
-    .prepare(
-      `UPDATE catalog_titles
+  await db.execute(
+    `UPDATE catalog_titles
        SET enriched_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?`,
-    )
-    .bind(titleId)
-    .run();
+       WHERE id = $1`,
+    [titleId],
+  );
 
   await recordProviderState(db, titleId, enrichedTitle.providers, !previous?.enrichedAt);
 

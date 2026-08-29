@@ -6,11 +6,11 @@ const FIELD: SimpleArrayField = {
   column: "genre",
 };
 
-export function readGenreMap(db: D1Database, ids: string[]) {
+export function readGenreMap(db: Database, ids: string[]) {
   return readSimpleArray(db, FIELD, ids);
 }
 
-export function writeGenreRows(db: D1Database, titles: MediaTitle[]) {
+export function writeGenreRows(db: Database, titles: MediaTitle[]) {
   return writeSimpleArray(
     db,
     FIELD,

@@ -13,19 +13,18 @@ type DetailsRow = {
   pending: number | null;
 };
 
-export async function readDetailsMap(db: D1Database, ids: string[]) {
+export async function readDetailsMap(db: Database, ids: string[]) {
   const rows = await queryChunked(ids, (wave) =>
     db
-      .prepare(
-        `SELECT title_id AS titleId, homepage, trailer_key AS trailerKey, tagline, budget,
-                episode_count AS episodeCount, last_air_date AS lastAirDate,
-                next_air_date AS nextAirDate, pending
+      .query<DetailsRow>(
+        `SELECT title_id AS "titleId", homepage, trailer_key AS "trailerKey", tagline, budget,
+                episode_count AS "episodeCount", last_air_date AS "lastAirDate",
+                next_air_date AS "nextAirDate", pending
          FROM catalog_title_details
-         WHERE title_id IN (${wave.map(() => "?").join(",")})`,
+         WHERE title_id IN (${wave.map((_, index) => `$${index + 1}`).join(",")})`,
+        [...wave],
       )
-      .bind(...wave)
-      .all<DetailsRow>()
-      .then((result) => result.results),
+      .then((result) => result.rows),
   );
 
   return new Map(
@@ -36,14 +35,14 @@ export async function readDetailsMap(db: D1Database, ids: string[]) {
   );
 }
 
-export async function writeDetailsRows(db: D1Database, titles: MediaTitle[]) {
+export async function writeDetailsRows(db: Database, titles: MediaTitle[]) {
   await deleteByTitleIds(
     db,
     "catalog_title_details",
     titles.map((title) => title.id),
   );
 
-  const rows = titles.flatMap((title): unknown[][] => {
+  const rows = titles.flatMap((title): DatabaseValue[][] => {
     const hasAny =
       title.homepage ??
       title.trailerKey ??

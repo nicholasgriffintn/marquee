@@ -28,43 +28,50 @@ export async function storeLinkState(
 ) {
   const expiresAt = new Date(Date.now() + STATE_TTL_SECONDS * 1_000).toISOString();
 
-  await env.DB.batch([
-    env.DB.prepare(`DELETE FROM link_states WHERE expires_at < datetime('now')`),
-    env.DB.prepare(
-      `INSERT INTO link_states (state_hash, provider, viewer_id, return_to, expires_at)
-       VALUES (?, ?, ?, ?, ?)`,
-    ).bind(await hashState(state), provider, viewerId, returnTo, expiresAt),
-  ]);
+  await env.DB.transaction(async (transaction) => {
+    const results = [];
+
+    results.push(
+      await transaction.execute(`DELETE FROM link_states WHERE expires_at < CURRENT_TIMESTAMP`),
+    );
+    results.push(
+      await transaction.execute(
+        `INSERT INTO link_states (state_hash, provider, viewer_id, return_to, expires_at)
+       VALUES ($1, $2, $3, $4, $5)`,
+        [await hashState(state), provider, viewerId, returnTo, expiresAt],
+      ),
+    );
+
+    return results;
+  });
 }
 
 export async function claimLinkState(env: Bindings, provider: LinkProvider, state: string) {
   const stateHash = await hashState(state);
-  const row = await env.DB.prepare(
-    `SELECT viewer_id AS viewerId, return_to AS returnTo
+  const row = await env.DB.first<{ viewerId: string; returnTo: string | null }>(
+    `SELECT viewer_id AS "viewerId", return_to AS "returnTo"
      FROM link_states
-     WHERE state_hash = ? AND provider = ? AND expires_at > datetime('now')`,
-  )
-    .bind(stateHash, provider)
-    .first<{ viewerId: string; returnTo: string | null }>();
+     WHERE state_hash = $1 AND provider = $2 AND expires_at > CURRENT_TIMESTAMP`,
+    [stateHash, provider],
+  );
 
-  await env.DB.prepare(`DELETE FROM link_states WHERE state_hash = ?`).bind(stateHash).run();
+  await env.DB.execute(`DELETE FROM link_states WHERE state_hash = $1`, [stateHash]);
 
   return row;
 }
 
 export async function readLink(env: Bindings, viewerId: string, provider: LinkProvider) {
-  const row = await env.DB.prepare(
-    `SELECT access_token AS accessToken,
-            refresh_token AS refreshToken,
-            expires_at AS expiresAt,
-            account_label AS accountLabel,
-            synced_at AS syncedAt,
-            broken_at AS brokenAt
+  const row = await env.DB.first<LinkRow>(
+    `SELECT access_token AS "accessToken",
+            refresh_token AS "refreshToken",
+            expires_at AS "expiresAt",
+            account_label AS "accountLabel",
+            synced_at AS "syncedAt",
+            broken_at AS "brokenAt"
      FROM linked_accounts
-     WHERE viewer_id = ? AND provider = ?`,
-  )
-    .bind(viewerId, provider)
-    .first<LinkRow>();
+     WHERE viewer_id = $1 AND provider = $2`,
+    [viewerId, provider],
+  );
 
   if (!row) {
     return row;
@@ -91,45 +98,41 @@ export async function saveLink(
   const accessToken = await encryptOAuthToken(env, link.accessToken);
   const refreshToken = link.refreshToken ? await encryptOAuthToken(env, link.refreshToken) : null;
 
-  await env.DB.prepare(
+  await env.DB.execute(
     `INSERT INTO linked_accounts
        (viewer_id, provider, access_token, refresh_token, expires_at, account_label)
-     VALUES (?, ?, ?, ?, ?, ?)
+     VALUES ($1, $2, $3, $4, $5, $6)
      ON CONFLICT(viewer_id, provider) DO UPDATE SET
        access_token = excluded.access_token,
        refresh_token = excluded.refresh_token,
        expires_at = excluded.expires_at,
        account_label = COALESCE(excluded.account_label, linked_accounts.account_label),
        broken_at = NULL`,
-  )
-    .bind(viewerId, provider, accessToken, refreshToken, link.expiresAt, accountLabel)
-    .run();
+    [viewerId, provider, accessToken, refreshToken, link.expiresAt, accountLabel],
+  );
 }
 
 export async function markLinkSynced(env: Bindings, viewerId: string, provider: LinkProvider) {
-  await env.DB.prepare(
+  await env.DB.execute(
     `UPDATE linked_accounts SET synced_at = CURRENT_TIMESTAMP
-     WHERE viewer_id = ? AND provider = ?`,
-  )
-    .bind(viewerId, provider)
-    .run();
+     WHERE viewer_id = $1 AND provider = $2`,
+    [viewerId, provider],
+  );
 }
 
 export async function markLinkBroken(env: Bindings, viewerId: string, provider: LinkProvider) {
-  await env.DB.prepare(
+  await env.DB.execute(
     `UPDATE linked_accounts SET broken_at = COALESCE(broken_at, CURRENT_TIMESTAMP)
-     WHERE viewer_id = ? AND provider = ?`,
-  )
-    .bind(viewerId, provider)
-    .run();
+     WHERE viewer_id = $1 AND provider = $2`,
+    [viewerId, provider],
+  );
 }
 
 export async function readPushedAt(env: Bindings, viewerId: string, provider: LinkProvider) {
-  const row = await env.DB.prepare(
-    `SELECT pushed_at AS pushedAt FROM linked_accounts WHERE viewer_id = ? AND provider = ?`,
-  )
-    .bind(viewerId, provider)
-    .first<{ pushedAt: string | null }>();
+  const row = await env.DB.first<{ pushedAt: string | null }>(
+    `SELECT pushed_at AS "pushedAt" FROM linked_accounts WHERE viewer_id = $1 AND provider = $2`,
+    [viewerId, provider],
+  );
 
   return row?.pushedAt ?? null;
 }
@@ -140,20 +143,18 @@ export async function markLinkPushed(
   provider: LinkProvider,
   at: string,
 ) {
-  await env.DB.prepare(
-    `UPDATE linked_accounts SET pushed_at = ?
-     WHERE viewer_id = ? AND provider = ?`,
-  )
-    .bind(at, viewerId, provider)
-    .run();
+  await env.DB.execute(
+    `UPDATE linked_accounts SET pushed_at = $1
+     WHERE viewer_id = $2 AND provider = $3`,
+    [at, viewerId, provider],
+  );
 }
 
 export async function deleteLink(env: Bindings, viewerId: string, provider: LinkProvider) {
-  const result = await env.DB.prepare(
-    `DELETE FROM linked_accounts WHERE viewer_id = ? AND provider = ?`,
-  )
-    .bind(viewerId, provider)
-    .run();
+  const result = await env.DB.execute(
+    `DELETE FROM linked_accounts WHERE viewer_id = $1 AND provider = $2`,
+    [viewerId, provider],
+  );
 
-  return result.meta.changes > 0;
+  return result.rowCount > 0;
 }

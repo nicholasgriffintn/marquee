@@ -43,25 +43,24 @@ type AnimeCoreRow = {
   statusBreakdownPlanToWatch: number | null;
 };
 
-export async function readAnimeCoreMap(db: D1Database, ids: string[]) {
+export async function readAnimeCoreMap(db: Database, ids: string[]) {
   const rows = await queryChunked(ids, (wave) =>
     db
-      .prepare(
-        `SELECT title_id AS titleId, format, episodes, duration_minutes AS durationMinutes,
-                season, season_year AS seasonYear, source, romaji_title AS romajiTitle,
-                english_title AS englishTitle, native_title AS nativeTitle, broadcast, airing,
-                background, rank, popularity, members, favorites, key_visual_url AS keyVisualUrl,
-                status_breakdown_watching AS statusBreakdownWatching,
-                status_breakdown_completed AS statusBreakdownCompleted,
-                status_breakdown_on_hold AS statusBreakdownOnHold,
-                status_breakdown_dropped AS statusBreakdownDropped,
-                status_breakdown_plan_to_watch AS statusBreakdownPlanToWatch
+      .query<AnimeCoreRow>(
+        `SELECT title_id AS "titleId", format, episodes, duration_minutes AS "durationMinutes",
+                season, season_year AS "seasonYear", source, romaji_title AS "romajiTitle",
+                english_title AS "englishTitle", native_title AS "nativeTitle", broadcast, airing,
+                background, rank, popularity, members, favorites, key_visual_url AS "keyVisualUrl",
+                status_breakdown_watching AS "statusBreakdownWatching",
+                status_breakdown_completed AS "statusBreakdownCompleted",
+                status_breakdown_on_hold AS "statusBreakdownOnHold",
+                status_breakdown_dropped AS "statusBreakdownDropped",
+                status_breakdown_plan_to_watch AS "statusBreakdownPlanToWatch"
          FROM catalog_title_anime
-         WHERE title_id IN (${wave.map(() => "?").join(",")})`,
+         WHERE title_id IN (${wave.map((_, index) => `$${index + 1}`).join(",")})`,
+        [...wave],
       )
-      .bind(...wave)
-      .all<AnimeCoreRow>()
-      .then((result) => result.results),
+      .then((result) => result.rows),
   );
 
   const values = new Map<string, AnimeCore>();
@@ -107,7 +106,7 @@ export async function readAnimeCoreMap(db: D1Database, ids: string[]) {
   return values;
 }
 
-export async function writeAnimeCoreRows(db: D1Database, titles: MediaTitle[]) {
+export async function writeAnimeCoreRows(db: Database, titles: MediaTitle[]) {
   await deleteByTitleIds(
     db,
     "catalog_title_anime",
@@ -118,7 +117,7 @@ export async function writeAnimeCoreRows(db: D1Database, titles: MediaTitle[]) {
     Boolean(title.anime),
   );
 
-  const rows = withAnime.map((title): unknown[] => {
+  const rows = withAnime.map((title): DatabaseValue[] => {
     const anime = title.anime;
 
     return [
