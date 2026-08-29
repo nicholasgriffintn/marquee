@@ -168,11 +168,21 @@ export async function questionFor(env: Bindings, id: string): Promise<UsherQuest
   }
 
   if (id === "runtime") {
-    return { id, kind: "single", line: "How long is too long?", options: RUNTIME_TOLERANCE };
+    return {
+      id,
+      kind: "single",
+      line: "How long is too long?",
+      options: RUNTIME_TOLERANCE,
+    };
   }
 
   if (id === "subtitles") {
-    return { id, kind: "single", line: "Do you read subtitles?", options: SUBTITLE_APPETITE };
+    return {
+      id,
+      kind: "single",
+      line: "Do you read subtitles?",
+      options: SUBTITLE_APPETITE,
+    };
   }
 
   if (id === "novelty") {
@@ -384,7 +394,9 @@ export async function markPrompted(env: Bindings, viewerId: string, moment: Ushe
     return;
   }
 
-  await writeUsherRecord(env.DB, viewerId, { lastPromptedAt: new Date().toISOString() });
+  await writeUsherRecord(env.DB, viewerId, {
+    lastPromptedAt: new Date().toISOString(),
+  });
 }
 
 async function mirrorProviderPreferences(db: D1Database, viewerId: string, providerIds: string[]) {
@@ -509,7 +521,10 @@ export async function applyAnswer(
     const answer = await peopleAnswer(env, value);
 
     if (!answer) {
-      return { ok: false as const, error: "Names must be people in the catalogue" };
+      return {
+        ok: false as const,
+        error: "Names must be people in the catalogue",
+      };
     }
 
     await saveAnswer(env.DB, viewerId, questionId, answer);
@@ -626,7 +641,10 @@ export async function readViewerPreferences(
   }
 
   try {
-    const answers = await readAnswers(db, viewerId);
+    const [answers, chosenProviderIds] = await Promise.all([
+      readAnswers(db, viewerId),
+      readProviderPreferences(db, viewerId),
+    ]);
     const single = (id: string) => {
       const value = answers.get(id);
 
@@ -634,7 +652,7 @@ export async function readViewerPreferences(
     };
 
     return {
-      providerIds: validProviderIds(answers.get("providers")),
+      providerIds: validProviderIds(chosenProviderIds ?? answers.get("providers")),
       genres: stringList(answers.get("genres"), { limit: 8 }),
       frequency: single("frequency"),
       motivation: stringList(answers.get("motivation"), { limit: 4 }),

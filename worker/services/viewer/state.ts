@@ -4,7 +4,7 @@ import { readRefusals } from "../../repositories/signals.ts";
 import { readViewerEntries } from "../../repositories/viewer-context.ts";
 import type { Bindings, ViewingContext } from "../../types.ts";
 import { NO_PREFERENCES, readViewerPreferences, type ViewerPreferences } from "../usher.ts";
-import { ADULT_CERTIFICATIONS, type AvailabilityRule, type Eligibility } from "./eligibility.ts";
+import type { AvailabilityRule, Eligibility } from "./eligibility.ts";
 
 export type ViewerState = {
   viewerId: string;
@@ -20,7 +20,7 @@ export type EligibilityOptions = {
   availability?: AvailabilityRule;
   exclude?: string[];
   excludeGenres?: string[];
-  allowAdult?: boolean;
+  certifications?: string[];
   maxRuntime?: number | null;
   mediaType?: "movie" | "tv";
 };
@@ -81,7 +81,7 @@ export function eligibilityFor(state: ViewerState, options: EligibilityOptions =
       ]),
     ],
     excludeGenres: [...new Set(options.excludeGenres ?? [])],
-    excludeCertifications: options.allowAdult === false ? ADULT_CERTIFICATIONS : [],
+    certifications: [...new Set(options.certifications ?? [])],
     ...(options.maxRuntime ? { maxRuntime: options.maxRuntime } : {}),
     ...(options.mediaType ? { mediaType: options.mediaType } : {}),
   };

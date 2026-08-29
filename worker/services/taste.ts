@@ -21,7 +21,10 @@ export function weighTitles(
   const weighted = entries.map((entry): WeightedTitle => {
     const base = entryWeight(entry.status, entry.rating);
 
-    return { titleId: entry.titleId, weight: base * recencyWeight(entry.updatedAt) };
+    return {
+      titleId: entry.titleId,
+      weight: base * recencyWeight(entry.updatedAt),
+    };
   });
   const seen = new Set(weighted.map((entry) => entry.titleId));
   const refused = never

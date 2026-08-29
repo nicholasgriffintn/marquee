@@ -55,7 +55,11 @@ export type Angle = {
   brief: string;
   fallbackText: string;
   query?: string;
-  search: { minScore?: number; minVotes?: number; sort?: "score" | "recent" | "popularity" };
+  search: {
+    minScore?: number;
+    minVotes?: number;
+    sort?: "score" | "recent" | "popularity";
+  };
   slice: "near" | "far";
 };
 
@@ -86,7 +90,12 @@ const BASE_ANGLES: Angle[] = [
   },
 ];
 
-export type StoredRail = { name: string; reason: string; titleIds: string[]; angle?: string };
+export type StoredRail = {
+  name: string;
+  reason: string;
+  titleIds: string[];
+  angle?: string;
+};
 
 type RailRow = { signature: string; payload: string; ageHours: number };
 
@@ -208,7 +217,13 @@ async function seedCandidates(
       const ids = await neighbourIds(env, vector, angle.slice);
 
       if (ids.length) {
-        take(await searchCatalogue(env.DB, { ...base, includeIds: ids }));
+        take(
+          await searchCatalogue(env.DB, {
+            ...base,
+            includeIds: ids,
+            sort: angle.search.sort ?? "given",
+          }),
+        );
       }
     } catch (error) {
       logError("rail_neighbours_failed", error, { angle: angle.id });
@@ -217,7 +232,13 @@ async function seedCandidates(
 
   if (merged.size < SHORTLIST && angle.query) {
     try {
-      take(await searchCatalogue(env.DB, { ...base, query: angle.query, sort: "relevance" }));
+      take(
+        await searchCatalogue(env.DB, {
+          ...base,
+          query: angle.query,
+          sort: "relevance",
+        }),
+      );
     } catch (error) {
       logError("rail_query_seed_failed", error, { angle: angle.id });
     }
@@ -433,7 +454,11 @@ export async function buildOneRail(
       return { ...rail, angle: angle.id };
     }
 
-    logEvent("rail_retry", { angle: angle.id, round, available: availableIds.size });
+    logEvent("rail_retry", {
+      angle: angle.id,
+      round,
+      available: availableIds.size,
+    });
     messages.push(response, { role: "user", content: nudge() });
   }
 
@@ -447,7 +472,11 @@ export async function buildOneRail(
     availableIds,
   );
 
-  logEvent("rail_final", { angle: angle.id, ok: Boolean(rail), available: availableIds.size });
+  logEvent("rail_final", {
+    angle: angle.id,
+    ok: Boolean(rail),
+    available: availableIds.size,
+  });
 
   return rail ? { ...rail, angle: angle.id } : null;
 }
@@ -579,7 +608,10 @@ export async function prepareRails(env: Bindings, viewer: ViewerState) {
   const summary = await viewerSummary(env, viewerId, preferences);
   const [onHomepage, vector, behaviour, shelf, allGenres, disliked] = await Promise.all([
     homepageTitleIds(env),
-    tasteVector(env, viewer.entries, preferences, { never: viewer.never, summary }),
+    tasteVector(env, viewer.entries, preferences, {
+      never: viewer.never,
+      summary,
+    }),
     readViewerAffinity(env.DB, viewerId),
     readShelfDetail(env.DB, viewerId),
     getGenres(env, 100).catch((): string[] => []),
@@ -589,7 +621,9 @@ export async function prepareRails(env: Bindings, viewer: ViewerState) {
     ...behaviour,
     genres: behaviour.genres.length ? behaviour.genres : preferences.genres,
   };
-  const eligibility = eligibilityFor(viewer, { exclude: [...onHomepage, ...disliked] });
+  const eligibility = eligibilityFor(viewer, {
+    exclude: [...onHomepage, ...disliked],
+  });
   const familiar = new Set(affinity.genres.map((genre) => genre.toLowerCase()));
   const wideGenres = allGenres.filter((genre) => !familiar.has(genre.toLowerCase()));
   const claimed = new Set<string>();

@@ -1,71 +1,49 @@
 import type { MediaTitle } from "../../../src/domain/catalog.ts";
+import { includesProvider } from "../../lib/providers.ts";
 
 export type AvailabilityRule = "confirmed" | "confirmed-or-unknown";
 
 export type TitleAvailability = "confirmed" | "elsewhere" | "unknown";
-
-export const ADULT_CERTIFICATIONS = [
-  "r",
-  "nc-17",
-  "x",
-  "tv-ma",
-  "17+",
-  "18",
-  "18+",
-  "r18+",
-  "ma15+",
-  "15",
-  "16",
-];
-
-export function certificationRating(certification: string) {
-  const space = certification.indexOf(" ");
-
-  return (space >= 0 ? certification.slice(space + 1) : certification).trim().toLowerCase();
-}
 
 export type Eligibility = {
   providerIds: string[];
   availability: AvailabilityRule;
   excludeIds: string[];
   excludeGenres: string[];
-  excludeCertifications: string[];
+  certifications: string[];
   maxRuntime?: number;
   mediaType?: "movie" | "tv";
 };
 
-type Availability = Pick<MediaTitle, "providers">;
+export function titleAvailability(title: MediaTitle, providerIds: string[]): TitleAvailability {
+  if (providerIds.length === 0) {
+    return "confirmed";
+  }
 
-export function titleAvailability(title: Availability, providerIds: string[]): TitleAvailability {
   if (title.providers.length === 0) {
     return "unknown";
   }
 
-  if (providerIds.length === 0 || title.providers.some((entry) => providerIds.includes(entry.id))) {
-    return "confirmed";
-  }
-
-  return "elsewhere";
+  return includesProvider(title, providerIds) ? "confirmed" : "elsewhere";
 }
 
 export function meetsAvailability(
-  title: Availability,
+  title: MediaTitle,
   providerIds: string[],
   availability: AvailabilityRule,
 ) {
-  if (providerIds.length === 0) {
-    return true;
-  }
-
   const state = titleAvailability(title, providerIds);
 
   return state === "confirmed" || (state === "unknown" && availability === "confirmed-or-unknown");
 }
 
+function matchesCertification(certification: string, barred: string[]) {
+  return barred.some((value) => certification === value || certification.endsWith(` ${value}`));
+}
+
 export function eligibilityGate(eligibility: Eligibility) {
   const excluded = new Set(eligibility.excludeIds);
   const banned = new Set(eligibility.excludeGenres.map((genre) => genre.toLowerCase()));
-  const barred = new Set(eligibility.excludeCertifications.map((value) => value.toLowerCase()));
 
   return (title: MediaTitle) => {
     if (excluded.has(title.id)) {
@@ -81,17 +59,16 @@ export function eligibilityGate(eligibility: Eligibility) {
     }
 
     if (
-      barred.size &&
+      eligibility.certifications.length &&
       title.certification &&
-      barred.has(certificationRating(title.certification))
+      matchesCertification(title.certification, eligibility.certifications)
     ) {
       return false;
     }
 
     if (
       eligibility.maxRuntime &&
-      title.runtimeMinutes &&
-      title.runtimeMinutes > eligibility.maxRuntime
+      (!title.runtimeMinutes || title.runtimeMinutes > eligibility.maxRuntime)
     ) {
       return false;
     }

@@ -23,7 +23,6 @@ import { findGapTitles } from "./catalogue-gaps.ts";
 import { retrieveTitles } from "./retrieval.ts";
 import { readNextEpisode, readTonight } from "./schedule.ts";
 import { traktUpcoming } from "./trakt.ts";
-import { meetsAvailability } from "./viewer/eligibility.ts";
 
 const HYBRID_SEARCH_LIMIT = 24;
 
@@ -89,9 +88,12 @@ export async function searchCatalogue(env: Bindings, query: string, providerIds:
 }
 
 export async function searchCatalogueHybrid(env: Bindings, query: string, providerIds: string[]) {
-  const items = (await retrieveTitles(env, { text: query, limit: HYBRID_SEARCH_LIMIT })).filter(
-    (title) => meetsAvailability(title, providerIds, "confirmed-or-unknown"),
-  );
+  const items = await retrieveTitles(env, {
+    text: query,
+    providerIds,
+    availability: "confirmed-or-unknown",
+    limit: HYBRID_SEARCH_LIMIT,
+  });
 
   return {
     items: await withBuzz(env.DB, items),

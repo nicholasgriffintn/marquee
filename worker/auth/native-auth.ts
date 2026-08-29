@@ -2,6 +2,7 @@ import { parseCookies, serializeCookie, serializeExpiredCookie } from "@ngriffin
 import { AuthError } from "@ngriffin_uk/auth-core";
 import { Hono } from "hono";
 
+import { API_SCOPES } from "../../src/domain/scopes.ts";
 import { jsonResponse, readJsonObject, withCookies } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
 import { canonicalOrigin } from "../lib/security.ts";
@@ -178,7 +179,7 @@ async function exchangeNativeCode(context: AppContext) {
 
   const token = mintToken();
 
-  await storeApiToken(context.env, userId, token, "Marquee for iOS");
+  await storeApiToken(context.env, userId, token, "Marquee for iOS", API_SCOPES);
 
   return jsonResponse({ token });
 }

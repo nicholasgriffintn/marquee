@@ -1,4 +1,5 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
+import { ADULT_CERTIFICATIONS } from "../../src/domain/certification.ts";
 import { showingFor, type TonightOrder } from "../../src/domain/usher.ts";
 import { newDecisionId, runAiObject } from "../ai/run.ts";
 import { USHER_VOICE } from "../ai/usher-voice.ts";
@@ -25,7 +26,7 @@ const COMPANY: Record<
     text: string;
     genres?: string[];
     bannedGenres?: string[];
-    allowAdult?: boolean;
+    certifications?: string[];
   }
 > = {
   alone: {
@@ -45,17 +46,33 @@ const COMPANY: Record<
     text: "something the whole family can watch together",
     genres: ["family", "animation", "adventure", "comedy"],
     bannedGenres: FAMILY_UNSUITABLE_GENRES,
-    allowAdult: false,
+    certifications: ADULT_CERTIFICATIONS,
   },
 };
 
 const LENGTH: Record<
   string,
-  { note: string; maxRuntime?: number; mediaType?: "movie" | "tv"; text?: string }
+  {
+    note: string;
+    maxRuntime?: number;
+    mediaType?: "movie" | "tv";
+    text?: string;
+  }
 > = {
-  short: { note: "ninety minutes at most", maxRuntime: 100, mediaType: "movie" },
-  evening: { note: "an ordinary evening's worth", maxRuntime: 150, mediaType: "movie" },
-  long: { note: "as long as it needs to be", text: "a long film that earns its running time" },
+  short: {
+    note: "ninety minutes at most",
+    maxRuntime: 100,
+    mediaType: "movie",
+  },
+  evening: {
+    note: "an ordinary evening's worth",
+    maxRuntime: 150,
+    mediaType: "movie",
+  },
+  long: {
+    note: "as long as it needs to be",
+    text: "a long film that earns its running time",
+  },
   episode: {
     note: "a series to start tonight, one episode in",
     mediaType: "tv",
@@ -126,9 +143,9 @@ export function constraintsFor(order: TonightOrder, guests: Guest[] = []): Short
     limit: ORDER_SHORTLIST,
     ...(length?.maxRuntime ? { maxRuntime: length.maxRuntime } : {}),
     ...(length?.mediaType ? { mediaType: length.mediaType } : {}),
+    ...(company?.certifications ? { certifications: company.certifications } : {}),
     ...(genres.length ? { genres } : {}),
     ...(bannedGenres.length ? { bannedGenres } : {}),
-    ...(company?.allowAdult === false ? { allowAdult: false } : {}),
     text: [mood?.text, company?.text, length?.text].filter(Boolean).join(", "),
   };
 }
@@ -188,7 +205,12 @@ export async function pickToOrder(
   const dress = (item: MediaTitle, line: string) => {
     const service = serviceFor(item, viewer.providerIds);
 
-    return { item, line, service, facts: factsFor(item, { service, shelf, beliefs }) };
+    return {
+      item,
+      line,
+      service,
+      facts: factsFor(item, { service, shelf, beliefs }),
+    };
   };
 
   const listing = titles

@@ -1,6 +1,12 @@
 import type { BackoffPolicy } from "../lib/backoff.ts";
 import { logEvent } from "../lib/logging.ts";
-import { isRateLimited, isRefused, pauseSource, resetBackoff } from "../repositories/budgets.ts";
+import {
+  claimBudget,
+  isRateLimited,
+  isRefused,
+  pauseSource,
+  resetBackoff,
+} from "../repositories/budgets.ts";
 import type { Bindings, EnrichmentSource } from "../types.ts";
 
 const BACKOFF: Record<EnrichmentSource, { rateLimited: BackoffPolicy; refused: BackoffPolicy }> = {
@@ -69,6 +75,21 @@ export async function withRateLimitPause<T>(
 
     return { limited: true };
   }
+}
+
+export async function withSourceBudget<T>(
+  env: Bindings,
+  source: EnrichmentSource,
+  run: () => Promise<T>,
+  reserve = 0,
+): Promise<T | null> {
+  if (!(await claimBudget(env, source, reserve))) {
+    return null;
+  }
+
+  const attempt = await withRateLimitPause(env, source, run);
+
+  return attempt.limited ? null : attempt.value;
 }
 
 export function titleParts(titleId: string) {

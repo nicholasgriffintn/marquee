@@ -9,7 +9,6 @@ import {
 import { logError } from "../lib/logging.ts";
 import { clamp } from "../lib/numbers.ts";
 import { isKnownTitle } from "../lib/validation.ts";
-import { meetsAvailability } from "../services/viewer/eligibility.ts";
 import { hydrateTitleRows } from "./catalog-arrays.ts";
 import { availabilityCondition, searchTitlesFirst } from "./catalog-search.ts";
 
@@ -241,9 +240,12 @@ export async function readAvailability(db: D1Database, titleId: string) {
 }
 
 async function readSearchResults(db: D1Database, query: string, providerIds: string[]) {
-  const items = (await searchTitlesFirst(db, { query, limit: 30 })).filter((title) =>
-    meetsAvailability(title, providerIds, "confirmed-or-unknown"),
-  );
+  const items = await searchTitlesFirst(db, {
+    query,
+    providerIds,
+    availability: "confirmed-or-unknown",
+    limit: 30,
+  });
 
   return {
     sections: [

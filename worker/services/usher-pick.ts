@@ -48,7 +48,7 @@ export type ShortlistConstraints = {
   mediaType?: "movie" | "tv";
   genres?: string[];
   bannedGenres?: string[];
-  allowAdult?: boolean;
+  certifications?: string[];
   text?: string;
   limit?: number;
 };
@@ -63,12 +63,14 @@ export async function shortlistFor(
   } = {},
 ) {
   const constraints = options.constraints ?? {};
-  const viewer = await readViewerState(env, viewerId, { providerIds: options.providerIds });
+  const viewer = await readViewerState(env, viewerId, {
+    providerIds: options.providerIds,
+  });
   const preferences = viewer.preferences;
   const eligibility = eligibilityFor(viewer, {
     exclude: options.rejected ?? [],
     ...(constraints.bannedGenres ? { excludeGenres: constraints.bannedGenres } : {}),
-    ...(constraints.allowAdult === false ? { allowAdult: false } : {}),
+    ...(constraints.certifications?.length ? { certifications: constraints.certifications } : {}),
     ...(constraints.maxRuntime ? { maxRuntime: constraints.maxRuntime } : {}),
     ...(constraints.mediaType ? { mediaType: constraints.mediaType } : {}),
   });
@@ -95,7 +97,11 @@ export async function shortlistFor(
       const ids = matches.matches.map((match) => match.id);
 
       if (ids.length) {
-        const titles = await searchCatalogue(env.DB, { ...base, includeIds: ids });
+        const titles = await searchCatalogue(env.DB, {
+          ...base,
+          includeIds: ids,
+          sort: "given",
+        });
 
         if (titles.length) {
           return { titles, viewer };
@@ -132,7 +138,12 @@ export async function shortlistFor(
 export async function pickOne(
   env: Bindings,
   viewerId: string,
-  options: { providerIds?: string[]; rejected?: string[]; hour?: number; isWeekend?: boolean } = {},
+  options: {
+    providerIds?: string[];
+    rejected?: string[];
+    hour?: number;
+    isWeekend?: boolean;
+  } = {},
 ) {
   const rejected = (options.rejected ?? []).filter(isKnownTitle).slice(0, 40);
   const showing = showingFor(options.hour ?? 20, options.isWeekend ?? false);
@@ -164,7 +175,11 @@ export async function pickOne(
   const factsById = new Map(
     titles.map((title) => [
       title.id,
-      factsFor(title, { service: serviceFor(title, viewer.providerIds), shelf, beliefs }),
+      factsFor(title, {
+        service: serviceFor(title, viewer.providerIds),
+        shelf,
+        beliefs,
+      }),
     ]),
   );
   const messages: ChatMessage[] = [

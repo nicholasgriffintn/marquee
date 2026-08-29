@@ -32,7 +32,11 @@ function ratingWeight(rating: number | null) {
 }
 
 export function entryWeight(status: EntryStatus, rating: number | null) {
-  return statusWeight(status) * ratingWeight(rating);
+  const stance = statusWeight(status);
+  const regard = ratingWeight(rating);
+  const strength = Math.abs(stance * regard);
+
+  return stance < 0 || regard < 0 ? -strength : strength;
 }
 
 export function recencyWeight(updatedAt: string, now = Date.now()) {
@@ -64,5 +68,9 @@ function ratingCase(column: string) {
 }
 
 export function entryWeightSql(statusColumn: string, ratingColumn: string) {
-  return `(${statusCase(statusColumn)}) * (${ratingCase(ratingColumn)})`;
+  const stance = statusCase(statusColumn);
+  const regard = ratingCase(ratingColumn);
+  const product = `(${stance}) * (${regard})`;
+
+  return `(CASE WHEN (${stance}) < 0 OR (${regard}) < 0 THEN -ABS(${product}) ELSE ABS(${product}) END)`;
 }
