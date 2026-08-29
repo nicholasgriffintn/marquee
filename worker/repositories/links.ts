@@ -1,3 +1,4 @@
+import { sha256Hex } from "../lib/hash.ts";
 import { decryptOAuthToken, encryptOAuthToken } from "../lib/token-crypto.ts";
 import type { Bindings } from "../types.ts";
 
@@ -14,10 +15,8 @@ export type LinkRow = {
 
 const STATE_TTL_SECONDS = 600;
 
-export async function hashState(state: string) {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(state));
-
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+export function hashState(state: string) {
+  return sha256Hex(state);
 }
 
 export async function storeLinkState(

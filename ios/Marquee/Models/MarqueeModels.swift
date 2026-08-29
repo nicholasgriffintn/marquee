@@ -117,7 +117,11 @@ struct CatalogSection: Codable, Identifiable {
   let items: [MediaTitle]
   let angle: String?
   let reason: String?
+  let source: String?
+  let generationId: String?
   var journey: String? = nil
+
+  var isCurated: Bool { source == "ai" }
 }
 
 struct CatalogResponse: Codable {
@@ -133,8 +137,18 @@ struct FeaturedTitleResponse: Codable {
   let fetchedAt: String
 }
 
-struct RailsResponse: Codable {
-  let sections: [CatalogSection]
+struct RailsDelivery: Codable {
+  let status: String
+  let revision: String
+  let generationId: String
+  let rails: [CatalogSection]
+
+  var isBuilding: Bool { status == "generating" }
+}
+
+struct RailFeedbackRequest: Encodable {
+  let railId: String
+  let verdict: String
 }
 
 struct ScheduledEpisode: Codable, Identifiable {

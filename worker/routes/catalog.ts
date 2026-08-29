@@ -1,12 +1,13 @@
 import { Hono } from "hono";
 
 import { NO_AWARDS } from "../../src/domain/awards.ts";
+import { NO_RAILS } from "../../src/domain/rails.ts";
 import { requireAuthentication, sessionPrincipal, type AuthVariables } from "../auth/session.ts";
 import { refreshTitleAvailability } from "../jobs/availability.ts";
 import { edgeCache } from "../lib/cache.ts";
 import { recordEvent } from "../lib/events.ts";
 import { edgeOrigin } from "../lib/geo.ts";
-import { mintJourney, ticketSections } from "../lib/journeys.ts";
+import { mintJourney, ticketSection, ticketSections } from "../lib/journeys.ts";
 import { logError } from "../lib/logging.ts";
 import { pathInteger, queryInteger, queryList, queryText } from "../lib/params.ts";
 import { canonicalOrigin } from "../lib/security.ts";
@@ -44,7 +45,7 @@ import {
   getTitleAvailability,
 } from "../services/catalog.ts";
 import { getFeaturedTitle } from "../services/featured.ts";
-import { getPersonalRails } from "../services/personal-rails.ts";
+import { deliverRails } from "../services/rail-delivery.ts";
 import { getSeason, getSeasonIndex } from "../services/seasons.ts";
 import type { Bindings } from "../types.ts";
 
@@ -58,6 +59,7 @@ const KEYWORDS_DEFAULT_LIMIT = 120;
 const PLACES_DEFAULT_LIMIT = 80;
 const GENRES_DEFAULT_LIMIT = 40;
 const SEASON_LIMIT = 100;
+const RAILS_CACHE_SECONDS = 120;
 const MAX_TMDB_ID = 9_999_999_999;
 
 export const catalogRoutes = new Hono<{
@@ -93,24 +95,37 @@ catalogRoutes.get("/rails", requireAuthentication, async (context) => {
 
   try {
     const startedAt = Date.now();
-    const sections = await getPersonalRails(context.env, user.id, edgeOrigin(context.req.raw));
-    const ticketed = await ticketSections(context.env, sections, "rail");
+    const delivery = await deliverRails(context.env, {
+      viewerId: user.id,
+      origin: edgeOrigin(context.req.raw),
+      generate: context.req.query("generate") === "1",
+    });
+    const rails = await Promise.all(
+      delivery.rails.map((rail) =>
+        ticketSection(context.env, rail, rail.source === "ai" ? "ai-rail" : "rail"),
+      ),
+    );
 
-    context.header("cache-control", "private, max-age=120");
+    context.header(
+      "cache-control",
+      delivery.status === "ready" ? `private, max-age=${RAILS_CACHE_SECONDS}` : "no-store",
+    );
 
     recordEvent(context.env, {
       name: "rails_served",
       viewerId: user.id,
       mode: "rail",
-      value: ticketed.length,
+      value: rails.length,
       latencyMs: Date.now() - startedAt,
+      detail: `${delivery.generationId}:${delivery.status}`,
     });
 
-    return context.json({ sections: ticketed });
+    return context.json({ ...delivery, rails });
   } catch (error) {
-    logError("personal_rails_failed", error, { area: "catalogue" });
+    logError("rails_delivery_failed", error, { area: "catalogue" });
+    context.header("cache-control", "no-store");
 
-    return context.json({ sections: [] });
+    return context.json({ ...NO_RAILS, status: "error" });
   }
 });
 

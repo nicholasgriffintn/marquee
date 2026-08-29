@@ -94,7 +94,7 @@ struct DigestView: View {
       TitleRail(
         section: CatalogSection(
           id: "fresh", title: "New, and close to your taste", description: "", items: digest.fresh,
-          angle: nil, reason: nil)
+          angle: nil, reason: nil, source: nil, generationId: nil)
       )
       .padding(.horizontal, -18)
     }
@@ -122,7 +122,7 @@ struct DigestView: View {
       TitleRail(
         section: CatalogSection(
           id: "digest-trending", title: "What the town is reading about", description: "",
-          items: digest.trending, angle: nil, reason: nil)
+          items: digest.trending, angle: nil, reason: nil, source: nil, generationId: nil)
       )
       .padding(.horizontal, -18)
     }

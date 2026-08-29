@@ -31,8 +31,8 @@ export const POLICY_FIXTURES: readonly PolicyFixture[] = [
     note: "A model call, priced as one.",
   },
   {
-    id: "curator-read-is-read",
-    path: "/api/curator/rails",
+    id: "rail-delivery-is-read",
+    path: "/api/catalog/rails",
     method: "GET",
     expect: "read",
     note: "Reading already-built rails is not a model call.",

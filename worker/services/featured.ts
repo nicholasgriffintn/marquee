@@ -1,10 +1,10 @@
 import type { CatalogSection, MediaTitle } from "../../src/domain/catalog.ts";
 import type { ViewerOrigin } from "../../src/domain/cinema.ts";
+import { personalFrom } from "../../src/domain/rails.ts";
 import { hashString } from "../../src/lib/string.ts";
 import type { Bindings } from "../types.ts";
-import { getAiRails } from "./ai-rails.ts";
 import { getCatalogue, getTrending } from "./catalog.ts";
-import { getPersonalRails } from "./personal-rails.ts";
+import { deliverRails } from "./rail-delivery.ts";
 import { eligibilityGate, type Eligibility } from "./viewer/eligibility.ts";
 import { eligibilityFor, readViewerState, type ViewerState } from "./viewer/state.ts";
 
@@ -104,14 +104,13 @@ function chooseFeatured(candidates: FeaturedCandidate[], identity: string, now: 
 }
 
 async function personalSections(env: Bindings, viewer: ViewerState, origin: ViewerOrigin | null) {
-  const [personal, ai] = await Promise.all([
-    getPersonalRails(env, viewer.viewerId, origin),
-    getAiRails(env, viewer)
-      .then((result) => (result.isFresh ? result.sections : []))
-      .catch((): CatalogSection[] => []),
-  ]);
+  const delivery = await deliverRails(env, {
+    viewerId: viewer.viewerId,
+    origin,
+    generate: false,
+  });
 
-  return [...ai, ...personal];
+  return delivery.status === "ready" ? delivery.rails : personalFrom(delivery);
 }
 
 export async function getFeaturedTitle(
