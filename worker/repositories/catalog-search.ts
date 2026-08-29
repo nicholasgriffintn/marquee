@@ -8,6 +8,7 @@ import {
 } from "../lib/catalog-payload.ts";
 import { clamp } from "../lib/numbers.ts";
 import { isKnownTitle, validProviderIds } from "../lib/validation.ts";
+import type { AvailabilityRule } from "../services/viewer/eligibility.ts";
 import { hydrateTitleRows } from "./catalog-arrays.ts";
 
 export type CatalogueSort = "trending" | "popularity" | "score" | "recent" | "relevance";
@@ -32,10 +33,13 @@ export type CatalogueSearch = {
   places?: string[];
   mediaType?: "movie" | "tv";
   providerIds?: string[];
+  availability?: AvailabilityRule;
   minScore?: number;
   releasedAfter?: number;
   maxRuntime?: number;
   excludeIds?: string[];
+  excludeGenres?: string[];
+  excludeCertifications?: string[];
   includeIds?: string[];
   sort?: CatalogueSort;
   scope?: SearchScope;
@@ -43,6 +47,25 @@ export type CatalogueSearch = {
   limit?: number;
   offset?: number;
 };
+
+function certificationRatingSql(alias: string) {
+  return `lower(trim(substr(${alias}.certification, instr(${alias}.certification, ' ') + 1)))`;
+}
+
+function hasProviders(alias: string) {
+  return `EXISTS (SELECT 1 FROM catalog_title_providers AS p WHERE p.title_id = ${alias}.id)`;
+}
+
+export function availabilityCondition(alias: string, availability: AvailabilityRule = "confirmed") {
+  const onMine = `EXISTS (
+         SELECT 1 FROM catalog_title_providers AS p
+         WHERE p.title_id = ${alias}.id AND p.provider_id IN (SELECT value FROM json_each(?))
+       )`;
+
+  return availability === "confirmed-or-unknown"
+    ? `(NOT ${hasProviders(alias)} OR ${onMine})`
+    : onMine;
+}
 
 const TITLE_EXACTNESS = `(CASE WHEN lower(t.title) = ? OR lower(t.original_title) = ? THEN 0 ELSE 1 END)`;
 
@@ -88,6 +111,14 @@ export async function searchCatalogue(db: D1Database, search: CatalogueSearch) {
     .filter(Boolean)
     .slice(0, 10);
   const providerIds = validProviderIds(search.providerIds);
+  const excludeGenres = (search.excludeGenres ?? [])
+    .map((genre) => genre.trim().toLowerCase())
+    .filter(Boolean)
+    .slice(0, 20);
+  const excludeCertifications = (search.excludeCertifications ?? [])
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean)
+    .slice(0, 20);
   const excludedIds = [...new Set((search.excludeIds ?? []).filter(isKnownTitle))].slice(0, 2_000);
   const limit = clamp(Math.floor(search.limit ?? 12), 1, 60);
   const offset = clamp(Math.floor(search.offset ?? 0), 0, 2_000);
@@ -155,13 +186,27 @@ export async function searchCatalogue(db: D1Database, search: CatalogueSearch) {
   }
 
   if (providerIds.length) {
+    conditions.push(availabilityCondition("t", search.availability));
+    bindings.push(JSON.stringify(providerIds));
+  }
+
+  if (excludeGenres.length) {
     conditions.push(
-      `EXISTS (
-         SELECT 1 FROM catalog_title_providers AS p
-         WHERE p.title_id = t.id AND p.provider_id IN (SELECT value FROM json_each(?))
+      `NOT EXISTS (
+         SELECT 1 FROM catalog_title_genres AS bg
+         WHERE bg.title_id = t.id AND lower(bg.genre) IN (${excludeGenres.map(() => "?").join(", ")})
        )`,
     );
-    bindings.push(JSON.stringify(providerIds));
+    bindings.push(...excludeGenres);
+  }
+
+  if (excludeCertifications.length) {
+    conditions.push(
+      `(t.certification IS NULL OR ${certificationRatingSql("t")} NOT IN (${excludeCertifications
+        .map(() => "?")
+        .join(", ")}))`,
+    );
+    bindings.push(...excludeCertifications);
   }
 
   if (Number.isFinite(search.minScore)) {
@@ -257,6 +302,7 @@ export type BrowseTrendingFilter = {
   keywords: string[];
   places: string[];
   providerIds: string[];
+  availability?: AvailabilityRule;
   minVotes: number;
 };
 
@@ -319,12 +365,7 @@ async function trendingCandidates(db: D1Database, filter: BrowseTrendingFilter) 
   const providerIds = validProviderIds(filter.providerIds);
 
   if (providerIds.length) {
-    conditions.push(
-      `EXISTS (
-         SELECT 1 FROM catalog_title_providers AS p
-         WHERE p.title_id = t.id AND p.provider_id IN (SELECT value FROM json_each(?))
-       )`,
-    );
+    conditions.push(availabilityCondition("t", filter.availability));
     bindings.push(JSON.stringify(providerIds));
   }
 

@@ -7,19 +7,16 @@ import { isKnownTitle } from "../lib/validation.ts";
 import { isRecord, parseJson } from "../lib/values.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
 import { searchCatalogue } from "../repositories/catalog-search.ts";
-import { neverTitleIds } from "../repositories/signals.ts";
 import { readRailFeedback } from "../repositories/usher.ts";
-import {
-  readShelfDetail,
-  readViewerAffinity,
-  readViewerContext,
-} from "../repositories/viewer-context.ts";
-import type { Bindings, ViewerContext } from "../types.ts";
+import { readShelfDetail, readViewerAffinity } from "../repositories/viewer-context.ts";
+import type { Bindings } from "../types.ts";
 import { readAngleScores } from "./angle-scores.ts";
 import { viewerSummary } from "./beliefs.ts";
 import { getGenres } from "./catalog.ts";
 import { tasteVector } from "./taste.ts";
-import { preferenceSummary, readViewerPreferences, type ViewerPreferences } from "./usher.ts";
+import { preferenceSummary, type ViewerPreferences } from "./usher.ts";
+import type { Eligibility } from "./viewer/eligibility.ts";
+import { eligibilityFor, type ViewerState } from "./viewer/state.ts";
 
 const MAX_AGE_HOURS = 12;
 const RAIL_LIMIT = 3;
@@ -162,13 +159,13 @@ function preferenceSignature(preferences: ViewerPreferences) {
   ].join("|");
 }
 
-function viewerSignature(viewer: ViewerContext, preferences: ViewerPreferences) {
+function viewerSignature(viewer: ViewerState) {
   return [
     viewer.entries
       .map((entry) => `${entry.titleId}:${entry.status}:${entry.rating ?? ""}`)
       .join(","),
-    viewer.selectedProviderIds.join(","),
-    preferenceSignature(preferences),
+    viewer.providerIds.join(","),
+    preferenceSignature(viewer.preferences),
   ].join("|");
 }
 
@@ -184,17 +181,16 @@ async function neighbourIds(env: Bindings, vector: number[], slice: Angle["slice
 
 async function seedCandidates(
   env: Bindings,
-  viewer: ViewerContext,
+  eligibility: Eligibility,
   vector: number[] | null,
   angle: Angle,
-  exclude: string[],
   affinity: ViewerAffinity,
   wideGenres: string[],
   claimed: Set<string>,
 ) {
   const base = {
-    providerIds: viewer.selectedProviderIds,
-    excludeIds: [...exclude, ...claimed],
+    ...eligibility,
+    excludeIds: [...eligibility.excludeIds, ...claimed],
     limit: SEED_POOL,
     ...angle.search,
   };
@@ -395,10 +391,9 @@ function strictRail(content: string, availableIds: Set<string>): StoredRail | nu
 
 export async function buildOneRail(
   env: Bindings,
-  viewer: ViewerContext,
+  viewer: ViewerState,
+  eligibility: Eligibility,
   angle: Angle,
-  exclude: string[],
-  viewerId = "unknown",
   seeds: MediaTitle[] = [],
   shelf: ShelfDetail[] = [],
   summary = "",
@@ -446,7 +441,7 @@ export async function buildOneRail(
       timeoutMs: 25_000,
       maxTokens: 500,
       toolChoice: "auto",
-      metadata: { feature: "rails", angle: angle.id, viewer: viewerId },
+      metadata: { feature: "rails", angle: angle.id, viewer: viewer.viewerId },
     });
 
     if (response.tool_calls?.length) {
@@ -459,7 +454,7 @@ export async function buildOneRail(
           tool_call_id: call.id,
           name: call.function.name,
           content: JSON.stringify(
-            await executeCuratorTool(env, call, viewer, availableIds, exclude),
+            await executeCuratorTool(env, call, viewer, eligibility, availableIds),
           ),
         })),
       );
@@ -488,7 +483,7 @@ export async function buildOneRail(
     timeoutMs: 20_000,
     maxTokens: 300,
     json: true,
-    metadata: { feature: "rails", angle: angle.id, viewer: viewerId },
+    metadata: { feature: "rails", angle: angle.id, viewer: viewer.viewerId },
   });
   const rail = parseRail(response.content, availableIds);
 
@@ -535,13 +530,6 @@ async function titlesInDislikedRails(env: Bindings, viewerId: string) {
 
     return [];
   }
-}
-
-export async function readRailViewer(env: Bindings, viewerId: string) {
-  const preferences = await readViewerPreferences(env.DB, viewerId);
-  const viewer = await readViewerContext(env.DB, viewerId, preferences.providerIds);
-
-  return { viewer, preferences };
 }
 
 async function homepageTitleIds(env: Bindings) {
@@ -609,15 +597,14 @@ export async function persistRails(
   logEvent("ai_rails_generated", { rails: rails.length });
 }
 
-export async function getAiRails(env: Bindings, viewerId: string) {
-  const { viewer, preferences } = await readRailViewer(env, viewerId);
-  const signature = viewerSignature(viewer, preferences);
+export async function getAiRails(env: Bindings, viewer: ViewerState) {
+  const signature = viewerSignature(viewer);
   const cached = await env.DB.prepare(
     `SELECT signature, payload,
             (julianday('now') - julianday(created_at)) * 24 AS ageHours
      FROM ai_rails WHERE viewer_id = ?`,
   )
-    .bind(viewerId)
+    .bind(viewer.viewerId)
     .first<RailRow>();
   const isFresh = Boolean(
     cached && cached.signature === signature && cached.ageHours < MAX_AGE_HOURS,
@@ -627,26 +614,17 @@ export async function getAiRails(env: Bindings, viewerId: string) {
     sections: cached ? await hydrate(env, JSON.parse(cached.payload) as StoredRail[]) : [],
     isFresh,
     signature,
-    viewer,
-    preferences,
   };
 }
 
-export async function prepareRails(
-  env: Bindings,
-  viewer: ViewerContext,
-  viewerId: string,
-  preferences: ViewerPreferences,
-) {
+export async function prepareRails(env: Bindings, viewer: ViewerState) {
+  const { viewerId, preferences } = viewer;
   const scores = await readAngleScores(env.DB);
   const angles = rankAngles(anglesFor(preferences), scores);
-  const [refused, summary] = await Promise.all([
-    neverTitleIds(env.DB, viewerId),
-    viewerSummary(env, viewerId, preferences),
-  ]);
-  const [onHomepage, vector, behaviour, shelf, allGenres, rejected] = await Promise.all([
+  const summary = await viewerSummary(env, viewerId, preferences);
+  const [onHomepage, vector, behaviour, shelf, allGenres, disliked] = await Promise.all([
     homepageTitleIds(env),
-    tasteVector(env, viewer, preferences, { never: refused, summary }),
+    tasteVector(env, viewer.entries, preferences, { never: viewer.never, summary }),
     readViewerAffinity(env.DB, viewerId),
     readShelfDetail(env.DB, viewerId),
     getGenres(env, 100).catch((): string[] => []),
@@ -656,13 +634,7 @@ export async function prepareRails(
     ...behaviour,
     genres: behaviour.genres.length ? behaviour.genres : preferences.genres,
   };
-  const exclude = [
-    ...onHomepage,
-    ...rejected,
-    ...viewer.entries
-      .filter((entry) => entry.status === "watched" || entry.status === "dropped")
-      .map((entry) => entry.titleId),
-  ];
+  const eligibility = eligibilityFor(viewer, { exclude: [...onHomepage, ...disliked] });
   const familiar = new Set(affinity.genres.map((genre) => genre.toLowerCase()));
   const wideGenres = allGenres.filter((genre) => !familiar.has(genre.toLowerCase()));
   const claimed = new Set<string>();
@@ -672,10 +644,9 @@ export async function prepareRails(
     // oxlint-disable-next-line no-await-in-loop
     seeds[angle.id] = await seedCandidates(
       env,
-      viewer,
+      eligibility,
       vector,
       angle,
-      exclude,
       affinity,
       wideGenres,
       claimed,
@@ -688,7 +659,7 @@ export async function prepareRails(
     angles,
     shelf,
     seeds,
-    exclude,
+    eligibility,
     summary: preferenceSummary(preferences),
   };
 }

@@ -16,7 +16,18 @@ import { factBrief, factsFor, serviceFor } from "./why.ts";
 
 const ORDER_SHORTLIST = 12;
 const BACKUPS = 2;
-const COMPANY: Record<string, { note: string; text: string; genres?: string[] }> = {
+const FAMILY_UNSUITABLE_GENRES = ["horror", "thriller", "crime", "war"];
+
+const COMPANY: Record<
+  string,
+  {
+    note: string;
+    text: string;
+    genres?: string[];
+    bannedGenres?: string[];
+    allowAdult?: boolean;
+  }
+> = {
   alone: {
     note: "watching on their own, answerable to nobody",
     text: "a film to watch alone without explaining yourself to anyone",
@@ -33,6 +44,8 @@ const COMPANY: Record<string, { note: string; text: string; genres?: string[] }>
     note: "children in the room, so nothing that will need explaining afterwards",
     text: "something the whole family can watch together",
     genres: ["family", "animation", "adventure", "comedy"],
+    bannedGenres: FAMILY_UNSUITABLE_GENRES,
+    allowAdult: false,
   },
 };
 
@@ -96,17 +109,26 @@ export function constraintsFor(order: TonightOrder, guests: Guest[] = []): Short
   const company = COMPANY[order.company];
   const length = LENGTH[order.length];
   const mood = MOOD[order.mood];
-  const vetoed = new Set(guests.flatMap((guest) => guest.vetoes.map((veto) => veto.toLowerCase())));
+  const bannedGenres = [
+    ...new Set(
+      [...guests.flatMap((guest) => guest.vetoes), ...(company?.bannedGenres ?? [])].map((genre) =>
+        genre.toLowerCase(),
+      ),
+    ),
+  ];
+  const banned = new Set(bannedGenres);
   const leanings = guests.flatMap((guest) => guest.leanings);
   const genres = [
     ...new Set([...(mood?.genres ?? []), ...(company?.genres ?? []), ...leanings]),
-  ].filter((genre) => !vetoed.has(genre.toLowerCase()));
+  ].filter((genre) => !banned.has(genre.toLowerCase()));
 
   return {
     limit: ORDER_SHORTLIST,
     ...(length?.maxRuntime ? { maxRuntime: length.maxRuntime } : {}),
     ...(length?.mediaType ? { mediaType: length.mediaType } : {}),
     ...(genres.length ? { genres } : {}),
+    ...(bannedGenres.length ? { bannedGenres } : {}),
+    ...(company?.allowAdult === false ? { allowAdult: false } : {}),
     text: [mood?.text, company?.text, length?.text].filter(Boolean).join(", "),
   };
 }
@@ -143,15 +165,14 @@ export async function pickToOrder(
     guestIds?: string[];
   } = {},
 ) {
-  const providerIds = options.providerIds ?? [];
   const rejected = (options.rejected ?? []).filter(isKnownTitle).slice(0, 40);
   const showing = showingFor(options.hour ?? 20, options.isWeekend ?? false);
   const everyone = await readGuests(env.DB, viewerId);
   const guests = options.guestIds?.length
     ? everyone.filter((guest) => options.guestIds?.includes(guest.id))
     : [];
-  const { titles, preferences } = await shortlistFor(env, viewerId, {
-    providerIds,
+  const { titles, viewer } = await shortlistFor(env, viewerId, {
+    ...(options.providerIds ? { providerIds: options.providerIds } : {}),
     rejected,
     constraints: constraintsFor(order, guests),
   });
@@ -165,7 +186,7 @@ export async function pickToOrder(
     readBeliefs(env.DB, viewerId),
   ]);
   const dress = (item: MediaTitle, line: string) => {
-    const service = serviceFor(item, providerIds);
+    const service = serviceFor(item, viewer.providerIds);
 
     return { item, line, service, facts: factsFor(item, { service, shelf, beliefs }) };
   };
@@ -180,7 +201,7 @@ export async function pickToOrder(
           .join(", ")} · ${title.overview.slice(0, 200)}`,
     )
     .join("\n");
-  const summary = preferenceSummary(preferences);
+  const summary = preferenceSummary(viewer.preferences);
   const messages: ChatMessage[] = [
     { role: "system", content: ORDER_PROMPT },
     {
@@ -209,7 +230,7 @@ export async function pickToOrder(
         "",
         titles
           .map((title) => {
-            const service = serviceFor(title, providerIds);
+            const service = serviceFor(title, viewer.providerIds);
 
             return `${title.id} — ${factBrief(factsFor(title, { service, shelf, beliefs }))}`;
           })

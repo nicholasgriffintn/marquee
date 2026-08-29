@@ -17,6 +17,7 @@ import { pinShelf, readPinnedShelves, unpinShelf } from "../repositories/shelves
 import { getAiRails } from "../services/ai-rails.ts";
 import { readDigest } from "../services/digest.ts";
 import { getTitleInsight } from "../services/title-insight.ts";
+import { readViewerState } from "../services/viewer/state.ts";
 import type { Bindings } from "../types.ts";
 import { viewerHour } from "./usher.ts";
 
@@ -114,7 +115,8 @@ curatorRoutes.get("/rails", requireViewer, async (context) => {
   try {
     context.header("cache-control", "no-store");
 
-    const { sections, isFresh } = await getAiRails(context.env, user.id);
+    const viewer = await readViewerState(context.env, user.id);
+    const { sections, isFresh } = await getAiRails(context.env, viewer);
 
     if (isFresh) {
       recordEvent(context.env, {

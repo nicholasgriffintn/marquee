@@ -2,10 +2,11 @@ import type { MediaTitle } from "../../src/domain/catalog.ts";
 import { logError, logEvent } from "../lib/logging.ts";
 import { readRanked } from "../repositories/catalog-search.ts";
 import type { Bindings } from "../types.ts";
-import { prepareRails, readRailViewer } from "./ai-rails.ts";
+import { prepareRails } from "./ai-rails.ts";
 import { readTrending } from "./buzz.ts";
 import { readTonight } from "./schedule.ts";
 import { pickOne } from "./usher-pick.ts";
+import { readViewerState } from "./viewer/state.ts";
 
 const FRESH_PICKS = 12;
 const DIGEST_TRENDING = 12;
@@ -102,16 +103,16 @@ async function freshForViewer(env: Bindings, vector: number[] | null, exclude: s
 }
 
 export async function buildDigest(env: Bindings, viewerId: string) {
-  const { viewer, preferences } = await readRailViewer(env, viewerId);
+  const viewer = await readViewerState(env, viewerId);
 
   if (viewer.entries.length === 0) {
     return null;
   }
 
-  const { vector, exclude } = await prepareRails(env, viewer, viewerId, preferences);
+  const { vector, eligibility } = await prepareRails(env, viewer);
   const [fresh, trending, episodes, numbers, lead] = await Promise.all([
     freshForViewer(env, vector, [
-      ...exclude,
+      ...eligibility.excludeIds,
       ...viewer.entries.map((entry) => entry.titleId),
     ]).catch((error: unknown): string[] => {
       logError("digest_fresh_failed", error, { viewerId });
@@ -121,7 +122,7 @@ export async function buildDigest(env: Bindings, viewerId: string) {
     readTrending(env, DIGEST_TRENDING),
     readTonight(env, viewerId, DIGEST_EPISODES, 168),
     weekNumbers(env, viewerId),
-    leadForViewer(env, viewerId, preferences.providerIds),
+    leadForViewer(env, viewerId, viewer.providerIds),
   ]);
   const digest: Digest = {
     createdAt: new Date().toISOString(),

@@ -36,7 +36,7 @@ import {
   saveGuest,
 } from "../repositories/guests.ts";
 import { hashState } from "../repositories/links.ts";
-import { readViewerContext } from "../repositories/viewer-context.ts";
+import { readViewerEntries } from "../repositories/viewer-context.ts";
 import { ALERT_KINDS, isAlertKind } from "../services/alerts/types.ts";
 import { refreshBeliefs } from "../services/beliefs.ts";
 import { buildTasteMap } from "../services/taste-map.ts";
@@ -62,9 +62,9 @@ notebookRoutes.get("/", async (context) => {
   const user = context.get("authenticatedUser");
 
   try {
-    const viewer = await readViewerContext(context.env.DB, user.id);
+    const entries = await readViewerEntries(context.env.DB, user.id);
 
-    await refreshBeliefs(context.env, user.id, viewer);
+    await refreshBeliefs(context.env, user.id, entries);
 
     const beliefs = await retryTransient(() => readBeliefs(context.env.DB, user.id));
 

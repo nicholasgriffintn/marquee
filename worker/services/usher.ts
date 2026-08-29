@@ -13,6 +13,7 @@ import {
 import { logError } from "../lib/logging.ts";
 import { isKnownTitle, validProviderIds } from "../lib/validation.ts";
 import { stringList } from "../lib/values.ts";
+import { readProviderPreferences, saveProviderPreferences } from "../repositories/profile.ts";
 import {
   readAnswers,
   readUsherRecord,
@@ -386,6 +387,16 @@ export async function markPrompted(env: Bindings, viewerId: string, moment: Ushe
   await writeUsherRecord(env.DB, viewerId, { lastPromptedAt: new Date().toISOString() });
 }
 
+async function mirrorProviderPreferences(db: D1Database, viewerId: string, providerIds: string[]) {
+  try {
+    const saved = await readProviderPreferences(db, viewerId);
+
+    await saveProviderPreferences(db, viewerId, [...new Set([...(saved ?? []), ...providerIds])]);
+  } catch (error) {
+    logError("usher_provider_mirror_failed", error);
+  }
+}
+
 function chipAnswer(value: unknown, question: UsherQuestion) {
   if (!Array.isArray(value)) {
     return null;
@@ -466,6 +477,7 @@ export async function applyAnswer(
       const providerIds = validProviderIds(value).slice(0, 40);
 
       await saveAnswer(env.DB, viewerId, questionId, providerIds);
+      await mirrorProviderPreferences(env.DB, viewerId, providerIds);
 
       return { ok: true as const, answer: providerIds };
     }
@@ -593,7 +605,7 @@ export type ViewerPreferences = {
   novelty: string;
 };
 
-const NO_PREFERENCES: ViewerPreferences = {
+export const NO_PREFERENCES: ViewerPreferences = {
   providerIds: [],
   genres: [],
   frequency: "",

@@ -7,9 +7,9 @@ import {
   getAiRails,
   persistRails,
   prepareRails,
-  readRailViewer,
   type StoredRail,
 } from "../services/ai-rails.ts";
+import { readViewerState } from "../services/viewer/state.ts";
 import type { Bindings } from "../types.ts";
 
 const RETRIES = { limit: 2, delay: "10 seconds", backoff: "exponential" } as const;
@@ -19,10 +19,10 @@ export type RailsParameters = { viewerId: string };
 export class RailsWorkflow extends WorkflowEntrypoint<Bindings, RailsParameters> {
   async run(event: Readonly<WorkflowEvent<RailsParameters>>, step: WorkflowStep) {
     const { viewerId } = event.payload;
-    const { viewer, preferences } = await readRailViewer(this.env, viewerId);
-    const { signature } = await getAiRails(this.env, viewerId);
+    const viewer = await readViewerState(this.env, viewerId);
+    const { signature } = await getAiRails(this.env, viewer);
     const prepared = await step.do("read taste", { retries: RETRIES }, async () =>
-      prepareRails(this.env, viewer, viewerId, preferences),
+      prepareRails(this.env, viewer),
     );
     const built = await Promise.all(
       prepared.angles.map((angle) =>
@@ -31,9 +31,8 @@ export class RailsWorkflow extends WorkflowEntrypoint<Bindings, RailsParameters>
             const rail = await buildOneRail(
               this.env,
               viewer,
+              prepared.eligibility,
               angle,
-              prepared.exclude,
-              viewerId,
               prepared.seeds[angle.id] ?? [],
               prepared.shelf,
               prepared.summary,

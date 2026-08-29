@@ -12,7 +12,7 @@ import { readFollowedPeople, setPersonFollow } from "../repositories/beliefs.ts"
 import { readItems } from "../repositories/catalog-reader.ts";
 import { readRanked } from "../repositories/catalog-search.ts";
 import { readPerson, readPersonTitleIds } from "../repositories/people.ts";
-import { readViewerContext } from "../repositories/viewer-context.ts";
+import { readViewerEntries } from "../repositories/viewer-context.ts";
 import { getTonight } from "../services/catalog.ts";
 import { similarTo } from "../services/embeddings.ts";
 import { readWeekAhead } from "../services/feeds.ts";
@@ -244,16 +244,16 @@ async function callTool(
   }
 
   if (name === "get_shelf") {
-    const viewer = await readViewerContext(env.DB, user.id);
+    const entries = await readViewerEntries(env.DB, user.id);
     const titles = await readItems(
       env.DB,
-      viewer.entries.map((entry) => entry.titleId),
+      entries.map((entry) => entry.titleId),
       100,
     );
     const byId = new Map(titles.map((title) => [title.id, title]));
 
     return textResult({
-      entries: viewer.entries.map((entry) => ({
+      entries: entries.map((entry) => ({
         id: entry.titleId,
         title: byId.get(entry.titleId)?.title ?? entry.titleId,
         year: byId.get(entry.titleId)?.year ?? null,

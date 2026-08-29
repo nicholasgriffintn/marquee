@@ -128,11 +128,6 @@ export type ViewingContext = {
   updatedAt: string;
 };
 
-export type ViewerContext = {
-  entries: ViewingContext[];
-  selectedProviderIds: string[];
-};
-
 export type CuratorResult = {
   titleIds: string[];
   summary: string;
