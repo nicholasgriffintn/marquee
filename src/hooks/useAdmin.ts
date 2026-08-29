@@ -39,6 +39,23 @@ export type AdminPipeline = {
     attempted: number;
     silentFailures: number;
   }[];
+  readiness: {
+    search: {
+      titles: number;
+      indexed: number;
+      pending: number;
+      oldestPendingAt: string | null;
+    };
+    embeddings: {
+      model: string;
+      titles: number;
+      embedded: number;
+      outstanding: number;
+      retrying: number;
+      otherModels: number;
+      newest: string | null;
+    };
+  };
   failures: {
     jobType: string;
     subjectId: string | null;

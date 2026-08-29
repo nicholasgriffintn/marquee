@@ -1,5 +1,5 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
-import { logError, logEvent } from "../lib/logging.ts";
+import { errorMessage, logError, logEvent } from "../lib/logging.ts";
 import { clamp } from "../lib/numbers.ts";
 import { isRecord, vectorValues } from "../lib/values.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
@@ -67,6 +67,9 @@ export async function embedQuery(env: Bindings, text: string) {
   return vector ?? null;
 }
 
+const RETRY_MINUTES = 30;
+const MAX_RETRY_MINUTES = 24 * 60;
+
 function markEmbedded(env: Bindings, titleId: string, hash: string) {
   return env.DB.prepare(
     `INSERT INTO title_embeddings (title_id, model, content_hash, embedded_at)
@@ -74,8 +77,34 @@ function markEmbedded(env: Bindings, titleId: string, hash: string) {
      ON CONFLICT(title_id) DO UPDATE SET
        model = excluded.model,
        content_hash = excluded.content_hash,
-       embedded_at = CURRENT_TIMESTAMP`,
+       embedded_at = CURRENT_TIMESTAMP,
+       attempts = 0,
+       next_attempt_at = NULL,
+       error = NULL`,
   ).bind(titleId, EMBEDDING_MODEL, hash);
+}
+
+// A failed title keeps a marker so the next selection can step over it instead of
+// re-reading the same head of the popularity queue on every sweep.
+function markEmbeddingFailure(env: Bindings, titleId: string, reason: string) {
+  return env.DB.prepare(
+    `INSERT INTO title_embeddings
+       (title_id, model, content_hash, attempts, next_attempt_at, error)
+     VALUES (?1, ?2, NULL, 1, datetime('now', '+${RETRY_MINUTES} minutes'), ?3)
+     ON CONFLICT(title_id) DO UPDATE SET
+       model = excluded.model,
+       content_hash = NULL,
+       attempts = title_embeddings.attempts + 1,
+       next_attempt_at = datetime(
+         'now',
+         '+' || min(${MAX_RETRY_MINUTES}, ${RETRY_MINUTES} * (title_embeddings.attempts + 1)) || ' minutes'
+       ),
+       error = excluded.error`,
+  ).bind(titleId, EMBEDDING_MODEL, reason.slice(0, 200));
+}
+
+function recordFailures(env: Bindings, titles: MediaTitle[], reason: string) {
+  return env.DB.batch(titles.map((title) => markEmbeddingFailure(env, title.id, reason)));
 }
 
 async function storedHashes(env: Bindings, titleIds: string[]) {
@@ -112,35 +141,40 @@ export async function embedTitles(
   const unchanged = titles.filter((title, index) => !stale(title, index));
   const hashById = new Map(titles.map((title, index) => [title.id, hashes[index]]));
   let stored = 0;
+  let failed = 0;
 
   for (let index = 0; index < pending.length; index += EMBED_BATCH) {
     const wave = pending.slice(index, index + EMBED_BATCH);
-    // oxlint-disable-next-line no-await-in-loop
-    const vectors = await embedTexts(env, wave.map(embeddingText));
 
-    if (vectors.length !== wave.length) {
-      logError(
-        "embedding_count_mismatch",
-        new Error(`expected ${wave.length} vectors, received ${vectors.length}`),
+    try {
+      // oxlint-disable-next-line no-await-in-loop
+      const vectors = await embedTexts(env, wave.map(embeddingText));
+
+      if (vectors.length !== wave.length) {
+        throw new Error(`expected ${wave.length} vectors, received ${vectors.length}`);
+      }
+
+      // oxlint-disable-next-line no-await-in-loop
+      await env.VECTORS.upsert(
+        wave.map((title, position) => ({
+          id: title.id,
+          values: vectors[position],
+          metadata: titleVectorMetadata(title),
+        })),
       );
-      continue;
+
+      // oxlint-disable-next-line no-await-in-loop
+      await env.DB.batch(
+        wave.map((title) => markEmbedded(env, title.id, hashById.get(title.id) as string)),
+      );
+
+      stored += wave.length;
+    } catch (error) {
+      logError("embedding_wave_failed", error, { titles: wave.length });
+      failed += wave.length;
+      // oxlint-disable-next-line no-await-in-loop
+      await recordFailures(env, wave, errorMessage(error, 200));
     }
-
-    // oxlint-disable-next-line no-await-in-loop
-    await env.VECTORS.upsert(
-      wave.map((title, position) => ({
-        id: title.id,
-        values: vectors[position],
-        metadata: titleVectorMetadata(title),
-      })),
-    );
-
-    // oxlint-disable-next-line no-await-in-loop
-    await env.DB.batch(
-      wave.map((title) => markEmbedded(env, title.id, hashById.get(title.id) as string)),
-    );
-
-    stored += wave.length;
   }
 
   if (unchanged.length) {
@@ -149,7 +183,13 @@ export async function embedTitles(
     );
   }
 
-  logEvent("titles_embedded", { count: stored, skipped: unchanged.length });
+  logEvent("titles_embedded", { count: stored, skipped: unchanged.length, failed });
+
+  // The backoff marker keeps the next selection moving; the throw keeps the run log and the
+  // queue's own retry honest about the failure.
+  if (failed > 0) {
+    throw new Error(`${failed} of ${pending.length} titles could not be embedded`);
+  }
 
   return stored;
 }
@@ -176,6 +216,14 @@ export async function readVectors(env: Bindings, titleIds: string[]) {
 
   return byId;
 }
+
+const OUTSTANDING = `(
+  e.title_id IS NULL
+  OR e.content_hash IS NULL
+  OR e.embedded_at < t.updated_at
+)`;
+
+const OFF_BACKOFF = `(e.next_attempt_at IS NULL OR e.next_attempt_at <= datetime('now'))`;
 
 const REINDEX_BATCH = 25;
 
@@ -223,16 +271,54 @@ export async function selectUnembedded(env: Bindings, limit: number) {
     `SELECT t.id AS titleId
      FROM catalog_titles AS t
      LEFT JOIN title_embeddings AS e ON e.title_id = t.id AND e.model = ?
-     WHERE e.title_id IS NULL
-        OR e.content_hash IS NULL
-        OR e.embedded_at < t.updated_at
-     ORDER BY t.popularity DESC
+     WHERE ${OUTSTANDING} AND ${OFF_BACKOFF}
+     ORDER BY COALESCE(e.attempts, 0), t.popularity DESC
      LIMIT ?`,
   )
     .bind(EMBEDDING_MODEL, clamp(limit, 1, 5_000))
     .all<{ titleId: string }>();
 
   return rows.results.map((row) => row.titleId);
+}
+
+export type EmbeddingCoverage = {
+  model: string;
+  titles: number;
+  embedded: number;
+  outstanding: number;
+  retrying: number;
+  otherModels: number;
+  newest: string | null;
+};
+
+export async function readEmbeddingCoverage(env: Bindings): Promise<EmbeddingCoverage> {
+  const row = await env.DB.prepare(
+    `SELECT
+       (SELECT count(*) FROM catalog_titles) AS titles,
+       (SELECT count(*) FROM title_embeddings WHERE model = ?1 AND content_hash IS NOT NULL)
+         AS embedded,
+       (SELECT count(*) FROM title_embeddings WHERE model <> ?1) AS otherModels,
+       (SELECT count(*) FROM title_embeddings
+         WHERE model = ?1 AND content_hash IS NULL AND attempts > 0) AS retrying,
+       (SELECT max(embedded_at) FROM title_embeddings WHERE model = ?1 AND content_hash IS NOT NULL)
+         AS newest,
+       (SELECT count(*)
+          FROM catalog_titles AS t
+          LEFT JOIN title_embeddings AS e ON e.title_id = t.id AND e.model = ?1
+         WHERE ${OUTSTANDING}) AS outstanding`,
+  )
+    .bind(EMBEDDING_MODEL)
+    .first<Omit<EmbeddingCoverage, "model">>();
+
+  return {
+    model: EMBEDDING_MODEL,
+    titles: row?.titles ?? 0,
+    embedded: row?.embedded ?? 0,
+    outstanding: row?.outstanding ?? 0,
+    retrying: row?.retrying ?? 0,
+    otherModels: row?.otherModels ?? 0,
+    newest: row?.newest ?? null,
+  };
 }
 
 export type Neighbour = { id: string; score: number };

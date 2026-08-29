@@ -1,5 +1,6 @@
 import { DEMAND_MAX_AGE_DAYS } from "../repositories/working-set.ts";
 import type { Bindings } from "../types.ts";
+import { EMBEDDING_MODEL } from "./embeddings.ts";
 
 const SAMPLE_LIMIT = 10;
 
@@ -54,10 +55,11 @@ async function embeddingsSample(db: D1Database): Promise<SampleResult> {
       `SELECT e.title_id AS id, t.title AS title, e.model AS model, e.embedded_at AS embeddedAt
        FROM title_embeddings AS e
        JOIN catalog_titles AS t ON t.id = e.title_id
-       WHERE e.content_hash IS NOT NULL
+       WHERE e.content_hash IS NOT NULL AND e.model = ?1
        ORDER BY e.embedded_at DESC
        LIMIT ${SAMPLE_LIMIT}`,
     )
+    .bind(EMBEDDING_MODEL)
     .all<SampleRow>();
 
   return {
