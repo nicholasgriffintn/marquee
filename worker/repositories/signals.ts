@@ -160,6 +160,7 @@ export async function recentExitFor(db: D1Database, viewerId: string, titleId: s
     return {
       journeyId: row.journeyId ?? "",
       source: (isRecord(parsed) && stringAt(parsed, "source")) || "",
+      mode: (isRecord(parsed) && stringAt(parsed, "mode")) || "",
     };
   } catch (error) {
     logError("exit_lookup_failed", error);

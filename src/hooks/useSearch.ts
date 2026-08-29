@@ -1,12 +1,14 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { MediaTitle } from "../domain/catalog";
 import { shouldRefineSearch } from "../domain/search-query";
+import { startJourneys } from "../lib/journey";
 import { queryJson, QueryError } from "../lib/query-client";
 
 type SearchResponse = {
   items: MediaTitle[];
   query: string;
+  journey?: string;
 };
 
 const KEYWORD_DEBOUNCE_MS = 250;
@@ -37,8 +39,17 @@ export function useSearch(query: string, providerIds: string[]) {
   const [error, setError] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [isRefining, setIsRefining] = useState(false);
+  const served = useRef<MediaTitle[]>([]);
   const trimmed = query.trim();
   const providerKey = providerIds.join(",");
+
+  // Results carry the ticket the server signed for this response, so a title
+  // opened from here is attributed to the search that surfaced it and at what rank.
+  const serve = useCallback((next: MediaTitle[], journey: string | undefined) => {
+    served.current = next;
+    setItems(next);
+    startJourneys(next, journey);
+  }, []);
 
   const isShort = trimmed.length < 2;
 
@@ -55,7 +66,7 @@ export function useSearch(query: string, providerIds: string[]) {
         const response = await queryJson<SearchResponse>(searchUrl(trimmed, providerKey, true));
 
         if (active) {
-          setItems((current) => mergeRefined(current, response.items));
+          serve(mergeRefined(served.current, response.items), response.journey);
         }
       } catch {
       } finally {
@@ -74,7 +85,7 @@ export function useSearch(query: string, providerIds: string[]) {
           const response = await queryJson<SearchResponse>(searchUrl(trimmed, providerKey, false));
 
           if (active) {
-            setItems(response.items);
+            serve(response.items, response.journey);
             setError("");
 
             if (shouldRefineSearch(trimmed, response.items)) {
@@ -84,7 +95,7 @@ export function useSearch(query: string, providerIds: string[]) {
           }
         } catch (caught) {
           if (active) {
-            setItems([]);
+            serve([], undefined);
             setError(caught instanceof QueryError ? caught.message : "Search is unavailable");
           }
         } finally {
@@ -105,7 +116,7 @@ export function useSearch(query: string, providerIds: string[]) {
         window.clearTimeout(hybridTimer);
       }
     };
-  }, [isShort, providerKey, trimmed]);
+  }, [isShort, providerKey, serve, trimmed]);
 
   return {
     items: isShort ? [] : items,

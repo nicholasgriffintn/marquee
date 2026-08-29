@@ -10,7 +10,7 @@ type StateResponse = { status: string; answered: string[]; awayDays?: number };
 
 type MomentResponse = { moment: UsherMoment | null };
 
-type PickResponse = { item: MediaTitle | null; line: string; facts?: string[] };
+type PickResponse = { item: MediaTitle | null; line: string; facts?: string[]; journey?: string };
 
 export type UsherPickState = {
   item: MediaTitle | null;
@@ -32,7 +32,12 @@ export type UsherOrderState = {
   error: string;
 };
 
-type OrderResponse = { pick: OrderResult | null; backups: OrderResult[]; line: string };
+type OrderResponse = {
+  pick: OrderResult | null;
+  backups: OrderResult[];
+  line: string;
+  journey?: string;
+};
 
 const NO_PICK: UsherPickState = { item: null, line: "", facts: [], isPicking: false, error: "" };
 
@@ -260,7 +265,7 @@ export function useUsher(isSignedIn: boolean) {
         }
 
         if (response.item) {
-          startJourney(response.item.id, "usher_pick");
+          startJourney(response.item.id, response.journey, 0);
         }
 
         setPick({
@@ -338,12 +343,12 @@ export function useUsher(isSignedIn: boolean) {
         );
 
         if (response.pick) {
-          startJourney(response.pick.item.id, "usher_order");
+          startJourney(response.pick.item.id, response.journey, 0);
         }
 
-        for (const backup of response.backups ?? []) {
-          startJourney(backup.item.id, "usher_order_backup");
-        }
+        (response.backups ?? []).forEach((backup, index) => {
+          startJourney(backup.item.id, response.journey, index + 1);
+        });
 
         setOrder({
           isOpen: true,

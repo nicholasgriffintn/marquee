@@ -5,6 +5,7 @@ export const TABS = [
   { id: "actions", label: "Actions" },
   { id: "pipeline", label: "Pipeline" },
   { id: "listings", label: "Listings" },
+  { id: "quality", label: "Quality" },
   { id: "vault", label: "The vault" },
   { id: "people", label: "People" },
 ] as const;
@@ -15,6 +16,7 @@ export const READS_DATA = new Set<AdminTab>([
   "overview",
   "pipeline",
   "listings",
+  "quality",
   "vault",
   "people",
 ]);

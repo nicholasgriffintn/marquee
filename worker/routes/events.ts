@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { sessionPrincipal } from "../auth/session.ts";
 import { recordEvent, type MarqueeEvent } from "../lib/events.ts";
 import { readJsonObject } from "../lib/http.ts";
+import { journeyLatency, journeyRank, verifyJourney } from "../lib/journeys.ts";
 import { logRejection } from "../lib/logging.ts";
 import { isKnownTitle, validProviderIds } from "../lib/validation.ts";
 import { recordSignal } from "../repositories/signals.ts";
@@ -24,12 +25,6 @@ function text(value: unknown, limit: number) {
   return typeof value === "string" ? value.slice(0, limit) : undefined;
 }
 
-function position(value: unknown) {
-  const parsed = Number(value);
-
-  return Number.isInteger(parsed) && parsed >= 0 && parsed < 500 ? parsed : undefined;
-}
-
 eventRoutes.post("/", async (context) => {
   const body = await readJsonObject(context.req.raw);
   const name = typeof body?.name === "string" ? body.name : "";
@@ -41,14 +36,25 @@ eventRoutes.post("/", async (context) => {
   const principal = await sessionPrincipal(context.env, context.req.raw);
   const titleId = isKnownTitle(body?.titleId) ? body.titleId : undefined;
   const [providerId] = validProviderIds([text(body?.providerId, 60) ?? ""]);
+  // Where the impression came from, how it ranked and how long it sat there are
+  // read from the signed journey, never from the caller: an unsigned event is
+  // still counted, but with no angle it cannot move the global scores.
+  const journey = await verifyJourney(context.env, body?.journey);
+  const rank = journey ? journeyRank(body?.rank, journey) : undefined;
   const event: MarqueeEvent = {
     name: name as MarqueeEvent["name"],
     viewerId: principal?.user.id,
     ...(titleId ? { titleId } : {}),
     ...(text(body?.detail, 200) ? { detail: text(body?.detail, 200) } : {}),
-    ...(text(body?.journeyId, 40) ? { journeyId: text(body?.journeyId, 40) } : {}),
-    ...(text(body?.source, 60) ? { source: text(body?.source, 60) } : {}),
-    ...(position(body?.position) === undefined ? {} : { position: position(body?.position) }),
+    ...(journey
+      ? {
+          journeyId: journey.id,
+          source: journey.angle,
+          mode: journey.mode,
+          latencyMs: journeyLatency(journey),
+        }
+      : {}),
+    ...(rank === undefined ? {} : { rank }),
     ...(providerId ? { providerId } : {}),
     ...(text(body?.monetization, 40) ? { monetization: text(body?.monetization, 40) } : {}),
   };
@@ -61,9 +67,10 @@ eventRoutes.post("/", async (context) => {
         recordSignal(context.env.DB, principal.user.id, {
           type: "provider_exit",
           titleId,
-          ...(event.journeyId ? { journeyId: event.journeyId } : {}),
+          ...(journey ? { journeyId: journey.id } : {}),
           context: {
-            source: event.source ?? "",
+            source: journey?.angle ?? "",
+            mode: journey?.mode ?? "",
             providerId: providerId ?? "",
             monetization: event.monetization ?? "",
           },

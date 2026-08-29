@@ -6,6 +6,7 @@ import { refreshTitleAvailability } from "../jobs/availability.ts";
 import { edgeCache } from "../lib/cache.ts";
 import { recordEvent } from "../lib/events.ts";
 import { edgeOrigin } from "../lib/geo.ts";
+import { mintJourney, ticketSections } from "../lib/journeys.ts";
 import { logError } from "../lib/logging.ts";
 import { pathInteger, queryInteger, queryList, queryText } from "../lib/params.ts";
 import { canonicalOrigin } from "../lib/security.ts";
@@ -76,7 +77,13 @@ catalogRoutes.get("/", edgeCache(900), async (context) => {
 
     context.header("cache-control", "public, max-age=900");
 
-    return context.json(catalogue);
+    // The whole response is edge-cached, so one journey is shared by everyone who
+    // gets the same cached copy. Attribution to an angle stays exact; the id is
+    // not unique per viewer, which is why this surface has its own mode.
+    return context.json({
+      ...catalogue,
+      sections: await ticketSections(context.env, catalogue.sections, "catalogue"),
+    });
   } catch (error) {
     logError("catalogue_read_failed", error, { area: "catalogue" });
 
@@ -88,11 +95,21 @@ catalogRoutes.get("/rails", requireAuthentication, async (context) => {
   const user = context.get("authenticatedUser");
 
   try {
+    const startedAt = Date.now();
     const sections = await getPersonalRails(context.env, user.id, edgeOrigin(context.req.raw));
+    const ticketed = await ticketSections(context.env, sections, "rail");
 
     context.header("cache-control", "private, max-age=120");
 
-    return context.json({ sections });
+    recordEvent(context.env, {
+      name: "rails_served",
+      viewerId: user.id,
+      mode: "rail",
+      value: ticketed.length,
+      latencyMs: Date.now() - startedAt,
+    });
+
+    return context.json({ sections: ticketed });
   } catch (error) {
     logError("personal_rails_failed", error, { area: "catalogue" });
 
@@ -141,18 +158,28 @@ catalogRoutes.get("/search", async (context) => {
   try {
     context.header("cache-control", "no-store");
 
+    const startedAt = Date.now();
     const results = hybrid
       ? await searchCatalogueHybrid(context.env, query, providerIds)
       : await searchCatalogue(context.env, query, providerIds);
+    const journey = await mintJourney(context.env, {
+      mode: "search",
+      angle: hybrid ? "search_hybrid" : "search_keyword",
+      size: results.items.length,
+    });
 
     recordEvent(context.env, {
       name: "search",
       viewerId: principal?.user.id,
       detail: query,
       value: results.items.length,
+      journeyId: journey.id,
+      mode: "search",
+      source: hybrid ? "search_hybrid" : "search_keyword",
+      latencyMs: Date.now() - startedAt,
     });
 
-    return context.json(results);
+    return context.json({ ...results, journey: journey.token });
   } catch (error) {
     logError("catalogue_search_failed", error, { area: "search" });
 

@@ -69,6 +69,21 @@ export type AdminListings = {
   fetchedAt: string;
 };
 
+export type AdminQuality = {
+  angles: {
+    angle: string;
+    impressions: number;
+    clicks: number;
+    views: number;
+    exits: number;
+    watched: number;
+    attrition: number;
+    dwellMs: number;
+    score: number;
+  }[];
+  fetchedAt: string;
+};
+
 export type AdminUser = {
   id: string;
   name: string;
