@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, type ReactNode } from "react";
 
 import { classNames } from "../lib/class-names";
 import { CloseIcon } from "./Icons";
+
 import styles from "./Modal.module.css";
 
 export function Modal({
@@ -39,9 +40,7 @@ export function Modal({
           event.preventDefault();
           onClose();
         }}
-        onMouseDown={(event) =>
-          event.target === event.currentTarget && onClose()
-        }
+        onMouseDown={(event) => event.target === event.currentTarget && onClose()}
       >
         <button
           ref={closeRef}

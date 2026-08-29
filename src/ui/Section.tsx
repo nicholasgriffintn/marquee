@@ -3,8 +3,9 @@ import { useId, type ReactNode } from "react";
 import { classNames } from "../lib/class-names";
 import { Eyebrow } from "./Eyebrow";
 import { Heading, type HeadingLevel, type HeadingSize } from "./Heading";
-import styles from "./Section.module.css";
 import { Text } from "./Text";
+
+import styles from "./Section.module.css";
 
 export function SectionHeader({
   eyebrow,
@@ -28,20 +29,10 @@ export function SectionHeader({
   className?: string;
 }) {
   return (
-    <div
-      className={classNames(
-        styles.header,
-        bleed && styles.headerBleed,
-        className,
-      )}
-    >
+    <div className={classNames(styles.header, bleed && styles.headerBleed, className)}>
       <div className={styles.headerMain}>
         {eyebrow && (
-          <Eyebrow
-            tone="accent"
-            weight="regular"
-            className={styles.headerEyebrow}
-          >
+          <Eyebrow tone="accent" weight="regular" className={styles.headerEyebrow}>
             {eyebrow}
           </Eyebrow>
         )}
@@ -85,10 +76,7 @@ export function Section({
   const headingId = useId();
 
   return (
-    <section
-      aria-labelledby={headingId}
-      className={classNames(styles.section, className)}
-    >
+    <section aria-labelledby={headingId} className={classNames(styles.section, className)}>
       <SectionHeader
         eyebrow={eyebrow}
         heading={heading}

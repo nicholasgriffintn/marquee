@@ -34,11 +34,7 @@ function knownTitleIds(titleIds: string[]) {
   return [...new Set(titleIds.filter(isKnownTitle))];
 }
 
-export function markTitlesForIndexing(
-  db: Database,
-  titleIds: string[],
-  reason: IndexReason,
-) {
+export function markTitlesForIndexing(db: Database, titleIds: string[], reason: IndexReason) {
   const unique = knownTitleIds(titleIds);
 
   if (unique.length === 0) {
@@ -125,9 +121,7 @@ export async function queueSearchRebuild(db: Database) {
   return row?.pending ?? 0;
 }
 
-export async function readSearchIndexState(
-  db: Database,
-): Promise<SearchIndexState> {
+export async function readSearchIndexState(db: Database): Promise<SearchIndexState> {
   const row = await db.first<SearchIndexState>(`SELECT
          (SELECT count(*) FROM catalog_titles) AS titles,
          (SELECT count(*) FROM catalog_search) AS indexed,

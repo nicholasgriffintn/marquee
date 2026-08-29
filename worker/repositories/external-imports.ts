@@ -51,7 +51,10 @@ export async function startImport(
 }
 
 export async function advanceImport(db: Database, id: string, written: number) {
-  await db.execute(`UPDATE external_imports SET written = written + $1 WHERE id = $2`, [written, id]);
+  await db.execute(`UPDATE external_imports SET written = written + $1 WHERE id = $2`, [
+    written,
+    id,
+  ]);
 }
 
 export async function finishImport(

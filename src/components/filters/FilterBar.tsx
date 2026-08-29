@@ -2,13 +2,22 @@ import { useState, type ReactNode } from "react";
 
 import { classNames } from "../../lib/class-names";
 import { Eyebrow, VerticalChevronIcon } from "../../ui";
+
 import styles from "./FilterBar.module.css";
 
 export function FilterBar({ children }: { children: ReactNode }) {
   return <div className={styles.bar}>{children}</div>;
 }
 
-export function Facet({ label, wide = false, children }: { label: string; wide?: boolean; children: ReactNode }) {
+export function Facet({
+  label,
+  wide = false,
+  children,
+}: {
+  label: string;
+  wide?: boolean;
+  children: ReactNode;
+}) {
   return (
     <div className={styles.facet}>
       <Eyebrow size="sm" weight="heavy" tracking="wide">

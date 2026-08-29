@@ -21,30 +21,20 @@ function byKey(statements: AwardStatement[]) {
   const grouped = new Map<string, AwardStatement[]>();
 
   for (const statement of statements) {
-    grouped.set(statement.key, [
-      ...(grouped.get(statement.key) ?? []),
-      statement,
-    ]);
+    grouped.set(statement.key, [...(grouped.get(statement.key) ?? []), statement]);
   }
 
   return grouped;
 }
 
 async function syncTitleAwards(env: Bindings) {
-  const candidates = await titleAwardCandidates(
-    env.DB,
-    SOURCE,
-    TITLE_SAMPLE,
-    REFRESH_DAYS,
-  );
+  const candidates = await titleAwardCandidates(env.DB, SOURCE, TITLE_SAMPLE, REFRESH_DAYS);
 
   if (candidates.length === 0) {
     return 0;
   }
 
-  const statements = await fetchTitleAwards(
-    candidates.map((candidate) => candidate.entityId),
-  );
+  const statements = await fetchTitleAwards(candidates.map((candidate) => candidate.entityId));
   const grouped = byKey(statements);
 
   await storeTitleAwards(
@@ -56,9 +46,7 @@ async function syncTitleAwards(env: Bindings) {
     })),
   );
 
-  const decorated = candidates.filter((candidate) =>
-    grouped.has(candidate.entityId),
-  ).length;
+  const decorated = candidates.filter((candidate) => grouped.has(candidate.entityId)).length;
 
   logEvent("title_awards_synced", {
     titles: candidates.length,
@@ -70,12 +58,7 @@ async function syncTitleAwards(env: Bindings) {
 }
 
 async function syncPersonAwards(env: Bindings) {
-  const candidates = await personAwardCandidates(
-    env.DB,
-    SOURCE,
-    PERSON_SAMPLE,
-    REFRESH_DAYS,
-  );
+  const candidates = await personAwardCandidates(env.DB, SOURCE, PERSON_SAMPLE, REFRESH_DAYS);
 
   if (candidates.length === 0) {
     return 0;

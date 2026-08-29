@@ -1,8 +1,9 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 import { classNames } from "../lib/class-names";
-import styles from "./Dropdown.module.css";
 import { ChevronIcon } from "./Icons";
+
+import styles from "./Dropdown.module.css";
 
 export type DropdownOption = {
   key: string;
@@ -107,11 +108,7 @@ export function Dropdown({
   }
 
   return (
-    <div
-      className={classNames(styles.dropdown, className)}
-      ref={wrapRef}
-      onBlur={onBlur}
-    >
+    <div className={classNames(styles.dropdown, className)} ref={wrapRef} onBlur={onBlur}>
       <button
         type="button"
         // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- select/datalist can't implement an aria-activedescendant combobox
@@ -121,9 +118,7 @@ export function Dropdown({
         aria-expanded={isOpen}
         aria-controls={panelId}
         aria-label={label}
-        aria-activedescendant={
-          isOpen && active >= 0 ? `${panelId}-option-${active}` : undefined
-        }
+        aria-activedescendant={isOpen && active >= 0 ? `${panelId}-option-${active}` : undefined}
         onClick={toggleOpen}
         onKeyDown={onKeyDown}
       >

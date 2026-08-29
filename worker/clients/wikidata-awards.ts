@@ -37,10 +37,7 @@ const WIKIDATA_GENDER: Record<string, number> = {
   "http://www.wikidata.org/entity/Q6581072": TMDB_FEMALE,
 };
 
-function genderMismatch(
-  row: SparqlRow,
-  knownGender: Map<string, number | null>,
-) {
+function genderMismatch(row: SparqlRow, knownGender: Map<string, number | null>) {
   const known = knownGender.get(row.person ?? "");
   const claimed = row.gender ? WIKIDATA_GENDER[row.gender] : undefined;
 
@@ -107,9 +104,7 @@ async function personBatch(people: PersonCandidate[]) {
     { timeoutMs: TIMEOUT_MS, cacheTtl: CACHE_TTL },
   );
 
-  const knownGender = new Map(
-    people.map((person) => [String(person.personId), person.gender]),
-  );
+  const knownGender = new Map(people.map((person) => [String(person.personId), person.gender]));
 
   return statementsFrom(
     rows,
@@ -118,10 +113,7 @@ async function personBatch(people: PersonCandidate[]) {
   );
 }
 
-async function collect<Input>(
-  inputs: Input[],
-  run: (wave: Input[]) => Promise<AwardStatement[]>,
-) {
+async function collect<Input>(inputs: Input[], run: (wave: Input[]) => Promise<AwardStatement[]>) {
   const statements: AwardStatement[] = [];
 
   for (let index = 0; index < inputs.length; index += BATCH) {
@@ -141,9 +133,7 @@ export function fetchTitleAwards(entityIds: string[]) {
 
 export function fetchPersonAwards(people: PersonCandidate[]) {
   return collect(
-    people.filter(
-      (person) => Number.isInteger(person.personId) && person.personId > 0,
-    ),
+    people.filter((person) => Number.isInteger(person.personId) && person.personId > 0),
     personBatch,
   );
 }

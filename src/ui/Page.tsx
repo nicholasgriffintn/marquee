@@ -3,8 +3,9 @@ import type { ReactNode } from "react";
 import { classNames } from "../lib/class-names";
 import { Eyebrow } from "./Eyebrow";
 import { Heading, type HeadingSize } from "./Heading";
-import styles from "./Page.module.css";
 import { Text } from "./Text";
+
+import styles from "./Page.module.css";
 
 export function Page({
   as: Tag = "section",
@@ -18,10 +19,7 @@ export function Page({
   children: ReactNode;
 }) {
   return (
-    <Tag
-      aria-labelledby={labelledBy}
-      className={classNames(styles.page, className)}
-    >
+    <Tag aria-labelledby={labelledBy} className={classNames(styles.page, className)}>
       {children}
     </Tag>
   );
@@ -48,11 +46,7 @@ export function PageHeader({
     <header className={classNames(styles.header, className)}>
       <div className={styles.headerMain}>
         {eyebrow && (
-          <Eyebrow
-            tone="accent"
-            tracking="wide"
-            className={styles.headerEyebrow}
-          >
+          <Eyebrow tone="accent" tracking="wide" className={styles.headerEyebrow}>
             {eyebrow}
           </Eyebrow>
         )}

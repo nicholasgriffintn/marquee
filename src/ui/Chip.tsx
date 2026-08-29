@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { classNames } from "../lib/class-names";
+
 import styles from "./Chip.module.css";
 
 type ChipShared = {

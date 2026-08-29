@@ -2,11 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { personPath } from "../../domain/catalog";
-import {
-  useTitleCredits,
-  type CreditSeason,
-  type TitleCredit,
-} from "../../hooks/useTitleCredits";
+import { useTitleCredits, type CreditSeason, type TitleCredit } from "../../hooks/useTitleCredits";
 import { Dropdown, Heading, StatusNote, type DropdownOption } from "../../ui";
 import { DetailCredit } from "./DetailNote";
 
@@ -55,13 +51,7 @@ function byJob(crew: TitleCredit[]) {
   });
 }
 
-export function CreditsBlock({
-  titleId,
-  people,
-}: {
-  titleId: string;
-  people: string[];
-}) {
+export function CreditsBlock({ titleId, people }: { titleId: string; people: string[] }) {
   const [season, setSeason] = useState<number | null>(null);
   const [page, setPage] = useState(1);
   const { credits, isLoading } = useTitleCredits(titleId, season, page);
@@ -87,8 +77,7 @@ export function CreditsBlock({
   }
 
   const jobs = byJob(crew);
-  const billed =
-    !isLoading && cast.length === 0 && jobs.length === 0 ? people : [];
+  const billed = !isLoading && cast.length === 0 && jobs.length === 0 ? people : [];
   const bare = cast.length === 0 && jobs.length === 0 && billed.length === 0;
 
   if (bare && !isLoading && seasons.length === 0 && people.length === 0) {
@@ -142,8 +131,7 @@ export function CreditsBlock({
             ))}
           </ul>
           <DetailCredit>
-            Top billing for the title from TMDB. The full credits are not read
-            yet.
+            Top billing for the title from TMDB. The full credits are not read yet.
           </DetailCredit>
         </>
       )}

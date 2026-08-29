@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { classNames } from "../lib/class-names";
+
 import styles from "./Stack.module.css";
 
 export type SpaceStep = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
@@ -42,16 +43,7 @@ export function Stack({
   className,
   children,
 }: {
-  as?:
-    | "div"
-    | "section"
-    | "li"
-    | "ul"
-    | "ol"
-    | "form"
-    | "article"
-    | "header"
-    | "footer";
+  as?: "div" | "section" | "li" | "ul" | "ol" | "form" | "article" | "header" | "footer";
   gap?: SpaceStep;
   align?: Align;
   className?: string;
@@ -59,12 +51,7 @@ export function Stack({
 }) {
   return (
     <Tag
-      className={classNames(
-        styles.stack,
-        GAP_CLASS[gap],
-        align && ALIGN_CLASS[align],
-        className,
-      )}
+      className={classNames(styles.stack, GAP_CLASS[gap], align && ALIGN_CLASS[align], className)}
     >
       {children}
     </Tag>

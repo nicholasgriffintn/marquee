@@ -1,8 +1,4 @@
-import {
-  NO_AWARDS,
-  type AwardEntry,
-  type AwardSummary,
-} from "../../src/domain/awards.ts";
+import { NO_AWARDS, type AwardEntry, type AwardSummary } from "../../src/domain/awards.ts";
 import type { AwardStatement } from "../clients/wikidata-awards.ts";
 import { logError } from "../lib/logging.ts";
 
@@ -27,10 +23,7 @@ const ENTRY_GROUP = `link.award_id, a.label, link.ceremony_year, link.outcome`;
 const ENTRY_ORDER = `CASE WHEN link.outcome = 'won' THEN 0 ELSE 1 END,
          link.ceremony_year DESC, a.label`;
 
-function toSummary(
-  rows: AwardRow[],
-  summary: string | null = null,
-): AwardSummary {
+function toSummary(rows: AwardRow[], summary: string | null = null): AwardSummary {
   const entries = rows.map((row): AwardEntry => ({
     awardId: row.awardId,
     label: row.label,
@@ -111,25 +104,16 @@ export async function personAwardCandidates(
   return rows.rows;
 }
 
-function awardKey(entry: {
-  awardId: string;
-  ceremonyYear: number | null;
-  outcome: string;
-}) {
+function awardKey(entry: { awardId: string; ceremonyYear: number | null; outcome: string }) {
   return `${entry.awardId}|${entry.ceremonyYear ?? 0}|${entry.outcome}`;
 }
 
 function sameAwardSet(existing: Set<string>, entries: AwardStatement[]) {
   const incoming = new Set(
-    entries.map((entry) =>
-      awardKey({ ...entry, ceremonyYear: entry.ceremonyYear ?? null }),
-    ),
+    entries.map((entry) => awardKey({ ...entry, ceremonyYear: entry.ceremonyYear ?? null })),
   );
 
-  return (
-    existing.size === incoming.size &&
-    [...existing].every((key) => incoming.has(key))
-  );
+  return existing.size === incoming.size && [...existing].every((key) => incoming.has(key));
 }
 
 async function currentAwardKeys<Id extends string | number>(
@@ -167,10 +151,7 @@ async function currentAwardKeys<Id extends string | number>(
   return keys;
 }
 
-async function upsertAwards(
-  transaction: DatabaseTransaction,
-  entries: AwardStatement[],
-) {
+async function upsertAwards(transaction: DatabaseTransaction, entries: AwardStatement[]) {
   for (const entry of entries) {
     // oxlint-disable-next-line no-await-in-loop
     await transaction.execute(
@@ -185,11 +166,7 @@ async function upsertAwards(
   }
 }
 
-export async function storeTitleAwards(
-  db: Database,
-  source: string,
-  writes: TitleAwardWrite[],
-) {
+export async function storeTitleAwards(db: Database, source: string, writes: TitleAwardWrite[]) {
   const current = await currentAwardKeys(
     db,
     "title_awards",
@@ -199,18 +176,15 @@ export async function storeTitleAwards(
   );
 
   for (const write of writes) {
-    const unchanged = sameAwardSet(
-      current.get(write.titleId) ?? new Set(),
-      write.entries,
-    );
+    const unchanged = sameAwardSet(current.get(write.titleId) ?? new Set(), write.entries);
 
     // oxlint-disable-next-line no-await-in-loop
     await db.transaction(async (transaction) => {
       if (!unchanged) {
-        await transaction.execute(
-          `DELETE FROM title_awards WHERE title_id = $1 AND source = $2`,
-          [write.titleId, source],
-        );
+        await transaction.execute(`DELETE FROM title_awards WHERE title_id = $1 AND source = $2`, [
+          write.titleId,
+          source,
+        ]);
         await upsertAwards(transaction, write.entries);
 
         for (const entry of write.entries) {
@@ -220,13 +194,7 @@ export async function storeTitleAwards(
                  (title_id, award_id, ceremony_year, outcome, source)
                VALUES ($1, $2, $3, $4, $5)
                ON CONFLICT DO NOTHING`,
-            [
-              write.titleId,
-              entry.awardId,
-              entry.ceremonyYear ?? 0,
-              entry.outcome,
-              source,
-            ],
+            [write.titleId, entry.awardId, entry.ceremonyYear ?? 0, entry.outcome, source],
           );
         }
       }
@@ -243,11 +211,7 @@ export async function storeTitleAwards(
   }
 }
 
-export async function storePersonAwards(
-  db: Database,
-  source: string,
-  writes: PersonAwardWrite[],
-) {
+export async function storePersonAwards(db: Database, source: string, writes: PersonAwardWrite[]) {
   const current = await currentAwardKeys(
     db,
     "person_awards",
@@ -257,10 +221,7 @@ export async function storePersonAwards(
   );
 
   for (const write of writes) {
-    const unchanged = sameAwardSet(
-      current.get(write.personId) ?? new Set(),
-      write.entries,
-    );
+    const unchanged = sameAwardSet(current.get(write.personId) ?? new Set(), write.entries);
 
     // oxlint-disable-next-line no-await-in-loop
     await db.transaction(async (transaction) => {
@@ -278,13 +239,7 @@ export async function storePersonAwards(
                  (person_id, award_id, ceremony_year, outcome, source)
                VALUES ($1, $2, $3, $4, $5)
                ON CONFLICT DO NOTHING`,
-            [
-              write.personId,
-              entry.awardId,
-              entry.ceremonyYear ?? 0,
-              entry.outcome,
-              source,
-            ],
+            [write.personId, entry.awardId, entry.ceremonyYear ?? 0, entry.outcome, source],
           );
         }
       }
@@ -301,10 +256,7 @@ export async function storePersonAwards(
   }
 }
 
-export async function readTitleAwards(
-  db: Database,
-  titleId: string,
-): Promise<AwardSummary> {
+export async function readTitleAwards(db: Database, titleId: string): Promise<AwardSummary> {
   try {
     const [entries, tally] = await Promise.all([
       db.query<AwardRow>(
@@ -331,10 +283,7 @@ export async function readTitleAwards(
   }
 }
 
-export async function readPersonAwards(
-  db: Database,
-  personId: number,
-): Promise<AwardSummary> {
+export async function readPersonAwards(db: Database, personId: number): Promise<AwardSummary> {
   try {
     const rows = await db.query<AwardRow>(
       `SELECT ${ENTRY_COLUMNS}

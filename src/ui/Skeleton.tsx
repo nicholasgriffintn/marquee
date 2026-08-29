@@ -1,4 +1,5 @@
 import { classNames } from "../lib/class-names";
+
 import styles from "./Skeleton.module.css";
 
 export type SkeletonShape =
@@ -34,12 +35,7 @@ export function Skeleton({
   return (
     <span
       aria-hidden="true"
-      className={classNames(
-        styles.skeleton,
-        SHAPE_CLASS[shape],
-        short && styles.short,
-        className,
-      )}
+      className={classNames(styles.skeleton, SHAPE_CLASS[shape], short && styles.short, className)}
     />
   );
 }

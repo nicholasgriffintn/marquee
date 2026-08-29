@@ -249,7 +249,9 @@ export async function searchCatalogue(db: Database, search: CatalogueSearch) {
   const sort = search.sort ?? (match ? "relevance" : "popularity");
   const bindings: DatabaseValue[] = [];
   const conditions = match
-    ? [`catalog_search.${search.scope === "title" ? "title_document" : "document"} @@ to_tsquery('simple', $${bindings.push(match)})`]
+    ? [
+        `catalog_search.${search.scope === "title" ? "title_document" : "document"} @@ to_tsquery('simple', $${bindings.push(match)})`,
+      ]
     : [];
   const eligibility = eligibilityClause(
     { ...search, minVotes: requiredVotes(search, sort) },

@@ -8,13 +8,7 @@ export function ArrowIcon({ className }: IconProps = {}) {
   );
 }
 
-export function ChevronIcon({
-  back,
-  className,
-}: {
-  back?: boolean;
-  className?: string;
-}) {
+export function ChevronIcon({ back, className }: { back?: boolean; className?: string }) {
   return (
     <svg className={className} viewBox="0 0 20 20" aria-hidden="true">
       <path d={back ? "M12 4l-6 6 6 6" : "M8 4l6 6-6 6"} />
@@ -22,10 +16,7 @@ export function ChevronIcon({
   );
 }
 
-export function VerticalChevronIcon({
-  up = false,
-  className,
-}: IconProps & { up?: boolean } = {}) {
+export function VerticalChevronIcon({ up = false, className }: IconProps & { up?: boolean } = {}) {
   return (
     <svg className={className} viewBox="0 0 20 20" aria-hidden="true">
       <path d={up ? "m4 12 6-6 6 6" : "m4 8 6 6 6-6"} />

@@ -3,12 +3,54 @@
   "dialect": "postgresql",
   "entries": [
     { "idx": 0, "version": "7", "when": 1787972400000, "tag": "0001_auth", "breakpoints": false },
-    { "idx": 1, "version": "7", "when": 1787972400001, "tag": "0002_catalog", "breakpoints": false },
-    { "idx": 2, "version": "7", "when": 1787972400002, "tag": "0003_catalog_metadata", "breakpoints": false },
-    { "idx": 3, "version": "7", "when": 1787972400003, "tag": "0004_catalog_search", "breakpoints": false },
-    { "idx": 4, "version": "7", "when": 1787972400004, "tag": "0005_discovery", "breakpoints": false },
-    { "idx": 5, "version": "7", "when": 1787972400005, "tag": "0006_viewing", "breakpoints": false },
-    { "idx": 6, "version": "7", "when": 1787972400006, "tag": "0007_personalisation", "breakpoints": false },
-    { "idx": 7, "version": "7", "when": 1787972400007, "tag": "0008_operations", "breakpoints": false }
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1787972400001,
+      "tag": "0002_catalog",
+      "breakpoints": false
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787972400002,
+      "tag": "0003_catalog_metadata",
+      "breakpoints": false
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1787972400003,
+      "tag": "0004_catalog_search",
+      "breakpoints": false
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1787972400004,
+      "tag": "0005_discovery",
+      "breakpoints": false
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1787972400005,
+      "tag": "0006_viewing",
+      "breakpoints": false
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787972400006,
+      "tag": "0007_personalisation",
+      "breakpoints": false
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1787972400007,
+      "tag": "0008_operations",
+      "breakpoints": false
+    }
   ]
 }

@@ -1,8 +1,8 @@
 import type { TitlePlace, TitlePlaces } from "../../src/domain/places.ts";
 import { placePin } from "../../src/domain/places.ts";
 import type { PlaceRecord, TitlePlaceRow } from "../clients/wikidata-places.ts";
-import { queryChunked } from "./catalog-array-utils.ts";
 import { isKnownTitle } from "../lib/validation.ts";
+import { queryChunked } from "./catalog-array-utils.ts";
 
 type PlaceRow = {
   entityId: string;
@@ -43,11 +43,7 @@ function sameSet(a: Set<string>, b: Set<string>) {
   return a.size === b.size && [...a].every((value) => b.has(value));
 }
 
-async function currentPlaceKeys(
-  db: Database,
-  titleIds: string[],
-  source: string,
-) {
+async function currentPlaceKeys(db: Database, titleIds: string[], source: string) {
   const rows = await queryChunked(titleIds, (wave) =>
     db
       .query<{ titleId: string; kind: string; placeId: string }>(
@@ -102,11 +98,7 @@ export async function writeTitlePlaces(
 
   const changed = new Set(
     titleIds.filter(
-      (titleId) =>
-        !sameSet(
-          current.get(titleId) ?? new Set(),
-          incoming.get(titleId) ?? new Set(),
-        ),
+      (titleId) => !sameSet(current.get(titleId) ?? new Set(), incoming.get(titleId) ?? new Set()),
     ),
   );
 
@@ -130,9 +122,7 @@ export async function writeTitlePlaces(
           place.latitude,
           place.longitude,
           place.precisionDegrees,
-          place.countryId && known.has(place.countryId)
-            ? place.countryId
-            : null,
+          place.countryId && known.has(place.countryId) ? place.countryId : null,
         ],
       );
     }
@@ -175,10 +165,7 @@ export async function writeTitlePlaces(
   return rows.length;
 }
 
-export async function readPlacesForTitle(
-  db: Database,
-  titleId: string,
-): Promise<TitlePlaces> {
+export async function readPlacesForTitle(db: Database, titleId: string): Promise<TitlePlaces> {
   const rows = await db.query<TitlePlaceReadRow>(
     `SELECT DISTINCT tp.title_id AS "titleId", tp.kind, ${PLACE_COLUMNS}
        FROM catalog_title_places AS tp

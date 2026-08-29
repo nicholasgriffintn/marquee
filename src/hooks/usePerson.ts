@@ -2,12 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { NO_AWARDS, type AwardSummary } from "../domain/awards";
 import type { MediaTitle } from "../domain/catalog";
-import {
-  jsonMutation,
-  mutateJson,
-  queryJson,
-  QueryError,
-} from "../lib/query-client";
+import { jsonMutation, mutateJson, queryJson, QueryError } from "../lib/query-client";
 import { useResource } from "./useResource";
 
 export type PersonResponse = {
@@ -56,16 +51,13 @@ export function usePerson(identifier: string, isSignedIn: boolean) {
         setPerson(response.person);
         setShelf(response.shelf);
         setAwards(response.awards);
-        setItems((current) =>
-          page === 0 ? response.items : [...current, ...response.items],
-        );
+        setItems((current) => (page === 0 ? response.items : [...current, ...response.items]));
         setHasMore(response.hasMore);
         setLoadError("");
       } catch (caught) {
         if (alive) {
           if (page === 0) {
-            const notFound =
-              caught instanceof QueryError && caught.status === 404;
+            const notFound = caught instanceof QueryError && caught.status === 404;
 
             setLoadError(
               notFound
@@ -92,20 +84,15 @@ export function usePerson(identifier: string, isSignedIn: boolean) {
     };
   }, [active, identifier, page]);
 
-  const followedResource = useResource<{ following: string[] }>(
-    "/api/notebook/people",
-    {
-      enabled: isSignedIn,
-    },
-  );
+  const followedResource = useResource<{ following: string[] }>("/api/notebook/people", {
+    enabled: isSignedIn,
+  });
   const [followed, setFollowed] = useState<string[] | null>(null);
   const [saveError, setSaveError] = useState("");
   const following =
     isSignedIn &&
     Boolean(person) &&
-    (followed ?? followedResource.data?.following ?? []).includes(
-      person?.name.toLowerCase() ?? "",
-    );
+    (followed ?? followedResource.data?.following ?? []).includes(person?.name.toLowerCase() ?? "");
 
   const toggleFollow = useCallback(async () => {
     if (!person) {

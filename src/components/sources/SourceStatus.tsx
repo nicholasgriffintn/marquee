@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { classNames } from "../../lib/class-names";
+
 import styles from "./SourceStatus.module.css";
 
 export type SourceStatusKind = "feed" | "link" | "marker";

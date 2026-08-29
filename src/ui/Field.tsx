@@ -7,8 +7,9 @@ import {
 
 import { classNames } from "../lib/class-names";
 import { Eyebrow } from "./Eyebrow";
-import styles from "./Field.module.css";
 import { Text } from "./Text";
+
+import styles from "./Field.module.css";
 
 export type FieldSurface = "dark" | "paper";
 
@@ -61,12 +62,7 @@ export function TextInput({
 } & Omit<InputHTMLAttributes<HTMLInputElement>, "className" | "size">) {
   return (
     <input
-      className={classNames(
-        styles.control,
-        styles[surface],
-        styles[size],
-        className,
-      )}
+      className={classNames(styles.control, styles[surface], styles[size], className)}
       {...rest}
     />
   );
@@ -82,12 +78,7 @@ export function TextArea({
 >) {
   return (
     <textarea
-      className={classNames(
-        styles.control,
-        styles[surface],
-        styles.area,
-        className,
-      )}
+      className={classNames(styles.control, styles[surface], styles.area, className)}
       {...rest}
     />
   );
@@ -109,13 +100,7 @@ export function LabelledField({
   const id = useId();
 
   return (
-    <Field
-      label={label}
-      hint={hint}
-      htmlFor={id}
-      surface={surface}
-      className={className}
-    >
+    <Field label={label} hint={hint} htmlFor={id} surface={surface} className={className}>
       {children(id)}
     </Field>
   );

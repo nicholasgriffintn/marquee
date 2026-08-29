@@ -1,11 +1,11 @@
 import type { ReactNode } from "react";
 
 import { classNames } from "../lib/class-names";
+
 import styles from "./Text.module.css";
 
 export type TextSize = "lede" | "body" | "sm" | "xs";
-export type TextTone =
-  "default" | "muted" | "accent" | "ink" | "inkMuted" | "warning";
+export type TextTone = "default" | "muted" | "accent" | "ink" | "inkMuted" | "warning";
 
 const TONE_CLASS: Record<TextTone, string> = {
   default: styles.toneDefault,

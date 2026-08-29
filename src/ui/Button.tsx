@@ -2,10 +2,10 @@ import type { ButtonHTMLAttributes, ReactNode, Ref } from "react";
 import { Link } from "react-router-dom";
 
 import { classNames } from "../lib/class-names";
+
 import styles from "./Button.module.css";
 
-export type ButtonVariant =
-  "primary" | "secondary" | "ghost" | "danger" | "quiet";
+export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "quiet";
 export type ButtonSize = "sm" | "md" | "lg";
 export type ButtonSurface = "dark" | "paper";
 
@@ -106,12 +106,7 @@ export function ButtonLink({
 
   if (to !== undefined) {
     return (
-      <Link
-        to={to}
-        className={composed}
-        onClick={onClick}
-        aria-label={ariaLabel}
-      >
+      <Link to={to} className={composed} onClick={onClick} aria-label={ariaLabel}>
         {children}
       </Link>
     );

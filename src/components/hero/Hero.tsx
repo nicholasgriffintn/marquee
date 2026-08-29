@@ -6,6 +6,7 @@ import { classNames } from "../../lib/class-names";
 import { heroTitleSize, type HeroTitleSize } from "../../lib/media";
 import { Eyebrow, Text } from "../../ui";
 import { TitleArt } from "../TitleArt";
+
 import styles from "./Hero.module.css";
 
 const TITLE_SIZE_CLASS: Record<HeroTitleSize, string> = {
@@ -33,9 +34,7 @@ export function Hero({
   children: ReactNode;
 }) {
   return (
-    <section
-      className={classNames(styles.hero, empty && styles.empty, className)}
-    >
+    <section className={classNames(styles.hero, empty && styles.empty, className)}>
       {children}
     </section>
   );
@@ -61,31 +60,13 @@ export function HeroGradient() {
   return <div className={styles.gradient} />;
 }
 
-export function HeroCopy({
-  className,
-  children,
-}: {
-  className?: string;
-  children: ReactNode;
-}) {
+export function HeroCopy({ className, children }: { className?: string; children: ReactNode }) {
   return <div className={classNames(styles.copy, className)}>{children}</div>;
 }
 
-export function HeroTitle({
-  title,
-  className,
-}: {
-  title: string;
-  className?: string;
-}) {
+export function HeroTitle({ title, className }: { title: string; className?: string }) {
   return (
-    <h1
-      className={classNames(
-        styles.title,
-        TITLE_SIZE_CLASS[heroTitleSize(title)],
-        className,
-      )}
-    >
+    <h1 className={classNames(styles.title, TITLE_SIZE_CLASS[heroTitleSize(title)], className)}>
       {title}
     </h1>
   );
@@ -103,16 +84,8 @@ export function HeroLede({ children }: { children: ReactNode }) {
   return <Text className={styles.lede}>{children}</Text>;
 }
 
-export function HeroActions({
-  className,
-  children,
-}: {
-  className?: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className={classNames(styles.actions, className)}>{children}</div>
-  );
+export function HeroActions({ className, children }: { className?: string; children: ReactNode }) {
+  return <div className={classNames(styles.actions, className)}>{children}</div>;
 }
 
 export function HeroAction({

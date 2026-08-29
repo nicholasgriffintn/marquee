@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { classNames } from "../lib/class-names";
+
 import styles from "./TextLink.module.css";
 
 export type TextLinkVariant = "underline" | "aside" | "accent" | "plain";
@@ -58,13 +59,7 @@ export function ExternalTextLink({
   rel?: string;
 }) {
   return (
-    <a
-      href={href}
-      target={target}
-      rel={rel}
-      onClick={onClick}
-      className={linkClass(shared)}
-    >
+    <a href={href} target={target} rel={rel} onClick={onClick} className={linkClass(shared)}>
       {shared.children}
     </a>
   );

@@ -1,6 +1,7 @@
 import { useRef, type KeyboardEvent, type ReactNode } from "react";
 
 import { classNames } from "../lib/class-names";
+
 import styles from "./Tabs.module.css";
 
 export type TabItem = {
@@ -69,10 +70,7 @@ export function TabList({
           aria-selected={selected === tab.id}
           aria-controls={`${idPrefix}-panel-${tab.id}`}
           tabIndex={selected === tab.id ? 0 : -1}
-          className={classNames(
-            styles.tab,
-            selected === tab.id && styles.selected,
-          )}
+          className={classNames(styles.tab, selected === tab.id && styles.selected)}
           onClick={() => onSelect(tab.id)}
           onKeyDown={(event) => onKeyDown(event, index)}
         >

@@ -86,9 +86,9 @@ export function TermsPage() {
               iOS app or access its feeds, API or MCP tools.
             </p>
             <p>
-              By using Marquee, you agree to these terms. If you do
-              not agree, do not use the service. Read the <Link to="/privacy">privacy policy</Link>{" "}
-              alongside these terms to understand how personal information is handled.
+              By using Marquee, you agree to these terms. If you do not agree, do not use the
+              service. Read the <Link to="/privacy">privacy policy</Link> alongside these terms to
+              understand how personal information is handled.
             </p>
           </section>
 

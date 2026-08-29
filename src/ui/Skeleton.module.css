@@ -11,12 +11,7 @@
 
 .skeleton {
   animation: pulse 1.5s ease-in-out infinite;
-  background: linear-gradient(
-    90deg,
-    var(--panel-tile),
-    var(--panel-raised),
-    var(--panel-tile)
-  );
+  background: linear-gradient(90deg, var(--panel-tile), var(--panel-raised), var(--panel-tile));
   display: block;
 }
 

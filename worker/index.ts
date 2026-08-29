@@ -2,8 +2,8 @@ import { Hono } from "hono";
 
 import { hasBearerCredential } from "./auth/api-tokens.ts";
 import { authRoutes } from "./auth/routes.ts";
-import { CuratorSession } from "./durable/curator-session.ts";
 import { openDatabase, withDatabase } from "./database/runtime.ts";
+import { CuratorSession } from "./durable/curator-session.ts";
 import { consumeDeadLetters, consumeIngestion } from "./jobs/ingestion-consumer.ts";
 import { scheduleIngestion } from "./jobs/ingestion-scheduler.ts";
 import { automatedSyncAllowed } from "./lib/environment.ts";

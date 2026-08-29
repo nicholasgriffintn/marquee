@@ -5,19 +5,8 @@ import { LoadMore } from "../components/ResultsGrid";
 import { SearchField } from "../components/SearchField";
 import { collectionPath, personPath } from "../domain/catalog";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
-import {
-  useCollectionsDirectory,
-  usePeopleDirectory,
-} from "../hooks/useDirectory";
-import {
-  Callout,
-  EmptyState,
-  Page,
-  PageHeader,
-  Skeleton,
-  TabList,
-  TabPanel,
-} from "../ui";
+import { useCollectionsDirectory, usePeopleDirectory } from "../hooks/useDirectory";
+import { Callout, EmptyState, Page, PageHeader, Skeleton, TabList, TabPanel } from "../ui";
 
 import styles from "./DirectoryPage.module.css";
 
@@ -54,9 +43,7 @@ function DirectoryList({
             <li key={entry.key}>
               <Link to={entry.to} className={styles.entry}>
                 <span className={styles.name}>{entry.name}</span>
-                <small className={styles.count}>
-                  {titleCount(entry.titles)}
-                </small>
+                <small className={styles.count}>{titleCount(entry.titles)}</small>
               </Link>
             </li>
           ))}
@@ -72,10 +59,7 @@ function DirectoryList({
       )}
 
       {!isLoading && entries.length === 0 && !error && (
-        <EmptyState
-          heading="Nothing under that."
-          description={emptyDescription}
-        />
+        <EmptyState heading="Nothing under that." description={emptyDescription} />
       )}
     </>
   );
@@ -87,10 +71,7 @@ export function DirectoryPage() {
   const query = params.get("q") ?? "";
   const debouncedQuery = useDebouncedValue(query, SEARCH_DELAY_MS);
   const people = usePeopleDirectory(debouncedQuery, tab === "people");
-  const collections = useCollectionsDirectory(
-    debouncedQuery,
-    tab === "collections",
-  );
+  const collections = useCollectionsDirectory(debouncedQuery, tab === "collections");
 
   function update(next: Record<string, string>) {
     const merged = new URLSearchParams(params);
@@ -147,16 +128,10 @@ export function DirectoryPage() {
             />
           )}
 
-          {people.hasMore && (
-            <LoadMore isLoading={people.isLoading} onClick={people.loadMore} />
-          )}
+          {people.hasMore && <LoadMore isLoading={people.isLoading} onClick={people.loadMore} />}
         </TabPanel>
 
-        <TabPanel
-          id="collections"
-          idPrefix="directory"
-          hidden={tab !== "collections"}
-        >
+        <TabPanel id="collections" idPrefix="directory" hidden={tab !== "collections"}>
           {tab === "collections" && (
             <DirectoryList
               entries={collections.items.map((collection) => ({
@@ -172,10 +147,7 @@ export function DirectoryPage() {
           )}
 
           {collections.hasMore && (
-            <LoadMore
-              isLoading={collections.isLoading}
-              onClick={collections.loadMore}
-            />
+            <LoadMore isLoading={collections.isLoading} onClick={collections.loadMore} />
           )}
         </TabPanel>
       </ErrorBoundary>

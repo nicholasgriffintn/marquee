@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { classNames } from "../lib/class-names";
+
 import styles from "./Eyebrow.module.css";
 
 export type EyebrowTone = "muted" | "accent" | "ink" | "inkMuted" | "default";
@@ -24,16 +25,7 @@ export function Eyebrow({
   className,
   children,
 }: {
-  as?:
-    | "span"
-    | "p"
-    | "div"
-    | "small"
-    | "dt"
-    | "strong"
-    | "legend"
-    | "figcaption"
-    | "label";
+  as?: "span" | "p" | "div" | "small" | "dt" | "strong" | "legend" | "figcaption" | "label";
   size?: "sm" | "md" | "lg";
   tone?: EyebrowTone;
   weight?: "regular" | "bold" | "heavy";

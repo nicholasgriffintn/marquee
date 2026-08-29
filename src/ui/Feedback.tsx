@@ -1,9 +1,10 @@
 import type { ReactNode } from "react";
 
 import { classNames } from "../lib/class-names";
-import styles from "./Feedback.module.css";
 import { Heading, type HeadingSize } from "./Heading";
 import { Text } from "./Text";
+
+import styles from "./Feedback.module.css";
 
 export function Spinner({
   surface = "dark",
@@ -15,11 +16,7 @@ export function Spinner({
   return (
     <i
       aria-hidden="true"
-      className={classNames(
-        styles.spinner,
-        surface === "paper" && styles.spinnerPaper,
-        className,
-      )}
+      className={classNames(styles.spinner, surface === "paper" && styles.spinnerPaper, className)}
     />
   );
 }
@@ -74,11 +71,7 @@ export function Callout({
   return (
     <div
       role={role}
-      className={classNames(
-        styles.callout,
-        tone === "info" && styles.calloutInfo,
-        className,
-      )}
+      className={classNames(styles.callout, tone === "info" && styles.calloutInfo, className)}
     >
       <div className={styles.calloutBody}>{children}</div>
       {actions && <div className={styles.calloutActions}>{actions}</div>}
@@ -108,9 +101,7 @@ export function EmptyState({
   children?: ReactNode;
 }) {
   return (
-    <div
-      className={classNames(styles.empty, surface === "paper" && styles.emptyPaper, className)}
-    >
+    <div className={classNames(styles.empty, surface === "paper" && styles.emptyPaper, className)}>
       {mark}
       {heading && (
         <Heading level={2} size={size} id={headingId} className={styles.emptyHeading}>
@@ -118,10 +109,7 @@ export function EmptyState({
         </Heading>
       )}
       {description && (
-        <Text
-          tone={surface === "paper" ? "inkMuted" : "muted"}
-          className={styles.emptyDescription}
-        >
+        <Text tone={surface === "paper" ? "inkMuted" : "muted"} className={styles.emptyDescription}>
           {description}
         </Text>
       )}

@@ -46,11 +46,7 @@ export async function readVisualFormatMap(db: Database, ids: string[]) {
   return formats;
 }
 
-export async function selectFormatCandidates(
-  db: Database,
-  limit: number,
-  retryDays: number,
-) {
+export async function selectFormatCandidates(db: Database, limit: number, retryDays: number) {
   const rows = await db.query<FormatCandidate>(
     `SELECT t.id AS "titleId", t.media_type AS "mediaType", t.tmdb_id AS "tmdbId"
        FROM title_working_set AS w
@@ -74,11 +70,7 @@ function sameSet(a: string[], b: string[]) {
   return setA.size === setB.size && [...setA].every((value) => setB.has(value));
 }
 
-export async function writeVisualFormats(
-  db: Database,
-  source: string,
-  writes: FormatWrite[],
-) {
+export async function writeVisualFormats(db: Database, source: string, writes: FormatWrite[]) {
   const current = await readVisualFormatMap(
     db,
     writes.map((write) => write.titleId),

@@ -2,6 +2,7 @@ import type { ReactNode, Ref } from "react";
 
 import { classNames } from "../../lib/class-names";
 import { ChevronIcon, Eyebrow, Heading } from "../../ui";
+
 import styles from "./Rail.module.css";
 
 export function Rail({
@@ -44,30 +45,14 @@ export function RailHeading({
   className?: string;
 }) {
   return (
-    <div
-      className={classNames(
-        styles.heading,
-        bleed && styles.headingBleed,
-        className,
-      )}
-    >
+    <div className={classNames(styles.heading, bleed && styles.headingBleed, className)}>
       <div className={styles.headingMain}>
         {eyebrow && (
-          <Eyebrow
-            tone="accent"
-            size="sm"
-            weight="regular"
-            className={styles.eyebrow}
-          >
+          <Eyebrow tone="accent" size="sm" weight="regular" className={styles.eyebrow}>
             {eyebrow}
           </Eyebrow>
         )}
-        <Heading
-          level={2}
-          size="section"
-          id={headingId}
-          className={styles.title}
-        >
+        <Heading level={2} size="section" id={headingId} className={styles.title}>
           {heading}
         </Heading>
       </div>
@@ -88,14 +73,7 @@ export function RailTrack({
   children: ReactNode;
 }) {
   return (
-    <div
-      ref={trackRef}
-      className={classNames(
-        styles.track,
-        bleed && styles.trackBleed,
-        className,
-      )}
-    >
+    <div ref={trackRef} className={classNames(styles.track, bleed && styles.trackBleed, className)}>
       {children}
     </div>
   );
@@ -124,10 +102,7 @@ export function RailPager({
     <div className={styles.pager}>
       <span className={styles.pages} aria-hidden="true">
         {Array.from({ length: pages }, (_, index) => (
-          <i
-            key={`page-${index}`}
-            className={index === page ? styles.pageCurrent : undefined}
-          />
+          <i key={`page-${index}`} className={index === page ? styles.pageCurrent : undefined} />
         ))}
       </span>
       <button

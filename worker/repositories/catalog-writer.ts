@@ -6,10 +6,7 @@ import type {
   TitleCredit,
   TitleCredits,
 } from "../../src/domain/catalog.ts";
-import {
-  EXTERNAL_ID_FIELDS,
-  EXTERNAL_ID_OWNERS,
-} from "../../src/domain/catalog.ts";
+import { EXTERNAL_ID_FIELDS, EXTERNAL_ID_OWNERS } from "../../src/domain/catalog.ts";
 import { computeBlendedRating, computeWeightedRating } from "../lib/ratings.ts";
 import { READ_CHUNK, rowPlaceholders } from "./catalog-array-utils.ts";
 import { persistTitleExtensions } from "./catalog-arrays.ts";
@@ -18,9 +15,7 @@ import { readRawItems } from "./catalog-reader.ts";
 
 const KEYWORD_LIMIT = 40;
 
-export const EXTERNAL_PROVIDER_SOURCES = new Set<
-  ProviderAvailability["source"]
->(["JustWatch"]);
+export const EXTERNAL_PROVIDER_SOURCES = new Set<ProviderAvailability["source"]>(["JustWatch"]);
 
 function canonical(value: unknown): string {
   if (Array.isArray(value)) {
@@ -42,9 +37,7 @@ function canonical(value: unknown): string {
 }
 
 function mergeProviders(fresh: MediaTitle, stored: MediaTitle) {
-  const providers = new Map(
-    fresh.providers.map((provider) => [provider.id, provider]),
-  );
+  const providers = new Map(fresh.providers.map((provider) => [provider.id, provider]));
 
   for (const provider of stored.providers) {
     if (!EXTERNAL_PROVIDER_SOURCES.has(provider.source)) {
@@ -58,9 +51,7 @@ function mergeProviders(fresh: MediaTitle, stored: MediaTitle) {
       existing
         ? {
             ...provider,
-            offerTypes: [
-              ...new Set([...existing.offerTypes, ...provider.offerTypes]),
-            ],
+            offerTypes: [...new Set([...existing.offerTypes, ...provider.offerTypes])],
             webUrl: provider.webUrl ?? existing.webUrl,
           }
         : provider,
@@ -90,10 +81,7 @@ function mergeExternalIds(fresh: MediaTitle, stored: MediaTitle) {
   return merged;
 }
 
-function mergeWithStored(
-  fresh: MediaTitle,
-  stored: MediaTitle | null,
-): MediaTitle {
+function mergeWithStored(fresh: MediaTitle, stored: MediaTitle | null): MediaTitle {
   if (!stored) {
     return fresh;
   }
@@ -115,15 +103,11 @@ function mergeWithStored(
     studios: fresh.studios?.length ? fresh.studios : stored.studios,
     countries: fresh.countries?.length ? fresh.countries : stored.countries,
     languages: fresh.languages?.length ? fresh.languages : stored.languages,
-    originCountries: fresh.originCountries?.length
-      ? fresh.originCountries
-      : stored.originCountries,
+    originCountries: fresh.originCountries?.length ? fresh.originCountries : stored.originCountries,
     productionCountries: fresh.productionCountries?.length
       ? fresh.productionCountries
       : stored.productionCountries,
-    spokenLanguages: fresh.spokenLanguages?.length
-      ? fresh.spokenLanguages
-      : stored.spokenLanguages,
+    spokenLanguages: fresh.spokenLanguages?.length ? fresh.spokenLanguages : stored.spokenLanguages,
     videos: fresh.videos?.length ? fresh.videos : stored.videos,
     recommendationIds: fresh.recommendationIds?.length
       ? fresh.recommendationIds
@@ -138,9 +122,10 @@ function mergeWithStored(
     lastAirDate: fresh.lastAirDate ?? stored.lastAirDate,
     nextAirDate: fresh.nextAirDate ?? stored.nextAirDate,
     pending: fresh.pending ?? stored.pending,
-    keywords: [
-      ...new Set([...(fresh.keywords ?? []), ...(stored.keywords ?? [])]),
-    ].slice(0, KEYWORD_LIMIT),
+    keywords: [...new Set([...(fresh.keywords ?? []), ...(stored.keywords ?? [])])].slice(
+      0,
+      KEYWORD_LIMIT,
+    ),
     ratings: stored.ratings ?? fresh.ratings,
     externalIds: mergeExternalIds(fresh, stored),
     status: fresh.status ?? stored.status,
@@ -151,9 +136,7 @@ function mergeWithStored(
 export async function storeCatalog(db: Database, catalogue: CatalogResponse) {
   const titles = [
     ...new Map(
-      catalogue.sections
-        .flatMap((section) => section.items)
-        .map((title) => [title.id, title]),
+      catalogue.sections.flatMap((section) => section.items).map((title) => [title.id, title]),
     ).values(),
   ];
 
@@ -168,10 +151,7 @@ const STATEMENTS_PER_BATCH = 10;
 const PEOPLE_CHUNK = PEOPLE_ROWS_PER_STATEMENT * STATEMENTS_PER_BATCH;
 const CREDIT_CHUNK = CREDIT_ROWS_PER_STATEMENT * STATEMENTS_PER_BATCH;
 
-function upsertPeople(
-  transaction: DatabaseTransaction,
-  who: TitleCredit["person"][],
-) {
+function upsertPeople(transaction: DatabaseTransaction, who: TitleCredit["person"][]) {
   const placeholders = rowPlaceholders(who.length, 7);
   const params = who.flatMap((person) => [
     person.id,
@@ -276,10 +256,7 @@ async function deleteStaleCredits(
 }
 
 export async function storeCredits(db: Database, credits: TitleCredits[]) {
-  const entriesByCreditId = new Map<
-    string,
-    { titleId: string; entry: TitleCredit }
-  >();
+  const entriesByCreditId = new Map<string, { titleId: string; entry: TitleCredit }>();
 
   for (const title of credits) {
     for (const entry of title.entries) {
@@ -308,16 +285,9 @@ export async function storeCredits(db: Database, credits: TitleCredits[]) {
 
     // oxlint-disable-next-line no-await-in-loop
     await db.transaction(async (transaction) => {
-      for (
-        let offset = 0;
-        offset < chunk.length;
-        offset += PEOPLE_ROWS_PER_STATEMENT
-      ) {
+      for (let offset = 0; offset < chunk.length; offset += PEOPLE_ROWS_PER_STATEMENT) {
         // oxlint-disable-next-line no-await-in-loop
-        await upsertPeople(
-          transaction,
-          chunk.slice(offset, offset + PEOPLE_ROWS_PER_STATEMENT),
-        );
+        await upsertPeople(transaction, chunk.slice(offset, offset + PEOPLE_ROWS_PER_STATEMENT));
       }
     });
   }
@@ -327,16 +297,9 @@ export async function storeCredits(db: Database, credits: TitleCredits[]) {
 
     // oxlint-disable-next-line no-await-in-loop
     await db.transaction(async (transaction) => {
-      for (
-        let offset = 0;
-        offset < chunk.length;
-        offset += CREDIT_ROWS_PER_STATEMENT
-      ) {
+      for (let offset = 0; offset < chunk.length; offset += CREDIT_ROWS_PER_STATEMENT) {
         // oxlint-disable-next-line no-await-in-loop
-        await upsertCredits(
-          transaction,
-          chunk.slice(offset, offset + CREDIT_ROWS_PER_STATEMENT),
-        );
+        await upsertCredits(transaction, chunk.slice(offset, offset + CREDIT_ROWS_PER_STATEMENT));
       }
     });
   }
@@ -344,11 +307,7 @@ export async function storeCredits(db: Database, credits: TitleCredits[]) {
   return entries.length;
 }
 
-export async function storeItems(
-  db: Database,
-  items: MediaTitle[],
-  sourceUpdatedAt: string,
-) {
+export async function storeItems(db: Database, items: MediaTitle[], sourceUpdatedAt: string) {
   if (items.length === 0) {
     return;
   }
@@ -362,9 +321,7 @@ export async function storeItems(
     const previous = stored.get(title.id) ?? null;
     const merged = mergeWithStored(title, previous);
 
-    return previous && canonical(merged) === canonical(previous)
-      ? []
-      : [merged];
+    return previous && canonical(merged) === canonical(previous) ? [] : [merged];
   });
 
   if (changed.length === 0) {
@@ -393,9 +350,7 @@ export async function storeItems(
   await storeCredits(
     db,
     changed.flatMap((title) =>
-      title.credits?.length
-        ? [{ titleId: title.id, entries: title.credits }]
-        : [],
+      title.credits?.length ? [{ titleId: title.id, entries: title.credits }] : [],
     ),
   );
 }
@@ -422,11 +377,7 @@ export function titleScalarColumns(title: MediaTitle) {
   };
 }
 
-function upsertTitle(
-  transaction: DatabaseTransaction,
-  title: MediaTitle,
-  sourceUpdatedAt: string,
-) {
+function upsertTitle(transaction: DatabaseTransaction, title: MediaTitle, sourceUpdatedAt: string) {
   const scalars = titleScalarColumns(title);
 
   return transaction.execute(

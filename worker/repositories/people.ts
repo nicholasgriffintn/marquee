@@ -144,10 +144,7 @@ export async function rebuildPersonTitles(db: Database) {
 // unambiguous lookup used by every link we generate). Otherwise it's a legacy name
 // from an old bookmarked/indexed URL — kept working via the old best-effort match,
 // which silently picks one row when multiple people share a name.
-export async function readPerson(
-  db: Database,
-  identifier: string,
-): Promise<PersonRecord | null> {
+export async function readPerson(db: Database, identifier: string): Promise<PersonRecord | null> {
   const personId = Number(identifier);
 
   if (Number.isInteger(personId) && personId > 0) {
@@ -226,12 +223,7 @@ export async function listPeople(
   }
 }
 
-export async function readPersonTitleIds(
-  db: Database,
-  personId: number,
-  limit = 48,
-  offset = 0,
-) {
+export async function readPersonTitleIds(db: Database, personId: number, limit = 48, offset = 0) {
   try {
     const rows = await db.query<{ titleId: string }>(
       `SELECT p.title_id AS "titleId"
@@ -252,11 +244,7 @@ export async function readPersonTitleIds(
   }
 }
 
-export async function readPersonShelf(
-  db: Database,
-  viewerId: string,
-  personId: number,
-) {
+export async function readPersonShelf(db: Database, viewerId: string, personId: number) {
   try {
     const row = await db.first<{ shelved: number; watched: number | null }>(
       `SELECT count(*) AS shelved,

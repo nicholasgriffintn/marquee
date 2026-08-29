@@ -261,7 +261,7 @@ option. `/api/auth/methods` only advertises what the deployment can actually do.
 [email-service]: https://developers.cloudflare.com/email-service/
 
 Every new account starts as a viewer. This prevents a public sign-in from claiming a fresh or
-temporarily empty deployment. 
+temporarily empty deployment.
 
 A fresh deployment fills will automatically collect data. Watch it on `/admin`.
 

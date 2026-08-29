@@ -13,11 +13,7 @@ export type LanguageBuzzRead = Omit<LanguageBuzzRow, "titleId"> & {
   measuredAt: string;
 };
 
-export async function readProjectVolumes(
-  db: Database,
-  languages: string[],
-  maxAgeDays: number,
-) {
+export async function readProjectVolumes(db: Database, languages: string[], maxAgeDays: number) {
   const rows = await db.query<{ language: string; views: number }>(
     `SELECT language, views
        FROM wikipedia_project_volume
@@ -28,10 +24,7 @@ export async function readProjectVolumes(
   return new Map(rows.rows.map((row) => [row.language, row.views]));
 }
 
-export async function writeProjectVolumes(
-  db: Database,
-  volumes: Map<string, number>,
-) {
+export async function writeProjectVolumes(db: Database, volumes: Map<string, number>) {
   if (volumes.size > 0) {
     await db.transaction(async (transaction) => {
       for (const [language, views] of volumes) {
@@ -49,11 +42,7 @@ export async function writeProjectVolumes(
   }
 }
 
-export async function writeLanguageBuzz(
-  db: Database,
-  titleIds: string[],
-  rows: LanguageBuzzRow[],
-) {
+export async function writeLanguageBuzz(db: Database, titleIds: string[], rows: LanguageBuzzRow[]) {
   for (let index = 0; index < rows.length; index += WRITE_BATCH) {
     const wave = rows.slice(index, index + WRITE_BATCH);
 
@@ -71,14 +60,7 @@ export async function writeLanguageBuzz(
                previous_views = excluded.previous_views,
                share = excluded.share,
                measured_at = excluded.measured_at`,
-          [
-            row.titleId,
-            row.language,
-            row.article,
-            row.views,
-            row.previousViews,
-            row.share,
-          ],
+          [row.titleId, row.language, row.article, row.views, row.previousViews, row.share],
         );
       }
     });

@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import { classNames } from "../lib/class-names";
 import { Eyebrow } from "./Eyebrow";
+
 import styles from "./Stats.module.css";
 
 export type StatSurface = "dark" | "paper" | "accent";
@@ -58,21 +59,10 @@ export function Stat({
 }) {
   const body = (
     <>
-      <strong
-        className={classNames(
-          styles.value,
-          styles[size],
-          tone === "warning" && styles.warn,
-        )}
-      >
+      <strong className={classNames(styles.value, styles[size], tone === "warning" && styles.warn)}>
         {value}
       </strong>
-      <Eyebrow
-        size="sm"
-        weight="regular"
-        tracking="label"
-        className={styles.label}
-      >
+      <Eyebrow size="sm" weight="regular" tracking="label" className={styles.label}>
         {label}
       </Eyebrow>
       {children}

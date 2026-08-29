@@ -18,11 +18,7 @@ const ROTATING_MOODS = 2;
 const ROTATING_STUDIOS = 2;
 const SERVICE_ROWS = 10;
 
-const JUNK_KEYWORDS = new Set([
-  "duringcreditsstinger",
-  "aftercreditsstinger",
-  "woman director",
-]);
+const JUNK_KEYWORDS = new Set(["duringcreditsstinger", "aftercreditsstinger", "woman director"]);
 
 type Section = {
   id: string;
@@ -137,9 +133,7 @@ async function topValues(
 
   return rows.rows
     .map((row) => row.value)
-    .filter(
-      (value): value is string => typeof value === "string" && value.length > 1,
-    );
+    .filter((value): value is string => typeof value === "string" && value.length > 1);
 }
 
 async function topStudios(env: Bindings, limit: number): Promise<string[]> {
@@ -155,9 +149,7 @@ async function topStudios(env: Bindings, limit: number): Promise<string[]> {
     [limit],
   );
 
-  return rows.rows
-    .map((row) => String(row.value))
-    .filter((value) => value.length > 1);
+  return rows.rows.map((row) => String(row.value)).filter((value) => value.length > 1);
 }
 
 async function cachedFacet<T>(
@@ -190,9 +182,7 @@ async function cachedFacet<T>(
   return value;
 }
 
-const PROVIDER_NAMES = new Map(
-  providerRegistry.map((provider) => [provider.id, provider.name]),
-);
+const PROVIDER_NAMES = new Map(providerRegistry.map((provider) => [provider.id, provider.name]));
 
 async function topServices(env: Bindings, limit: number) {
   const rows = await env.DB.query<{ providerId: string; uses: number }>(
@@ -252,13 +242,7 @@ export async function buildSections(env: Bindings) {
     id: "fresh",
     title: "New this year",
     description: `Released in ${year}, most talked about first`,
-    titleIds: await pick(
-      env,
-      used,
-      `year >= $1 AND ${VOTES} >= 40`,
-      "popularity DESC",
-      [year],
-    ),
+    titleIds: await pick(env, used, `year >= $1 AND ${VOTES} >= 40`, "popularity DESC", [year]),
   });
 
   const anniversary = await anniversaries(env, used);
@@ -391,19 +375,13 @@ export async function buildSections(env: Bindings) {
     id: "awarded",
     title: "The trophy cabinet",
     description: "Films and series the awards season could not ignore",
-    titleIds: await pick(
-      env,
-      used,
-      `${AWARD_WINS} >= 8 AND ${VOTES} >= 150`,
-      `${AWARD_WINS} DESC`,
-    ),
+    titleIds: await pick(env, used, `${AWARD_WINS} >= 8 AND ${VOTES} >= 150`, `${AWARD_WINS} DESC`),
   });
 
   add({
     id: "palme-dor",
     title: "The Palme d'Or",
-    description:
-      "Every winner Cannes has crowned that we have in the catalogue",
+    description: "Every winner Cannes has crowned that we have in the catalogue",
     titleIds: await pick(
       env,
       used,
@@ -507,9 +485,9 @@ export async function buildSections(env: Bindings) {
     });
   }
 
-  for (const studio of await cachedFacet(env, "studios", seed, () =>
-    topStudios(env, 24),
-  ).then((studios) => rotate(studios, ROTATING_STUDIOS, seed * 11))) {
+  for (const studio of await cachedFacet(env, "studios", seed, () => topStudios(env, 24)).then(
+    (studios) => rotate(studios, ROTATING_STUDIOS, seed * 11),
+  )) {
     // oxlint-disable-next-line no-await-in-loop
     const titleIds = await pick(
       env,
@@ -557,9 +535,7 @@ export async function buildSections(env: Bindings) {
     await cachedFacet(env, "keywords", seed, () =>
       topValues(env, "catalog_title_keywords", "keyword", 60, 40),
     )
-  ).filter(
-    (keyword) => !JUNK_KEYWORDS.has(keyword) && !keyword.startsWith("based on"),
-  );
+  ).filter((keyword) => !JUNK_KEYWORDS.has(keyword) && !keyword.startsWith("based on"));
 
   for (const mood of rotate(moods, ROTATING_MOODS, seed * 7)) {
     // oxlint-disable-next-line no-await-in-loop
@@ -623,12 +599,8 @@ export async function buildSections(env: Bindings) {
 
   logEvent("sections_built", {
     sections: chosen.length,
-    gated: chosen.filter((section) => section.audience?.providerIds?.length)
-      .length,
-    titles: chosen.reduce(
-      (total, section) => total + section.titleIds.length,
-      0,
-    ),
+    gated: chosen.filter((section) => section.audience?.providerIds?.length).length,
+    titles: chosen.reduce((total, section) => total + section.titleIds.length, 0),
   });
 
   return chosen.length;

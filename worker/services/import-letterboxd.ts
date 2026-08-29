@@ -80,19 +80,13 @@ export async function importDiary(
       await env.DB.transaction(async (transaction) => {
         for (const entry of matched) {
           await transaction.execute(
-        `INSERT INTO viewing_entries (id, viewer_id, title_id, status, rating, thoughts, updated_at)
+            `INSERT INTO viewing_entries (id, viewer_id, title_id, status, rating, thoughts, updated_at)
          VALUES ($1, $2, $3, 'watched', $4, '', $5)
          ON CONFLICT(viewer_id, title_id) DO UPDATE SET
            status = 'watched',
            rating = COALESCE(excluded.rating, viewing_entries.rating),
            updated_at = excluded.updated_at`,
-        [
-          crypto.randomUUID(),
-          viewerId,
-          entry.titleId,
-          entry.rating,
-          entry.watchedAt,
-        ],
+            [crypto.randomUUID(), viewerId, entry.titleId, entry.rating, entry.watchedAt],
           );
         }
       });

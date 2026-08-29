@@ -71,9 +71,10 @@ export async function syncSchedule(env: Bindings) {
   );
   const known = entries.filter((episode) => episode.imdbId && byImdb.has(episode.imdbId));
 
-  await env.DB.execute(`DELETE FROM title_schedule WHERE airs_at < (CURRENT_TIMESTAMP + CAST($1 AS INTERVAL))`, [
-    `-${RETENTION_DAYS} days`,
-  ]);
+  await env.DB.execute(
+    `DELETE FROM title_schedule WHERE airs_at < (CURRENT_TIMESTAMP + CAST($1 AS INTERVAL))`,
+    [`-${RETENTION_DAYS} days`],
+  );
 
   for (let index = 0; index < known.length; index += 50) {
     const wave = known.slice(index, index + 50);
