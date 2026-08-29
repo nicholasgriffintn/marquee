@@ -51,15 +51,17 @@ export const INSIGHT_SCHEMA: OutputSchema = {
   }),
 };
 
-export const NOTE_HUNCHES_SCHEMA: OutputSchema = {
-  name: "note_hunches",
+export const NOTE_FACETS_SCHEMA: OutputSchema = {
+  name: "note_facets",
   schema: object({
-    observations: {
+    facets: {
       type: "array",
-      maxItems: 3,
+      maxItems: 4,
       items: object({
-        claim: { type: "string", maxLength: 160 },
-        slug: { type: "string", maxLength: 40 },
+        trait: { type: "string", maxLength: 40 },
+        polarity: { type: "string", enum: ["seeks", "avoids"] },
+        confidence: { type: "number", minimum: 0, maximum: 1 },
+        notes: { type: "array", maxItems: 12, items: { type: "integer", minimum: 1 } },
       }),
     },
   }),

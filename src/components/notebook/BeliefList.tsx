@@ -5,11 +5,13 @@ import {
   confidenceLabel,
   GROUP_TITLES,
   isSuspended,
+  NOTE_FACET_RULE,
   strengthLabel,
   type Belief,
 } from "../../domain/notebook";
 import { classNames } from "../../lib/class-names";
 import { Button, Text } from "../../ui";
+import { BeliefEvidence } from "./BeliefEvidence";
 import { NotebookEmpty, NotebookSubheading } from "./NotebookSection";
 
 import styles from "./BeliefList.module.css";
@@ -62,6 +64,7 @@ export function BeliefList({
           <ul className={styles.list}>
             {items.map((belief) => {
               const suspended = isSuspended(belief);
+              const fromNotes = belief.sourceRule === NOTE_FACET_RULE;
 
               return (
                 <li
@@ -107,12 +110,16 @@ export function BeliefList({
                         <em>{strengthLabel(belief.strength)}</em>
                         {belief.evidence > 0 && (
                           <small>
-                            {belief.evidence} thing{belief.evidence === 1 ? "" : "s"} on your shelf
+                            {belief.evidence}{" "}
+                            {fromNotes
+                              ? `of your own note${belief.evidence === 1 ? "" : "s"}`
+                              : `thing${belief.evidence === 1 ? "" : "s"} on your shelf`}
                           </small>
                         )}
                         {belief.edited && <small>in your words</small>}
                         {suspended && <strong>{suspendLabel(belief)}</strong>}
                       </p>
+                      {fromNotes && <BeliefEvidence belief={belief} />}
                       <div className={styles.actions}>
                         {suspended ? (
                           <button
