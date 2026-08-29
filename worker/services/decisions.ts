@@ -1,5 +1,6 @@
 import {
   estimatedCost,
+  newDecisionId,
   type DecisionCandidate,
   type DecisionDraft,
   type DecisionFeature,
@@ -28,7 +29,7 @@ export function beginDecision(
   },
 ): Decision {
   const draft: DecisionDraft = {
-    id: crypto.randomUUID(),
+    id: newDecisionId(),
     feature: input.feature,
     surface: input.surface ?? "",
     promptVersion: input.promptVersion ?? "",

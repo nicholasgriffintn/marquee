@@ -1,6 +1,6 @@
 import type { CatalogSection, MediaTitle } from "../../src/domain/catalog.ts";
 import { CURATOR_TOOLS, executeCuratorTool } from "../ai/curator-tools.ts";
-import { fastModel, requestAiCompletion } from "../clients/ai-gateway.ts";
+import { runAiMessage, runAiObject } from "../ai/run.ts";
 import type { ChatMessage } from "../lib/curator-payload.ts";
 import {
   candidatesFrom,
@@ -10,7 +10,7 @@ import {
 } from "../lib/decisions.ts";
 import { logError, logEvent } from "../lib/logging.ts";
 import { isKnownTitle } from "../lib/validation.ts";
-import { isRecord, parseJson } from "../lib/values.ts";
+import { isRecord, parseJson, parseJsonContent } from "../lib/values.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
 import { searchCatalogue } from "../repositories/catalog-search.ts";
 import { neverTitleIds } from "../repositories/signals.ts";
@@ -350,8 +350,6 @@ function trimWords(value: string, limit: number) {
   return (boundary > limit * 0.6 ? cut.slice(0, boundary) : cut).replace(/[\s,;:.—-]+$/u, "");
 }
 
-const TITLE_ID_PATTERN = /\b(?:movie|tv):[1-9]\d{0,9}\b/gu;
-
 function usableIds(candidates: Iterable<string>, availableIds: Set<string>) {
   const seen = new Set<string>();
 
@@ -368,57 +366,21 @@ function usableIds(candidates: Iterable<string>, availableIds: Set<string>) {
     .slice(0, RAIL_MAX);
 }
 
-function scavengeRail(content: string, availableIds: Set<string>): StoredRail | null {
-  const name = content.match(/"name"\s*:\s*"([^"]{1,60})"/u)?.[1]?.trim() ?? "";
-  const titleIds = usableIds(
-    [...content.matchAll(TITLE_ID_PATTERN)].map((match) => match[0]),
-    availableIds,
-  );
-
-  if (!name || titleIds.length < RAIL_MIN) {
+function parseRail(parsed: unknown, availableIds: Set<string>): StoredRail | null {
+  if (!isRecord(parsed) || typeof parsed.name !== "string" || !Array.isArray(parsed.titleIds)) {
     return null;
   }
 
-  const reason = content.match(/"reason"\s*:\s*"([^"]{0,200})"/u)?.[1] ?? "";
+  const titleIds = usableIds(parsed.titleIds.filter(isKnownTitle), availableIds);
+  const name = parsed.name.trim().slice(0, 60);
 
-  return { name, reason: trimWords(reason, 90), titleIds };
-}
-
-function parseRail(content: string | null, availableIds: Set<string>): StoredRail | null {
-  if (!content) {
-    return null;
-  }
-
-  return strictRail(content, availableIds) ?? scavengeRail(content, availableIds);
-}
-
-function strictRail(content: string, availableIds: Set<string>): StoredRail | null {
-  const json = content.match(/\{[\s\S]*\}/u)?.[0];
-
-  if (!json) {
-    return null;
-  }
-
-  try {
-    const parsed: unknown = JSON.parse(json);
-
-    if (!isRecord(parsed) || typeof parsed.name !== "string" || !Array.isArray(parsed.titleIds)) {
-      return null;
-    }
-
-    const titleIds = usableIds(parsed.titleIds.filter(isKnownTitle), availableIds);
-    const name = parsed.name.trim().slice(0, 60);
-
-    return titleIds.length >= RAIL_MIN && name
-      ? {
-          name,
-          reason: typeof parsed.reason === "string" ? trimWords(parsed.reason, 90) : "",
-          titleIds,
-        }
-      : null;
-  } catch {
-    return null;
-  }
+  return titleIds.length >= RAIL_MIN && name
+    ? {
+        name,
+        reason: typeof parsed.reason === "string" ? trimWords(parsed.reason, 90) : "",
+        titleIds,
+      }
+    : null;
 }
 
 export type RailBuild = {
@@ -438,7 +400,6 @@ export async function buildOneRail(
   exclude: string[],
   build: RailBuild = {},
 ): Promise<BuiltRail> {
-  const viewerId = build.viewerId || "unknown";
   const seeds = build.seeds ?? [];
   const shelf = build.shelf ?? [];
   const summary = build.summary ?? "";
@@ -494,12 +455,13 @@ export async function buildOneRail(
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
     // oxlint-disable-next-line no-await-in-loop
-    const response = await requestAiCompletion(env, messages, RAIL_TOOLS, true, {
-      model: fastModel(env),
-      timeoutMs: 25_000,
-      maxTokens: 500,
+    const response = await runAiMessage(env, {
+      feature: "rails",
+      decisionId: decision.id,
+      messages,
+      tools: RAIL_TOOLS,
       toolChoice: "auto",
-      metadata: { feature: "rails", angle: angle.id, viewer: viewerId },
+      attributes: { angle: angle.id, round },
       record: decision,
     });
 
@@ -522,37 +484,28 @@ export async function buildOneRail(
       continue;
     }
 
-    const rail = parseRail(response.content, availableIds);
+    const rail = parseRail(parseJsonContent(response.content), availableIds);
 
     if (rail) {
       return built(rail);
     }
 
-    logEvent("rail_retry", {
-      angle: angle.id,
-      round,
-      available: availableIds.size,
-      raw: response.content?.slice(0, 160),
-    });
+    logEvent("rail_retry", { angle: angle.id, round, available: availableIds.size });
     messages.push(response, { role: "user", content: nudge() });
   }
 
-  const response = await requestAiCompletion(env, messages, [], false, {
-    model: fastModel(env),
-    timeoutMs: 20_000,
-    maxTokens: 300,
-    json: true,
-    metadata: { feature: "rails", angle: angle.id, viewer: viewerId },
-    record: decision,
-  });
-  const rail = parseRail(response.content, availableIds);
+  const rail = parseRail(
+    await runAiObject(env, {
+      feature: "rails",
+      decisionId: decision.id,
+      messages,
+      attributes: { angle: angle.id, round: "final" },
+      record: decision,
+    }),
+    availableIds,
+  );
 
-  logEvent("rail_final", {
-    angle: angle.id,
-    ok: Boolean(rail),
-    available: availableIds.size,
-    raw: rail ? undefined : response.content?.slice(0, 200),
-  });
+  logEvent("rail_final", { angle: angle.id, ok: Boolean(rail), available: availableIds.size });
 
   return built(rail);
 }

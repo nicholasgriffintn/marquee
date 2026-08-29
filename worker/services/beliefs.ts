@@ -1,15 +1,10 @@
-import type { Belief } from "../../src/domain/notebook.ts";
+import { beliefSteersPicks, evidenceConfidence, type Belief } from "../../src/domain/notebook.ts";
 import { logError } from "../lib/logging.ts";
 import { jsonStringList } from "../lib/values.ts";
-import {
-  activeBeliefs,
-  readBeliefs,
-  writeDerivedBeliefs,
-  type BeliefDraft,
-} from "../repositories/beliefs.ts";
+import { readBeliefs, writeDerivedBeliefs, type BeliefDraft } from "../repositories/beliefs.ts";
 import { readSignals } from "../repositories/signals.ts";
 import type { Bindings, ViewerContext } from "../types.ts";
-import { noteHunches } from "./note-beliefs.ts";
+import { noteFacets } from "./note-facets.ts";
 import { weighTitles } from "./taste.ts";
 import { preferenceSummary, readViewerPreferences, type ViewerPreferences } from "./usher.ts";
 
@@ -73,10 +68,6 @@ async function factsFor(db: D1Database, titleIds: string[]): Promise<TitleFacts[
     people: jsonStringList(row.people),
     runtimeMinutes: row.runtime,
   }));
-}
-
-function confidenceFor(count: number) {
-  return Math.min(0.8, 0.25 + count * 0.12);
 }
 
 function listPhrase(values: string[]) {
@@ -190,7 +181,7 @@ function derivedDrafts(
       key: `rule:genre:${genre}`,
       value: `You keep coming back to ${genre}, and you never said so.`,
       strength: strongest > 0 ? Math.min(1, total.weight / strongest) : 0.5,
-      confidence: confidenceFor(total.ids.length),
+      confidence: evidenceConfidence(total.ids.length),
       sourceRule: "rule:liked-genre",
       evidence: total.ids.map((id) => ({ kind: "entry" as const, id })),
     });
@@ -205,7 +196,7 @@ function derivedDrafts(
       key: `rule:avoid:${genre}`,
       value: `${genre.charAt(0).toUpperCase()}${genre.slice(1)} rarely lands with you.`,
       strength: Math.min(1, Math.abs(total.weight) / MIN_EVIDENCE),
-      confidence: confidenceFor(total.ids.length),
+      confidence: evidenceConfidence(total.ids.length),
       sourceRule: "rule:disliked-genre",
       evidence: total.ids.map((id) => ({ kind: "entry" as const, id })),
     });
@@ -220,7 +211,7 @@ function derivedDrafts(
       key: `rule:person:${person}`,
       value: `${person.replace(/\b\w/gu, (letter) => letter.toUpperCase())} keeps turning up in what you watch.`,
       strength: Math.min(1, total.ids.length / 5),
-      confidence: confidenceFor(total.ids.length),
+      confidence: evidenceConfidence(total.ids.length),
       sourceRule: "rule:recurring-person",
       evidence: total.ids.map((id) => ({ kind: "entry" as const, id })),
     });
@@ -240,7 +231,7 @@ function derivedDrafts(
         key: "rule:runtime:short",
         value: "Almost everything you finish is under two hours.",
         strength: short.length / timed.length,
-        confidence: confidenceFor(short.length),
+        confidence: evidenceConfidence(short.length),
         sourceRule: "rule:runtime",
         evidence: short.slice(0, 12).map((entry) => ({ kind: "entry" as const, id: entry.id })),
       });
@@ -309,7 +300,7 @@ async function serviceDrafts(db: D1Database, viewerId: string): Promise<BeliefDr
     key: `service:${providerId}`,
     value: `When you actually watch something, it is usually on ${providerId}.`,
     strength: Math.min(1, ids.length / 8),
-    confidence: confidenceFor(ids.length),
+    confidence: evidenceConfidence(ids.length),
     sourceRule: "rule:provider-exit",
     evidence: ids.slice(0, 12).map((id) => ({ kind: "signal" as const, id })),
   }));
@@ -319,7 +310,7 @@ export async function refreshBeliefs(
   env: Bindings,
   viewerId: string,
   viewer: ViewerContext,
-  options: { includeHunches?: boolean } = {},
+  options: { includeFacets?: boolean } = {},
 ) {
   try {
     const preferences = await readViewerPreferences(env.DB, viewerId);
@@ -340,7 +331,7 @@ export async function refreshBeliefs(
       ...derivedDrafts(entries, stated),
       ...(await serviceDrafts(env.DB, viewerId)),
       ...(await moodDrafts(env.DB, viewerId)),
-      ...(options.includeHunches ? await noteHunches(env, viewerId) : []),
+      ...(options.includeFacets ? await noteFacets(env, viewerId) : []),
     ];
 
     await writeDerivedBeliefs(env.DB, viewerId, drafts);
@@ -353,12 +344,17 @@ export async function refreshBeliefs(
   }
 }
 
-export function beliefSummary(beliefs: Belief[]) {
-  const active = activeBeliefs(beliefs)
-    .filter((belief) => belief.confidence * belief.strength >= 0.2)
-    .slice(0, 14);
+const SUMMARY_FLOOR = 0.2;
+const SUMMARY_LIMIT = 14;
 
-  return active.map((belief) => belief.value).join(" ");
+export function beliefSummary(beliefs: Belief[]) {
+  const steering = beliefs
+    .filter(
+      (belief) => beliefSteersPicks(belief) && belief.confidence * belief.strength >= SUMMARY_FLOOR,
+    )
+    .slice(0, SUMMARY_LIMIT);
+
+  return steering.map((belief) => belief.value).join(" ");
 }
 
 export async function viewerSummary(env: Bindings, viewerId: string, fallback: ViewerPreferences) {

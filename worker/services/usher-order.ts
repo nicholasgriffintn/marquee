@@ -1,7 +1,7 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
 import { showingFor, type TonightOrder } from "../../src/domain/usher.ts";
+import { runAiObject } from "../ai/run.ts";
 import { USHER_VOICE } from "../ai/usher-voice.ts";
-import { fastModel, requestAiCompletion } from "../clients/ai-gateway.ts";
 import type { ChatMessage } from "../lib/curator-payload.ts";
 import { promptVersion } from "../lib/decisions.ts";
 import { logError } from "../lib/logging.ts";
@@ -231,8 +231,8 @@ export async function pickToOrder(
       ].join("\n"),
     },
   ];
-  const settle = async (pick: string, backups: string[]) => {
-    decision.select([pick, ...backups]);
+  const settle = async (pick: string, backups: { item: MediaTitle }[]) => {
+    decision.select([pick, ...backups.map((backup) => backup.item.id)]);
 
     await decision.settle("served");
   };
@@ -242,10 +242,7 @@ export async function pickToOrder(
       .slice(1, 1 + BACKUPS)
       .map((item, index) => dress(item, backupLine(index)));
 
-    await settle(
-      titles[0].id,
-      backups.map((backup) => backup.item.id),
-    );
+    await settle(titles[0].id, backups);
 
     return {
       order,
@@ -256,16 +253,12 @@ export async function pickToOrder(
   };
 
   try {
-    const response = await requestAiCompletion(env, messages, [], false, {
-      model: fastModel(env),
-      timeoutMs: 18_000,
-      maxTokens: 320,
-      json: true,
-      metadata: { feature: "usher_order", viewer: viewerId },
+    const parsed = await runAiObject(env, {
+      feature: "usher_order",
+      decisionId: decision.id,
+      messages,
       record: decision,
     });
-    const json = response.content?.match(/\{[\s\S]*\}/u)?.[0];
-    const parsed: unknown = json ? JSON.parse(json) : null;
 
     const proposed = isRecord(parsed) && isRecord(parsed.pick) ? parsed.pick : null;
 
@@ -321,10 +314,7 @@ export async function pickToOrder(
         ? proposed.line.trim().slice(0, 160)
         : orderLine(headline, order);
 
-    await settle(
-      headline.id,
-      backups.map((backup) => backup.item.id),
-    );
+    await settle(headline.id, backups);
 
     return { order, pick: dress(headline, line), backups, decisionId: decision.id };
   } catch (error) {

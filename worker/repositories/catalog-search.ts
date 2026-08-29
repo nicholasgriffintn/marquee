@@ -1,4 +1,5 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
+import { searchTokens } from "../../src/domain/search-query.ts";
 import { buzzScoreSql, MIN_TRENDING_VIEWS } from "../lib/buzz.ts";
 import {
   CATALOG_TITLE_COLUMNS,
@@ -55,12 +56,7 @@ const ORDER_BY: Record<CatalogueSort, string> = {
 };
 
 function ftsMatchQuery(raw: string, scope: SearchScope = "everything", matchAny = false) {
-  const tokens = raw
-    .toLowerCase()
-    .replaceAll(/[^\p{L}\p{N}\s]+/gu, " ")
-    .split(/\s+/u)
-    .filter(Boolean)
-    .slice(0, MAX_QUERY_TOKENS);
+  const tokens = searchTokens(raw).slice(0, MAX_QUERY_TOKENS);
 
   if (tokens.length === 0) {
     return null;

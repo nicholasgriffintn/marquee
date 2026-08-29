@@ -1,3 +1,5 @@
+import { randomHex } from "./tokens.ts";
+
 export type DecisionFeature =
   | "curator"
   | "rails"
@@ -45,7 +47,12 @@ const CANDIDATE_LIMIT = 60;
 const SELECTED_LIMIT = 24;
 const SCORE_PRECISION = 4;
 
-const DECISION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
+const DECISION_ID_BYTES = 8;
+const DECISION_ID = /^[0-9a-f]{16}$/u;
+
+export function newDecisionId() {
+  return randomHex(DECISION_ID_BYTES);
+}
 
 export function isDecisionId(value: unknown): value is string {
   return typeof value === "string" && DECISION_ID.test(value);

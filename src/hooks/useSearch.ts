@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import type { MediaTitle } from "../domain/catalog";
+import { shouldRefineSearch } from "../domain/search-query";
 import { queryJson, QueryError } from "../lib/query-client";
 
 type SearchResponse = {
@@ -10,7 +11,6 @@ type SearchResponse = {
 
 const KEYWORD_DEBOUNCE_MS = 250;
 const HYBRID_SETTLE_MS = 400;
-const HYBRID_TRIGGER_MAX_ITEMS = 6;
 
 function searchUrl(trimmed: string, providerKey: string, hybrid: boolean) {
   const parameters = new URLSearchParams({ query: trimmed });
@@ -77,7 +77,7 @@ export function useSearch(query: string, providerIds: string[]) {
             setItems(response.items);
             setError("");
 
-            if (response.items.length < HYBRID_TRIGGER_MAX_ITEMS) {
+            if (shouldRefineSearch(trimmed, response.items)) {
               setIsRefining(true);
               hybridTimer = window.setTimeout(() => void refine(), HYBRID_SETTLE_MS);
             }
