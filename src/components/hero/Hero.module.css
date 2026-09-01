@@ -213,6 +213,15 @@
 
   .title {
     font-size: clamp(54px, 16vw, 76px);
+    -webkit-line-clamp: unset;
+  }
+
+  .titleSmall {
+    font-size: clamp(44px, 12vw, 60px);
+  }
+
+  .titleTiny {
+    font-size: clamp(36px, 10vw, 48px);
   }
 
   .lede {

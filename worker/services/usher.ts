@@ -13,6 +13,7 @@ import {
 import { logError } from "../lib/logging.ts";
 import { isKnownTitle, validProviderIds } from "../lib/validation.ts";
 import { stringList } from "../lib/values.ts";
+import { readNotebookPreferences } from "../repositories/notebook-preferences.ts";
 import { readProviderPreferences, saveProviderPreferences } from "../repositories/profile.ts";
 import {
   readAnswers,
@@ -619,6 +620,7 @@ export type ViewerPreferences = {
   runtime: string;
   subtitles: string;
   novelty: string;
+  preferredLanguage: string;
 };
 
 export const NO_PREFERENCES: ViewerPreferences = {
@@ -631,6 +633,7 @@ export const NO_PREFERENCES: ViewerPreferences = {
   runtime: "",
   subtitles: "",
   novelty: "",
+  preferredLanguage: "en",
 };
 
 export async function readViewerPreferences(
@@ -642,9 +645,10 @@ export async function readViewerPreferences(
   }
 
   try {
-    const [answers, chosenProviderIds] = await Promise.all([
+    const [answers, chosenProviderIds, notebook] = await Promise.all([
       readAnswers(db, viewerId),
       readProviderPreferences(db, viewerId),
+      readNotebookPreferences(db, viewerId),
     ]);
     const single = (id: string) => {
       const value = answers.get(id);
@@ -662,6 +666,7 @@ export async function readViewerPreferences(
       runtime: single("runtime"),
       subtitles: single("subtitles"),
       novelty: single("novelty"),
+      preferredLanguage: notebook.preferredLanguage,
     };
   } catch (error) {
     logError("usher_preferences_failed", error);

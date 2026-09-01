@@ -1,4 +1,5 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
+import { cachedWorkersAiOptions } from "../ai/workers-ai.ts";
 import { sha256Hex } from "../lib/hash.ts";
 import { errorMessage, logError, logEvent } from "../lib/logging.ts";
 import { clamp } from "../lib/numbers.ts";
@@ -49,10 +50,15 @@ async function embedTexts(env: Bindings, texts: string[]) {
     return [];
   }
 
-  const result = await env.AI.run(EMBEDDING_MODEL, {
+  const input = {
     text: texts.map((text) => text.slice(0, MAX_TEXT_LENGTH)),
     truncate_inputs: true,
-  });
+  };
+  const result = await env.AI.run(
+    EMBEDDING_MODEL,
+    input,
+    await cachedWorkersAiOptions(env, "embedding", EMBEDDING_MODEL, input),
+  );
 
   return parseVectors(result);
 }

@@ -192,14 +192,16 @@ deploy.
 Outside data needs keys. Every client checks for its own and stands down quietly without it, so a
 partial setup runs; it just knows less.
 
-| Key                                    | Gives you                                          |
-| -------------------------------------- | -------------------------------------------------- |
-| `TMDB_API_TOKEN`                       | Titles, images, credits, providers — the catalogue |
-| `GITHUB_CLIENT_ID` / `_SECRET`         | Sign-in                                            |
-| `OMDB_API_KEY`                         | Ratings, awards, box office, episodes, search      |
-| `TRAKT_CLIENT_ID` / `_SECRET`          | Importing a viewer's history                       |
-| `EUROPEANA_API_KEY`                    | British and European prints for the revival house  |
-| `CLOUDFLARE_ACCOUNT_ID` / `_API_TOKEN` | AI Gateway                                         |
+| Key                            | Gives you                                          |
+| ------------------------------ | -------------------------------------------------- |
+| `TMDB_API_TOKEN`               | Titles, images, credits, providers — the catalogue |
+| `GITHUB_CLIENT_ID` / `_SECRET` | Sign-in                                            |
+| `OMDB_API_KEY`                 | Ratings, awards, box office, episodes, search      |
+| `TRAKT_CLIENT_ID` / `_SECRET`  | Importing a viewer's history                       |
+| `EUROPEANA_API_KEY`            | British and European prints for the revival house  |
+| `CLOUDFLARE_ACCOUNT_ID`        | AI Gateway and Analytics Engine account            |
+| `CLOUDFLARE_API_TOKEN`         | Analytics Engine queries                           |
+| `AI_GATEWAY_TOKEN`             | AI Gateway requests; grant only AI Gateway Run     |
 
 TMDB is the one you cannot really run without. Air dates come from TVmaze, the trending rail from
 Wikipedia pageviews, and the revival house's UK term checks from Wikidata; none of those needs a

@@ -1,10 +1,12 @@
 import type { ViewerOrigin } from "../../src/domain/cinema.ts";
 import type { DeliveredRail, RailsDelivery, RailStatus } from "../../src/domain/rails.ts";
 import { logError } from "../lib/logging.ts";
+import { readNotebookPreferences } from "../repositories/notebook-preferences.ts";
 import type { Bindings } from "../types.ts";
 import { hydrateRails } from "./ai-rails.ts";
 import { getPersonalRails } from "./personal-rails.ts";
-import { readRailRecord, startGeneration } from "./rail-generation.ts";
+import { readRailRecord } from "./rail-generation.ts";
+import { ensureRailRefreshScheduled } from "./rail-refresh.ts";
 import { readRailRevision } from "./rail-revision.ts";
 
 export type DeliveryRequest = {
@@ -33,10 +35,13 @@ async function curatedDelivery(
   generate: boolean,
 ): Promise<CuratedDelivery> {
   try {
-    const revision = await readRailRevision(env.DB, viewerId);
+    const [revision, preferences] = await Promise.all([
+      readRailRevision(env.DB, viewerId),
+      readNotebookPreferences(env.DB, viewerId),
+    ]);
     const record = await readRailRecord(env.DB, viewerId, revision);
     const rails = record.rails.length
-      ? await hydrateRails(env, record.rails, record.generationId)
+      ? await hydrateRails(env, record.rails, record.generationId, preferences.preferredLanguage)
       : [];
 
     if (record.isSettled || !revision) {
@@ -44,10 +49,15 @@ async function curatedDelivery(
     }
 
     if (generate) {
-      await startGeneration(env, viewerId, revision);
+      await ensureRailRefreshScheduled(env, viewerId, revision);
     }
 
-    return { status: "generating", revision, generationId: record.generationId, rails };
+    return {
+      status: record.rails.length ? "ready" : "generating",
+      revision,
+      generationId: record.generationId,
+      rails,
+    };
   } catch (error) {
     logError("ai_rails_failed", error);
 

@@ -53,6 +53,10 @@ export function queryJson<T>(path: string, identity = "") {
   return queryClient.fetchQuery(jsonQueryOptions<T>(path, identity));
 }
 
+export function queryJsonFresh<T>(path: string) {
+  return queryClient.fetchQuery({ ...jsonQueryOptions<T>(path), staleTime: 0 });
+}
+
 export function jsonMutation(method: "POST" | "PATCH" | "DELETE", body?: unknown): RequestInit {
   return {
     method,

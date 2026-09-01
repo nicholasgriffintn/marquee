@@ -7,7 +7,8 @@ MAL_CLIENT_ID=
 MAL_CLIENT_SECRET=
 
 CLOUDFLARE_ACCOUNT_ID=your-cloudflare-account-id
-CLOUDFLARE_API_TOKEN=your-cloudflare-workers-ai-token
+CLOUDFLARE_API_TOKEN=your-cloudflare-analytics-token
+AI_GATEWAY_TOKEN=your-cloudflare-ai-gateway-run-token
 
 GITHUB_CLIENT_ID=your-github-oauth-app-client-id
 GITHUB_CLIENT_SECRET=your-github-oauth-app-client-secret

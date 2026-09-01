@@ -122,9 +122,10 @@ export const catalogueTools: readonly McpTool[] = [
       }
 
       const { success: canGenerate } = await env.CURATOR_RATE_LIMITER.limit({ key: user.id });
-      const insight = await getTitleInsight(env, title.id, { generate: canGenerate }).catch(
-        () => null,
-      );
+      const insight = await getTitleInsight(env, title.id, {
+        generate: canGenerate,
+        viewerId: user.id,
+      }).catch(() => null);
 
       return answer({
         ...summarise([title])[0],

@@ -105,7 +105,7 @@ function readFacets(parsed: unknown, byNumber: Map<number, ViewerNote>) {
   return [...merged.values()].slice(0, MAX_FACETS);
 }
 
-function askForFacets(env: Bindings, notes: ViewerNote[]) {
+function askForFacets(env: Bindings, viewerId: string, notes: ViewerNote[]) {
   const numbered = notes
     .map(
       (note, index) =>
@@ -120,6 +120,7 @@ function askForFacets(env: Bindings, notes: ViewerNote[]) {
   return runAiObject(env, {
     feature: "note_facets",
     decisionId: newDecisionId(),
+    viewerId,
     messages,
   });
 }
@@ -133,7 +134,7 @@ export async function noteFacets(env: Bindings, viewerId: string): Promise<Belie
     }
 
     const byNumber = new Map(notes.map((note, index) => [index + 1, note]));
-    const facets = readFacets(await askForFacets(env, notes), byNumber);
+    const facets = readFacets(await askForFacets(env, viewerId, notes), byNumber);
 
     if (facets.length === 0) {
       return [];

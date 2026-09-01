@@ -1,0 +1,73 @@
+.form {
+  display: grid;
+  gap: 18px;
+  max-width: 680px;
+}
+
+.field {
+  display: grid;
+  gap: 7px;
+}
+
+.field > span {
+  color: var(--paper);
+  font: var(--weight-medium) var(--type-body) / 1.2 var(--sans);
+}
+
+.field input,
+.field select {
+  background: var(--panel);
+  border: 1px solid var(--panel-line);
+  border-radius: 0;
+  color: var(--white);
+  font: var(--weight-regular) var(--type-body) / 1 var(--sans);
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  width: 100%;
+}
+
+.field input:focus,
+.field select:focus {
+  border-color: var(--acid);
+  outline: 1px solid var(--acid);
+  outline-offset: 1px;
+}
+
+.field select:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.field small {
+  color: var(--muted);
+  font: var(--weight-regular) var(--type-sm) / 1.4 var(--sans);
+}
+
+.actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.clear {
+  background: none;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  font: var(--weight-medium) var(--type-sm) / 1 var(--sans);
+  padding: var(--space-2) 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.clear:hover {
+  color: var(--coral);
+}
+
+.status {
+  color: var(--paper);
+  font: italic var(--weight-regular) var(--type-body) / 1.5 var(--serif);
+  margin: var(--space-3) 0 0;
+  max-width: 56ch;
+}

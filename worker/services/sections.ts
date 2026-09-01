@@ -233,7 +233,7 @@ export async function buildSections(env: Bindings) {
 
   add({
     id: "on-this-week",
-    title: "On this week",
+    title: "On the box this week",
     description: "Episodes landing over the next seven days",
     titleIds: await scheduled(env, used),
   });

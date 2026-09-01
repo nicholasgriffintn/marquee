@@ -129,6 +129,34 @@ export async function readCinemasBySource(db: Database, source: string) {
   return rows.rows;
 }
 
+export async function searchCinemas(db: Database, query: string, limit = 20) {
+  const needle = query.trim().slice(0, 120);
+
+  if (needle.length < 2) {
+    return [];
+  }
+
+  const rows = await db.query<CinemaRow>(
+    `SELECT id, source, site_id AS "siteId", name, chain, address, postcode,
+            latitude, longitude, booking_url AS "bookingUrl"
+       FROM cinemas
+      WHERE name ILIKE $1 OR address ILIKE $1 OR postcode ILIKE $1
+      ORDER BY
+        CASE WHEN postcode ILIKE $2 THEN 0 WHEN name ILIKE $2 THEN 1 ELSE 2 END,
+        name
+      LIMIT $3`,
+    [`%${needle}%`, `${needle}%`, Math.max(1, Math.min(limit, 40))],
+  );
+
+  return rows.rows.map((row) => toCinema(row, null));
+}
+
+export async function cinemaExists(db: Database, cinemaId: string) {
+  return Boolean(
+    await db.first<{ id: string }>(`SELECT id FROM cinemas WHERE id = $1`, [cinemaId]),
+  );
+}
+
 export async function readNearbyCinemas(
   db: Database,
   origin: { latitude: number; longitude: number },

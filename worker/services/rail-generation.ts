@@ -62,6 +62,17 @@ export async function readRailRecord(
   };
 }
 
+export async function readRecentRails(db: Database, viewerId: string) {
+  const row = await db.first<Pick<RailRow, "payload">>(
+    `SELECT payload FROM ai_rails
+       WHERE viewer_id = $1
+         AND created_at > (CURRENT_TIMESTAMP + CAST($2 AS INTERVAL))`,
+    [viewerId, `-${MAX_AGE_HOURS} hours`],
+  );
+
+  return row ? toStoredRails(parseJson(row.payload)) : [];
+}
+
 async function claimGeneration(db: Database, viewerId: string, revision: string) {
   const result = await db.execute(
     `INSERT INTO ai_rails (viewer_id, claim_revision, claimed_at)

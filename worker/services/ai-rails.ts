@@ -1,6 +1,7 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
+import { titleMatchesPreferredLanguage } from "../../src/domain/languages.ts";
 import type { DeliveredRail } from "../../src/domain/rails.ts";
-import { CURATOR_TOOLS, executeCuratorTool } from "../ai/curator-tools.ts";
+import { CURATOR_TOOLS, executeCuratorTool, type CuratorToolCache } from "../ai/curator-tools.ts";
 import { runAiMessage, runAiObject } from "../ai/run.ts";
 import type { ChatMessage } from "../lib/curator-payload.ts";
 import {
@@ -378,6 +379,7 @@ export type RailBuild = {
   candidates?: DecisionCandidate[];
   shelf?: ShelfDetail[];
   summary?: string;
+  toolCache?: CuratorToolCache;
 };
 export type BuiltRail = { rail: StoredRail | null; decision: DecisionDraft };
 
@@ -448,6 +450,7 @@ export async function buildOneRail(
     const response = await runAiMessage(env, {
       feature: "rails",
       decisionId: decision.id,
+      viewerId: viewer.viewerId || null,
       messages,
       tools: RAIL_TOOLS,
       toolChoice: "auto",
@@ -465,7 +468,7 @@ export async function buildOneRail(
           tool_call_id: call.id,
           name: call.function.name,
           content: JSON.stringify(
-            await executeCuratorTool(env, call, viewer, eligibility, availableIds),
+            await executeCuratorTool(env, call, viewer, eligibility, availableIds, build.toolCache),
           ),
         })),
       );
@@ -492,6 +495,7 @@ export async function buildOneRail(
     await runAiObject(env, {
       feature: "rails",
       decisionId: decision.id,
+      viewerId: viewer.viewerId || null,
       messages,
       attributes: { angle: angle.id, round: "final" },
       record: decision,
@@ -542,12 +546,15 @@ export async function hydrateRails(
   env: Bindings,
   rails: StoredRail[],
   generationId: string,
+  preferredLanguage: string,
 ): Promise<DeliveredRail[]> {
-  const titles = await readItems(
-    env.DB,
-    rails.flatMap((rail) => rail.titleIds),
-    RAIL_LIMIT * RAIL_MAX,
-  );
+  const titles = (
+    await readItems(
+      env.DB,
+      rails.flatMap((rail) => rail.titleIds),
+      RAIL_LIMIT * RAIL_MAX,
+    )
+  ).filter((title) => titleMatchesPreferredLanguage(title.originalLanguage, preferredLanguage));
   const byId = new Map(titles.map((title) => [title.id, title]));
 
   return rails.flatMap((rail): DeliveredRail[] => {

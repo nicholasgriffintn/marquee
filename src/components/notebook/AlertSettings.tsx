@@ -23,7 +23,7 @@ const KIND_COPY: Record<string, { label: string; hint: string }> = {
   },
   cinema: {
     label: "Something on your shelf is on a real screen",
-    hint: "Within the week, nearest date first.",
+    hint: "Only at the preferred cinema and location saved above.",
   },
   person: {
     label: "Someone you follow has something new",

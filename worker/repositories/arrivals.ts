@@ -1,5 +1,6 @@
 import type { ProviderAvailability } from "../../src/domain/catalog.ts";
 import { isStreamingOffer } from "../../src/domain/providers.ts";
+import { preferredLanguageCondition } from "../lib/languages.ts";
 import { logError } from "../lib/logging.ts";
 
 const CONFIRMATIONS = 2;
@@ -98,8 +99,11 @@ export async function settleAnnounced(db: Database, arrivals: Arrival[]) {
                 AND NOT EXISTS (
                   SELECT 1 FROM viewing_entries AS v
                     JOIN users AS u ON u.id = v.viewer_id
+                    JOIN catalog_titles AS t ON t.id = v.title_id
+                    LEFT JOIN viewer_preferences AS p ON p.viewer_id = v.viewer_id
                    WHERE v.title_id = title_provider_state.title_id
                      AND v.status IN ('watchlist', 'watching')
+                     AND ${preferredLanguageCondition("t", "COALESCE(p.preferred_language, 'en')")}
                      AND u.email IS NOT NULL AND u.email != ''
                      AND NOT EXISTS (
                        SELECT 1 FROM viewer_alert_settings AS s
@@ -130,8 +134,11 @@ export async function waitingViewers(db: Database, titleIds: string[]) {
       `SELECT v.title_id AS "titleId", v.viewer_id AS "viewerId", u.email AS email, u.name AS name
            FROM viewing_entries AS v
            JOIN users AS u ON u.id = v.viewer_id
+           JOIN catalog_titles AS t ON t.id = v.title_id
+           LEFT JOIN viewer_preferences AS p ON p.viewer_id = v.viewer_id
           WHERE v.status IN ('watchlist', 'watching')
             AND u.email IS NOT NULL AND u.email != ''
+            AND ${preferredLanguageCondition("t", "COALESCE(p.preferred_language, 'en')")}
             AND v.title_id IN (${titleIds.map((_, index) => `$${index + 1}`).join(",")})`,
       [...titleIds],
     );

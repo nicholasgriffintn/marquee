@@ -21,6 +21,7 @@ export type WorkerBindings = DatabaseBinding & {
   LOCAL_SYNC?: string;
   CLOUDFLARE_ACCOUNT_ID: string;
   CLOUDFLARE_API_TOKEN?: string;
+  AI_GATEWAY_TOKEN?: string;
   AI_GATEWAY_ID: string;
   AI_MODEL: string;
   AI_FAST_MODEL?: string;
@@ -43,6 +44,7 @@ export type WorkerBindings = DatabaseBinding & {
   POSTER_QUEUE: Queue<IngestionJob>;
   EMBEDDING_QUEUE: Queue<IngestionJob>;
   REVIVAL_QUEUE: Queue<IngestionJob>;
+  RAIL_REFRESH_QUEUE: Queue<RailRefreshJob>;
   CATALOG_SWEEP: Workflow<CatalogSweepParameters>;
   RAILS_WORKFLOW: Workflow<RailsParameters>;
   DIGEST_WORKFLOW: Workflow;
@@ -64,6 +66,14 @@ export type RailsParameters = {
   revision: string;
   generationId: string;
 };
+
+export type RailRefreshJob = {
+  type: "refresh-rails";
+  viewerId: string;
+  token: string;
+};
+
+export type QueueJob = IngestionJob | RailRefreshJob;
 
 export type EnrichmentSource = "tmdb" | "justwatch" | "omdb" | "poster" | "mal" | "anilist";
 

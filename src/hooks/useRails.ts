@@ -9,7 +9,7 @@ import {
 } from "../domain/rails";
 import { queryJson } from "../lib/query-client";
 
-const RETRY_DELAYS = [5_000, 10_000, 20_000, 30_000];
+const RETRY_DELAYS = [10_000, 30_000];
 const SHELF_CHANGE_DEBOUNCE_MS = 4_000;
 
 type Settled = { viewerId: string; done: boolean; curated: DeliveredRail[] };
@@ -95,6 +95,5 @@ export function useRails(viewerId: string, enabled: boolean, savedKey: string) {
     personal: viewerId ? personal : [],
     heroCurated: viewerId ? viewerSettled.curated : [],
     isGenerating: Boolean(viewerId) && delivery.status === "generating",
-    isResolved: !viewerId || viewerSettled.done,
   };
 }

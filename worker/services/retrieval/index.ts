@@ -31,6 +31,7 @@ export function eligibilityOf(query: RetrievalQuery): CatalogueSearch {
     releasedAfter: query.releasedAfter,
     excludeIds: query.excludeIds,
     excludeGenres: query.excludeGenres,
+    languages: query.languages,
   };
 }
 

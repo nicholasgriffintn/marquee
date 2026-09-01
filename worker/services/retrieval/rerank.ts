@@ -1,4 +1,5 @@
 import type { MediaTitle } from "../../../src/domain/catalog.ts";
+import { cachedWorkersAiOptions } from "../../ai/workers-ai.ts";
 import { logError } from "../../lib/logging.ts";
 import { isRecord } from "../../lib/values.ts";
 import type { Bindings } from "../../types.ts";
@@ -6,14 +7,6 @@ import type { Bindings } from "../../types.ts";
 const RERANK_MODEL = "@cf/baai/bge-reranker-base";
 const RERANK_TEXT_LENGTH = 400;
 const RERANK_QUERY_LENGTH = 512;
-
-type RerankInput = { query: string; contexts: { text: string }[]; top_k?: number };
-
-function reranker(env: Bindings) {
-  return env.AI as unknown as {
-    run(model: typeof RERANK_MODEL, inputs: RerankInput): Promise<unknown>;
-  };
-}
 
 function candidateText(title: MediaTitle) {
   return [
@@ -46,11 +39,16 @@ export async function rerankTitles(env: Bindings, text: string, candidates: Medi
   const scores = new Map<string, number>();
 
   try {
-    const result = await reranker(env).run(RERANK_MODEL, {
+    const input = {
       query: text.slice(0, RERANK_QUERY_LENGTH),
       contexts: candidates.map((title) => ({ text: candidateText(title) })),
       top_k: candidates.length,
-    });
+    };
+    const result = await env.AI.run(
+      RERANK_MODEL,
+      input,
+      await cachedWorkersAiOptions(env, "rerank", RERANK_MODEL, input),
+    );
 
     for (const entry of parseRanking(result).toSorted((left, right) => right.score - left.score)) {
       const title = candidates[entry.index];

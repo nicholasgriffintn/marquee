@@ -149,6 +149,7 @@
       "TMDB_API_TOKEN",
       "CLOUDFLARE_ACCOUNT_ID",
       "CLOUDFLARE_API_TOKEN",
+      "AI_GATEWAY_TOKEN",
       "GITHUB_CLIENT_ID",
       "GITHUB_CLIENT_SECRET",
       "OMDB_API_KEY",
@@ -194,6 +195,10 @@
       {
         "binding": "REVIVAL_QUEUE",
         "queue": "marquee-revival"
+      },
+      {
+        "binding": "RAIL_REFRESH_QUEUE",
+        "queue": "marquee-rail-refresh"
       }
     ],
     "consumers": [
@@ -259,6 +264,22 @@
         "dead_letter_queue": "marquee-ingestion-dead-letter",
         "max_concurrency": 1,
         "retry_delay": 60
+      },
+      {
+        "queue": "marquee-rail-refresh",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 8,
+        "dead_letter_queue": "marquee-rail-refresh-dead-letter",
+        "max_concurrency": 2,
+        "retry_delay": 30
+      },
+      {
+        "queue": "marquee-rail-refresh-dead-letter",
+        "max_batch_size": 25,
+        "max_batch_timeout": 30,
+        "max_retries": 1,
+        "max_concurrency": 1
       },
       {
         "queue": "marquee-ingestion-dead-letter",

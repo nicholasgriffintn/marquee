@@ -1,5 +1,6 @@
 import type { CatalogResponse, CatalogSection, MediaTitle } from "../../src/domain/catalog.ts";
 import {
+  buildTitleFromRow,
   CATALOG_TITLE_COLUMNS,
   type CatalogTitleRow,
   parseSectionAudience,
@@ -11,6 +12,8 @@ import { clamp } from "../lib/numbers.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { READ_CHUNK } from "./catalog-array-utils.ts";
 import { hydrateTitleRows } from "./catalog-arrays.ts";
+import { readGenreMap } from "./catalog-genres.ts";
+import { readProviderMap } from "./catalog-providers.ts";
 import { availabilityCondition, searchTitlesFirst } from "./catalog-search.ts";
 
 type SectionRow = {
@@ -109,6 +112,36 @@ export async function readItems(db: Database, ids: string[], limit = 30) {
   });
 }
 
+export async function readSummaryItems(db: Database, ids: string[], limit = 30) {
+  const uniqueIds = [...new Set(ids.filter(isKnownTitle))].slice(0, Math.min(limit, 400));
+
+  if (uniqueIds.length === 0) {
+    return [];
+  }
+
+  const result = await db.query<CatalogTitleRow>(
+    `SELECT ${CATALOG_TITLE_COLUMNS}
+       FROM catalog_titles WHERE id IN (${uniqueIds.map((_, position) => `$${position + 1}`).join(",")})`,
+    [...uniqueIds],
+  );
+  const [genres, providers] = await Promise.all([
+    readGenreMap(db, uniqueIds),
+    readProviderMap(db, uniqueIds),
+  ]);
+  const byId = new Map(
+    result.rows.map((row) => {
+      const title = withStoredPoster(buildTitleFromRow(row), row.poster_key);
+
+      title.genres = genres.get(title.id) ?? [];
+      title.providers = providers.get(title.id) ?? [];
+
+      return [title.id, title] as const;
+    }),
+  );
+
+  return uniqueIds.flatMap((id) => byId.get(id) ?? []);
+}
+
 export async function readTitlesByMalId(db: Database, malIds: number[]) {
   const unique = [...new Set(malIds.filter((id) => Number.isInteger(id) && id > 0))].slice(0, 40);
   const found = new Map<number, MediaTitle>();
@@ -189,6 +222,13 @@ async function readShortlistedTitles(db: Database, shortlist: { ids: string[] }[
   return new Map(titles.map((title) => [title.id, title]));
 }
 
+async function readShortlistedSummaries(db: Database, shortlist: { ids: string[] }[]) {
+  const wanted = shortlist.flatMap((section) => section.ids);
+  const titles = await readSummaryItems(db, wanted, wanted.length);
+
+  return new Map(titles.map((title) => [title.id, title]));
+}
+
 function sectionItems(ids: string[], titlesById: Map<string, MediaTitle>) {
   return ids.flatMap((id) => {
     const title = titlesById.get(id);
@@ -212,7 +252,7 @@ export async function readSectionFronts(
     row,
     ids: ids.slice(0, perSection),
   }));
-  const titlesById = await readShortlistedTitles(db, fronts);
+  const titlesById = await readShortlistedSummaries(db, fronts);
 
   return fronts.map(({ row, ids }) => ({
     id: row.id,

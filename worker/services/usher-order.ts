@@ -299,6 +299,7 @@ export async function pickToOrder(
     const parsed = await runAiObject(env, {
       feature: "usher_order",
       decisionId: decision.id,
+      viewerId,
       messages,
       record: decision,
     });

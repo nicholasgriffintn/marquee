@@ -1,4 +1,5 @@
 import type { MediaTitle } from "../../../src/domain/catalog.ts";
+import { titleMatchesPreferredLanguage } from "../../../src/domain/languages.ts";
 import { includesProvider } from "../../lib/providers.ts";
 
 export type AvailabilityRule = "confirmed" | "confirmed-or-unknown";
@@ -11,6 +12,7 @@ export type Eligibility = {
   excludeIds: string[];
   excludeGenres: string[];
   certifications: string[];
+  languages: string[];
   maxRuntime?: number;
   mediaType?: "movie" | "tv";
 };
@@ -44,6 +46,7 @@ function matchesCertification(certification: string, barred: string[]) {
 export function eligibilityGate(eligibility: Eligibility) {
   const excluded = new Set(eligibility.excludeIds);
   const banned = new Set(eligibility.excludeGenres.map((genre) => genre.toLowerCase()));
+  const languages = new Set(eligibility.languages);
 
   return (title: MediaTitle) => {
     if (excluded.has(title.id)) {
@@ -51,6 +54,15 @@ export function eligibilityGate(eligibility: Eligibility) {
     }
 
     if (!meetsAvailability(title, eligibility.providerIds, eligibility.availability)) {
+      return false;
+    }
+
+    if (
+      languages.size > 0 &&
+      ![...languages].some((language) =>
+        titleMatchesPreferredLanguage(title.originalLanguage, language),
+      )
+    ) {
       return false;
     }
 

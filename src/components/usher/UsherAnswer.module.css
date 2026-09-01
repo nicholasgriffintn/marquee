@@ -212,7 +212,7 @@
   height: clamp(280px, 38vh, 440px);
   margin-bottom: var(--space-4);
   overflow-y: auto;
-  padding-right: 6px;
+  padding: 3px 6px 5px 3px;
   scrollbar-color: var(--line) transparent;
   scrollbar-width: thin;
 }
@@ -223,12 +223,30 @@
   cursor: pointer;
   display: block;
   padding: 0;
-  position: relative;
   text-align: left;
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--acid);
+  outline-offset: 2px;
 }
 
 .cardPicked {
   border-color: var(--acid);
+}
+
+.cardArt {
+  display: block;
+  position: relative;
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.card:hover .cardArt,
+.card:focus-visible .cardArt {
+  box-shadow: 5px 5px 0 var(--acid);
+  transform: translate(-2px, -2px);
 }
 
 .cardCheck {
@@ -265,7 +283,13 @@
   overflow: hidden;
   padding: var(--space-1) 3px 3px;
   text-overflow: ellipsis;
+  transition: color 0.2s ease;
   white-space: nowrap;
+}
+
+.card:hover small,
+.card:focus-visible small {
+  color: var(--white);
 }
 
 .cardPicked small {
@@ -280,12 +304,19 @@
 
 @media (prefers-reduced-motion: reduce) {
   .option,
-  .service {
+  .service,
+  .cardArt,
+  .card small {
     transition: none;
   }
 
   .option:hover:not(:disabled),
   .service:hover:not(:disabled) {
+    transform: none;
+  }
+
+  .card:hover .cardArt,
+  .card:focus-visible .cardArt {
     transform: none;
   }
 }

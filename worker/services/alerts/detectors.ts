@@ -1,4 +1,5 @@
 import { titlePath } from "../../../src/domain/catalog.ts";
+import { preferredLanguageCondition } from "../../lib/languages.ts";
 import { logError } from "../../lib/logging.ts";
 import { confirmedArrivals, settleAnnounced, waitingViewers } from "../../repositories/arrivals.ts";
 import { readItems } from "../../repositories/catalog-reader.ts";
@@ -84,10 +85,13 @@ const seasons: Detector = {
                 s.season AS season, min(s.airs_at) AS "airsAt", s.network AS network
            FROM title_schedule AS s
            JOIN viewing_entries AS v ON v.title_id = s.title_id
+           JOIN catalog_titles AS t ON t.id = s.title_id
+           LEFT JOIN viewer_preferences AS p ON p.viewer_id = v.viewer_id
           WHERE s.season IS NOT NULL
             AND s.season BETWEEN 2 AND 60
             AND s.episode = 1
             AND v.status IN ('watchlist', 'watching', 'watched')
+            AND ${preferredLanguageCondition("t", "COALESCE(p.preferred_language, 'en')")}
             AND s.airs_at BETWEEN (CURRENT_TIMESTAMP - INTERVAL '2 day')
                                          AND (CURRENT_TIMESTAMP + CAST($1 AS INTERVAL))
             AND s.season > COALESCE(
@@ -143,8 +147,13 @@ const cinema: Detector = {
            JOIN cinemas AS cin ON cin.id = c.cinema_id
            JOIN viewing_entries AS v ON v.title_id = c.title_id
            JOIN catalog_titles AS t ON t.id = c.title_id
+           JOIN viewer_preferences AS p
+             ON p.viewer_id = v.viewer_id
+            AND p.preferred_cinema_id = c.cinema_id
+            AND NULLIF(trim(p.preferred_location), '') IS NOT NULL
           WHERE c.title_id IS NOT NULL
             AND v.status IN ('watchlist', 'watching')
+            AND ${preferredLanguageCondition("t", "p.preferred_language")}
             AND c.business_day BETWEEN CURRENT_DATE
                                              AND (CURRENT_DATE + CAST($1 AS INTERVAL))
           GROUP BY v.viewer_id, c.title_id, t.title, cin.name
@@ -192,9 +201,11 @@ const people: Detector = {
              ON lower(cp.name) = replace(replace(b.key, 'rule:person:', ''), 'person:', '')
            JOIN catalog_credits AS cr ON cr.person_id = cp.person_id
            JOIN catalog_titles AS t ON t.id = cr.title_id
+           LEFT JOIN viewer_preferences AS p ON p.viewer_id = b.viewer_id
           WHERE (b.key LIKE 'rule:person:%' OR b.key LIKE 'person:%')
             AND b.revoked_at IS NULL
             AND (b.suspended_until IS NULL OR b.suspended_until < CURRENT_TIMESTAMP)
+            AND ${preferredLanguageCondition("t", "COALESCE(p.preferred_language, 'en')")}
             AND COALESCE(t.release_date, DATE '1900-01-01')
                   > CURRENT_DATE + CAST($1 AS INTERVAL)
             AND NOT EXISTS (

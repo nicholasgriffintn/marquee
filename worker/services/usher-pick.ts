@@ -239,6 +239,7 @@ export async function pickOne(
     const parsed = await runAiObject(env, {
       feature: "usher_pick",
       decisionId: decision.id,
+      viewerId,
       messages,
       record: decision,
     });

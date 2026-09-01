@@ -6,7 +6,7 @@ import { isCinemaSourceId } from "../clients/cinema/index.ts";
 import { isEuropeanaCountry } from "../clients/europeana.ts";
 import { isPartitionId } from "../repositories/discover.ts";
 import { isRevivalId, isRevivalSource } from "../repositories/revival.ts";
-import type { IngestionJob, ViewingContext } from "../types.ts";
+import type { IngestionJob, RailRefreshJob, ViewingContext } from "../types.ts";
 import { isRecord } from "./values.ts";
 
 export { isEntryStatus };
@@ -29,6 +29,18 @@ export function validProviderIds(value: unknown) {
 
 export function isKnownTitle(value: unknown): value is string {
   return typeof value === "string" && /^(movie|tv):[1-9]\d{0,9}$/u.test(value);
+}
+
+export function isRailRefreshJob(value: unknown): value is RailRefreshJob {
+  return (
+    isRecord(value) &&
+    value.type === "refresh-rails" &&
+    typeof value.viewerId === "string" &&
+    value.viewerId.length > 0 &&
+    value.viewerId.length <= 128 &&
+    typeof value.token === "string" &&
+    /^[0-9a-f-]{36}$/u.test(value.token)
+  );
 }
 
 export function isIngestionJob(value: unknown): value is IngestionJob {

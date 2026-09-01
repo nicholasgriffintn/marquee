@@ -80,6 +80,7 @@ export function eligibilityFor(state: ViewerState, options: EligibilityOptions =
     ],
     excludeGenres: [...new Set(options.excludeGenres ?? [])],
     certifications: [...new Set(options.certifications ?? [])],
+    languages: [state.preferences.preferredLanguage],
     ...(options.maxRuntime ? { maxRuntime: options.maxRuntime } : {}),
     ...(options.mediaType ? { mediaType: options.mediaType } : {}),
   };

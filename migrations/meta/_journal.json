@@ -92,6 +92,27 @@
       "when": 1787972400012,
       "tag": "0013_catalog_people_hot_updates",
       "breakpoints": false
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1788256800013,
+      "tag": "0014_viewer_ai_models",
+      "breakpoints": false
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1788256800014,
+      "tag": "0015_notebook_preferences",
+      "breakpoints": false
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1788256800015,
+      "tag": "0016_rail_refresh_schedule",
+      "breakpoints": false
     }
   ]
 }

@@ -1,4 +1,5 @@
 import type { ToolCall } from "../lib/curator-payload.ts";
+import { logEvent } from "../lib/logging.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { isRecord, parseJson } from "../lib/values.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
@@ -107,7 +108,64 @@ export const CURATOR_TOOLS: ChatCompletionTool[] = [
   },
 ];
 
+export type CuratorToolCache = Map<string, Promise<unknown>>;
+
+function rememberAvailableIds(result: unknown, availableIds: Set<string>) {
+  if (!isRecord(result)) {
+    return;
+  }
+
+  for (const field of [result.results, result.items]) {
+    if (!Array.isArray(field)) {
+      continue;
+    }
+
+    for (const item of field) {
+      if (isRecord(item) && isKnownTitle(item.id)) {
+        availableIds.add(item.id);
+      }
+    }
+  }
+}
+
 export async function executeCuratorTool(
+  env: Bindings,
+  call: ToolCall,
+  viewer: ViewerState,
+  eligibility: Eligibility,
+  availableIds: Set<string>,
+  cache?: CuratorToolCache,
+) {
+  if (!cache) {
+    return executeCuratorToolUncached(env, call, viewer, eligibility, availableIds);
+  }
+
+  const cacheKey = `${call.function.name}:${call.function.arguments}`;
+  const cached = cache.get(cacheKey);
+
+  if (cached) {
+    const result = await cached;
+
+    rememberAvailableIds(result, availableIds);
+    logEvent("curator_tool_cache_hit", { tool: call.function.name });
+
+    return result;
+  }
+
+  const pending = executeCuratorToolUncached(env, call, viewer, eligibility, availableIds);
+
+  cache.set(cacheKey, pending);
+
+  try {
+    return await pending;
+  } catch (error) {
+    cache.delete(cacheKey);
+
+    throw error;
+  }
+}
+
+async function executeCuratorToolUncached(
   env: Bindings,
   call: ToolCall,
   viewer: ViewerState,

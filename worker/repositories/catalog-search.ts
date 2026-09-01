@@ -7,6 +7,7 @@ import {
   type CatalogTitleRow,
   withStoredPoster,
 } from "../lib/catalog-payload.ts";
+import { preferredLanguageCondition } from "../lib/languages.ts";
 import { clamp } from "../lib/numbers.ts";
 import { providerFilterSql } from "../lib/providers.ts";
 import { isKnownTitle, validProviderIds } from "../lib/validation.ts";
@@ -41,6 +42,7 @@ export type CatalogueSearch = {
   maxRuntime?: number;
   excludeIds?: string[];
   excludeGenres?: string[];
+  languages?: string[];
   includeIds?: string[];
   certifications?: string[];
   sort?: CatalogueSort;
@@ -121,6 +123,9 @@ function eligibilityClause(search: CatalogueSearch, bindings: DatabaseValue[]): 
   const keywords = lowered(search.keywords, 6);
   const providerIds = validProviderIds(search.providerIds);
   const excludeGenres = lowered(search.excludeGenres, 20);
+  const languages = lowered(search.languages, 10).filter((language) =>
+    /^[a-z]{2}$/u.test(language),
+  );
   const excludedIds = [...new Set((search.excludeIds ?? []).filter(isKnownTitle))].slice(
     0,
     EXCLUDE_ID_LIMIT,
@@ -170,6 +175,12 @@ function eligibilityClause(search: CatalogueSearch, bindings: DatabaseValue[]): 
          SELECT 1 FROM catalog_title_genres AS bg
          WHERE bg.title_id = t.id AND lower(bg.genre) IN (${excludeGenres.map((genre) => `$${bindings.push(genre)}`).join(", ")})
        )`,
+    );
+  }
+
+  if (languages.length) {
+    conditions.push(
+      `(${languages.map((language) => preferredLanguageCondition("t", `$${bindings.push(language)}`)).join(" OR ")})`,
     );
   }
 

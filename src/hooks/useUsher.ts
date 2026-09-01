@@ -4,7 +4,7 @@ import type { MediaTitle } from "../domain/catalog";
 import type { Guest } from "../domain/notebook";
 import type { TonightOrder, UsherMoment, UsherSurface } from "../domain/usher";
 import { journeyFor, startJourney } from "../lib/journey";
-import { jsonMutation, mutateJson, queryJson } from "../lib/query-client";
+import { jsonMutation, mutateJson, queryJson, queryJsonFresh } from "../lib/query-client";
 
 type StateResponse = { status: string; answered: string[]; awayDays?: number };
 
@@ -51,6 +51,8 @@ const NO_ORDER: UsherOrderState = {
   error: "",
 };
 
+const NO_ONBOARDING = { viewerId: "", active: false };
+
 const UNINVITED_PER_SESSION = 1;
 const REJECTED_MEMORY = 40;
 const WEEKEND_DAYS = new Set([0, 6]);
@@ -62,9 +64,10 @@ function viewingMoment() {
   return { hour: now.getHours(), isWeekend: WEEKEND_DAYS.has(now.getDay()) };
 }
 
-export function useUsher(isSignedIn: boolean) {
+export function useUsher(viewerId: string) {
+  const isSignedIn = Boolean(viewerId);
   const [moment, setMoment] = useState<UsherMoment | null>(null);
-  const [isOnboarding, setIsOnboarding] = useState(false);
+  const [onboarding, setOnboarding] = useState(NO_ONBOARDING);
   const [pick, setPick] = useState<UsherPickState>(NO_PICK);
   const [aside, setAside] = useState("");
   const [order, setOrder] = useState<UsherOrderState>(NO_ORDER);
@@ -75,6 +78,8 @@ export function useUsher(isSignedIn: boolean) {
   const pickRun = useRef(0);
   const awayDays = useRef(0);
   const momentRef = useRef<UsherMoment | null>(null);
+  const isOnboarding = onboarding.viewerId === viewerId && onboarding.active;
+  const isOnboardingResolved = !isSignedIn || onboarding.viewerId === viewerId;
 
   useEffect(() => {
     momentRef.current = moment;
@@ -105,7 +110,7 @@ export function useUsher(isSignedIn: boolean) {
       }
 
       try {
-        const response = await queryJson<MomentResponse>(`/api/usher/moment?${parameters}`);
+        const response = await queryJsonFresh<MomentResponse>(`/api/usher/moment?${parameters}`);
 
         if (response.moment) {
           setMoment(response.moment);
@@ -152,7 +157,7 @@ export function useUsher(isSignedIn: boolean) {
       const pending = state.status === "new" || state.status === "in-progress";
 
       awayDays.current = state.awayDays ?? 0;
-      setIsOnboarding(pending);
+      setOnboarding({ viewerId, active: pending });
 
       if (pending) {
         await request("first-run");
@@ -162,7 +167,7 @@ export function useUsher(isSignedIn: boolean) {
     void load();
 
     return () => controller.abort();
-  }, [isSignedIn, request]);
+  }, [isSignedIn, request, viewerId]);
 
   const advance = useCallback(async () => {
     if (!isOnboarding) {
@@ -171,16 +176,16 @@ export function useUsher(isSignedIn: boolean) {
       return;
     }
 
-    const response = await queryJson<MomentResponse>("/api/usher/moment?surface=first-run").catch(
-      (): MomentResponse => ({ moment: null }),
-    );
+    const response = await queryJsonFresh<MomentResponse>(
+      "/api/usher/moment?surface=first-run",
+    ).catch((): MomentResponse => ({ moment: null }));
 
     setMoment(response.moment);
 
     if (!response.moment) {
-      setIsOnboarding(false);
+      setOnboarding({ viewerId, active: false });
     }
-  }, [isOnboarding]);
+  }, [isOnboarding, viewerId]);
 
   const answer = useCallback(
     async (questionId: string, value: unknown) => {
@@ -221,14 +226,14 @@ export function useUsher(isSignedIn: boolean) {
       setMoment(null);
 
       if (isOnboarding && scope !== "once") {
-        setIsOnboarding(false);
+        setOnboarding({ viewerId, active: false });
       }
 
       await mutateJson("/api/usher/dismiss", jsonMutation("POST", { kind, scope })).catch(
         () => undefined,
       );
     },
-    [isOnboarding],
+    [isOnboarding, viewerId],
   );
 
   const railVerdict = useCallback(async (railId: string, verdict: "good" | "bad") => {
@@ -437,6 +442,7 @@ export function useUsher(isSignedIn: boolean) {
     () => ({
       moment: isSignedIn ? moment : null,
       isOnboarding: isSignedIn && isOnboarding,
+      isOnboardingResolved,
       pick: isSignedIn ? pick : NO_PICK,
       order: isSignedIn ? order : NO_ORDER,
       guests: isSignedIn ? guests : [],
@@ -464,6 +470,7 @@ export function useUsher(isSignedIn: boolean) {
       editOrder,
       guests,
       isOnboarding,
+      isOnboardingResolved,
       isSignedIn,
       moment,
       openOrder,

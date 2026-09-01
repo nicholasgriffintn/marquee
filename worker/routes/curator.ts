@@ -132,7 +132,10 @@ curatorRoutes.get("/insight/:titleId", async (context) => {
   const user = context.get("viewer");
 
   try {
-    const insight = await getTitleInsight(context.env, titleId, { generate: Boolean(user) });
+    const insight = await getTitleInsight(context.env, titleId, {
+      generate: Boolean(user),
+      viewerId: user?.id,
+    });
 
     if (!insight) {
       return jsonResponse({ insight: null, pairs: [] });

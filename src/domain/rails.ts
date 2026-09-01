@@ -3,7 +3,7 @@ import type { CatalogSection } from "./catalog";
 const CURATED_RAIL_PREFIX = "rail-";
 const PINNED_RAIL_PREFIX = "pinned-";
 
-export type RailSource = "ai" | "person" | "cinema" | "broadcast";
+export type RailSource = "ai" | "person" | "cinema";
 
 export type RailStatus = "ready" | "generating" | "error";
 

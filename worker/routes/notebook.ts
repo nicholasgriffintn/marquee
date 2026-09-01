@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 
+import { preferredLanguage } from "../../src/domain/languages.ts";
 import { isBeliefScope } from "../../src/domain/notebook.ts";
 import { requireAuthentication, type AuthVariables } from "../auth/session.ts";
 import { sendAddressConfirmation } from "../clients/email.ts";
@@ -22,6 +23,7 @@ import {
   readFollowedPeople,
   setPersonFollow,
 } from "../repositories/beliefs.ts";
+import { cinemaExists, searchCinemas } from "../repositories/cinemas.ts";
 import type { FeedKey } from "../repositories/feeds.ts";
 import {
   mintFeedToken,
@@ -38,6 +40,10 @@ import {
   saveGuest,
 } from "../repositories/guests.ts";
 import { hashState } from "../repositories/links.ts";
+import {
+  readNotebookPreferences,
+  saveNotebookPreferences,
+} from "../repositories/notebook-preferences.ts";
 import { readNotesByIds } from "../repositories/notes.ts";
 import { readViewerEntries } from "../repositories/viewer-context.ts";
 import { ALERT_KINDS, isAlertKind } from "../services/alerts/types.ts";
@@ -86,6 +92,44 @@ const GUEST_TRAIT_LENGTH = 40;
 function guestList(value: unknown) {
   return stringList(value, { limit: GUEST_TRAITS, itemLength: GUEST_TRAIT_LENGTH });
 }
+
+notebookRoutes.get("/preferences", async (context) => {
+  const user = context.get("authenticatedUser");
+
+  return jsonResponse(await readNotebookPreferences(context.env.DB, user.id));
+});
+
+notebookRoutes.get("/preferences/cinemas", async (context) => {
+  const query = context.req.query("query")?.trim().slice(0, 120) ?? "";
+
+  return jsonResponse({ cinemas: await searchCinemas(context.env.DB, query) });
+});
+
+notebookRoutes.post("/preferences", async (context) => {
+  const user = context.get("authenticatedUser");
+  const body = await readJsonObject(context.req.raw);
+  const requestedCinemaId =
+    typeof body?.preferredCinemaId === "string" ? body.preferredCinemaId.trim().slice(0, 160) : "";
+  const requestedLocation =
+    typeof body?.preferredLocation === "string" ? body.preferredLocation.trim().slice(0, 120) : "";
+  const hasCinemaPreference = Boolean(requestedCinemaId || requestedLocation);
+
+  if (hasCinemaPreference && (!requestedCinemaId || requestedLocation.length < 2)) {
+    return jsonResponse({ error: "Choose both a location and a cinema." }, 400);
+  }
+
+  if (requestedCinemaId && !(await cinemaExists(context.env.DB, requestedCinemaId))) {
+    return jsonResponse({ error: "That cinema is not in the directory." }, 400);
+  }
+
+  await saveNotebookPreferences(context.env.DB, user.id, {
+    preferredCinemaId: requestedCinemaId || null,
+    preferredLocation: requestedLocation || null,
+    preferredLanguage: preferredLanguage(body?.preferredLanguage),
+  });
+
+  return jsonResponse(await readNotebookPreferences(context.env.DB, user.id));
+});
 
 notebookRoutes.get("/alerts", async (context) => {
   const user = context.get("authenticatedUser");

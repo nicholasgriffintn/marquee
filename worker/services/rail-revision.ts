@@ -1,7 +1,7 @@
 import { sha256Hex } from "../lib/hash.ts";
 import { logError } from "../lib/logging.ts";
 
-const REVISION_SCHEME = "r2";
+const REVISION_SCHEME = "r3";
 
 type RevisionRow = {
   shelf: string | null;
@@ -10,6 +10,7 @@ type RevisionRow = {
   answers: string | null;
   providers: string | null;
   beliefs: string | null;
+  aiModel: string | null;
 };
 
 export async function readRailRevision(db: Database, viewerId: string) {
@@ -30,7 +31,10 @@ export async function readRailRevision(db: Database, viewerId: string) {
               FROM viewer_preferences WHERE viewer_id = $1) AS providers,
            (SELECT count(*) || ':' || coalesce(max(updated_at)::text, '')
               FROM viewer_beliefs
-             WHERE viewer_id = $1 AND revoked_at IS NULL) AS beliefs`,
+             WHERE viewer_id = $1 AND revoked_at IS NULL) AS beliefs,
+           (SELECT provider || ':' || model || ':' || credential_source || ':'
+                   || coalesce(byok_alias, '') || ':' || updated_at::text
+              FROM viewer_ai_models WHERE viewer_id = $1) AS "aiModel"`,
       [viewerId],
     );
     const parts = [
@@ -40,6 +44,7 @@ export async function readRailRevision(db: Database, viewerId: string) {
       row?.answers ?? "",
       row?.providers ?? "",
       row?.beliefs ?? "",
+      row?.aiModel ?? "",
     ];
 
     return `${REVISION_SCHEME}-${await sha256Hex(parts.join("|"), 16)}`;

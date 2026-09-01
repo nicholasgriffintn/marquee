@@ -1,5 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 
+import { AiGatewayError } from "../clients/ai-gateway.ts";
 import { withDatabase } from "../database/runtime.ts";
 import { logError } from "../lib/logging.ts";
 import { isRecord } from "../lib/values.ts";
@@ -127,6 +128,10 @@ function curatorMessage(error: unknown) {
   const status = error && typeof error === "object" && "status" in error ? error.status : null;
 
   if (status === 402) {
+    if (error instanceof AiGatewayError && error.transport === "byok") {
+      return "The configured AI provider has no available quota.";
+    }
+
     return "The AI curator has used up its Cloudflare AI allowance.";
   }
 

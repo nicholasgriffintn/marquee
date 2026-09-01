@@ -6,6 +6,7 @@ import { openDatabase, withDatabase } from "./database/runtime.ts";
 import { CuratorSession } from "./durable/curator-session.ts";
 import { consumeDeadLetters, consumeIngestion } from "./jobs/ingestion-consumer.ts";
 import { scheduleIngestion } from "./jobs/ingestion-scheduler.ts";
+import { consumeRailRefresh, consumeRailRefreshDeadLetters } from "./jobs/rail-refresh-consumer.ts";
 import { automatedSyncAllowed } from "./lib/environment.ts";
 import { hasTrustedOrigin } from "./lib/http.ts";
 import { logError, logEvent, logRejection } from "./lib/logging.ts";
@@ -31,7 +32,7 @@ import { sitemapRoutes } from "./routes/sitemap.ts";
 import { usherRoutes } from "./routes/usher.ts";
 import { bearerScopeGuard } from "./security/bearer-scopes.ts";
 import { apiGuard } from "./security/guard.ts";
-import type { Bindings, IngestionJob, WorkerBindings } from "./types.ts";
+import type { Bindings, QueueJob, WorkerBindings } from "./types.ts";
 import { CatalogSweep } from "./workflows/catalog-sweep.ts";
 import { DigestWorkflow } from "./workflows/digest.ts";
 import { RailsWorkflow } from "./workflows/rails.ts";
@@ -176,13 +177,17 @@ export default {
     context.waitUntil(
       logRejection(
         withDatabase(env, (runtime) =>
-          batch.queue === "marquee-ingestion-dead-letter"
-            ? consumeDeadLetters(batch, runtime)
-            : consumeIngestion(batch, runtime),
+          batch.queue === "marquee-rail-refresh"
+            ? consumeRailRefresh(batch, runtime)
+            : batch.queue === "marquee-rail-refresh-dead-letter"
+              ? consumeRailRefreshDeadLetters(batch)
+              : batch.queue === "marquee-ingestion-dead-letter"
+                ? consumeDeadLetters(batch, runtime)
+                : consumeIngestion(batch, runtime),
         ),
         "queue_batch_failed",
         { queue: batch.queue, batchSize: batch.messages.length },
       ),
     );
   },
-} satisfies ExportedHandler<WorkerBindings, IngestionJob>;
+} satisfies ExportedHandler<WorkerBindings, QueueJob>;

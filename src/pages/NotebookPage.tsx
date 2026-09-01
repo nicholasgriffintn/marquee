@@ -15,6 +15,7 @@ import {
   NotebookSection,
   NotebookSubheading,
 } from "../components/notebook/NotebookSection";
+import { PreferencesPanel } from "../components/notebook/PreferencesPanel";
 import { ServicesPanel } from "../components/notebook/ServicesPanel";
 import { TasteMap } from "../components/notebook/TasteMap";
 import { UsherMark } from "../components/usher/UsherMark";
@@ -30,6 +31,11 @@ type NotebookResponse = { beliefs: Belief[] };
 type GuestResponse = { guests: Guest[] };
 
 const DIVIDERS: Divider[] = [
+  {
+    id: "preferences",
+    label: "Your preferences",
+    aside: "language, location and your cinema",
+  },
   {
     id: "notes",
     label: "What I have written down",
@@ -214,9 +220,20 @@ export function NotebookPage({
 
         <div className={styles.pages}>
           <NotebookSection
-            id="notes"
+            id="preferences"
             number={1}
             title={DIVIDERS[0].label}
+            lede="Set the language I should use and, if you want cinema notes, the one branch that counts as yours."
+          >
+            <ErrorBoundary label="These preferences">
+              <PreferencesPanel isSignedIn={isSignedIn} />
+            </ErrorBoundary>
+          </NotebookSection>
+
+          <NotebookSection
+            id="notes"
+            number={2}
+            title={DIVIDERS[1].label}
             lede="Every line here came from something you did, or something you told me. Where I am guessing, I say so."
           >
             <ErrorBoundary label="These notes">
@@ -234,8 +251,8 @@ export function NotebookPage({
 
           <NotebookSection
             id="shape"
-            number={2}
-            title={DIVIDERS[1].label}
+            number={3}
+            title={DIVIDERS[2].label}
             lede="Everything you have marked, placed by what it is rather than what it is called. Close together means alike. The two directions are mine rather than the industry's — where one end has a character to it, I have written it in the margin."
           >
             <ErrorBoundary label="This map">
@@ -245,8 +262,8 @@ export function NotebookPage({
 
           <NotebookSection
             id="services"
-            number={3}
-            title={DIVIDERS[2].label}
+            number={4}
+            title={DIVIDERS[3].label}
             lede="Tick the ones you actually pay for. I will stop offering you things behind doors you cannot open."
           >
             <ErrorBoundary label="This list of services">
@@ -262,8 +279,8 @@ export function NotebookPage({
 
           <NotebookSection
             id="room"
-            number={4}
-            title={DIVIDERS[3].label}
+            number={5}
+            title={DIVIDERS[4].label}
             lede="Give me a name and what they will not sit through, and I will keep it in mind when the room is not just you."
           >
             <ErrorBoundary label="This guest list">
@@ -277,8 +294,8 @@ export function NotebookPage({
 
           <NotebookSection
             id="post"
-            number={5}
-            title={DIVIDERS[4].label}
+            number={6}
+            title={DIVIDERS[5].label}
             lede="Only about things already on your shelf, never more than a handful a week, and never twice about the same thing."
           >
             <ErrorBoundary label="These settings">
@@ -288,8 +305,8 @@ export function NotebookPage({
 
           <NotebookSection
             id="elsewhere"
-            number={6}
-            title={DIVIDERS[5].label}
+            number={7}
+            title={DIVIDERS[6].label}
             lede="Bring your history in from somewhere else, or hand a key to something that is not a person."
           >
             <NotebookSubheading>What you brought with you</NotebookSubheading>

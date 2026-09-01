@@ -4,7 +4,7 @@ import { Heading, Page } from "../ui";
 
 import styles from "./LegalPage.module.css";
 
-const UPDATED = "28 August 2026";
+const UPDATED = "1 September 2026";
 
 export function PrivacyPolicyPage() {
   return (
@@ -136,8 +136,9 @@ export function PrivacyPolicyPage() {
             <p>
               For nearby cinema showings, Marquee uses the approximate location supplied by
               Cloudflare at the network edge. This is roughly town-level, not precise GPS. It is
-              used to find nearby venues and is not stored against your account. Marquee may retain
-              an aggregated map cell to decide which areas need fresher listings.
+              used to find nearby venues and is not stored against your account unless you
+              explicitly save a preferred location and cinema in the Notebook. Marquee may retain an
+              aggregated map cell to decide which areas need fresher listings.
             </p>
 
             <h3>Information used before sign-in</h3>
@@ -245,20 +246,23 @@ export function PrivacyPolicyPage() {
           <section className={styles.section} id="ai">
             <h2>4. AI and preference profiling</h2>
             <p>
-              Marquee uses Cloudflare Workers AI to make and explain recommendations, summarise
-              viewing preferences and help the Usher respond. A request can include what you typed,
-              selected services, relevant catalogue records and a limited view of your shelf,
+              Marquee uses Cloudflare Workers AI by default to make and explain recommendations,
+              summarise viewing preferences and help the Usher respond. An account may instead be
+              configured to use a third-party model through Cloudflare AI Gateway. That provider
+              then processes the same request content for Marquee. A request can include what you
+              typed, selected services, relevant catalogue records and a limited view of your shelf,
               ratings and notes. Do not include information in a request that you would not want
               processed for that purpose.
             </p>
             <p>
-              Requests travel through Cloudflare AI Gateway, which keeps a log of them. That log
-              holds a copy of the whole request, including anything about you the request carried,
-              together with the model's reply. Replies may also be held in the Gateway response
-              cache and reused for a later request that matches; the short brief Marquee writes
-              about a single title is cached for a day. Marquee does not attach your account
-              identifier to these requests. It sends the name of the feature and a random reference
-              created for that one decision, which cannot be traced back to you.
+              Requests travel through Cloudflare AI Gateway. By default, its log holds a copy of the
+              whole request, including anything about you the request carried, together with the
+              model's reply. Replies may also be held in the Gateway response cache and reused for a
+              later request that matches; the short brief Marquee writes about a single title is
+              cached for a day. Gateway logging, Gateway caching and that shared title cache are
+              disabled when an account uses its own provider key. Marquee does not attach your
+              account identifier to these requests. It sends the name of the feature and a random
+              reference created for that one decision, which cannot be traced back to you.
             </p>
             <p>
               Cloudflare states in its{" "}
@@ -270,7 +274,8 @@ export function PrivacyPolicyPage() {
                 Workers AI data-use terms
               </a>{" "}
               that customer content is not used to train AI models or improve Cloudflare or
-              third-party services without explicit consent. Guest and member curator conversation
+              third-party services without explicit consent. A configured third-party provider's own
+              data-use terms also apply to its processing. Guest and member curator conversation
               turns are kept together for follow-ups and deleted after one hour of inactivity.
               Separately, Marquee's own usage analytics record the first 200 characters of what you
               typed when you ask the curator, so that broken and unanswerable requests can be found

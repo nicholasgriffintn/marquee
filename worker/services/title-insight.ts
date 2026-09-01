@@ -1,4 +1,5 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
+import { hasViewerAiModel } from "../ai/model-routing.ts";
 import { runAiObject } from "../ai/run.ts";
 import { candidatesFrom, promptVersion } from "../lib/decisions.ts";
 import { isRecord } from "../lib/values.ts";
@@ -93,14 +94,18 @@ async function pairCandidates(env: Bindings, title: MediaTitle) {
 export async function getTitleInsight(
   env: Bindings,
   titleId: string,
-  options: { generate?: boolean } = {},
+  options: { generate?: boolean; viewerId?: string } = {},
 ) {
   const generate = options.generate ?? true;
-  const cached = await env.DB.first<InsightRow>(
-    `SELECT payload, EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - created_at)) / 86400.0 AS "ageDays"
-     FROM title_insights WHERE title_id = $1`,
-    [titleId],
-  );
+  const viewerId = options.viewerId ?? "";
+  const hasModelOverride = viewerId ? await hasViewerAiModel(env, viewerId) : false;
+  const cached = hasModelOverride
+    ? null
+    : await env.DB.first<InsightRow>(
+        `SELECT payload, EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - created_at)) / 86400.0 AS "ageDays"
+         FROM title_insights WHERE title_id = $1`,
+        [titleId],
+      );
 
   if (cached && (!generate || cached.ageDays < MAX_AGE_DAYS)) {
     return JSON.parse(cached.payload) as TitleInsight;
@@ -119,6 +124,7 @@ export async function getTitleInsight(
   const decision = beginDecision(env, {
     feature: "insight",
     promptVersion: INSIGHT_PROMPT_VERSION,
+    viewerId,
     surface: titleId,
   });
   const { candidates, origin } = await pairCandidates(env, title);
@@ -131,6 +137,7 @@ export async function getTitleInsight(
   const parsed = await runAiObject(env, {
     feature: "insight",
     decisionId: decision.id,
+    viewerId: viewerId || null,
     record: decision,
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
@@ -160,14 +167,16 @@ export async function getTitleInsight(
   decision.select(insight.pairs.map((pair) => pair.titleId));
   await decision.settle(insight.pairs.length ? "served" : "empty");
 
-  await env.DB.execute(
-    `INSERT INTO title_insights (title_id, payload)
-     VALUES ($1, $2)
-     ON CONFLICT(title_id) DO UPDATE SET
-       payload = excluded.payload,
-       created_at = CURRENT_TIMESTAMP`,
-    [titleId, JSON.stringify(insight)],
-  );
+  if (!hasModelOverride) {
+    await env.DB.execute(
+      `INSERT INTO title_insights (title_id, payload)
+       VALUES ($1, $2)
+       ON CONFLICT(title_id) DO UPDATE SET
+         payload = excluded.payload,
+         created_at = CURRENT_TIMESTAMP`,
+      [titleId, JSON.stringify(insight)],
+    );
+  }
 
   return insight;
 }

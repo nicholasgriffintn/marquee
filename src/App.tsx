@@ -129,11 +129,11 @@ export function App() {
   );
   const search = useSearch(query, selectedProviderIds);
   const curator = useCurator();
-  const usher = useUsher(isSignedIn);
+  const usher = useUsher(session.user?.id ?? "");
   const pinned = usePinned(isSignedIn);
   const rails = useRails(
     session.user?.id ?? "",
-    isSignedIn && isViewerReady && isHome,
+    isSignedIn && isViewerReady && isHome && usher.isOnboardingResolved && !usher.isOnboarding,
     profile.shelfKey,
   );
   const episodes = useTonight(isViewerReady && isHome, TONIGHT_EPISODES);
@@ -262,11 +262,7 @@ export function App() {
   );
   const featured = featuredTitle.item ?? heroSections.flatMap((section) => section.items)[0];
   const isHeroReady =
-    isViewerReady &&
-    !catalog.isLoading &&
-    featuredTitle.isResolved &&
-    rails.isResolved &&
-    pinned.isResolved;
+    isViewerReady && !catalog.isLoading && featuredTitle.isResolved && pinned.isResolved;
   const isPinned = Boolean(curator.state.prompt && pinned.pinnedPrompt === curator.state.prompt);
 
   const pinCurrentShelf = useCallback(() => {

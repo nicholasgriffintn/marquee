@@ -400,7 +400,8 @@ function TitleAnswer({
   }, [query]);
 
   const pickedIds = new Set(picked.map((item) => item.id));
-  const grid = [...picked, ...items.filter((item) => !pickedIds.has(item.id))];
+  const itemIds = new Set(items.map((item) => item.id));
+  const grid = [...items, ...picked.filter((item) => !itemIds.has(item.id))];
 
   return (
     <>
@@ -430,12 +431,14 @@ function TitleAnswer({
                 )
               }
             >
-              <TitleArt url={item.posterUrl} seed={item.id} label={item.title} width={160} />
-              {isPicked ? (
-                <span className={styles.cardCheck} aria-hidden="true">
-                  <CheckIcon />
-                </span>
-              ) : null}
+              <span className={styles.cardArt}>
+                <TitleArt url={item.posterUrl} seed={item.id} label={item.title} width={160} />
+                {isPicked ? (
+                  <span className={styles.cardCheck} aria-hidden="true">
+                    <CheckIcon />
+                  </span>
+                ) : null}
+              </span>
               <small>{item.title}</small>
             </button>
           );

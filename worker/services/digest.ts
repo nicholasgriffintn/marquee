@@ -1,4 +1,5 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
+import { titleMatchesPreferredLanguage } from "../../src/domain/languages.ts";
 import { candidatesFrom, type DecisionCandidate } from "../lib/decisions.ts";
 import { mintJourney } from "../lib/journeys.ts";
 import { logError, logEvent } from "../lib/logging.ts";
@@ -7,6 +8,7 @@ import {
   searchCatalogue,
   type CatalogueSearch,
 } from "../repositories/catalog-search.ts";
+import { readNotebookPreferences } from "../repositories/notebook-preferences.ts";
 import type { Bindings } from "../types.ts";
 import { prepareRails } from "./ai-rails.ts";
 import { readTrending } from "./buzz.ts";
@@ -151,6 +153,13 @@ async function freshForViewer(
   return byTaste.titleIds.length ? byTaste : freshByGenre(env, genres, search);
 }
 
+async function trendingForViewer(env: Bindings, eligibility: Eligibility) {
+  const ids = await readTrending(env, DIGEST_TRENDING * 3);
+  const titles = await eligibleTitles(env, ids, { ...eligibility, sort: "given" }, DIGEST_TRENDING);
+
+  return titles.map((title) => title.id);
+}
+
 export async function buildDigest(env: Bindings, viewerId: string) {
   const viewer = await readViewerState(env, viewerId);
 
@@ -174,7 +183,7 @@ export async function buildDigest(env: Bindings, viewerId: string) {
         return NO_FRESH;
       },
     ),
-    readTrending(env, DIGEST_TRENDING),
+    trendingForViewer(env, digestEligibility),
     readTonight(env, viewerId, DIGEST_EPISODES, 168),
     weekNumbers(env, viewerId),
     leadForViewer(env, viewerId, viewer.providerIds),
@@ -231,21 +240,27 @@ export async function buildDigest(env: Bindings, viewerId: string) {
 }
 
 export async function readDigest(env: Bindings, viewerId: string) {
-  const row = await env.DB.first<{ payload: string }>(
-    `SELECT payload FROM viewer_digests WHERE viewer_id = $1`,
-    [viewerId],
-  );
+  const [row, preferences] = await Promise.all([
+    env.DB.first<{ payload: string }>(`SELECT payload FROM viewer_digests WHERE viewer_id = $1`, [
+      viewerId,
+    ]),
+    readNotebookPreferences(env.DB, viewerId),
+  ]);
 
   if (!row) {
     return null;
   }
 
   const digest = JSON.parse(row.payload) as Digest;
-  const items = await readRanked(env.DB, [
-    ...(digest.lead ? [digest.lead.titleId] : []),
-    ...digest.fresh,
-    ...digest.trending,
-  ]);
+  const items = (
+    await readRanked(env.DB, [
+      ...(digest.lead ? [digest.lead.titleId] : []),
+      ...digest.fresh,
+      ...digest.trending,
+    ])
+  ).filter((item) =>
+    titleMatchesPreferredLanguage(item.originalLanguage, preferences.preferredLanguage),
+  );
   const byId = new Map(items.map((item) => [item.id, item]));
   const pick = (ids: string[]): MediaTitle[] =>
     ids.flatMap((id) => {
