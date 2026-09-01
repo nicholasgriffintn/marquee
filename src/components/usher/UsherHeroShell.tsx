@@ -36,9 +36,9 @@ export function UsherExit({ onClick }: { onClick: () => void }) {
   );
 }
 
-export function UsherFigure({ face }: { face: UsherFace }) {
+export function UsherFigure({ face, busy = false }: { face: UsherFace; busy?: boolean }) {
   return (
-    <div className={styles.figure} aria-hidden="true">
+    <div className={classNames(styles.figure, busy && styles.figureBusy)} aria-hidden="true">
       <UsherMark face={face} className={styles.figureMark} />
     </div>
   );
@@ -58,6 +58,24 @@ export function UsherNarration({ children }: { children: ReactNode }) {
 
 export function UsherCaret() {
   return <i className={styles.caret} />;
+}
+
+export function UsherWorking({ status }: { status: string }) {
+  return (
+    <output className={styles.working} aria-live="polite">
+      <span className={styles.film} aria-hidden="true">
+        <span className={styles.filmTrack}>
+          {Array.from({ length: 10 }, (_, index) => (
+            <i key={index} />
+          ))}
+        </span>
+      </span>
+      <span className={styles.workingCopy}>
+        <span>In the projection booth</span>
+        <strong>{status || "Reading the room"}</strong>
+      </span>
+    </output>
+  );
 }
 
 export function UsherFacts({ facts, className }: { facts: string[]; className?: string }) {

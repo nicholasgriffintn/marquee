@@ -7,6 +7,7 @@ import type {
   TitleCredits,
 } from "../../src/domain/catalog.ts";
 import { EXTERNAL_ID_FIELDS, EXTERNAL_ID_OWNERS } from "../../src/domain/catalog.ts";
+import { mergeLanguageCodes } from "../../src/domain/languages.ts";
 import { computeBlendedRating, computeWeightedRating } from "../lib/ratings.ts";
 import { READ_CHUNK, rowPlaceholders } from "./catalog-array-utils.ts";
 import { persistTitleExtensions } from "./catalog-arrays.ts";
@@ -45,6 +46,11 @@ function mergeProviders(fresh: MediaTitle, stored: MediaTitle) {
     }
 
     const existing = providers.get(provider.id);
+    const audioLanguages = mergeLanguageCodes(existing?.audioLanguages, provider.audioLanguages);
+    const subtitleLanguages = mergeLanguageCodes(
+      existing?.subtitleLanguages,
+      provider.subtitleLanguages,
+    );
 
     providers.set(
       provider.id,
@@ -52,6 +58,8 @@ function mergeProviders(fresh: MediaTitle, stored: MediaTitle) {
         ? {
             ...provider,
             offerTypes: [...new Set([...existing.offerTypes, ...provider.offerTypes])],
+            ...(audioLanguages.length > 0 ? { audioLanguages } : {}),
+            ...(subtitleLanguages.length > 0 ? { subtitleLanguages } : {}),
             webUrl: provider.webUrl ?? existing.webUrl,
           }
         : provider,

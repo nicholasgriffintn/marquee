@@ -149,7 +149,7 @@ export function PreferencesPanel({ isSignedIn }: { isSignedIn: boolean }) {
   return (
     <NotebookGroup
       heading="What should reach your seat"
-      lede="Recommendations and letters stay in your preferred language. Cinema letters remain off until you choose both a location and one exact cinema branch."
+      lede="Recommendations and streaming letters use your preferred audio language. Cinema letters remain off until you choose both a location and one exact cinema branch."
     >
       <form
         className={styles.form}
@@ -159,7 +159,7 @@ export function PreferencesPanel({ isSignedIn }: { isSignedIn: boolean }) {
         }}
       >
         <label className={styles.field}>
-          <span>Preferred language</span>
+          <span>Preferred audio language</span>
           <select value={language} onChange={(event) => setLanguage(event.target.value)}>
             {PREFERRED_LANGUAGES.map((option) => (
               <option key={option.code} value={option.code}>
@@ -167,7 +167,10 @@ export function PreferencesPanel({ isSignedIn }: { isSignedIn: boolean }) {
               </option>
             ))}
           </select>
-          <small>Titles without language data count as English.</small>
+          <small>
+            Titles without language data count as English. Reported English audio and dubs count
+            too.
+          </small>
         </label>
 
         <label className={styles.field}>

@@ -1,5 +1,8 @@
 import type { ViewerOrigin } from "../../src/domain/cinema.ts";
-import { titleMatchesPreferredLanguage } from "../../src/domain/languages.ts";
+import {
+  titleHasPreferredAudioLanguage,
+  titleMatchesPreferredLanguage,
+} from "../../src/domain/languages.ts";
 import type { DeliveredRail } from "../../src/domain/rails.ts";
 import { logError } from "../lib/logging.ts";
 import { titleCase } from "../lib/text.ts";
@@ -8,6 +11,7 @@ import { readItems } from "../repositories/catalog-reader.ts";
 import { readNearbyCinemas, readShowingTitles } from "../repositories/cinemas.ts";
 import { readNotebookPreferences } from "../repositories/notebook-preferences.ts";
 import { readPerson, readPersonTitleIds } from "../repositories/people.ts";
+import { readProviderPreferences } from "../repositories/profile.ts";
 import type { Bindings } from "../types.ts";
 
 const MIN_RAIL = 3;
@@ -24,6 +28,7 @@ async function peopleRails(
   env: Bindings,
   viewerId: string,
   preferredLanguage: string,
+  providerIds: string[],
 ): Promise<DeliveredRail[]> {
   const names = (await readFollowedPeople(env.DB, viewerId)).slice(0, PEOPLE_RAILS);
 
@@ -36,7 +41,7 @@ async function peopleRails(
       const person = await readPerson(env.DB, name);
       const ids = person ? await readPersonTitleIds(env.DB, person.personId, RAIL_SIZE * 2) : [];
       const items = (await readItems(env.DB, ids, RAIL_SIZE * 2))
-        .filter((item) => titleMatchesPreferredLanguage(item.originalLanguage, preferredLanguage))
+        .filter((item) => titleHasPreferredAudioLanguage(item, [preferredLanguage], providerIds))
         .slice(0, RAIL_SIZE);
       const label = titleCase(name);
 
@@ -123,10 +128,15 @@ export async function getPersonalRails(
   origin: ViewerOrigin | null,
 ): Promise<DeliveredRail[]> {
   try {
-    const preferences = viewerId ? await readNotebookPreferences(env.DB, viewerId) : null;
+    const [preferences, providerIds] = viewerId
+      ? await Promise.all([
+        readNotebookPreferences(env.DB, viewerId),
+        readProviderPreferences(env.DB, viewerId),
+      ])
+      : [null, null];
     const language = preferences?.preferredLanguage ?? "en";
     const [people, cinema] = await Promise.all([
-      viewerId ? peopleRails(env, viewerId, language) : Promise.resolve([]),
+      viewerId ? peopleRails(env, viewerId, language, providerIds ?? []) : Promise.resolve([]),
       cinemaRail(env, origin, {
         cinemaId: preferences?.preferredCinemaId ?? null,
         cinemaName: preferences?.preferredCinemaName ?? null,

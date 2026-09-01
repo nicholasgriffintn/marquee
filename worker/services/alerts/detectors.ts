@@ -1,5 +1,9 @@
 import { titlePath } from "../../../src/domain/catalog.ts";
-import { preferredLanguageCondition } from "../../lib/languages.ts";
+import { titleHasPreferredAudioLanguage } from "../../../src/domain/languages.ts";
+import {
+  preferredAudioLanguageCondition,
+  preferredLanguageCondition,
+} from "../../lib/languages.ts";
 import { logError } from "../../lib/logging.ts";
 import { confirmedArrivals, settleAnnounced, waitingViewers } from "../../repositories/arrivals.ts";
 import { readItems } from "../../repositories/catalog-reader.ts";
@@ -46,6 +50,13 @@ const arrivals: Detector = {
       }
 
       for (const viewer of byTitle.get(arrival.titleId) ?? []) {
+        if (
+          (viewer.providerIds.length > 0 && !viewer.providerIds.includes(arrival.providerId)) ||
+          !titleHasPreferredAudioLanguage(title, [viewer.preferredLanguage], [arrival.providerId])
+        ) {
+          continue;
+        }
+
         candidates.push({
           kind: "arrival",
           viewerId: viewer.viewerId,
@@ -91,7 +102,9 @@ const seasons: Detector = {
             AND s.season BETWEEN 2 AND 60
             AND s.episode = 1
             AND v.status IN ('watchlist', 'watching', 'watched')
-            AND ${preferredLanguageCondition("t", "COALESCE(p.preferred_language, 'en')")}
+            AND ${preferredAudioLanguageCondition("t", "COALESCE(p.preferred_language, 'en')", {
+              providerIdsExpression: "p.selected_provider_ids",
+            })}
             AND s.airs_at BETWEEN (CURRENT_TIMESTAMP - INTERVAL '2 day')
                                          AND (CURRENT_TIMESTAMP + CAST($1 AS INTERVAL))
             AND s.season > COALESCE(
@@ -153,6 +166,7 @@ const cinema: Detector = {
             AND NULLIF(trim(p.preferred_location), '') IS NOT NULL
           WHERE c.title_id IS NOT NULL
             AND v.status IN ('watchlist', 'watching')
+            -- Streaming dub metadata does not establish a cinema screening's audio track.
             AND ${preferredLanguageCondition("t", "p.preferred_language")}
             AND c.business_day BETWEEN CURRENT_DATE
                                              AND (CURRENT_DATE + CAST($1 AS INTERVAL))
@@ -205,7 +219,9 @@ const people: Detector = {
           WHERE (b.key LIKE 'rule:person:%' OR b.key LIKE 'person:%')
             AND b.revoked_at IS NULL
             AND (b.suspended_until IS NULL OR b.suspended_until < CURRENT_TIMESTAMP)
-            AND ${preferredLanguageCondition("t", "COALESCE(p.preferred_language, 'en')")}
+            AND ${preferredAudioLanguageCondition("t", "COALESCE(p.preferred_language, 'en')", {
+              providerIdsExpression: "p.selected_provider_ids",
+            })}
             AND COALESCE(t.release_date, DATE '1900-01-01')
                   > CURRENT_DATE + CAST($1 AS INTERVAL)
             AND NOT EXISTS (

@@ -1,5 +1,6 @@
 import type { CuratorCandidate, ProviderAvailability } from "../../src/domain/catalog.ts";
 import { isEntryStatus } from "../../src/domain/entries.ts";
+import { languageCodes } from "../../src/domain/languages.ts";
 import { providerRegistryIds } from "../../src/domain/providers.ts";
 import { isArchiveCollection } from "../clients/archive.ts";
 import { isCinemaSourceId } from "../clients/cinema/index.ts";
@@ -245,12 +246,16 @@ export function curatorCandidates(value: unknown): CuratorCandidate[] {
                   .filter((offer): offer is string => typeof offer === "string")
                   .slice(0, 5)
               : [];
+            const audioLanguages = languageCodes(provider.audioLanguages);
+            const subtitleLanguages = languageCodes(provider.subtitleLanguages);
 
             return [
               {
                 id: provider.id,
                 name: provider.name.slice(0, 100),
                 offerTypes,
+                ...(audioLanguages.length > 0 ? { audioLanguages } : {}),
+                ...(subtitleLanguages.length > 0 ? { subtitleLanguages } : {}),
                 webUrl: null,
                 source: provider.source === "JustWatch" ? "JustWatch" : "TMDB / JustWatch",
               },

@@ -1,5 +1,5 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
-import { titleMatchesPreferredLanguage } from "../../src/domain/languages.ts";
+import { titleHasPreferredAudioLanguage } from "../../src/domain/languages.ts";
 import { candidatesFrom, type DecisionCandidate } from "../lib/decisions.ts";
 import { mintJourney } from "../lib/journeys.ts";
 import { logError, logEvent } from "../lib/logging.ts";
@@ -9,6 +9,7 @@ import {
   type CatalogueSearch,
 } from "../repositories/catalog-search.ts";
 import { readNotebookPreferences } from "../repositories/notebook-preferences.ts";
+import { readProviderPreferences } from "../repositories/profile.ts";
 import type { Bindings } from "../types.ts";
 import { prepareRails } from "./ai-rails.ts";
 import { readTrending } from "./buzz.ts";
@@ -240,11 +241,12 @@ export async function buildDigest(env: Bindings, viewerId: string) {
 }
 
 export async function readDigest(env: Bindings, viewerId: string) {
-  const [row, preferences] = await Promise.all([
+  const [row, preferences, providerIds] = await Promise.all([
     env.DB.first<{ payload: string }>(`SELECT payload FROM viewer_digests WHERE viewer_id = $1`, [
       viewerId,
     ]),
     readNotebookPreferences(env.DB, viewerId),
+    readProviderPreferences(env.DB, viewerId),
   ]);
 
   if (!row) {
@@ -259,7 +261,7 @@ export async function readDigest(env: Bindings, viewerId: string) {
       ...digest.trending,
     ])
   ).filter((item) =>
-    titleMatchesPreferredLanguage(item.originalLanguage, preferences.preferredLanguage),
+    titleHasPreferredAudioLanguage(item, [preferences.preferredLanguage], providerIds ?? []),
   );
   const byId = new Map(items.map((item) => [item.id, item]));
   const pick = (ids: string[]): MediaTitle[] =>

@@ -25,6 +25,8 @@ const AVAILABILITY_QUERY = `query MarqueeTitleOffers($country: Country!, $langua
           monetizationType
           presentationType
           standardWebURL
+          audioLanguages
+          subtitleLanguages
           package {
             packageId
             clearName

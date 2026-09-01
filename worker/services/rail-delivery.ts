@@ -2,6 +2,7 @@ import type { ViewerOrigin } from "../../src/domain/cinema.ts";
 import type { DeliveredRail, RailsDelivery, RailStatus } from "../../src/domain/rails.ts";
 import { logError } from "../lib/logging.ts";
 import { readNotebookPreferences } from "../repositories/notebook-preferences.ts";
+import { readProviderPreferences } from "../repositories/profile.ts";
 import type { Bindings } from "../types.ts";
 import { hydrateRails } from "./ai-rails.ts";
 import { getPersonalRails } from "./personal-rails.ts";
@@ -35,13 +36,20 @@ async function curatedDelivery(
   generate: boolean,
 ): Promise<CuratedDelivery> {
   try {
-    const [revision, preferences] = await Promise.all([
+    const [revision, preferences, providerIds] = await Promise.all([
       readRailRevision(env.DB, viewerId),
       readNotebookPreferences(env.DB, viewerId),
+      readProviderPreferences(env.DB, viewerId),
     ]);
     const record = await readRailRecord(env.DB, viewerId, revision);
     const rails = record.rails.length
-      ? await hydrateRails(env, record.rails, record.generationId, preferences.preferredLanguage)
+      ? await hydrateRails(
+          env,
+          record.rails,
+          record.generationId,
+          preferences.preferredLanguage,
+          providerIds ?? [],
+        )
       : [];
 
     if (record.isSettled || !revision) {

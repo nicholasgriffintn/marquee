@@ -28,6 +28,7 @@ import {
   UsherHeroSkeleton,
   UsherNarration,
   UsherRefusal,
+  UsherWorking,
 } from "./UsherHeroShell";
 
 import styles from "./UsherHero.module.css";
@@ -99,7 +100,7 @@ export function UsherHero({
 
       <UsherExit onClick={onClear} />
 
-      {isPick && <UsherFigure face={face} />}
+      {(isPick || (!active && isThinking)) && <UsherFigure face={face} busy={isThinking} />}
 
       <UsherHeroCopy>
         <UsherByline
@@ -160,6 +161,8 @@ export function UsherHero({
               )}
             </HeroActions>
           </>
+        ) : isThinking ? (
+          <UsherWorking status={line} />
         ) : (
           <UsherHeroSkeleton />
         )}

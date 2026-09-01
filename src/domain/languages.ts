@@ -1,3 +1,5 @@
+import type { MediaTitle, ProviderAvailability } from "./catalog";
+
 export const DEFAULT_PREFERRED_LANGUAGE = "en";
 
 export const PREFERRED_LANGUAGES = [
@@ -39,4 +41,60 @@ export function titleMatchesPreferredLanguage(
   preference: string,
 ) {
   return (originalLanguage?.toLowerCase() || DEFAULT_PREFERRED_LANGUAGE) === preference;
+}
+
+export function languageCodes(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return [
+    ...new Set(
+      value.flatMap((entry) => {
+        const normalised = typeof entry === "string" ? entry.trim().toLowerCase() : "";
+
+        return LANGUAGE_CODE.test(normalised) ? [normalised] : [];
+      }),
+    ),
+  ];
+}
+
+export function mergeLanguageCodes(...values: (readonly string[] | undefined)[]): string[] {
+  return languageCodes(values.flatMap((value) => value ?? []));
+}
+
+function relevantProviders(providers: ProviderAvailability[], providerIds: readonly string[]) {
+  if (providerIds.length === 0) {
+    return providers;
+  }
+
+  const wanted = new Set(providerIds);
+
+  return providers.filter((provider) => wanted.has(provider.id));
+}
+
+export function titleHasPreferredAudioLanguage(
+  title: Pick<MediaTitle, "originalLanguage" | "providers">,
+  preferences: readonly string[],
+  providerIds: readonly string[] = [],
+) {
+  const wanted = new Set(languageCodes(preferences));
+
+  if (wanted.size === 0) {
+    return true;
+  }
+
+  const availableAudio = new Set(
+    relevantProviders(title.providers, providerIds).flatMap(
+      (provider) => provider.audioLanguages ?? [],
+    ),
+  );
+
+  if (availableAudio.size > 0) {
+    return [...wanted].some((language) => availableAudio.has(language));
+  }
+
+  return [...wanted].some((language) =>
+    titleMatchesPreferredLanguage(title.originalLanguage, language),
+  );
 }

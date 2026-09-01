@@ -1,4 +1,5 @@
 import type { MediaType, ProviderAvailability } from "../../src/domain/catalog.ts";
+import { languageCodes, mergeLanguageCodes } from "../../src/domain/languages.ts";
 import {
   canonicalProviderName,
   findRegistryProviderForOffer,
@@ -30,6 +31,8 @@ const OFFER_KINDS: Record<string, ProviderOfferKind> = {
   RENT: "rent",
   BUY: "buy",
 };
+
+const STREAMING_KINDS = new Set<ProviderOfferKind>(["subscription", "free"]);
 
 function offerLabel(monetizationType: string) {
   return OFFER_LABELS[monetizationType] ?? "Other";
@@ -98,9 +101,16 @@ export function parseJustwatchAvailability(
       continue;
     }
 
-    const registry = findRegistryProviderForOffer(name, justwatchOfferKind(monetizationType));
+    const offerKind = justwatchOfferKind(monetizationType);
+    const registry = findRegistryProviderForOffer(name, offerKind);
     const providerId = registry?.id ?? `justwatch:${packageId}`;
     const label = offerLabel(monetizationType);
+    const audioLanguages = STREAMING_KINDS.has(offerKind)
+      ? languageCodes(offer.audioLanguages)
+      : [];
+    const subtitleLanguages = STREAMING_KINDS.has(offerKind)
+      ? languageCodes(offer.subtitleLanguages)
+      : [];
     const existing = providers.get(providerId);
 
     if (existing) {
@@ -109,16 +119,40 @@ export function parseJustwatchAvailability(
       }
 
       existing.webUrl ??= offerUrl(offer.standardWebURL);
+      const mergedAudioLanguages = mergeLanguageCodes(existing.audioLanguages, audioLanguages);
+      const mergedSubtitleLanguages = mergeLanguageCodes(
+        existing.subtitleLanguages,
+        subtitleLanguages,
+      );
+
+      if (mergedAudioLanguages.length > 0) {
+        existing.audioLanguages = mergedAudioLanguages;
+      }
+
+      if (mergedSubtitleLanguages.length > 0) {
+        existing.subtitleLanguages = mergedSubtitleLanguages;
+      }
+
       continue;
     }
 
-    providers.set(providerId, {
+    const availability: ProviderAvailability = {
       id: providerId,
       name: registry?.name ?? name,
       offerTypes: [label],
       webUrl: offerUrl(offer.standardWebURL),
       source: "JustWatch",
-    });
+    };
+
+    if (audioLanguages.length > 0) {
+      availability.audioLanguages = audioLanguages;
+    }
+
+    if (subtitleLanguages.length > 0) {
+      availability.subtitleLanguages = subtitleLanguages;
+    }
+
+    providers.set(providerId, availability);
   }
 
   return [...providers.values()];

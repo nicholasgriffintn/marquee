@@ -9,6 +9,34 @@
   }
 }
 
+@keyframes thread-film {
+  to {
+    transform: translateX(-60px);
+  }
+}
+
+@keyframes usher-think {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-0.4deg);
+  }
+
+  50% {
+    transform: translateY(-7px) rotate(0.7deg);
+  }
+}
+
+@keyframes booth-glow {
+  0%,
+  100% {
+    opacity: 0.42;
+  }
+
+  50% {
+    opacity: 0.82;
+  }
+}
+
 .hero {
   position: relative;
 }
@@ -40,6 +68,11 @@
   position: relative;
   width: 124%;
   z-index: 1;
+}
+
+.figureBusy .figureMark {
+  animation: usher-think 2.4s var(--ease) infinite;
+  transform-origin: 50% 100%;
 }
 
 .byline {
@@ -126,6 +159,115 @@
   width: 8px;
 }
 
+.working {
+  align-items: flex-start;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 520px;
+  min-height: 150px;
+  padding-top: var(--space-2);
+}
+
+.film {
+  background:
+    radial-gradient(circle, var(--ink) 3px, transparent 3.5px) 4px 0 / 16px 8px repeat-x,
+    radial-gradient(circle, var(--ink) 3px, transparent 3.5px) 4px 100% / 16px 8px repeat-x,
+    var(--paper);
+  box-shadow: 8px 8px 0 rgba(0, 0, 0, 0.22);
+  box-sizing: border-box;
+  height: 82px;
+  overflow: hidden;
+  padding: 10px 0;
+  position: relative;
+  transform: rotate(-1deg);
+  width: min(100%, 430px);
+}
+
+.film::after {
+  animation: booth-glow 1.8s ease-in-out infinite;
+  background: linear-gradient(90deg, transparent, rgba(201, 243, 93, 0.38), transparent);
+  content: "";
+  inset: 8px 28% 8px 28%;
+  pointer-events: none;
+  position: absolute;
+}
+
+.filmTrack {
+  animation: thread-film 0.9s linear infinite;
+  display: flex;
+  gap: 8px;
+  margin-left: -54px;
+  width: max-content;
+}
+
+.filmTrack i {
+  background: var(--ink);
+  border: 2px solid var(--ink);
+  display: block;
+  height: 58px;
+  overflow: hidden;
+  position: relative;
+  width: 52px;
+}
+
+.filmTrack i::before,
+.filmTrack i::after {
+  content: "";
+  position: absolute;
+}
+
+.filmTrack i::before {
+  background: var(--acid);
+  border-radius: 50% 50% 42% 42%;
+  height: 30px;
+  left: 13px;
+  top: 9px;
+  width: 26px;
+}
+
+.filmTrack i::after {
+  background: var(--paper);
+  bottom: -16px;
+  height: 34px;
+  left: 5px;
+  transform: rotate(45deg);
+  width: 42px;
+}
+
+.filmTrack i:nth-child(3n + 2)::before {
+  background: var(--coral);
+  border-radius: 2px;
+  height: 34px;
+  transform: rotate(-8deg);
+}
+
+.filmTrack i:nth-child(3n)::before {
+  background: var(--paper);
+  border-radius: 0;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  height: 34px;
+}
+
+.workingCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 0;
+}
+
+.workingCopy span {
+  color: var(--acid);
+  font: var(--weight-bold) var(--type-xs) / 1 var(--mono);
+  letter-spacing: var(--tracking-label-wide);
+  text-transform: uppercase;
+}
+
+.workingCopy strong {
+  color: var(--white);
+  font: italic var(--weight-regular) var(--type-heading) / 1.15 var(--serif);
+}
+
 .facts {
   display: flex;
   flex-wrap: wrap;
@@ -169,7 +311,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .caret {
+  .caret,
+  .figureBusy .figureMark,
+  .film::after,
+  .filmTrack {
     animation: none;
   }
 }

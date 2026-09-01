@@ -1,5 +1,5 @@
 import type { MediaTitle } from "../../../src/domain/catalog.ts";
-import { titleMatchesPreferredLanguage } from "../../../src/domain/languages.ts";
+import { titleHasPreferredAudioLanguage } from "../../../src/domain/languages.ts";
 import { includesProvider } from "../../lib/providers.ts";
 
 export type AvailabilityRule = "confirmed" | "confirmed-or-unknown";
@@ -59,9 +59,7 @@ export function eligibilityGate(eligibility: Eligibility) {
 
     if (
       languages.size > 0 &&
-      ![...languages].some((language) =>
-        titleMatchesPreferredLanguage(title.originalLanguage, language),
-      )
+      !titleHasPreferredAudioLanguage(title, [...languages], eligibility.providerIds)
     ) {
       return false;
     }

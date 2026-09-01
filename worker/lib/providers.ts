@@ -32,3 +32,14 @@ export function providerFilterSql(titleIdExpression: string, providerIdsParamete
     )
   )`;
 }
+
+export function selectedProviderIdCondition(
+  providerIdExpression: string,
+  providerIdsExpression: string,
+) {
+  const ids = `CAST(COALESCE(NULLIF(${providerIdsExpression}, ''), '[]') AS jsonb)`;
+
+  return `(jsonb_array_length(${ids}) = 0 OR ${providerIdExpression} IN (
+    SELECT value FROM jsonb_array_elements_text(${ids}) AS selected_provider(value)
+  ))`;
+}

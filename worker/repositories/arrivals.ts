@@ -1,9 +1,20 @@
 import type { ProviderAvailability } from "../../src/domain/catalog.ts";
+import { preferredLanguage } from "../../src/domain/languages.ts";
 import { isStreamingOffer } from "../../src/domain/providers.ts";
-import { preferredLanguageCondition } from "../lib/languages.ts";
+import { preferredAudioLanguageCondition } from "../lib/languages.ts";
 import { logError } from "../lib/logging.ts";
+import { selectedProviderIdCondition } from "../lib/providers.ts";
+import { jsonStringList } from "../lib/values.ts";
 
 const CONFIRMATIONS = 2;
+
+type WaitingViewer = {
+  viewerId: string;
+  email: string;
+  name: string;
+  preferredLanguage: string;
+  providerIds: string[];
+};
 
 export type Arrival = {
   titleId: string;
@@ -103,7 +114,17 @@ export async function settleAnnounced(db: Database, arrivals: Arrival[]) {
                     LEFT JOIN viewer_preferences AS p ON p.viewer_id = v.viewer_id
                    WHERE v.title_id = title_provider_state.title_id
                      AND v.status IN ('watchlist', 'watching')
-                     AND ${preferredLanguageCondition("t", "COALESCE(p.preferred_language, 'en')")}
+                     AND ${preferredAudioLanguageCondition(
+                       "t",
+                       "COALESCE(p.preferred_language, 'en')",
+                       {
+                         providerIdExpression: "title_provider_state.provider_id",
+                       },
+                     )}
+                     AND ${selectedProviderIdCondition(
+                       "title_provider_state.provider_id",
+                       "p.selected_provider_ids",
+                     )}
                      AND u.email IS NOT NULL AND u.email != ''
                      AND NOT EXISTS (
                        SELECT 1 FROM viewer_alert_settings AS s
@@ -126,28 +147,41 @@ export async function settleAnnounced(db: Database, arrivals: Arrival[]) {
 
 export async function waitingViewers(db: Database, titleIds: string[]) {
   if (titleIds.length === 0) {
-    return new Map<string, { viewerId: string; email: string; name: string }[]>();
+    return new Map<string, WaitingViewer[]>();
   }
 
   try {
-    const rows = await db.query<{ titleId: string; viewerId: string; email: string; name: string }>(
-      `SELECT v.title_id AS "titleId", v.viewer_id AS "viewerId", u.email AS email, u.name AS name
+    const rows = await db.query<{
+      titleId: string;
+      viewerId: string;
+      email: string;
+      name: string;
+      preferredLanguage: string | null;
+      selectedProviderIds: string | null;
+    }>(
+      `SELECT v.title_id AS "titleId", v.viewer_id AS "viewerId", u.email AS email, u.name AS name,
+              p.preferred_language AS "preferredLanguage",
+              p.selected_provider_ids AS "selectedProviderIds"
            FROM viewing_entries AS v
            JOIN users AS u ON u.id = v.viewer_id
-           JOIN catalog_titles AS t ON t.id = v.title_id
            LEFT JOIN viewer_preferences AS p ON p.viewer_id = v.viewer_id
           WHERE v.status IN ('watchlist', 'watching')
             AND u.email IS NOT NULL AND u.email != ''
-            AND ${preferredLanguageCondition("t", "COALESCE(p.preferred_language, 'en')")}
             AND v.title_id IN (${titleIds.map((_, index) => `$${index + 1}`).join(",")})`,
       [...titleIds],
     );
-    const byTitle = new Map<string, { viewerId: string; email: string; name: string }[]>();
+    const byTitle = new Map<string, WaitingViewer[]>();
 
     for (const row of rows.rows) {
       byTitle.set(row.titleId, [
         ...(byTitle.get(row.titleId) ?? []),
-        { viewerId: row.viewerId, email: row.email, name: row.name },
+        {
+          viewerId: row.viewerId,
+          email: row.email,
+          name: row.name,
+          preferredLanguage: preferredLanguage(row.preferredLanguage),
+          providerIds: jsonStringList(row.selectedProviderIds),
+        },
       ]);
     }
 
@@ -155,7 +189,7 @@ export async function waitingViewers(db: Database, titleIds: string[]) {
   } catch (error) {
     logError("arrival_viewers_failed", error);
 
-    return new Map<string, { viewerId: string; email: string; name: string }[]>();
+    return new Map<string, WaitingViewer[]>();
   }
 }
 

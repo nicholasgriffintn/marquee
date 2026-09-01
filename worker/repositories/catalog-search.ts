@@ -7,7 +7,7 @@ import {
   type CatalogTitleRow,
   withStoredPoster,
 } from "../lib/catalog-payload.ts";
-import { preferredLanguageCondition } from "../lib/languages.ts";
+import { preferredAudioLanguageCondition } from "../lib/languages.ts";
 import { clamp } from "../lib/numbers.ts";
 import { providerFilterSql } from "../lib/providers.ts";
 import { isKnownTitle, validProviderIds } from "../lib/validation.ts";
@@ -130,6 +130,9 @@ function eligibilityClause(search: CatalogueSearch, bindings: DatabaseValue[]): 
     0,
     EXCLUDE_ID_LIMIT,
   );
+  const providerIdsParameter = providerIds.length
+    ? `$${bindings.push(JSON.stringify(providerIds))}`
+    : undefined;
 
   if (search.mediaType === "movie" || search.mediaType === "tv") {
     conditions.push(`t.media_type = $${bindings.push(search.mediaType)}`);
@@ -159,14 +162,8 @@ function eligibilityClause(search: CatalogueSearch, bindings: DatabaseValue[]): 
     );
   }
 
-  if (providerIds.length) {
-    conditions.push(
-      availabilityCondition(
-        "t",
-        `$${bindings.push(JSON.stringify(providerIds))}`,
-        search.availability,
-      ),
-    );
+  if (providerIdsParameter) {
+    conditions.push(availabilityCondition("t", providerIdsParameter, search.availability));
   }
 
   if (excludeGenres.length) {
@@ -180,7 +177,13 @@ function eligibilityClause(search: CatalogueSearch, bindings: DatabaseValue[]): 
 
   if (languages.length) {
     conditions.push(
-      `(${languages.map((language) => preferredLanguageCondition("t", `$${bindings.push(language)}`)).join(" OR ")})`,
+      `(${languages
+        .map((language) =>
+          preferredAudioLanguageCondition("t", `$${bindings.push(language)}`, {
+            providerIdsExpression: providerIdsParameter,
+          }),
+        )
+        .join(" OR ")})`,
     );
   }
 

@@ -22,6 +22,8 @@ export type ProviderAvailability = {
   id: string;
   name: string;
   offerTypes: string[];
+  audioLanguages?: string[];
+  subtitleLanguages?: string[];
   webUrl: string | null;
   source: "JustWatch" | "TMDB / JustWatch" | "AniList";
 };

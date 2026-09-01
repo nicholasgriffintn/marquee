@@ -12,12 +12,18 @@ type ProviderRow = {
   id: string;
   name: string;
   webUrl: string | null;
-  source: string;
+  source: ProviderAvailability["source"];
 };
 type OfferRow = { titleId: string; providerId: string; offerType: string };
+type LanguageRow = {
+  titleId: string;
+  providerId: string;
+  kind: "audio" | "subtitle";
+  language: string;
+};
 
 export async function readProviderMap(db: Database, ids: string[]) {
-  const [providerRows, offerRows] = await Promise.all([
+  const [providerRows, offerRows, languageRows] = await Promise.all([
     queryChunked(ids, (wave) =>
       db
         .query<ProviderRow>(
@@ -40,6 +46,17 @@ export async function readProviderMap(db: Database, ids: string[]) {
         )
         .then((result) => result.rows),
     ),
+    queryChunked(ids, (wave) =>
+      db
+        .query<LanguageRow>(
+          `SELECT title_id AS "titleId", provider_id AS "providerId", kind, language
+           FROM catalog_title_provider_languages
+           WHERE title_id IN (${wave.map((_, index) => `$${index + 1}`).join(",")})
+           ORDER BY title_id, provider_id, kind, position`,
+          [...wave],
+        )
+        .then((result) => result.rows),
+    ),
   ]);
 
   const offersByKey = new Map<string, string[]>();
@@ -55,19 +72,47 @@ export async function readProviderMap(db: Database, ids: string[]) {
     }
   }
 
+  const languagesByKey = new Map<string, string[]>();
+
+  for (const entry of languageRows) {
+    const key = `${entry.titleId}:${entry.providerId}:${entry.kind}`;
+    const list = languagesByKey.get(key);
+
+    if (list) {
+      list.push(entry.language);
+    } else {
+      languagesByKey.set(key, [entry.language]);
+    }
+  }
+
   const grouped = groupBy(providerRows, (row) => row.titleId);
   const values = new Map<string, ProviderAvailability[]>();
 
   for (const [titleId, entries] of grouped) {
     values.set(
       titleId,
-      entries.map((entry): ProviderAvailability => ({
-        id: entry.id,
-        name: entry.name,
-        webUrl: entry.webUrl,
-        source: entry.source as ProviderAvailability["source"],
-        offerTypes: offersByKey.get(`${titleId}:${entry.id}`) ?? [],
-      })),
+      entries.map((entry): ProviderAvailability => {
+        const audioLanguages = languagesByKey.get(`${titleId}:${entry.id}:audio`) ?? [];
+        const subtitleLanguages = languagesByKey.get(`${titleId}:${entry.id}:subtitle`) ?? [];
+
+        const availability: ProviderAvailability = {
+          id: entry.id,
+          name: entry.name,
+          webUrl: entry.webUrl,
+          source: entry.source,
+          offerTypes: offersByKey.get(`${titleId}:${entry.id}`) ?? [],
+        };
+
+        if (audioLanguages.length > 0) {
+          availability.audioLanguages = audioLanguages;
+        }
+
+        if (subtitleLanguages.length > 0) {
+          availability.subtitleLanguages = subtitleLanguages;
+        }
+
+        return availability;
+      }),
     );
   }
 
@@ -78,6 +123,11 @@ export async function writeProviderRows(db: Database, titles: MediaTitle[]) {
   await deleteByTitleIds(
     db,
     "catalog_title_providers",
+    titles.map((title) => title.id),
+  );
+  await deleteByTitleIds(
+    db,
+    "catalog_title_provider_languages",
     titles.map((title) => title.id),
   );
   await deleteByTitleIds(
@@ -130,6 +180,37 @@ export async function writeProviderRows(db: Database, titles: MediaTitle[]) {
       `INSERT INTO catalog_title_provider_offers
          (title_id, provider_id, offer_type, position)
        VALUES ${rowPlaceholders(chunk.length, 4)}
+      ON CONFLICT DO NOTHING`,
+  );
+
+  const languageRows = titles.flatMap((title) =>
+    title.providers.flatMap((provider) =>
+      (
+        [
+          ["audio", provider.audioLanguages],
+          ["subtitle", provider.subtitleLanguages],
+        ] as const
+      ).flatMap(([kind, languages]) =>
+        [...new Set(languages ?? [])].map((language, position): DatabaseValue[] => [
+          title.id,
+          provider.id,
+          kind,
+          language,
+          position,
+        ]),
+      ),
+    ),
+  );
+
+  await insertRows(
+    db,
+    5,
+    18,
+    languageRows,
+    (chunk) =>
+      `INSERT INTO catalog_title_provider_languages
+         (title_id, provider_id, kind, language, position)
+       VALUES ${rowPlaceholders(chunk.length, 5)}
        ON CONFLICT DO NOTHING`,
   );
 }

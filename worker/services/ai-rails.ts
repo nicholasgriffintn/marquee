@@ -1,5 +1,5 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
-import { titleMatchesPreferredLanguage } from "../../src/domain/languages.ts";
+import { titleHasPreferredAudioLanguage } from "../../src/domain/languages.ts";
 import type { DeliveredRail } from "../../src/domain/rails.ts";
 import { CURATOR_TOOLS, executeCuratorTool, type CuratorToolCache } from "../ai/curator-tools.ts";
 import { runAiMessage, runAiObject } from "../ai/run.ts";
@@ -547,6 +547,7 @@ export async function hydrateRails(
   rails: StoredRail[],
   generationId: string,
   preferredLanguage: string,
+  providerIds: string[],
 ): Promise<DeliveredRail[]> {
   const titles = (
     await readItems(
@@ -554,7 +555,7 @@ export async function hydrateRails(
       rails.flatMap((rail) => rail.titleIds),
       RAIL_LIMIT * RAIL_MAX,
     )
-  ).filter((title) => titleMatchesPreferredLanguage(title.originalLanguage, preferredLanguage));
+  ).filter((title) => titleHasPreferredAudioLanguage(title, [preferredLanguage], providerIds));
   const byId = new Map(titles.map((title) => [title.id, title]));
 
   return rails.flatMap((rail): DeliveredRail[] => {
