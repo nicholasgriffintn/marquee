@@ -24,16 +24,20 @@ export function withCookies(response: Response, ...cookies: (string | null | und
 }
 
 export async function readJsonObject(request: Request) {
+  return readJsonObjectWithLimit(request, MAX_JSON_BYTES);
+}
+
+export async function readJsonObjectWithLimit(request: Request, maxBytes: number) {
   const contentLength = Number(request.headers.get("content-length") ?? "0");
 
-  if (Number.isFinite(contentLength) && contentLength > MAX_JSON_BYTES) {
+  if (Number.isFinite(contentLength) && contentLength > maxBytes) {
     return null;
   }
 
   try {
     const text = await request.text();
 
-    if (text.length > MAX_JSON_BYTES) {
+    if (text.length > maxBytes) {
       return null;
     }
 

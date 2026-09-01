@@ -1,0 +1,368 @@
+.wizard,
+.review {
+  border: 1px solid var(--panel-line);
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-4);
+}
+
+.wizardHead,
+.reviewHead,
+.reviewRecord header,
+.commitBar,
+.pagination,
+.history article,
+.reviewActions {
+  align-items: center;
+  display: flex;
+  gap: var(--space-3);
+  justify-content: space-between;
+}
+
+.wizardHead {
+  align-items: end;
+  flex-wrap: wrap;
+}
+
+.wizardHead > div:first-child > span,
+.reviewHead span,
+.reviewRecord header > span {
+  color: var(--acid);
+  font: var(--weight-bold) var(--type-label) / 1 var(--mono);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.wizardHead h3,
+.reviewHead h3,
+.history h3 {
+  font: var(--weight-regular) var(--type-xl) / 1.1 var(--serif);
+  margin: var(--space-1) 0 0;
+}
+
+.sourceTabs {
+  border: 1px solid var(--panel-line);
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.source,
+.sourceActive {
+  background: transparent;
+  border: 0;
+  border-right: 1px solid var(--panel-line);
+  color: var(--muted);
+  cursor: pointer;
+  font: var(--weight-bold) var(--type-label) / 1 var(--mono);
+  padding: var(--space-2) var(--space-3);
+  text-transform: uppercase;
+}
+
+.source:last-child,
+.sourceActive:last-child {
+  border-right: 0;
+}
+
+.sourceActive {
+  background: var(--acid);
+  color: var(--black);
+}
+
+.guide {
+  background: color-mix(in srgb, var(--paper) 3%, transparent);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 0.7fr);
+}
+
+.guideCopy,
+.importAction {
+  padding: var(--space-4);
+}
+
+.guideCopy {
+  border-right: 1px solid var(--panel-line);
+}
+
+.guideCopy h4 {
+  font: var(--weight-regular) var(--type-lg) / 1.1 var(--serif);
+  margin: 0;
+}
+
+.guideCopy > p,
+.guideCopy li,
+.formatGuide p {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.guideCopy ol {
+  margin: var(--space-3) 0;
+  padding-left: var(--space-4);
+}
+
+.guideLinks,
+.reviewActions {
+  justify-content: flex-start;
+}
+
+.guideLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.guideLinks a,
+.formatGuide summary {
+  color: var(--acid);
+  cursor: pointer;
+  font: var(--weight-bold) var(--type-label) / 1.2 var(--mono);
+}
+
+.formatGuide {
+  border-top: 1px solid var(--panel-line);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+}
+
+.formatGuide pre {
+  background: var(--black);
+  color: var(--paper);
+  font: var(--weight-regular) 0.72rem / 1.5 var(--mono);
+  max-height: 230px;
+  overflow: auto;
+  padding: var(--space-3);
+  white-space: pre;
+}
+
+.importAction {
+  align-content: center;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.importAction p,
+.preview p,
+.commitBar p {
+  margin: 0;
+}
+
+.importAction small,
+.drop small,
+.preview small,
+.reviewRecord small,
+.suggestions small,
+.commitBar small,
+.history small {
+  color: var(--muted);
+  display: block;
+  margin-top: var(--space-1);
+}
+
+.drop {
+  align-items: center;
+  border: 1px dashed var(--panel-line);
+  cursor: pointer;
+  display: grid;
+  gap: var(--space-2);
+  min-height: 150px;
+  padding: var(--space-4);
+  text-align: center;
+}
+
+.drop:hover {
+  border-color: var(--acid);
+}
+
+.drop strong {
+  color: var(--acid);
+  display: block;
+  font: var(--weight-bold) var(--type-label) / 1.2 var(--mono);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.fileInput {
+  max-width: 100%;
+}
+
+.connectButton {
+  background: var(--acid);
+  color: var(--black);
+  display: inline-block;
+  font: var(--weight-bold) var(--type-label) / 1 var(--mono);
+  justify-self: start;
+  padding: var(--space-3) var(--space-4);
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.preview {
+  align-items: center;
+  border-left: 3px solid var(--acid);
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: auto 1fr auto;
+  padding: var(--space-3) var(--space-4);
+}
+
+.count {
+  color: var(--acid);
+  font: var(--weight-bold) clamp(2rem, 6vw, 4rem) / 1 var(--serif);
+}
+
+.totals {
+  display: grid;
+  gap: 1px;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+}
+
+.totals span {
+  background: color-mix(in srgb, var(--paper) 4%, transparent);
+  color: var(--muted);
+  padding: var(--space-3);
+}
+
+.totals strong {
+  color: var(--paper);
+  display: block;
+  font: var(--weight-bold) var(--type-lg) / 1 var(--mono);
+}
+
+.matchedPreview {
+  border-top: 1px solid var(--panel-line);
+  padding-top: var(--space-3);
+}
+
+.matchedPreview summary {
+  color: var(--acid);
+  cursor: pointer;
+  font: var(--weight-bold) var(--type-label) / 1.2 var(--mono);
+}
+
+.matchedPreview ul {
+  display: grid;
+  gap: 1px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+}
+
+.matchedPreview li {
+  background: color-mix(in srgb, var(--paper) 4%, transparent);
+  padding: var(--space-2);
+}
+
+.matchedPreview small {
+  color: var(--muted);
+  display: block;
+  margin-top: var(--space-1);
+}
+
+.reviewRecord {
+  border-top: 1px solid var(--panel-line);
+  display: grid;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+}
+
+.search {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: 1fr auto;
+}
+
+.search input {
+  background: color-mix(in srgb, var(--paper) 4%, transparent);
+  border: 1px solid var(--panel-line);
+  color: var(--paper);
+  font: var(--weight-regular) var(--type-sm) / 1.5 var(--mono);
+  padding: var(--space-3);
+}
+
+.suggestions {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+}
+
+.suggestion,
+.suggestionSelected {
+  background: transparent;
+  border: 2px solid var(--panel-line);
+  color: var(--paper);
+  cursor: pointer;
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  text-align: left;
+}
+
+.suggestionSelected {
+  border-color: var(--acid);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--acid) 35%, transparent);
+}
+
+.suggestionPoster {
+  width: 100%;
+}
+
+.suggestions strong {
+  display: block;
+}
+
+.commitBar {
+  background: color-mix(in srgb, var(--acid) 9%, transparent);
+  border-top: 1px solid var(--acid);
+  padding: var(--space-3);
+}
+
+.pagination {
+  border-top: 1px solid var(--panel-line);
+  padding-top: var(--space-3);
+}
+
+.pagination small {
+  color: var(--muted);
+  font: var(--weight-regular) var(--type-label) / 1.2 var(--mono);
+}
+
+.history {
+  border-top: 1px solid var(--panel-line);
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+}
+
+.history article {
+  border-bottom: 1px solid var(--panel-line);
+  padding: var(--space-2) 0;
+}
+
+.history article > button:first-child {
+  background: transparent;
+  border: 0;
+  color: var(--paper);
+  cursor: pointer;
+  text-align: left;
+}
+
+@media (max-width: 760px) {
+  .guide {
+    grid-template-columns: 1fr;
+  }
+
+  .guideCopy {
+    border-bottom: 1px solid var(--panel-line);
+    border-right: 0;
+  }
+
+  .preview {
+    grid-template-columns: auto 1fr;
+  }
+
+  .preview > :last-child {
+    grid-column: 1 / -1;
+  }
+}

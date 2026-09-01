@@ -2,7 +2,6 @@ import { useState } from "react";
 
 import { useLinks } from "../../hooks/useLinks";
 import { classNames } from "../../lib/class-names";
-import { formatDate } from "../../lib/dates";
 import { ApiTokensPanel } from "./ApiTokensPanel";
 
 import styles from "./ConnectionsPanel.module.css";
@@ -18,90 +17,50 @@ export function ConnectionsPanel({ isSignedIn }: { isSignedIn: boolean }) {
 
   return (
     <>
-      <div className={styles.row}>
-        <strong>Trakt</strong>
-        {trakt?.available === false ? (
-          <small>Not configured on this deployment.</small>
-        ) : trakt?.connected && trakt.needsReconnect ? (
-          <>
-            <small>
-              {trakt.account ? `${trakt.account} needs reconnecting` : "Needs reconnecting"} · Trakt
-              stopped accepting our access, so syncing is paused.
-            </small>
-            <span className={styles.spacer} />
+      {trakt?.connected && (
+        <div className={styles.row}>
+          <strong>Trakt connection</strong>
+          <small>
+            {trakt.account ? `Connected as ${trakt.account}` : "Connected"}
+            {trakt.needsReconnect ? " · needs reconnecting" : ""}
+            {connections.pushStatus === "running" ? " · sending your shelf…" : ""}
+            {connections.pushStatus === "done" ? " · sent" : ""}
+          </small>
+          <span className={styles.spacer} />
+          {trakt.needsReconnect ? (
             <a
               className={classNames(styles.button, styles.primary)}
               href="/api/links/trakt/start?returnTo=/notebook"
             >
-              Reconnect Trakt
+              Reconnect
             </a>
-            <button
-              type="button"
-              className={styles.button}
-              onClick={() => void connections.unlinkTrakt()}
-            >
-              Unlink
-            </button>
-          </>
-        ) : trakt?.connected ? (
-          <>
-            <small>
-              {trakt.account ? `Linked as ${trakt.account}` : "Linked"}
-              {trakt.syncedAt ? ` · synced ${formatDate(trakt.syncedAt, {})}` : ""}
-              {connections.syncStatus === "running" ? " · bringing your history over…" : ""}
-              {connections.syncStatus === "timeout"
-                ? " · still bringing it over, check back shortly"
-                : ""}
-              {connections.pushStatus === "running" ? " · sending your shelf over…" : ""}
-              {connections.pushStatus === "done" ? " · sent" : ""}
-              {connections.pushStatus === "timeout" ? " · still sending, check back shortly" : ""}
-            </small>
-            <span className={styles.spacer} />
-            <button
-              type="button"
-              className={styles.button}
-              disabled={connections.syncStatus === "running"}
-              onClick={() => void connections.syncTrakt()}
-            >
-              Bring it here
-            </button>
+          ) : (
             <button
               type="button"
               className={styles.button}
               disabled={connections.pushStatus === "running"}
               onClick={() => setConfirmPush(true)}
             >
-              Send it there
+              Send shelf to Trakt
             </button>
-            <button
-              type="button"
-              className={styles.button}
-              onClick={() => void connections.unlinkTrakt()}
-            >
-              Unlink
-            </button>
-          </>
-        ) : (
-          <>
-            <small>Import your watch history, ratings and watchlist.</small>
-            <span className={styles.spacer} />
-            <a
-              className={classNames(styles.button, styles.primary)}
-              href="/api/links/trakt/start?returnTo=/notebook"
-            >
-              Connect Trakt
-            </a>
-          </>
-        )}
-      </div>
+          )}
+          <button
+            type="button"
+            className={styles.button}
+            onClick={() => void connections.unlinkTrakt()}
+          >
+            Unlink
+          </button>
+        </div>
+      )}
 
       {confirmPush && trakt?.connected && (
         <div className={styles.row}>
-          <strong>Send it there</strong>
+          <strong>Send shelf to Trakt?</strong>
           <small>
             {connections.pending
-              ? `${connections.pending.watched} watched, ${connections.pending.rated} rated and ${connections.pending.listed} waiting would go onto your Trakt account. Only what has changed since the last send.`
-              : "Your shelf would go onto your Trakt account."}
+              ? `${connections.pending.watched} watched, ${connections.pending.rated} rated, and ${connections.pending.listed} watchlisted items have changed since the last send.`
+              : "Only shelf changes since the last send will be included."}
           </small>
           <span className={styles.spacer} />
           <button
@@ -112,10 +71,10 @@ export function ConnectionsPanel({ isSignedIn }: { isSignedIn: boolean }) {
               setConfirmPush(false);
             }}
           >
-            Send it
+            Send
           </button>
           <button type="button" className={styles.button} onClick={() => setConfirmPush(false)}>
-            Leave it
+            Cancel
           </button>
         </div>
       )}

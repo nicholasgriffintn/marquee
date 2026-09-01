@@ -10,6 +10,8 @@ import { syncCinemaDirectory, syncCinemaScreenings } from "../services/cinema-sy
 import { advanceDiscoverFrontier, measureDiscoverPartition } from "../services/discover.ts";
 import { embedTitles, reindexVectorMetadata } from "../services/embeddings.ts";
 import { syncTitleIdentifiers } from "../services/identifiers.ts";
+import { commitViewerImport } from "../services/imports/commit.ts";
+import { matchViewerImport } from "../services/imports/match.ts";
 import { refreshPeople } from "../services/people.ts";
 import { describeRevivalWorks } from "../services/revival-descriptions.ts";
 import { groupRevivalPrints } from "../services/revival-groups.ts";
@@ -31,7 +33,7 @@ import { importAnimeIds } from "./anime-ids.ts";
 import { enrichQueuedAvailability, queueAvailability } from "./availability.ts";
 import { queueEmbeddings } from "./embeddings.ts";
 import { enrichAniListMedia, enrichAnime, enrichRatings, queueEnrichment } from "./enrichment.ts";
-import { importDiaryRow, importImdbTitle } from "./imports.ts";
+import { importImdbTitle } from "./imports.ts";
 import { cachePoster } from "./posters.ts";
 import { getProviderLedger } from "./provider-ledger.ts";
 import { withRateLimitPause } from "./sources.ts";
@@ -226,12 +228,6 @@ export async function executeIngestionJob(env: Bindings, job: IngestionJob) {
       return;
     }
 
-    case "import-diary-row": {
-      await importDiaryRow(env, job);
-
-      return;
-    }
-
     case "sync-schedule": {
       await syncSchedule(env);
 
@@ -340,6 +336,18 @@ export async function executeIngestionJob(env: Bindings, job: IngestionJob) {
 
     case "import-trakt-history": {
       await importTraktHistory(env, job.viewerId, job.origin);
+
+      return;
+    }
+
+    case "process-viewer-import": {
+      await matchViewerImport(env, job.runId);
+
+      return;
+    }
+
+    case "commit-viewer-import": {
+      await commitViewerImport(env, job.viewerId, job.runId);
 
       return;
     }

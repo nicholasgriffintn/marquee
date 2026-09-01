@@ -124,6 +124,20 @@ export function isIngestionJob(value: unknown): value is IngestionJob {
     );
   }
 
+  if (value.type === "process-viewer-import") {
+    return typeof value.runId === "string" && /^[0-9a-f-]{36}$/u.test(value.runId);
+  }
+
+  if (value.type === "commit-viewer-import") {
+    return (
+      typeof value.runId === "string" &&
+      /^[0-9a-f-]{36}$/u.test(value.runId) &&
+      typeof value.viewerId === "string" &&
+      value.viewerId.length > 0 &&
+      value.viewerId.length <= 128
+    );
+  }
+
   if (value.type === "embed-titles") {
     return (
       Array.isArray(value.titleIds) &&
@@ -135,15 +149,6 @@ export function isIngestionJob(value: unknown): value is IngestionJob {
 
   if (value.type === "import-imdb-title") {
     return typeof value.imdbId === "string" && /^tt\d+$/u.test(value.imdbId);
-  }
-
-  if (value.type === "import-diary-row") {
-    return (
-      typeof value.viewerId === "string" &&
-      typeof value.name === "string" &&
-      value.name.length > 0 &&
-      value.name.length <= 160
-    );
   }
 
   if (value.type === "recheck-revival-works") {

@@ -1,5 +1,7 @@
 import { QueryClient, queryOptions } from "@tanstack/react-query";
 
+import { isRecord } from "./values";
+
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -10,10 +12,6 @@ export const queryClient = new QueryClient({
     },
   },
 });
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
 
 export class QueryError extends Error {
   constructor(

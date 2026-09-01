@@ -29,10 +29,24 @@ export type TraktTokens = {
 export type TraktEntry = {
   tmdbId: number;
   mediaType: "movie" | "tv";
+  title: string;
   imdbId: string | null;
   plays: number;
   rating: number | null;
   lastWatchedAt: string | null;
+  listedAt: string | null;
+  ratedAt: string | null;
+};
+
+export type TraktHistoryEntry = {
+  id: string;
+  tmdbId: number;
+  mediaType: "movie" | "tv";
+  title: string;
+  imdbId: string | null;
+  watchedAt: string | null;
+  season: number | null;
+  episode: number | null;
 };
 
 export type TraktEpisode = {
@@ -130,6 +144,42 @@ async function requestTrakt(env: Bindings, path: string, accessToken: string) {
   }
 
   return response.json();
+}
+
+async function requestTraktPage(env: Bindings, path: string, accessToken: string, page: number) {
+  assertConfigured(env);
+  const separator = path.includes("?") ? "&" : "?";
+  const response = await upstreamFetch(`${API_BASE}${path}${separator}limit=100&page=${page}`, {
+    headers: traktHeaders(env, accessToken),
+    timeoutMs: READ_TIMEOUT_MS,
+  });
+
+  if (response.status === 401) {
+    throw new TraktError("Trakt authorisation expired", 401);
+  }
+
+  if (!response.ok) {
+    throw new TraktError(`Trakt request failed (${response.status})`, response.status);
+  }
+
+  const pageCount = Number(response.headers.get("x-pagination-page-count") ?? "1");
+
+  return {
+    payload: await response.json(),
+    pageCount: Number.isInteger(pageCount) && pageCount > 0 ? Math.min(pageCount, 500) : 1,
+  };
+}
+
+async function requestAllTrakt(env: Bindings, path: string, accessToken: string) {
+  const first = await requestTraktPage(env, path, accessToken, 1);
+  const payloads = [first.payload];
+
+  for (let page = 2; page <= first.pageCount; page += 1) {
+    // oxlint-disable-next-line no-await-in-loop -- respect provider pagination and rate limits
+    payloads.push((await requestTraktPage(env, path, accessToken, page)).payload);
+  }
+
+  return payloads.flatMap(records);
 }
 
 export type TraktPushItem = {
@@ -232,8 +282,9 @@ function parseEntries(payload: unknown, mediaType: "movie" | "tv"): TraktEntry[]
   return records(payload).flatMap((item): TraktEntry[] => {
     const container = recordAt(item, key);
     const { tmdbId, imdbId } = idsOf(container);
+    const title = container ? stringAt(container, "title") : null;
 
-    if (!tmdbId) {
+    if (!tmdbId || !title) {
       return [];
     }
 
@@ -243,10 +294,13 @@ function parseEntries(payload: unknown, mediaType: "movie" | "tv"): TraktEntry[]
       {
         tmdbId,
         mediaType,
+        title,
         imdbId,
         plays: numberAt(item, "plays") ?? 0,
         rating: rating && rating >= 1 && rating <= 10 ? rating : null,
         lastWatchedAt: stringAt(item, "last_watched_at") ?? stringAt(item, "rated_at"),
+        listedAt: stringAt(item, "listed_at"),
+        ratedAt: stringAt(item, "rated_at"),
       },
     ];
   });
@@ -263,8 +317,8 @@ export async function getTraktWatched(env: Bindings, accessToken: string) {
 
 export async function getTraktRatings(env: Bindings, accessToken: string) {
   const [movies, shows] = await Promise.all([
-    requestTrakt(env, "/sync/ratings/movies", accessToken),
-    requestTrakt(env, "/sync/ratings/shows", accessToken),
+    requestAllTrakt(env, "/sync/ratings/movies", accessToken),
+    requestAllTrakt(env, "/sync/ratings/shows", accessToken),
   ]);
 
   return [...parseEntries(movies, "movie"), ...parseEntries(shows, "tv")];
@@ -272,11 +326,47 @@ export async function getTraktRatings(env: Bindings, accessToken: string) {
 
 export async function getTraktWatchlist(env: Bindings, accessToken: string) {
   const [movies, shows] = await Promise.all([
-    requestTrakt(env, "/sync/watchlist/movies", accessToken),
-    requestTrakt(env, "/sync/watchlist/shows", accessToken),
+    requestAllTrakt(env, "/sync/watchlist/movies", accessToken),
+    requestAllTrakt(env, "/sync/watchlist/shows", accessToken),
   ]);
 
   return [...parseEntries(movies, "movie"), ...parseEntries(shows, "tv")];
+}
+
+function parseHistory(payload: unknown, mediaType: "movie" | "tv"): TraktHistoryEntry[] {
+  return records(payload).flatMap((item): TraktHistoryEntry[] => {
+    const media = recordAt(item, mediaType === "movie" ? "movie" : "show");
+    const episode = mediaType === "tv" ? recordAt(item, "episode") : null;
+    const { tmdbId, imdbId } = idsOf(media);
+    const title = media ? stringAt(media, "title") : null;
+    const id = numberAt(item, "id");
+
+    if (!tmdbId || !title || id === null) {
+      return [];
+    }
+
+    return [
+      {
+        id: String(id),
+        tmdbId,
+        mediaType,
+        title,
+        imdbId,
+        watchedAt: stringAt(item, "watched_at"),
+        season: episode ? numberAt(episode, "season") : null,
+        episode: episode ? numberAt(episode, "number") : null,
+      },
+    ];
+  });
+}
+
+export async function getTraktHistory(env: Bindings, accessToken: string) {
+  const [movies, episodes] = await Promise.all([
+    requestAllTrakt(env, "/sync/history/movies", accessToken),
+    requestAllTrakt(env, "/sync/history/episodes", accessToken),
+  ]);
+
+  return [...parseHistory(movies, "movie"), ...parseHistory(episodes, "tv")];
 }
 
 export async function getTraktCalendar(env: Bindings, accessToken: string, days = 7) {

@@ -108,17 +108,11 @@ export type IngestionJob =
   | { type: "refresh-people"; chain?: boolean }
   | { type: "cache-poster"; titleId: string }
   | { type: "import-imdb-title"; imdbId: string }
-  | {
-      type: "import-diary-row";
-      viewerId: string;
-      name: string;
-      year: number | null;
-      rating: number | null;
-      watchedAt: string;
-    }
   | { type: "embed-titles"; titleIds: string[] }
   | { type: "reindex-vectors"; after?: string }
   | { type: "import-trakt-history"; viewerId: string; origin: string }
+  | { type: "process-viewer-import"; runId: string }
+  | { type: "commit-viewer-import"; runId: string; viewerId: string }
   | { type: "push-trakt-shelf"; viewerId: string; origin: string }
   | { type: "sync-schedule" }
   | { type: "sync-buzz" }

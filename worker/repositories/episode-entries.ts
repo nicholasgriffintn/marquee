@@ -127,7 +127,11 @@ function isEmpty(entry: EpisodeEntryInput) {
   return !entry.watched && entry.rating === null && entry.notes.trim().length === 0;
 }
 
-export async function saveEpisodeEntry(db: Database, viewerId: string, entry: EpisodeEntryInput) {
+export async function saveEpisodeEntry(
+  db: DatabaseTransaction,
+  viewerId: string,
+  entry: EpisodeEntryInput,
+) {
   if (isEmpty(entry)) {
     await deleteEntry(db, viewerId, entry);
 

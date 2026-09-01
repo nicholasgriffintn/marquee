@@ -31,3 +31,12 @@ export function rankingHash(value: string) {
 
   return (result ^ (result >>> 16)) >>> 0;
 }
+
+export function normaliseTitle(value: string) {
+  return value
+    .normalize("NFKD")
+    .toLowerCase()
+    .replaceAll(/[^\p{L}\p{N}\s]/gu, "")
+    .replaceAll(/\s+/gu, " ")
+    .trim();
+}

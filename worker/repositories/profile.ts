@@ -31,7 +31,7 @@ export async function readProfile(db: Database, viewerId: string) {
 }
 
 export async function saveViewingEntry(
-  db: Database,
+  db: DatabaseTransaction,
   viewerId: string,
   entry: {
     titleId: string;
@@ -42,12 +42,22 @@ export async function saveViewingEntry(
 ) {
   await db.execute(
     `INSERT INTO viewing_entries
-         (id, viewer_id, title_id, status, rating, thoughts)
-       VALUES ($1, $2, $3, $4, $5, $6)
+         (id, viewer_id, title_id, status, rating, thoughts, last_watched_at,
+          status_source, rating_source, projected_at)
+       VALUES ($1, $2, $3, $4, $5, $6,
+               CASE WHEN $4 = 'watched' THEN CURRENT_TIMESTAMP ELSE NULL END,
+               'marquee', CASE WHEN $5 IS NULL THEN NULL ELSE 'marquee' END, CURRENT_TIMESTAMP)
        ON CONFLICT(viewer_id, title_id) DO UPDATE SET
          status = excluded.status,
          rating = excluded.rating,
          thoughts = excluded.thoughts,
+         last_watched_at = CASE
+           WHEN excluded.status = 'watched' THEN CURRENT_TIMESTAMP
+           ELSE viewing_entries.last_watched_at
+         END,
+         status_source = 'marquee',
+         rating_source = CASE WHEN excluded.rating IS NULL THEN NULL ELSE 'marquee' END,
+         projected_at = CURRENT_TIMESTAMP,
          updated_at = CURRENT_TIMESTAMP`,
     [crypto.randomUUID(), viewerId, entry.titleId, entry.status, entry.rating, entry.thoughts],
   );
@@ -76,7 +86,11 @@ export async function deleteViewingEntry(db: Database, viewerId: string, titleId
 }
 
 export async function readProfileSummary(db: Database, viewerId: string) {
-  const row = await db.first<{ shelved: number; unrated: number | null; updatedAt: string }>(
+  const row = await db.first<{
+    shelved: number;
+    unrated: number | null;
+    updatedAt: string;
+  }>(
     `SELECT count(*) AS shelved,
               sum(CASE WHEN rating IS NULL THEN 1 ELSE 0 END) AS unrated,
               COALESCE(max(updated_at)::text, '') AS "updatedAt"

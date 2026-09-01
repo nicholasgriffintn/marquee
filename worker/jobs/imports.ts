@@ -35,16 +35,6 @@ async function matchThroughOmdb(env: Bindings, imdbId: string) {
   return findByTitle(env, record.title, record.year, record.mediaType);
 }
 
-async function matchThroughImdb(env: Bindings, name: string, year: number | null) {
-  const record = await askOmdb(env, () => getOmdbTitle(env, { title: name, year }));
-
-  if (!record?.imdbId) {
-    return null;
-  }
-
-  return findByImdbId(env, record.imdbId);
-}
-
 export async function importImdbTitle(env: Bindings, imdbId: string) {
   const titleId = (await findByImdbId(env, imdbId)) ?? (await matchThroughOmdb(env, imdbId));
 
@@ -55,45 +45,4 @@ export async function importImdbTitle(env: Bindings, imdbId: string) {
   }
 
   await ingestTitle(env, titleId);
-}
-
-export async function importDiaryRow(
-  env: Bindings,
-  job: {
-    viewerId: string;
-    name: string;
-    year: number | null;
-    rating: number | null;
-    watchedAt: string;
-  },
-) {
-  const titleId =
-    (await findByTitle(env, job.name, job.year)) ??
-    (await matchThroughImdb(env, job.name, job.year));
-
-  if (!titleId) {
-    logEvent("diary_import_unmatched", { name: job.name });
-
-    return;
-  }
-
-  if (!(await ingestTitle(env, titleId))) {
-    return;
-  }
-
-  await env.DB.execute(
-    `INSERT INTO viewing_entries (id, viewer_id, title_id, status, rating, thoughts, updated_at)
-     VALUES ($1, $2, $3, 'watched', $4, '', $5)
-     ON CONFLICT(viewer_id, title_id) DO UPDATE SET
-       status = 'watched',
-       rating = COALESCE(excluded.rating, viewing_entries.rating),
-       updated_at = excluded.updated_at`,
-    [
-      crypto.randomUUID(),
-      job.viewerId,
-      titleId,
-      job.rating,
-      job.watchedAt ? `${job.watchedAt} 12:00:00` : new Date().toISOString(),
-    ],
-  );
 }

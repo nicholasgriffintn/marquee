@@ -311,11 +311,14 @@ export function NotebookPage({
           >
             <NotebookSubheading>What you brought with you</NotebookSubheading>
             <NotebookAside>
-              Letterboxd will give you your whole account under Settings, Data, Export. Hand me
-              diary.csv or ratings.csv and I will fill in what I have missed.
+              Bring over an IMDb export, a Letterboxd ZIP, a linked Trakt account, or a portable
+              JSON or CSV file. You will preview uncertain titles before anything changes.
             </NotebookAside>
             <ErrorBoundary label="The import">
-              <ImportPanel onImported={() => setReloads((count) => count + 1)} />
+              <ImportPanel
+                isSignedIn={isSignedIn}
+                onImported={() => setReloads((count) => count + 1)}
+              />
             </ErrorBoundary>
 
             <NotebookSubheading>Accounts and keys</NotebookSubheading>

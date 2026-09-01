@@ -120,9 +120,15 @@ export function PrivacyPolicyPage() {
             <p>
               If you connect Trakt, Marquee receives your Trakt username, watch history, ratings,
               watchlist and upcoming calendar data. It stores encrypted access credentials so it can
-              sync when you ask. If you import a Letterboxd CSV, the file is read in your browser
-              and only the recognised title, year, rating and watched-date rows are sent to Marquee;
-              the original file is not kept.
+              sync when you ask. IMDb CSV files, Letterboxd ZIP files, and portable JSON or CSV
+              files are read in your browser. Only normalised activities and external title IDs are
+              sent to Marquee; the original files are not kept.
+            </p>
+            <p>
+              Marquee stores an import summary, title-match decisions, and accepted viewing events
+              so it can show a preview, avoid duplicates, and rebuild your shelf. You can remove an
+              import from the Notebook, which removes its viewing events and rebuilds affected
+              entries without removing later manual choices.
             </p>
 
             <h3>Device, location and use of the service</h3>
@@ -193,7 +199,10 @@ export function PrivacyPolicyPage() {
                   </tr>
                   <tr>
                     <td>Optional alerts and links</td>
-                    <td>Email alerts, Trakt sync, Letterboxd import and any export you request.</td>
+                    <td>
+                      Email alerts, Trakt sync, IMDb and Letterboxd imports, portable file imports,
+                      and any export you request.
+                    </td>
                     <td>
                       Your consent where required, and performance of the service you ask us to
                       provide.
@@ -393,6 +402,10 @@ export function PrivacyPolicyPage() {
               <li>
                 Trakt credentials are kept until you unlink Trakt. Alert addresses and feed or API
                 keys are kept until you replace, remove or revoke them.
+              </li>
+              <li>
+                Normalised import records and their viewing events are kept with your account until
+                you remove that import or erase the account. Original import files are not stored.
               </li>
               <li>
                 AI curator conversations expire after one hour of inactivity. Temporary sign-in and

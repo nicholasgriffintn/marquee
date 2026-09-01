@@ -54,7 +54,6 @@ export function useLinks(isSignedIn: boolean) {
   const [tokens, setTokens] = useState<ApiToken[]>([]);
   const [freshToken, setFreshToken] = useState("");
   const [pending, setPending] = useState<TraktPending | null>(null);
-  const [syncStatus, setSyncStatus] = useState<TraktJobStatus>("idle");
   const [pushStatus, setPushStatus] = useState<TraktJobStatus>("idle");
   const [error, setError] = useState("");
 
@@ -85,34 +84,6 @@ export function useLinks(isSignedIn: boolean) {
 
     return () => window.clearTimeout(timer);
   }, [reload]);
-
-  const syncTrakt = useCallback(async () => {
-    setError("");
-    setSyncStatus("running");
-
-    try {
-      await mutateJson("/api/links/trakt/sync", jsonMutation("POST"));
-
-      const before = links.find((link) => link.provider === "trakt")?.syncedAt ?? null;
-      const finished = await pollUntil(async () => {
-        const response = await queryJson<{ links: AccountLink[] }>("/api/links");
-        const trakt = response.links.find((link) => link.provider === "trakt");
-
-        if (!trakt?.syncedAt || trakt.syncedAt === before) {
-          return false;
-        }
-
-        setLinks(response.links);
-
-        return true;
-      });
-
-      setSyncStatus(finished ? "done" : "timeout");
-    } catch {
-      setError("Could not start the Trakt sync.");
-      setSyncStatus("idle");
-    }
-  }, [links]);
 
   const pushTrakt = useCallback(async () => {
     setError("");
@@ -200,12 +171,10 @@ export function useLinks(isSignedIn: boolean) {
     tokens,
     freshToken,
     pending,
-    syncStatus,
     pushStatus,
     error,
     createToken,
     revokeToken,
-    syncTrakt,
     pushTrakt,
     unlinkTrakt,
     dismissToken: () => setFreshToken(""),

@@ -21,8 +21,8 @@ export function jobSubject(job: IngestionJob) {
     return job.viewerId;
   }
 
-  if (job.type === "import-diary-row") {
-    return `${job.viewerId}#${job.name.slice(0, 40)}`;
+  if (job.type === "process-viewer-import" || job.type === "commit-viewer-import") {
+    return job.runId;
   }
 
   if (job.type === "sync-discover-page") {

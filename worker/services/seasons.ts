@@ -27,6 +27,10 @@ import {
   writeSeasonSummaries,
   type StoredSeason,
 } from "../repositories/seasons.ts";
+import {
+  insertManualEpisodeEvents,
+  insertManualEpisodeWatchEvent,
+} from "../repositories/viewing-events.ts";
 import type { Bindings } from "../types.ts";
 
 const INDEX_TTL_HOURS = 12;
@@ -307,7 +311,11 @@ async function syncShelfProgress(db: Database, viewerId: string, titleId: string
 }
 
 export async function recordEpisodeEntry(db: Database, viewerId: string, input: EpisodeEntryInput) {
-  const entry = await saveEpisodeEntry(db, viewerId, input);
+  const entry = await db.transaction(async (transaction) => {
+    await insertManualEpisodeEvents(transaction, viewerId, input);
+
+    return saveEpisodeEntry(transaction, viewerId, input);
+  });
 
   await syncShelfProgress(db, viewerId, input.titleId);
 
@@ -336,6 +344,17 @@ export async function markEpisodes(
     .map((episode) => episode.episodeNumber);
 
   await setEpisodesWatched(env.DB, viewerId, titleId, season, numbers, watched);
+  await env.DB.transaction(async (transaction) => {
+    for (const episode of numbers) {
+      // oxlint-disable-next-line no-await-in-loop -- record every explicit episode decision
+      await insertManualEpisodeWatchEvent(transaction, viewerId, {
+        titleId,
+        season,
+        episode,
+        watched,
+      });
+    }
+  });
   await syncShelfProgress(env.DB, viewerId, titleId);
 
   return numbers.length;

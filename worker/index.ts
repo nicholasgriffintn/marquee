@@ -20,6 +20,7 @@ import { curatorRoutes } from "./routes/curator.ts";
 import { episodeRoutes } from "./routes/episodes.ts";
 import { eventRoutes } from "./routes/events.ts";
 import { feedRoutes } from "./routes/feeds.ts";
+import { importRoutes } from "./routes/imports.ts";
 import { linkRoutes } from "./routes/links.ts";
 import { mcpRoutes } from "./routes/mcp.ts";
 import { mediaRoutes } from "./routes/media.ts";
@@ -81,6 +82,8 @@ app.route("/api/catalog", catalogRoutes);
 app.route("/api/cinema", cinemaRoutes);
 
 app.route("/api/auth", authRoutes);
+
+app.route("/api/profile/imports", importRoutes);
 
 app.route("/api/profile", profileRoutes);
 

@@ -1,6 +1,7 @@
 import { errorStatus, isPermanentHttpStatus } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
 import { isIngestionJob } from "../lib/validation.ts";
+import { failImportRunForProcessing } from "../repositories/import-runs.ts";
 import type { Bindings, IngestionJob } from "../types.ts";
 import {
   completeIngestionRun,
@@ -14,7 +15,7 @@ function handleIngestionFailure(
   message: Message<unknown>,
   job: IngestionJob,
   error: unknown,
-): void {
+): boolean {
   const status = errorStatus(error);
   const permanent = isPermanentHttpStatus(status);
 
@@ -27,20 +28,27 @@ function handleIngestionFailure(
       kind: error instanceof Error ? error.name : "UnknownError",
       status,
       permanent,
-      detail: error instanceof Error ? error.message.slice(0, 300) : String(error).slice(0, 300),
+      detail:
+        job.type === "process-viewer-import" || job.type === "commit-viewer-import"
+          ? "Viewer import processing failed"
+          : error instanceof Error
+            ? error.message.slice(0, 300)
+            : String(error).slice(0, 300),
     }),
   );
 
   if (permanent) {
     message.ack();
 
-    return;
+    return true;
   }
 
   message.retry({
     delaySeconds:
       status === 429 ? Math.min(900, 180 * message.attempts) : Math.min(300, 30 * message.attempts),
   });
+
+  return false;
 }
 
 export async function consumeIngestion(batch: MessageBatch<unknown>, env: Bindings) {
@@ -89,7 +97,21 @@ export async function consumeIngestion(batch: MessageBatch<unknown>, env: Bindin
     } catch (error) {
       // oxlint-disable-next-line no-await-in-loop
       await failIngestionRun(env, runId, error);
-      handleIngestionFailure(message, job, error);
+      const permanent = handleIngestionFailure(message, job, error);
+
+      if (
+        permanent &&
+        (job.type === "process-viewer-import" || job.type === "commit-viewer-import")
+      ) {
+        // oxlint-disable-next-line no-await-in-loop -- persist the user-visible terminal state
+        await failImportRunForProcessing(
+          env.DB,
+          job.runId,
+          "import_processing_failed",
+          "The import could not be processed. You can remove it and try again.",
+        );
+      }
+
       continue;
     }
 
@@ -126,6 +148,16 @@ export async function consumeDeadLetters(batch: MessageBatch<unknown>, env: Bind
               `Gave up after ${message.attempts} attempt${message.attempts === 1 ? "" : "s"}`,
             ],
           );
+
+          if (job?.type === "process-viewer-import" || job?.type === "commit-viewer-import") {
+            // oxlint-disable-next-line no-await-in-loop -- dead-letter state must be visible to its owner
+            await failImportRunForProcessing(
+              transaction,
+              job.runId,
+              "import_retries_exhausted",
+              "The import could not finish after several attempts. You can remove it and try again.",
+            );
+          }
         }
       });
     }

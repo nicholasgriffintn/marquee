@@ -2,16 +2,13 @@ import { Hono } from "hono";
 
 import { isJourneyMode } from "../../src/domain/journeys.ts";
 import { isShelfSort, shelfStatus, SHELF_PAGE_SIZE } from "../../src/domain/shelf.ts";
-import type { DiaryRow } from "../../src/lib/letterboxd.ts";
 import { requireAuthentication, type AuthVariables } from "../auth/session.ts";
 import { recordEvent } from "../lib/events.ts";
 import { jsonResponse, readJsonObject } from "../lib/http.ts";
 import { logError, logRejection } from "../lib/logging.ts";
 import { queryInteger, queryText } from "../lib/params.ts";
 import { isKnownTitle } from "../lib/validation.ts";
-import { calendarDate, isRecord } from "../lib/values.ts";
 import { recentExitFor, recordSignal } from "../repositories/signals.ts";
-import { importDiary } from "../services/import-letterboxd.ts";
 import {
   getProfile,
   getProviderPreferences,
@@ -24,7 +21,6 @@ import {
 import type { Bindings } from "../types.ts";
 import { profileEntryResponse } from "./profile-entry-response.ts";
 
-const IMPORT_BATCH = 100;
 const MAX_SHELF_PAGE = 500;
 const GENRE_LIMIT = 60;
 const QUERY_LIMIT = 80;
@@ -174,44 +170,6 @@ async function creditJourney(env: Bindings, viewerId: string, titleId: string) {
     expiresInDays: 365,
   });
 }
-
-profileRoutes.post("/import/letterboxd", async (context) => {
-  const user = context.get("authenticatedUser");
-  const body = await readJsonObject(context.req.raw);
-  const rows = Array.isArray(body?.rows) ? body.rows : [];
-
-  if (rows.length === 0 || rows.length > IMPORT_BATCH) {
-    return jsonResponse({ error: `Send between 1 and ${IMPORT_BATCH} rows.` }, 400);
-  }
-
-  const clean = rows.flatMap((row): DiaryRow[] => {
-    if (!isRecord(row) || typeof row.name !== "string" || !row.name.trim()) {
-      return [];
-    }
-
-    const year = Number(row.year);
-    const rating = Number(row.rating);
-
-    return [
-      {
-        name: row.name.trim().slice(0, 160),
-        year: Number.isInteger(year) && year > 1870 && year < 2100 ? year : null,
-        rating: Number.isInteger(rating) && rating >= 1 && rating <= 5 ? rating : null,
-        watchedAt: calendarDate(row.watchedAt) ?? "",
-      },
-    ];
-  });
-
-  try {
-    const outcome = await importDiary(context.env, user.id, clean);
-
-    return jsonResponse(outcome);
-  } catch (error) {
-    logError("letterboxd_route_failed", error);
-
-    return jsonResponse({ error: "That import did not take." }, 500);
-  }
-});
 
 profileRoutes.delete("/:titleId", async (context) => {
   const user = context.get("authenticatedUser");

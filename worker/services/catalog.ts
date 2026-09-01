@@ -106,9 +106,9 @@ export async function searchCatalogueHybrid(env: Bindings, query: string, provid
   };
 }
 
-export async function getCatalogueItems(db: Database, ids: string[]) {
+export async function getCatalogueItems(db: Database, ids: string[], limit = 30) {
   return {
-    items: await withBuzz(db, await readItems(db, ids)),
+    items: await withBuzz(db, await readItems(db, ids, limit)),
     source: "Marquee catalogue",
     fetchedAt: new Date().toISOString(),
   };

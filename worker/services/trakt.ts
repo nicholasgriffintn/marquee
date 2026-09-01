@@ -1,22 +1,25 @@
-import { getItems } from "../clients/tmdb.ts";
+import { IMPORT_RECORD_LIMIT, type ImportedActivity } from "../../src/domain/imports.ts";
 import {
   getTraktCalendar,
+  getTraktHistory,
   getTraktRatings,
-  getTraktWatched,
   getTraktWatchlist,
   pushTraktHistory,
   pushTraktRatings,
   pushTraktWatchlist,
   refreshTraktTokens,
   TraktError,
-  type TraktEntry,
   type TraktPushItem,
 } from "../clients/trakt.ts";
+import { sha256Hex } from "../lib/hash.ts";
 import { logError, logEvent } from "../lib/logging.ts";
 import { clamp } from "../lib/numbers.ts";
-import { isKnownTitle } from "../lib/validation.ts";
 import { databaseDate } from "../lib/values.ts";
-import { storeItems } from "../repositories/catalog-writer.ts";
+import {
+  createImportRun,
+  stageImportRecords,
+  transitionImportRun,
+} from "../repositories/import-runs.ts";
 import {
   markLinkBroken,
   markLinkPushed,
@@ -27,10 +30,9 @@ import {
 } from "../repositories/links.ts";
 import type { Bindings, EntryStatus } from "../types.ts";
 
-const IMPORT_LIMIT = 400;
 const PUSH_LIMIT = 400;
 const PUSH_CHUNK = 100;
-const HYDRATE_LIMIT = 120;
+const IMPORT_CHUNK = 100;
 
 export function traktRedirectUri(origin: string) {
   return `${origin}/api/links/trakt/callback`;
@@ -67,82 +69,74 @@ async function traktAccessToken(env: Bindings, viewerId: string, origin: string)
   }
 }
 
-function titleIdOf(entry: TraktEntry) {
-  const titleId = `${entry.mediaType}:${entry.tmdbId}`;
-
-  return isKnownTitle(titleId) ? titleId : null;
-}
-
 function marqueeRating(rating: number | null) {
   return rating === null ? null : clamp(Math.round(rating / 2), 1, 5);
 }
 
-type Planned = { titleId: string; status: EntryStatus; rating: number | null };
-
-function plan(watched: TraktEntry[], watchlist: TraktEntry[], ratings: TraktEntry[]) {
-  const planned = new Map<string, Planned>();
-
-  for (const entry of watchlist) {
-    const titleId = titleIdOf(entry);
-
-    if (titleId) {
-      planned.set(titleId, { titleId, status: "watchlist", rating: null });
-    }
-  }
-
-  for (const entry of watched) {
-    const titleId = titleIdOf(entry);
-
-    if (titleId) {
-      planned.set(titleId, {
-        titleId,
-        status: entry.mediaType === "tv" ? "watching" : "watched",
-        rating: planned.get(titleId)?.rating ?? null,
-      });
-    }
-  }
-
-  for (const entry of ratings) {
-    const titleId = titleIdOf(entry);
+function traktRecords(
+  history: Awaited<ReturnType<typeof getTraktHistory>>,
+  watchlist: Awaited<ReturnType<typeof getTraktWatchlist>>,
+  ratings: Awaited<ReturnType<typeof getTraktRatings>>,
+) {
+  const titledStatus = new Set(
+    [...history, ...watchlist].map((entry) => `${entry.mediaType}:${entry.tmdbId}`),
+  );
+  const watched: ImportedActivity[] = history.map((entry) => ({
+    source: "trakt",
+    sourceSubject: "",
+    sourceEventId: `history:${entry.id}`,
+    eventTypes: ["watched"],
+    providerItemId: `${entry.mediaType}:${entry.tmdbId}`,
+    mediaType: entry.mediaType,
+    title: entry.title.slice(0, 160),
+    externalIds: {
+      tmdb: entry.tmdbId,
+      ...(entry.imdbId ? { imdb: entry.imdbId } : {}),
+    },
+    ...(entry.season !== null ? { season: entry.season } : {}),
+    ...(entry.episode !== null ? { episode: entry.episode } : {}),
+    ...(entry.watchedAt ? { watchedAt: entry.watchedAt } : {}),
+  }));
+  const listed: ImportedActivity[] = watchlist.map((entry) => ({
+    source: "trakt",
+    sourceSubject: "",
+    sourceEventId: `watchlist:${entry.mediaType}:${entry.tmdbId}:${entry.listedAt ?? ""}`,
+    eventTypes: ["watchlist"],
+    providerItemId: `${entry.mediaType}:${entry.tmdbId}`,
+    mediaType: entry.mediaType,
+    title: entry.title.slice(0, 160),
+    externalIds: {
+      tmdb: entry.tmdbId,
+      ...(entry.imdbId ? { imdb: entry.imdbId } : {}),
+    },
+  }));
+  const rated: ImportedActivity[] = ratings.flatMap((entry): ImportedActivity[] => {
     const rating = marqueeRating(entry.rating);
 
-    if (!titleId || rating === null) {
-      continue;
-    }
+    return rating === null
+      ? []
+      : [
+          {
+            source: "trakt",
+            sourceSubject: "",
+            sourceEventId: `rating:${entry.mediaType}:${entry.tmdbId}:${entry.ratedAt ?? ""}`,
+            eventTypes: titledStatus.has(`${entry.mediaType}:${entry.tmdbId}`)
+              ? ["rated"]
+              : ["watched", "rated"],
+            providerItemId: `${entry.mediaType}:${entry.tmdbId}`,
+            mediaType: entry.mediaType,
+            title: entry.title.slice(0, 160),
+            externalIds: {
+              tmdb: entry.tmdbId,
+              ...(entry.imdbId ? { imdb: entry.imdbId } : {}),
+            },
+            ...(entry.ratedAt ? { watchedAt: entry.ratedAt } : {}),
+            rating,
+          },
+        ];
+  });
 
-    const existing = planned.get(titleId);
-
-    planned.set(titleId, {
-      titleId,
-      status: existing?.status ?? "watched",
-      rating,
-    });
-  }
-
-  return [...planned.values()].slice(0, IMPORT_LIMIT);
-}
-
-async function hydrateMissing(env: Bindings, titleIds: string[]) {
-  if (titleIds.length === 0) {
-    return;
-  }
-
-  const known = await env.DB.query<{ id: string }>(
-    `SELECT id FROM catalog_titles WHERE id IN (SELECT value FROM jsonb_array_elements_text(CAST($1 AS jsonb)) AS entries(value))`,
-    [JSON.stringify(titleIds)],
-  );
-  const have = new Set(known.rows.map((row) => row.id));
-  const missing = titleIds.filter((titleId) => !have.has(titleId)).slice(0, HYDRATE_LIMIT);
-
-  if (missing.length === 0) {
-    return;
-  }
-
-  const titles = await getItems(env, missing);
-
-  await storeItems(env.DB, titles, new Date().toISOString());
-
-  logEvent("trakt_titles_hydrated", { count: titles.length });
+  return [...watched, ...listed, ...rated];
 }
 
 export async function importTraktHistory(env: Bindings, viewerId: string, origin: string) {
@@ -152,44 +146,49 @@ export async function importTraktHistory(env: Bindings, viewerId: string, origin
     throw new TraktError("Trakt is not linked for this viewer", 400);
   }
 
-  const [watched, watchlist, ratings] = await Promise.all([
-    getTraktWatched(env, accessToken),
+  const [history, watchlist, ratings] = await Promise.all([
+    getTraktHistory(env, accessToken),
     getTraktWatchlist(env, accessToken),
     getTraktRatings(env, accessToken),
   ]);
-  const planned = plan(watched, watchlist, ratings);
+  const records = traktRecords(history, watchlist, ratings);
 
-  await hydrateMissing(
-    env,
-    planned.map((entry) => entry.titleId),
-  );
-
-  if (planned.length === 0) {
-    await markLinkSynced(env, viewerId, "trakt");
-
-    return 0;
+  if (records.length > IMPORT_RECORD_LIMIT) {
+    throw new TraktError(
+      `That Trakt account contains more than ${IMPORT_RECORD_LIMIT.toLocaleString()} importable activities.`,
+      400,
+    );
   }
 
-  await env.DB.transaction(async (transaction) => {
-    for (const entry of planned) {
-      // oxlint-disable-next-line no-await-in-loop
-      await transaction.execute(
-        `INSERT INTO viewing_entries (id, viewer_id, title_id, status, rating, thoughts)
-         VALUES ($1, $2, $3, $4, $5, '')
-         ON CONFLICT(viewer_id, title_id) DO UPDATE SET
-           status = excluded.status,
-           rating = COALESCE(excluded.rating, viewing_entries.rating),
-           updated_at = CURRENT_TIMESTAMP`,
-        [crypto.randomUUID(), viewerId, entry.titleId, entry.status, entry.rating],
-      );
-    }
+  if (records.length === 0) {
+    await markLinkSynced(env, viewerId, "trakt");
+
+    return null;
+  }
+
+  const run = await createImportRun(env.DB, viewerId, {
+    source: "trakt",
+    sourceSubject: "",
+    inputKind: "connected_api",
+    adapterId: "trakt-sync-api",
+    adapterVersion: 1,
+    inputFingerprint: await sha256Hex(crypto.randomUUID()),
   });
 
-  await markLinkSynced(env, viewerId, "trakt");
+  for (let index = 0; index < records.length; index += IMPORT_CHUNK) {
+    // oxlint-disable-next-line no-await-in-loop -- stage provider pages into one resumable run
+    await stageImportRecords(env.DB, viewerId, run.id, records.slice(index, index + IMPORT_CHUNK));
+  }
 
-  logEvent("trakt_history_imported", { entries: planned.length });
+  await transitionImportRun(env.DB, viewerId, run.id, ["staging"], "matching");
+  await env.INGESTION_QUEUE.send(
+    { type: "process-viewer-import", runId: run.id },
+    { contentType: "json" },
+  );
 
-  return planned.length;
+  logEvent("trakt_history_staged", { runId: run.id, entries: records.length });
+
+  return run.id;
 }
 
 export async function traktUpcoming(env: Bindings, viewerId: string, origin: string) {
@@ -212,6 +211,7 @@ type ShelfRow = {
   titleId: string;
   status: EntryStatus;
   rating: number | null;
+  lastWatchedAt: string | null;
   updatedAt: string;
 };
 
@@ -256,7 +256,8 @@ export async function exportTraktShelf(env: Bindings, viewerId: string, origin: 
 
   const pushedAt = await readPushedAt(env, viewerId, "trakt");
   const rows = await env.DB.query<ShelfRow>(
-    `SELECT title_id AS "titleId", status, rating, updated_at AS "updatedAt"
+    `SELECT title_id AS "titleId", status, rating,
+            last_watched_at AS "lastWatchedAt", updated_at AS "updatedAt"
        FROM viewing_entries
       WHERE viewer_id = $1
         AND ($2::timestamptz IS NULL OR updated_at > $2::timestamptz)
@@ -285,7 +286,7 @@ export async function exportTraktShelf(env: Bindings, viewerId: string, origin: 
     if (row.status === "watched") {
       history.push({
         ...item,
-        watchedAt: databaseDate(row.updatedAt).toISOString(),
+        ...(row.lastWatchedAt ? { watchedAt: databaseDate(row.lastWatchedAt).toISOString() } : {}),
       });
     } else if (row.status === "watchlist" || row.status === "watching") {
       watchlist.push(item);

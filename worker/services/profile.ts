@@ -1,6 +1,6 @@
 import type { ShelfResponse } from "../../src/domain/shelf.ts";
 import { isEntryStatus, isKnownTitle, validProviderIds } from "../lib/validation.ts";
-import { deleteProfileData } from "../repositories/profile-removal.ts";
+import { deleteProfileDataInTransaction } from "../repositories/profile-removal.ts";
 import {
   readProfileSummary,
   readProviderPreferences,
@@ -14,6 +14,10 @@ import {
   readShelfPage,
   type ShelfPageQuery,
 } from "../repositories/shelf.ts";
+import {
+  insertManualRemovalEvent,
+  insertManualTitleEvents,
+} from "../repositories/viewing-events.ts";
 
 const MAX_THOUGHTS_LENGTH = 2_000;
 
@@ -72,6 +76,9 @@ export async function updateProfile(
     return { ok: false, error: "Invalid status" };
   }
 
+  const titleId = input.titleId;
+  const status = input.status;
+
   const rating = input.rating === null || input.rating === undefined ? null : Number(input.rating);
 
   if (rating !== null && (!Number.isInteger(rating) || rating < 1 || rating > 5)) {
@@ -80,11 +87,19 @@ export async function updateProfile(
 
   const thoughts =
     typeof input.thoughts === "string" ? input.thoughts.trim().slice(0, MAX_THOUGHTS_LENGTH) : "";
-  const entry = await saveViewingEntry(db, viewerId, {
-    titleId: input.titleId,
-    status: input.status,
-    rating,
-    thoughts,
+  const entry = await db.transaction(async (transaction) => {
+    await insertManualTitleEvents(transaction, viewerId, {
+      titleId,
+      status,
+      rating,
+    });
+
+    return saveViewingEntry(transaction, viewerId, {
+      titleId,
+      status,
+      rating,
+      thoughts,
+    });
   });
 
   return { ok: true, payload: { entry } };
@@ -113,7 +128,10 @@ export async function removeFromProfile(db: Database, viewerId: string, titleId:
     return false;
   }
 
-  await deleteProfileData(db, viewerId, titleId);
+  await db.transaction(async (transaction) => {
+    await insertManualRemovalEvent(transaction, viewerId, titleId);
+    await deleteProfileDataInTransaction(transaction, viewerId, titleId);
+  });
 
   return true;
 }
