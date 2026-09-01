@@ -130,9 +130,9 @@ export async function getPersonalRails(
   try {
     const [preferences, providerIds] = viewerId
       ? await Promise.all([
-        readNotebookPreferences(env.DB, viewerId),
-        readProviderPreferences(env.DB, viewerId),
-      ])
+          readNotebookPreferences(env.DB, viewerId),
+          readProviderPreferences(env.DB, viewerId),
+        ])
       : [null, null];
     const language = preferences?.preferredLanguage ?? "en";
     const [people, cinema] = await Promise.all([
