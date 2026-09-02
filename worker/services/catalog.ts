@@ -4,6 +4,10 @@ import { withKvCache, writeKvValue } from "../lib/cache.ts";
 import { sha256Hex } from "../lib/hash.ts";
 import { logError, logEvent } from "../lib/logging.ts";
 import {
+  readAnimeRecommendationMap,
+  readAnimeRelationMap,
+} from "../repositories/catalog-anime-relations.ts";
+import {
   readAvailability,
   readCatalog,
   readItems,
@@ -141,8 +145,7 @@ export async function getCatalogueItems(db: Database, ids: string[], limit = 30)
 }
 
 export async function getAnimeWatchOrder(db: Database, titleId: string) {
-  const [title] = await readItems(db, [titleId]);
-  const relations = title?.anime?.relations ?? [];
+  const relations = (await readAnimeRelationMap(db, [titleId])).get(titleId) ?? [];
 
   if (relations.length === 0) {
     return {
@@ -178,8 +181,7 @@ export async function getAnimeWatchOrder(db: Database, titleId: string) {
 }
 
 export async function getAnimeRecommendations(db: Database, titleId: string) {
-  const [title] = await readItems(db, [titleId]);
-  const malIds = title?.anime?.recommendations ?? [];
+  const malIds = (await readAnimeRecommendationMap(db, [titleId])).get(titleId) ?? [];
 
   if (malIds.length === 0) {
     return {

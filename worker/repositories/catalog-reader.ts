@@ -143,7 +143,7 @@ export async function readTitlesByMalId(db: Database, malIds: number[]) {
     [...unique],
   );
 
-  const hydrated = await servedTitles(db, result.rows);
+  const hydrated = await summariseTitleRows(db, result.rows);
 
   hydrated.forEach((title, index) => {
     const row = result.rows[index];
