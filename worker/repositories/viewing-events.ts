@@ -225,47 +225,63 @@ async function projectEpisodes(
   );
 }
 
-export async function insertViewingEvent(
+const EVENT_FIELDS = 15;
+
+function eventValues(viewerId: string, titleId: string, event: EventDraft): DatabaseValue[] {
+  return [
+    crypto.randomUUID(),
+    viewerId,
+    titleId,
+    event.source,
+    event.sourceSubject,
+    event.sourceEventId,
+    event.eventType,
+    event.status ?? null,
+    event.watched === null || event.watched === undefined ? null : event.watched ? 1 : 0,
+    event.rating ?? null,
+    event.watchedAt ?? null,
+    event.season ?? null,
+    event.episode ?? null,
+    event.importRunId ?? null,
+    event.occurredAt ?? null,
+  ];
+}
+
+export async function insertViewingEvents(
   transaction: DatabaseTransaction,
   viewerId: string,
-  titleId: string,
-  event: EventDraft,
+  entries: { titleId: string; event: EventDraft }[],
 ) {
+  if (entries.length === 0) {
+    return 0;
+  }
+
+  const tuples = entries.map(
+    (_, index) =>
+      `(${Array.from({ length: EVENT_FIELDS }, (__, field) => `$${index * EVENT_FIELDS + field + 1}`).join(", ")})`,
+  );
   const result = await transaction.execute(
     `INSERT INTO viewing_events
        (id, viewer_id, title_id, source, source_subject, source_event_id, event_type,
         status, watched, rating, watched_at, season_number, episode_number, import_run_id, occurred_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+     VALUES ${tuples.join(", ")}
      ON CONFLICT (viewer_id, source, source_subject, source_event_id, event_type) DO NOTHING`,
-    [
-      crypto.randomUUID(),
-      viewerId,
-      titleId,
-      event.source,
-      event.sourceSubject,
-      event.sourceEventId,
-      event.eventType,
-      event.status ?? null,
-      event.watched === null || event.watched === undefined ? null : event.watched ? 1 : 0,
-      event.rating ?? null,
-      event.watchedAt ?? null,
-      event.season ?? null,
-      event.episode ?? null,
-      event.importRunId ?? null,
-      event.occurredAt ?? null,
-    ],
+    entries.flatMap((entry) => eventValues(viewerId, entry.titleId, entry.event)),
   );
 
   return result.rowCount;
 }
 
-export async function insertImportedActivityEvents(
+export function insertViewingEvent(
   transaction: DatabaseTransaction,
   viewerId: string,
-  runId: string,
   titleId: string,
-  activity: ImportedActivity,
+  event: EventDraft,
 ) {
+  return insertViewingEvents(transaction, viewerId, [{ titleId, event }]);
+}
+
+export function importedActivityEvents(runId: string, activity: ImportedActivity): EventDraft[] {
   const common = {
     source: activity.source,
     sourceSubject: activity.sourceSubject,
@@ -278,42 +294,34 @@ export async function insertImportedActivityEvents(
     imported === "watched" && activity.mediaType === "tv" && activity.season !== undefined
       ? "watching"
       : imported;
-  let written = 0;
+  const episodic = activity.season !== undefined && activity.episode !== undefined;
 
-  if (status) {
-    written += await insertViewingEvent(transaction, viewerId, titleId, {
-      ...common,
-      eventType: "status",
-      status,
-    });
-  }
-
-  if (activity.eventTypes.includes("watched")) {
-    written += await insertViewingEvent(transaction, viewerId, titleId, {
-      ...common,
-      eventType:
-        activity.season !== undefined && activity.episode !== undefined ? "episode_watch" : "watch",
-      watched: true,
-      watchedAt: activity.watchedAt ?? null,
-      season: activity.season ?? null,
-      episode: activity.episode ?? null,
-    });
-  }
-
-  if (activity.eventTypes.includes("rated") && activity.rating !== undefined) {
-    written += await insertViewingEvent(transaction, viewerId, titleId, {
-      ...common,
-      eventType:
-        activity.season !== undefined && activity.episode !== undefined
-          ? "episode_rating"
-          : "rating",
-      rating: activity.rating,
-      season: activity.season ?? null,
-      episode: activity.episode ?? null,
-    });
-  }
-
-  return written;
+  return [
+    ...(status ? [{ ...common, eventType: "status" as const, status }] : []),
+    ...(activity.eventTypes.includes("watched")
+      ? [
+          {
+            ...common,
+            eventType: episodic ? ("episode_watch" as const) : ("watch" as const),
+            watched: true,
+            watchedAt: activity.watchedAt ?? null,
+            season: activity.season ?? null,
+            episode: activity.episode ?? null,
+          },
+        ]
+      : []),
+    ...(activity.eventTypes.includes("rated") && activity.rating !== undefined
+      ? [
+          {
+            ...common,
+            eventType: episodic ? ("episode_rating" as const) : ("rating" as const),
+            rating: activity.rating,
+            season: activity.season ?? null,
+            episode: activity.episode ?? null,
+          },
+        ]
+      : []),
+  ];
 }
 
 export function insertManualTitleEvents(

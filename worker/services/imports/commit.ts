@@ -9,7 +9,8 @@ import {
   transitionImportRun,
 } from "../../repositories/import-runs.ts";
 import {
-  insertImportedActivityEvents,
+  importedActivityEvents,
+  insertViewingEvents,
   projectViewingTitle,
 } from "../../repositories/viewing-events.ts";
 import type { Bindings } from "../../types.ts";
@@ -40,18 +41,21 @@ export async function commitViewerImport(env: Bindings, viewerId: string, runId:
   for (let index = 0; index < records.length; index += COMMIT_CHUNK) {
     const wave = records.slice(index, index + COMMIT_CHUNK);
 
-    // oxlint-disable-next-line no-await-in-loop -- bounded transactions make interrupted commits resumable
-    await env.DB.transaction(async (transaction) => {
-      for (const record of wave) {
-        if (!record.titleId) {
-          continue;
-        }
+    const entries = wave.flatMap((record) => {
+      const titleId = record.titleId;
 
-        titleIds.add(record.titleId);
-        // oxlint-disable-next-line no-await-in-loop -- event insertion order is deterministic per record
-        await insertImportedActivityEvents(transaction, viewerId, runId, record.titleId, record);
+      if (!titleId) {
+        return [];
       }
 
+      titleIds.add(titleId);
+
+      return importedActivityEvents(runId, record).map((event) => ({ titleId, event }));
+    });
+
+    // oxlint-disable-next-line no-await-in-loop -- bounded transactions make interrupted commits resumable
+    await env.DB.transaction(async (transaction) => {
+      await insertViewingEvents(transaction, viewerId, entries);
       await markImportRecordsCommitted(
         transaction,
         viewerId,
