@@ -138,7 +138,11 @@ export function useImports(onImported: () => void) {
           `/api/profile/imports/${active.run.id}/records/${recordId}`,
           jsonMutation("PATCH", resolution),
         );
-        setActive(await queryJsonFresh<ImportRunDetail>(`/api/profile/imports/${active.run.id}`));
+        setActive(
+          await queryJsonFresh<ImportRunDetail>(
+            `/api/profile/imports/${active.run.id}?offset=${active.recordPage.offset}`,
+          ),
+        );
         await reload();
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "That match did not stick.");
@@ -159,9 +163,12 @@ export function useImports(onImported: () => void) {
     setProgress("Writing your history…");
 
     try {
+      const written = active.run.committed;
+
       await mutateJson(`/api/profile/imports/${active.run.id}/commit`, jsonMutation("POST"));
-      const detail = await waitForRun(active.run.id, (run) =>
-        ["completed", "failed"].includes(run.status),
+      const detail = await waitForRun(
+        active.run.id,
+        (run) => ["completed", "failed"].includes(run.status) || run.committed > written,
       );
 
       if (!detail) {

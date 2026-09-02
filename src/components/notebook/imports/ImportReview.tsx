@@ -10,13 +10,32 @@ import styles from "./imports.module.css";
 
 type CatalogueResponse = { items: MediaTitle[] };
 
+function groupUnresolved(records: ImportRecord[]) {
+  const groups = new Map<string, { record: ImportRecord; watches: number }>();
+
+  for (const record of records) {
+    const key = record.providerItemId ?? record.id;
+    const group = groups.get(key);
+
+    if (group) {
+      group.watches += 1;
+    } else {
+      groups.set(key, { record, watches: 1 });
+    }
+  }
+
+  return [...groups.values()];
+}
+
 function ReviewRecord({
   record,
+  watches,
   candidates,
   busy,
   onResolve,
 }: {
   record: ImportRecord;
+  watches: number;
   candidates: Map<string, MediaTitle>;
   busy: boolean;
   onResolve: (
@@ -62,7 +81,12 @@ function ReviewRecord({
         <div>
           <strong>{record.title}</strong>
           <small>
-            {[record.year, record.mediaType, record.watchedAt?.slice(0, 10)]
+            {[
+              record.year,
+              record.mediaType,
+              watches > 1 ? `${watches.toLocaleString()} watches on this page` : null,
+              record.watchedAt?.slice(0, 10),
+            ]
               .filter(Boolean)
               .join(" · ") || "No further details"}
           </small>
@@ -150,13 +174,18 @@ export function ImportReview({
   onClose: () => void;
 }) {
   const candidates = new Map(detail.titles.map((title) => [title.id, title]));
-  const unresolved = detail.records.filter(
-    (record) => record.matchStatus === "review" || record.matchStatus === "unmatched",
+  const unresolved = groupUnresolved(
+    detail.records.filter(
+      (record) => record.matchStatus === "review" || record.matchStatus === "unmatched",
+    ),
   );
   const matchedPreview = detail.records
     .filter((record) => record.matchStatus === "matched" && record.titleId)
     .slice(0, 12);
   const completed = detail.run.status === "completed";
+  const writable =
+    detail.run.matched > 0 &&
+    (detail.run.status === "ready" || detail.run.status === "needs_review");
 
   return (
     <section className={styles.review} aria-labelledby="import-review-title">
@@ -215,10 +244,11 @@ export function ImportReview({
         </details>
       )}
 
-      {unresolved.map((record) => (
+      {unresolved.map((group) => (
         <ReviewRecord
-          key={record.id}
-          record={record}
+          key={group.record.id}
+          record={group.record}
+          watches={group.watches}
           candidates={candidates}
           busy={busy}
           onResolve={onResolve}
@@ -257,20 +287,26 @@ export function ImportReview({
         </nav>
       )}
 
-      {!completed && detail.run.status === "ready" && (
+      {!completed && writable && (
         <div className={styles.commitBar}>
           <p>
             <strong>{detail.run.matched.toLocaleString()} records are ready.</strong>
-            <small>Nothing changes on your shelf until you confirm.</small>
+            <small>
+              {detail.run.review > 0
+                ? `Write these now; the ${detail.run.review.toLocaleString()} awaiting your eye stay here until you resolve them.`
+                : "Nothing changes on your shelf until you confirm."}
+            </small>
           </p>
           <Button variant="primary" disabled={busy} onClick={() => void onCommit()}>
-            Write this history
+            Write {detail.run.review > 0 ? "the matched titles" : "this history"}
           </Button>
         </div>
       )}
 
-      {!completed && detail.run.status === "needs_review" && unresolved.length > 0 && (
-        <StatusNote>Resolve or ignore every uncertain title before writing the import.</StatusNote>
+      {!completed && detail.run.review > 0 && detail.run.matched === 0 && (
+        <StatusNote>
+          Resolve or ignore the remaining titles to write the rest of this import.
+        </StatusNote>
       )}
     </section>
   );

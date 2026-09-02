@@ -57,8 +57,9 @@ const INSTRUCTIONS: Partial<
     steps: [
       "Start with the example CSV and keep its header row.",
       "Use one row per title or episode; ratings use a 1–10 scale.",
-      "Save as CSV and upload it below.",
+      "A viewing history with only a title and a date works too—Netflix exports upload as they are.",
     ],
+    links: [{ label: "Netflix viewing activity", href: "https://www.netflix.com/viewingactivity" }],
   },
 };
 
@@ -69,6 +70,13 @@ function FormatGuide({ source }: { source: "json" | "csv" }) {
   return (
     <details className={styles.formatGuide}>
       <summary>Format and example</summary>
+      {source === "csv" && (
+        <p>
+          A file whose only columns are a title and a date—a Netflix viewing history, for
+          instance—is read as watches instead. Episode titles are traced back to their series, and
+          anything uncertain waits for you in the preview.
+        </p>
+      )}
       <p>
         Fields: <code>imdb_id</code>, <code>tmdb_id</code>, <code>tvdb_id</code>, <code>type</code>,{" "}
         <code>title</code>, <code>year</code>, <code>season</code>, <code>episode</code>,{" "}

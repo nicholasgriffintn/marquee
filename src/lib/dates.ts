@@ -49,3 +49,50 @@ export function formatTime(
 ) {
   return parseDate(value)?.toLocaleTimeString(undefined, options) ?? fallback;
 }
+
+const SLASH_DATE = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2}|\d{4})$/u;
+
+function localeDayFirst() {
+  const parts = new Intl.DateTimeFormat().formatToParts(new Date(Date.UTC(2000, 0, 2)));
+
+  return parts.find((part) => part.type === "day" || part.type === "month")?.type === "day";
+}
+
+export function parseSlashDate(value: string, dayFirst: boolean) {
+  const match = SLASH_DATE.exec(value.trim());
+
+  if (!match) {
+    return null;
+  }
+
+  const [, first = "", second = "", rawYear = ""] = match;
+  const day = Number(dayFirst ? first : second);
+  const month = Number(dayFirst ? second : first);
+  const shortYear = Number(rawYear);
+  const year = rawYear.length === 2 ? (shortYear >= 70 ? 1900 : 2000) + shortYear : shortYear;
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+
+  return parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day ? parsed : null;
+}
+
+export function slashDatesAreDayFirst(values: Iterable<string>) {
+  for (const value of values) {
+    const match = SLASH_DATE.exec(value.trim());
+    const first = Number(match?.[1]);
+    const second = Number(match?.[2]);
+
+    if (!match || first === second) {
+      continue;
+    }
+
+    if (first > 12 && second <= 12) {
+      return true;
+    }
+
+    if (second > 12 && first <= 12) {
+      return false;
+    }
+  }
+
+  return localeDayFirst();
+}

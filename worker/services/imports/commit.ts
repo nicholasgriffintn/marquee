@@ -1,10 +1,11 @@
 import { logEvent } from "../../lib/logging.ts";
 import {
-  completeImportRun,
   importRunTitleIds,
   markImportRecordsCommitted,
   readCommitRecords,
   readImportRun,
+  recordImportCommit,
+  refreshImportRunCounts,
   transitionImportRun,
 } from "../../repositories/import-runs.ts";
 import {
@@ -14,16 +15,18 @@ import {
 import type { Bindings } from "../../types.ts";
 
 const COMMIT_CHUNK = 50;
+const CLAIMABLE = ["ready", "needs_review"] as const;
+const COMMITTABLE: ReadonlySet<string> = new Set([...CLAIMABLE, "committing"]);
 
 export async function commitViewerImport(env: Bindings, viewerId: string, runId: string) {
   const run = await readImportRun(env.DB, viewerId, runId);
 
-  if (!run || (run.status !== "ready" && run.status !== "committing")) {
+  if (!run || !COMMITTABLE.has(run.status)) {
     return null;
   }
 
-  if (run.status === "ready") {
-    const claimed = await transitionImportRun(env.DB, viewerId, runId, ["ready"], "committing");
+  if (run.status !== "committing") {
+    const claimed = await transitionImportRun(env.DB, viewerId, runId, CLAIMABLE, "committing");
 
     if (!claimed) {
       return null;
@@ -65,7 +68,8 @@ export async function commitViewerImport(env: Bindings, viewerId: string, runId:
     await projectViewingTitle(env.DB, viewerId, titleId);
   }
 
-  await completeImportRun(env.DB, viewerId, runId, committed);
+  await recordImportCommit(env.DB, viewerId, runId, committed);
+  await refreshImportRunCounts(env.DB, viewerId, runId);
   logEvent("viewer_import_committed", {
     runId,
     source: run.source,

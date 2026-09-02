@@ -201,6 +201,7 @@ export async function resolveViewerImportRecord(
   const resolved = await resolveImportRecord(env.DB, viewerId, runId, recordId, {
     titleId,
     ignore,
+    providerItemId: record.providerItemId ?? null,
   });
 
   if (!resolved) {
@@ -225,8 +226,9 @@ export async function resolveViewerImportRecord(
 
 export async function queueViewerImportCommit(env: Bindings, viewerId: string, runId: string) {
   const run = await readImportRun(env.DB, viewerId, runId);
+  const writable = run?.status === "ready" || run?.status === "needs_review";
 
-  if (!run || run.status !== "ready") {
+  if (!run || !writable || run.matched === 0) {
     return false;
   }
 

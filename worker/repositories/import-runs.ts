@@ -402,22 +402,21 @@ export async function refreshImportRunCounts(db: Database, viewerId: string, run
      WHERE run_id = $1 AND viewer_id = $2`,
     [runId, viewerId],
   );
-  const status = (counts?.review ?? 0) > 0 ? "needs_review" : "ready";
+  const matched = counts?.matched ?? 0;
+  const review = counts?.review ?? 0;
+  const status = review > 0 ? "needs_review" : matched > 0 ? "ready" : "completed";
 
   await db.execute(
     `UPDATE viewer_import_runs
         SET matched = $1, review = $2, skipped = $3, failed = $4,
-            status = $5, updated_at = CURRENT_TIMESTAMP
+            status = $5,
+            completed_at = CASE
+              WHEN $5 = 'completed' THEN COALESCE(completed_at, CURRENT_TIMESTAMP)
+              ELSE NULL
+            END,
+            updated_at = CURRENT_TIMESTAMP
       WHERE id = $6 AND viewer_id = $7`,
-    [
-      counts?.matched ?? 0,
-      counts?.review ?? 0,
-      counts?.skipped ?? 0,
-      counts?.failed ?? 0,
-      status,
-      runId,
-      viewerId,
-    ],
+    [matched, review, counts?.skipped ?? 0, counts?.failed ?? 0, status, runId, viewerId],
   );
 }
 
@@ -426,7 +425,7 @@ export async function resolveImportRecord(
   viewerId: string,
   runId: string,
   recordId: string,
-  resolution: { titleId: string | null; ignore: boolean },
+  resolution: { titleId: string | null; ignore: boolean; providerItemId: string | null },
 ) {
   const result = await db.execute(
     `UPDATE viewer_import_records
@@ -435,8 +434,9 @@ export async function resolveImportRecord(
             match_method = $3,
             candidate_title_ids = '[]'::jsonb,
             updated_at = CURRENT_TIMESTAMP
-      WHERE id = $4 AND run_id = $5 AND viewer_id = $6
-        AND match_status IN ('review', 'unmatched')`,
+      WHERE run_id = $5 AND viewer_id = $6
+        AND match_status IN ('review', 'unmatched')
+        AND (id = $4 OR provider_item_id = $7)`,
     [
       resolution.ignore ? "ignored" : "matched",
       resolution.ignore ? null : resolution.titleId,
@@ -444,6 +444,7 @@ export async function resolveImportRecord(
       recordId,
       runId,
       viewerId,
+      resolution.providerItemId,
     ],
   );
 
@@ -516,7 +517,7 @@ export async function markImportRecordsCommitted(
   );
 }
 
-export async function completeImportRun(
+export async function recordImportCommit(
   db: Database,
   viewerId: string,
   runId: string,
@@ -524,8 +525,7 @@ export async function completeImportRun(
 ) {
   await db.execute(
     `UPDATE viewer_import_runs
-        SET status = 'completed', committed = committed + $1,
-            updated_at = CURRENT_TIMESTAMP, completed_at = CURRENT_TIMESTAMP
+        SET committed = committed + $1, updated_at = CURRENT_TIMESTAMP
       WHERE id = $2 AND viewer_id = $3`,
     [committed, runId, viewerId],
   );

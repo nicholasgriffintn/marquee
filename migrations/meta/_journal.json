@@ -127,6 +127,13 @@
       "when": 1788256800017,
       "tag": "0018_viewer_history_imports",
       "breakpoints": false
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1788256800018,
+      "tag": "0019_viewing_events_watched",
+      "breakpoints": false
     }
   ]
 }

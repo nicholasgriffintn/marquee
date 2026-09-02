@@ -3,6 +3,7 @@ import { csvObjects } from "../lib/csv";
 import { importFingerprint, sourceEventId } from "../lib/import-fingerprint";
 import { isRecord } from "../lib/values";
 import { ImportParseError, type ImportFile, type ParsedImport } from "./types";
+import { parseWatchHistoryCsv, watchHistoryShape } from "./watch-history";
 
 const ADAPTER_VERSION = 1;
 const TYPES = new Set(["movie", "show", "episode", "season"]);
@@ -234,5 +235,8 @@ export async function parseStructuredJson(file: ImportFile) {
 }
 
 export function parseStructuredCsv(file: ImportFile) {
-  return buildImport("csv", file, csvObjects(file.text));
+  const rows = csvObjects(file.text);
+  const shape = watchHistoryShape(rows);
+
+  return shape ? parseWatchHistoryCsv(file, rows, shape) : buildImport("csv", file, rows);
 }

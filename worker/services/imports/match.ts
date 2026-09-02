@@ -181,10 +181,16 @@ export async function matchViewerImport(env: Bindings, runId: string) {
   }
 
   const records = await readPendingImportRecords(env.DB, run.viewerId, runId);
+  const decided = new Map<string, Awaited<ReturnType<typeof matchRecord>>>();
 
   for (const record of records) {
+    const key = record.providerItemId ? `${record.providerItemId}${record.mediaType ?? ""}` : "";
     // oxlint-disable-next-line no-await-in-loop -- upstream hydration and deterministic progress are sequential
-    const match = await matchRecord(env, run.viewerId, record);
+    const match = decided.get(key) ?? (await matchRecord(env, run.viewerId, record));
+
+    if (key) {
+      decided.set(key, match);
+    }
 
     // oxlint-disable-next-line no-await-in-loop -- record state must follow its match
     await saveImportMatch(env.DB, run.viewerId, record.id, match);
