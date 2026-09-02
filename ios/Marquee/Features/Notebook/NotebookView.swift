@@ -114,7 +114,8 @@ struct NotebookView: View {
         .font(MarqueeTheme.sans(12)).foregroundStyle(MarqueeTheme.ink.opacity(0.65))
       ForEach(
         model.providers.filter {
-          $0.category == "subscription" || appState.selectedProviderIDs.contains($0.id)
+          $0.category.lowercased() == "subscription"
+            || appState.selectedProviderIDs.contains($0.id)
         }
       ) { provider in
         Toggle(
