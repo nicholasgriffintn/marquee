@@ -17,6 +17,7 @@ export type AiRun = {
   toolChoice?: "auto" | "required" | "none";
   attributes?: Record<string, string | number>;
   record?: ModelCallSink;
+  signal?: AbortSignal;
 };
 
 async function callFor(env: Bindings, run: AiRun) {
@@ -42,6 +43,7 @@ async function callFor(env: Bindings, run: AiRun) {
     ]),
     schema: policy.schema,
     ...(run.record ? { record: run.record } : {}),
+    ...(run.signal ? { signal: run.signal } : {}),
   };
 }
 

@@ -1,11 +1,12 @@
 import { modelOptions } from "../ai/model-options.ts";
-import type { AiModelCandidate, AiRoute } from "../ai/model-routing.ts";
+import type { AiModelCandidate, AiRoute, AiTransport } from "../ai/model-routing.ts";
 import type { CachePolicy } from "../ai/policy.ts";
 import type { OutputSchema } from "../ai/schemas.ts";
+import { readKvValue, writeKvValue } from "../lib/cache.ts";
 import { parseAssistantMessage, parseUsage, type ChatMessage } from "../lib/curator-payload.ts";
 import type { ModelCallSink } from "../lib/decisions.ts";
 import { sha256Hex } from "../lib/hash.ts";
-import { logEvent } from "../lib/logging.ts";
+import { logEvent, logRejection } from "../lib/logging.ts";
 import { traceUpstream } from "../lib/upstream-usage.ts";
 import { isRecord } from "../lib/values.ts";
 import type { Bindings } from "../types.ts";
@@ -15,7 +16,8 @@ export class AiGatewayError extends UpstreamError {
   constructor(
     message: string,
     status = 502,
-    readonly transport: AiRoute["transport"] = "cloudflare",
+    readonly transport: AiTransport = "cloudflare",
+    readonly schemaRejected = false,
   ) {
     super(message, status);
     this.name = "AiGatewayError";
@@ -24,6 +26,11 @@ export class AiGatewayError extends UpstreamError {
 
 const METADATA_LIMIT = 1_000;
 const TIMEOUT_HEADROOM_MS = 1_000;
+const ATTEMPT_FLOOR_MS = 3_000;
+const ATTEMPT_SHARE = 0.6;
+const STREAM_BODY_MULTIPLIER = 2;
+const SCHEMA_MEMO_TTL_SECONDS = 86_400;
+const SCHEMA_REJECTION = /response_format|json_schema|schema/iu;
 
 export type AiCall = {
   messages: ChatMessage[];
@@ -38,6 +45,7 @@ export type AiCall = {
   toolChoice?: "auto" | "required" | "none";
   schema?: OutputSchema | null;
   record?: ModelCallSink;
+  signal?: AbortSignal;
 };
 
 function assertConfiguration(env: Bindings) {
@@ -54,56 +62,127 @@ function assertConfiguration(env: Bindings) {
   }
 }
 
-function isRetryable(error: unknown) {
-  return (
-    error instanceof AiGatewayError &&
-    (error.status === 429 || error.status === 500 || error.status >= 502)
-  );
+function timeoutError(message: string) {
+  const error = new Error(message);
+
+  error.name = "TimeoutError";
+
+  return error;
+}
+
+function isTimeout(error: unknown) {
+  return error instanceof Error && error.name === "TimeoutError";
+}
+
+function isRetryable(error: unknown, candidate: AiModelCandidate) {
+  if (error instanceof AiGatewayError) {
+    return (
+      candidate.transport === "byok" ||
+      error.status === 429 ||
+      error.status === 500 ||
+      error.status >= 502
+    );
+  }
+
+  return isTimeout(error) || error instanceof TypeError;
 }
 
 function isSchemaRejection(error: unknown) {
-  return error instanceof AiGatewayError && (error.status === 400 || error.status === 422);
+  return error instanceof AiGatewayError && error.schemaRejected;
 }
 
-function cacheScope(route: AiRoute) {
-  return route.transport === "byok" ? `byok:${route.provider}:${route.byokAlias}` : "cloudflare";
+function attemptSignal(timeoutMs: number, signal?: AbortSignal) {
+  const timeout = AbortSignal.timeout(timeoutMs);
+
+  return signal ? AbortSignal.any([signal, timeout]) : timeout;
 }
 
-async function gatewayHeaders(call: AiCall, body: string) {
+function attemptBudget(call: AiCall) {
+  return call.route.candidates.length > 1
+    ? Math.max(ATTEMPT_FLOOR_MS, Math.round(call.timeoutMs * ATTEMPT_SHARE))
+    : call.timeoutMs;
+}
+
+function schemaMemoKey(candidate: AiModelCandidate, schema: OutputSchema) {
+  return `ai-schema-unsupported:${candidate.recordedModel}:${schema.name}`;
+}
+
+async function schemaIsRejected(env: Bindings, candidate: AiModelCandidate, schema: OutputSchema) {
+  const memo = await readKvValue<boolean>(
+    env,
+    schemaMemoKey(candidate, schema),
+    SCHEMA_MEMO_TTL_SECONDS,
+  ).catch(() => null);
+
+  return memo === true;
+}
+
+function rememberSchemaRejection(
+  env: Bindings,
+  candidate: AiModelCandidate,
+  schema: OutputSchema,
+): Promise<void> {
+  return logRejection(
+    writeKvValue(env, schemaMemoKey(candidate, schema), true, SCHEMA_MEMO_TTL_SECONDS),
+    "ai_schema_memo_write_failed",
+    { model: candidate.recordedModel, schema: schema.name },
+  );
+}
+
+function cacheScope(candidate: AiModelCandidate) {
+  return candidate.transport === "byok"
+    ? `byok:${candidate.provider}:${candidate.byokAlias}`
+    : "cloudflare";
+}
+
+async function gatewayHeaders(call: AiCall, candidate: AiModelCandidate, body: string) {
   return {
     "cf-aig-collect-log": call.collectLog ? "true" : "false",
     "cf-aig-skip-cache": call.cache.enabled ? "false" : "true",
     ...(call.cache.enabled
-      ? { "cf-aig-cache-key": `marquee-v1-${await sha256Hex(`${cacheScope(call.route)}:${body}`)}` }
+      ? { "cf-aig-cache-key": `marquee-v1-${await sha256Hex(`${cacheScope(candidate)}:${body}`)}` }
       : {}),
     ...(call.cache.ttlSeconds ? { "cf-aig-cache-ttl": String(call.cache.ttlSeconds) } : {}),
     "cf-aig-metadata": JSON.stringify(call.metadata).slice(0, METADATA_LIMIT),
   };
 }
 
-function failureMessage(route: AiRoute, status: number) {
-  if (route.transport === "cloudflare" && (status === 401 || status === 403)) {
+function failureMessage(candidate: AiModelCandidate, status: number) {
+  if (candidate.transport === "cloudflare" && (status === 401 || status === 403)) {
     return `Cloudflare Workers AI rejected AI_GATEWAY_TOKEN with status ${status}: the token must be an account API token with Workers AI Read and AI Gateway Run permissions`;
   }
 
-  if (route.transport === "byok" && (status === 401 || status === 403)) {
-    return `AI Gateway rejected the BYOK request for ${route.provider} with status ${status}: check the gateway authentication token and the ${route.byokAlias} key alias`;
+  if (candidate.transport === "byok" && (status === 401 || status === 403)) {
+    return `AI Gateway rejected the BYOK request for ${candidate.provider} with status ${status}: check the gateway authentication token and the ${candidate.byokAlias} key alias`;
   }
 
   return `Cloudflare AI Gateway request failed with status ${status}`;
 }
 
-function completionsUrl(env: Bindings, route: AiRoute) {
-  return route.transport === "byok"
-    ? `https://gateway.ai.cloudflare.com/v1/${env.CLOUDFLARE_ACCOUNT_ID}/${env.AI_GATEWAY_ID}/${route.providerPath}`
+async function failureError(response: Response, candidate: AiModelCandidate) {
+  const detail = await response.text().catch(() => "");
+  const rejectedSchema =
+    (response.status === 400 || response.status === 422) && SCHEMA_REJECTION.test(detail);
+
+  return new AiGatewayError(
+    failureMessage(candidate, response.status),
+    response.status,
+    candidate.transport,
+    rejectedSchema,
+  );
+}
+
+function completionsUrl(env: Bindings, candidate: AiModelCandidate) {
+  return candidate.transport === "byok"
+    ? `https://gateway.ai.cloudflare.com/v1/${env.CLOUDFLARE_ACCOUNT_ID}/${env.AI_GATEWAY_ID}/${candidate.providerPath}`
     : `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/ai/v1/chat/completions`;
 }
 
-function authenticationHeaders(env: Bindings, route: AiRoute): Record<string, string> {
-  if (route.transport === "byok") {
+function authenticationHeaders(env: Bindings, candidate: AiModelCandidate): Record<string, string> {
+  if (candidate.transport === "byok") {
     return {
       "cf-aig-authorization": `Bearer ${env.AI_GATEWAY_TOKEN}`,
-      "cf-aig-byok-alias": route.byokAlias,
+      "cf-aig-byok-alias": candidate.byokAlias,
     };
   }
 
@@ -116,6 +195,8 @@ function authenticationHeaders(env: Bindings, route: AiRoute): Record<string, st
 export async function requestAiCompletion(env: Bindings, call: AiCall) {
   assertConfiguration(env);
 
+  const deadline = Date.now() + call.timeoutMs;
+  const budget = attemptBudget(call);
   let schema = call.schema ?? null;
   let lastError: unknown = new Error("Cloudflare AI produced no response");
 
@@ -125,22 +206,40 @@ export async function requestAiCompletion(env: Bindings, call: AiCall) {
     while (attempt) {
       attempt = false;
 
+      const remaining = deadline - Date.now();
+
+      if (remaining < ATTEMPT_FLOOR_MS) {
+        logEvent("ai_deadline_exhausted", { model: model.recordedModel });
+
+        throw lastError;
+      }
+
+      // oxlint-disable-next-line no-await-in-loop
+      const memoised = schema ? await schemaIsRejected(env, model, schema) : false;
+      const effective = memoised ? null : schema;
+
       try {
         // oxlint-disable-next-line no-await-in-loop
-        return await completeOnce(env, call, model, schema);
+        return await completeOnce(env, call, model, effective, Math.min(remaining, budget));
       } catch (error) {
         lastError = error;
 
-        if (schema && isSchemaRejection(error)) {
-          logEvent("ai_schema_unsupported", { model: model.recordedModel, schema: schema.name });
+        if (call.signal?.aborted) {
+          throw error;
+        }
+
+        if (effective && isSchemaRejection(error)) {
+          logEvent("ai_schema_unsupported", { model: model.recordedModel, schema: effective.name });
+          // oxlint-disable-next-line no-await-in-loop
+          await rememberSchemaRejection(env, model, effective);
           schema = null;
           attempt = true;
           continue;
         }
 
-        const retryable = isRetryable(error);
+        const retryable = isRetryable(error, model);
 
-        if (call.route.transport === "byok") {
+        if (model.transport === "byok") {
           logEvent("ai_byok_request_failed", {
             model: model.recordedModel,
             status: error instanceof AiGatewayError ? error.status : null,
@@ -151,15 +250,13 @@ export async function requestAiCompletion(env: Bindings, call: AiCall) {
           throw error;
         }
 
-        if (call.route.transport === "cloudflare") {
-          logEvent(
-            index < call.route.candidates.length - 1 ? "ai_model_fallback" : "ai_model_exhausted",
-            {
-              model: model.recordedModel,
-              status: error instanceof AiGatewayError ? error.status : null,
-            },
-          );
-        }
+        logEvent(
+          index < call.route.candidates.length - 1 ? "ai_model_fallback" : "ai_model_exhausted",
+          {
+            model: model.recordedModel,
+            status: error instanceof AiGatewayError ? error.status : null,
+          },
+        );
       }
     }
   }
@@ -181,7 +278,7 @@ function responseFormat(schema: OutputSchema | null, hasSchemaPolicy: boolean) {
 }
 
 function generationOptions(call: AiCall, model: AiModelCandidate) {
-  const options = modelOptions(call.route, model);
+  const options = modelOptions(model);
 
   return {
     ...(options.supportsTemperature ? { temperature: call.temperature } : {}),
@@ -195,6 +292,7 @@ async function completeOnce(
   call: AiCall,
   model: AiModelCandidate,
   schema: OutputSchema | null,
+  timeoutMs: number,
 ) {
   const tools = call.tools ?? [];
   const body = JSON.stringify({
@@ -202,9 +300,7 @@ async function completeOnce(
     messages: call.messages,
     max_completion_tokens: call.maxTokens,
     ...generationOptions(call, model),
-    ...(tools.length
-      ? { tools, tool_choice: call.toolChoice ?? "auto", parallel_tool_calls: false }
-      : {}),
+    ...(tools.length ? { tools, tool_choice: call.toolChoice ?? "auto" } : {}),
     ...responseFormat(schema, Boolean(call.schema)),
   });
   const startedAt = Date.now();
@@ -218,18 +314,18 @@ async function completeOnce(
   };
 
   const response = await fetchCompletion(
-    completionsUrl(env, call.route),
+    completionsUrl(env, model),
     {
       method: "POST",
       headers: {
         accept: "application/json",
-        ...authenticationHeaders(env, call.route),
-        "cf-aig-request-timeout": String(call.timeoutMs - TIMEOUT_HEADROOM_MS),
-        ...(await gatewayHeaders(call, body)),
+        ...authenticationHeaders(env, model),
+        "cf-aig-request-timeout": String(timeoutMs - TIMEOUT_HEADROOM_MS),
+        ...(await gatewayHeaders(call, model, body)),
         "content-type": "application/json",
       },
       body,
-      signal: AbortSignal.timeout(call.timeoutMs),
+      signal: attemptSignal(timeoutMs, call.signal),
     },
     report,
   );
@@ -237,11 +333,7 @@ async function completeOnce(
   if (!response.ok) {
     report(null);
 
-    throw new AiGatewayError(
-      failureMessage(call.route, response.status),
-      response.status,
-      call.route.transport,
-    );
+    throw await failureError(response, model);
   }
 
   let payload: unknown;
@@ -254,7 +346,7 @@ async function completeOnce(
     throw new AiGatewayError(
       `Cloudflare AI returned a body that is not JSON (model: ${model.recordedModel}, ${String(error)})`,
       502,
-      call.route.transport,
+      model.transport,
     );
   }
 
@@ -266,7 +358,7 @@ async function completeOnce(
     throw new AiGatewayError(
       `Cloudflare AI returned an invalid response (model: ${model.recordedModel})`,
       502,
-      call.route.transport,
+      model.transport,
     );
   }
 
@@ -276,7 +368,7 @@ async function completeOnce(
     throw new AiGatewayError(
       `Cloudflare AI returned no content (finish_reason: ${finishReason(payload) ?? "unknown"}, model: ${model.recordedModel})`,
       502,
-      call.route.transport,
+      model.transport,
     );
   }
 
@@ -295,15 +387,16 @@ async function fetchCompletion(url: string, init: RequestInit, report: (usage: n
   }
 }
 
-export async function* streamAiCompletion(env: Bindings, call: AiCall) {
-  assertConfiguration(env);
+type StreamAttempt = {
+  body: ReadableStream;
+  release: () => void;
+};
 
-  const model = call.route.candidates[0];
-
-  if (!model) {
-    throw new Error("Cloudflare AI model route is empty");
-  }
-
+async function openStream(
+  env: Bindings,
+  call: AiCall,
+  model: AiModelCandidate,
+): Promise<StreamAttempt> {
   const body = JSON.stringify({
     model: model.requestModel,
     messages: call.messages,
@@ -311,66 +404,130 @@ export async function* streamAiCompletion(env: Bindings, call: AiCall) {
     ...generationOptions(call, model),
     stream: true,
   });
-
-  const headers = {
-    accept: "text/event-stream",
-    ...authenticationHeaders(env, call.route),
-    "cf-aig-request-timeout": String(call.timeoutMs),
-    ...(await gatewayHeaders(call, body)),
-    "content-type": "application/json",
-  };
-  const response = await traceUpstream("ai-gateway", () =>
-    fetch(completionsUrl(env, call.route), {
-      method: "POST",
-      headers,
-      body,
-      signal: AbortSignal.timeout(call.timeoutMs),
-    }),
+  const controller = new AbortController();
+  const signal = call.signal
+    ? AbortSignal.any([call.signal, controller.signal])
+    : controller.signal;
+  let timer = setTimeout(
+    () => controller.abort(timeoutError("Cloudflare AI stream did not start in time")),
+    call.timeoutMs,
   );
+  const release = () => clearTimeout(timer);
 
-  if (!response.ok || !response.body) {
-    throw new AiGatewayError(
-      `Cloudflare AI stream failed with status ${response.status}`,
-      response.status,
-      call.route.transport,
+  try {
+    const headers = {
+      accept: "text/event-stream",
+      ...authenticationHeaders(env, model),
+      "cf-aig-request-timeout": String(call.timeoutMs - TIMEOUT_HEADROOM_MS),
+      ...(await gatewayHeaders(call, model, body)),
+      "content-type": "application/json",
+    };
+    const response = await traceUpstream("ai-gateway", () =>
+      fetch(completionsUrl(env, model), { method: "POST", headers, body, signal }),
     );
-  }
 
-  const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+    if (!response.ok || !response.body) {
+      throw new AiGatewayError(
+        `Cloudflare AI stream failed with status ${response.status}`,
+        response.status,
+        model.transport,
+      );
+    }
+
+    clearTimeout(timer);
+    timer = setTimeout(
+      () => controller.abort(timeoutError("Cloudflare AI stream stalled")),
+      call.timeoutMs * STREAM_BODY_MULTIPLIER,
+    );
+
+    return { body: response.body, release };
+  } catch (error) {
+    release();
+
+    throw error;
+  }
+}
+
+async function* readStream(attempt: StreamAttempt) {
+  const reader = attempt.body.pipeThrough(new TextDecoderStream()).getReader();
   let buffer = "";
 
-  while (true) {
-    // oxlint-disable-next-line no-await-in-loop -- reads one stream reader sequentially, chunks arrive in order
-    const { done, value } = await reader.read();
+  try {
+    while (true) {
+      // oxlint-disable-next-line no-await-in-loop -- reads one stream reader sequentially, chunks arrive in order
+      const { done, value } = await reader.read();
 
-    if (done) {
-      break;
+      if (done) {
+        break;
+      }
+
+      buffer += value;
+
+      const lines = buffer.split("\n");
+
+      buffer = lines.pop() ?? "";
+
+      for (const line of lines) {
+        if (!line.startsWith("data:")) {
+          continue;
+        }
+
+        const data = line.slice(5).trim();
+
+        if (!data || data === "[DONE]") {
+          continue;
+        }
+
+        const delta = parseStreamDelta(data);
+
+        if (delta) {
+          yield delta;
+        }
+      }
     }
-
-    buffer += value;
-
-    const lines = buffer.split("\n");
-
-    buffer = lines.pop() ?? "";
-
-    for (const line of lines) {
-      if (!line.startsWith("data:")) {
-        continue;
-      }
-
-      const data = line.slice(5).trim();
-
-      if (!data || data === "[DONE]") {
-        continue;
-      }
-
-      const delta = parseStreamDelta(data);
-
-      if (delta) {
-        yield delta;
-      }
-    }
+  } finally {
+    attempt.release();
   }
+}
+
+export async function* streamAiCompletion(env: Bindings, call: AiCall) {
+  assertConfiguration(env);
+
+  const candidates = call.route.candidates;
+
+  if (!candidates.length) {
+    throw new Error("Cloudflare AI model route is empty");
+  }
+
+  let lastError: unknown = new Error("Cloudflare AI produced no response");
+
+  for (const [index, model] of candidates.entries()) {
+    let attempt: StreamAttempt;
+
+    try {
+      // oxlint-disable-next-line no-await-in-loop
+      attempt = await openStream(env, call, model);
+    } catch (error) {
+      lastError = error;
+
+      if (call.signal?.aborted || !isRetryable(error, model)) {
+        throw error;
+      }
+
+      logEvent(index < candidates.length - 1 ? "ai_model_fallback" : "ai_model_exhausted", {
+        model: model.recordedModel,
+        status: error instanceof AiGatewayError ? error.status : null,
+      });
+
+      continue;
+    }
+
+    yield* readStream(attempt);
+
+    return;
+  }
+
+  throw lastError;
 }
 
 function parseStreamDelta(data: string) {
