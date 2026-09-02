@@ -65,7 +65,7 @@
 
 .sourceActive {
   background: var(--acid);
-  color: var(--black);
+  color: var(--ink);
 }
 
 .guide {
@@ -125,7 +125,7 @@
 }
 
 .formatGuide pre {
-  background: var(--black);
+  background: var(--ink);
   color: var(--paper);
   font: var(--weight-regular) 0.72rem / 1.5 var(--mono);
   max-height: 230px;
@@ -187,7 +187,7 @@
 
 .connectButton {
   background: var(--acid);
-  color: var(--black);
+  color: var(--ink);
   display: inline-block;
   font: var(--weight-bold) var(--type-label) / 1 var(--mono);
   justify-self: start;
