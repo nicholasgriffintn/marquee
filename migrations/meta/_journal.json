@@ -148,6 +148,20 @@
       "when": 1788256800020,
       "tag": "0021_autovacuum_hot_tables",
       "breakpoints": false
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1788256800021,
+      "tag": "0022_people_search_indexes",
+      "breakpoints": false
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1788256800022,
+      "tag": "0023_filter_and_buzz_indexes",
+      "breakpoints": false
     }
   ]
 }

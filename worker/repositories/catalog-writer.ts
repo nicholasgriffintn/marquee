@@ -13,6 +13,7 @@ import { READ_CHUNK, rowPlaceholders } from "./catalog-array-utils.ts";
 import { persistTitleExtensions } from "./catalog-arrays.ts";
 import { projectTitles } from "./catalog-index.ts";
 import { readRawItems } from "./catalog-reader.ts";
+import { recountPersonTitles } from "./people.ts";
 
 const KEYWORD_LIMIT = 40;
 
@@ -304,6 +305,11 @@ export async function storeCredits(db: Database, credits: TitleCredits[]) {
       }
     });
   }
+
+  await recountPersonTitles(
+    db,
+    entries.map(({ entry }) => entry.person.id),
+  );
 
   return entries.length;
 }
