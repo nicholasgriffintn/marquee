@@ -110,6 +110,49 @@ export const CURATOR_TOOLS: ChatCompletionTool[] = [
 
 export type CuratorToolCache = Map<string, Promise<unknown>>;
 
+const PROFILE_ENTRIES = 40;
+
+export type ToolTitleLine = { id: string; line: string };
+
+export function toolResultLines(content: string): ToolTitleLine[] {
+  const parsed = parseJson(content);
+
+  if (!isRecord(parsed)) {
+    return [];
+  }
+
+  const lines: ToolTitleLine[] = [];
+
+  for (const field of [parsed.results, parsed.items, parsed.entries]) {
+    if (!Array.isArray(field)) {
+      continue;
+    }
+
+    for (const item of field) {
+      if (!isRecord(item) || !isKnownTitle(item.id)) {
+        continue;
+      }
+
+      lines.push({ id: item.id, line: titleLine(item.id, item) });
+    }
+  }
+
+  return lines;
+}
+
+function titleLine(id: string, item: Record<string, unknown>) {
+  const title = typeof item.title === "string" && item.title ? item.title : id;
+  const year = typeof item.year === "number" ? ` (${item.year})` : "";
+  const genres = Array.isArray(item.genres)
+    ? item.genres
+        .filter((genre): genre is string => typeof genre === "string")
+        .slice(0, 3)
+        .join(", ")
+    : "";
+
+  return `${id} · ${title}${year}${genres ? ` · ${genres}` : ""}`;
+}
+
 function rememberAvailableIds(result: unknown, availableIds: Set<string>) {
   if (!isRecord(result)) {
     return;
@@ -176,15 +219,17 @@ async function executeCuratorToolUncached(
   const argumentsValue = isRecord(parsedArguments) ? parsedArguments : {};
 
   if (call.function.name === "get_viewing_profile") {
+    const entries = viewer.entries.slice(0, PROFILE_ENTRIES);
     const titles = await readItems(
       env.DB,
-      viewer.entries.map((entry) => entry.titleId),
+      entries.map((entry) => entry.titleId),
+      entries.length,
     );
     const byId = new Map(titles.map((title) => [title.id, title]));
 
     return {
       selectedProviderIds: viewer.providerIds,
-      entries: viewer.entries.map((entry) => {
+      entries: entries.map((entry) => {
         const title = byId.get(entry.titleId);
 
         return {

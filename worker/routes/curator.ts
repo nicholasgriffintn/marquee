@@ -135,6 +135,7 @@ curatorRoutes.get("/insight/:titleId", async (context) => {
     const insight = await getTitleInsight(context.env, titleId, {
       generate: Boolean(user),
       viewerId: user?.id,
+      defer: (task) => context.executionCtx.waitUntil(task),
     });
 
     if (!insight) {

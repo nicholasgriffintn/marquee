@@ -55,6 +55,8 @@ async function readAsk(request: Request): Promise<AskRequest | null> {
 }
 
 export class CuratorSession extends DurableObject<WorkerBindings> {
+  private generation = 0;
+
   async fetch(request: Request) {
     const url = new URL(request.url);
 
@@ -74,16 +76,38 @@ export class CuratorSession extends DurableObject<WorkerBindings> {
     const { readable, writable } = new TransformStream();
     const writer = writable.getWriter();
     const encoder = new TextEncoder();
+    const { signal } = request;
+    const generation = (this.generation += 1);
 
     this.ctx.waitUntil(
       (async () => {
+        let open = true;
+        const send = async (payload: unknown) => {
+          if (!open) {
+            return;
+          }
+
+          try {
+            await writer.write(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
+          } catch {
+            open = false;
+          }
+        };
+
+        const current = () => generation === this.generation && !signal.aborted;
+
         try {
           await withDatabase(this.env, async (env) => {
             for await (const event of curateStream(env, body.prompt, body.viewerId, turns, {
               providerIds: body.providerIds ?? [],
               hour: body.hour,
               isWeekend: body.isWeekend,
+              signal,
             })) {
+              if (!open || !current()) {
+                break;
+              }
+
               if (event.type === "turn") {
                 await this.ctx.storage.transaction(async (txn) => {
                   const latest = (await txn.get<CuratorTurn[]>("turns")) ?? [];
@@ -94,18 +118,14 @@ export class CuratorSession extends DurableObject<WorkerBindings> {
                 continue;
               }
 
-              await writer.write(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+              await send(event);
             }
           });
         } catch (error) {
           logError("curator_session_failed", error);
-          await writer.write(
-            encoder.encode(
-              `data: ${JSON.stringify({ type: "error", message: curatorMessage(error) })}\n\n`,
-            ),
-          );
+          await send({ type: "error", message: curatorMessage(error) });
         } finally {
-          await writer.close();
+          await writer.close().catch(() => undefined);
         }
       })(),
     );

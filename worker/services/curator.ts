@@ -1,5 +1,11 @@
 import { showingFor } from "../../src/domain/usher.ts";
-import { CURATOR_TOOLS, executeCuratorTool, type CuratorToolCache } from "../ai/curator-tools.ts";
+import { isAbortError } from "../../src/lib/errors.ts";
+import {
+  CURATOR_TOOLS,
+  executeCuratorTool,
+  toolResultLines,
+  type CuratorToolCache,
+} from "../ai/curator-tools.ts";
 import { runAiMessage, runAiObject, runAiStream } from "../ai/run.ts";
 import { USHER_VOICE } from "../ai/usher-voice.ts";
 import { parseCuratorResult, type ChatMessage } from "../lib/curator-payload.ts";
@@ -40,6 +46,8 @@ const NARRATION_PROMPT = [
 
 const PROMPT_VERSION = promptVersion(SYSTEM_PROMPT);
 
+type ToolMessage = Extract<ChatMessage, { role: "tool" }>;
+
 export type CuratorTurn = { prompt: string; titleIds: string[]; summary: string };
 
 export type CuratorEvent =
@@ -66,6 +74,18 @@ function historyMessages(turns: CuratorTurn[]): ChatMessage[] {
   ]);
 }
 
+function stopIfAborted(signal?: AbortSignal) {
+  if (signal?.aborted) {
+    throw new DOMException("The curator run was cancelled", "AbortError");
+  }
+}
+
+function candidateLine(title: Candidate["title"]) {
+  return `${title.id} · ${title.title}${title.year ? ` (${title.year})` : ""} · ${title.genres
+    .slice(0, 3)
+    .join(", ")}`;
+}
+
 function describeCandidates(candidates: Candidate[]) {
   return candidates
     .map((candidate) => {
@@ -88,6 +108,7 @@ async function runCurator(
   initialCandidates: Candidate[],
   summary = "",
   showingBrief = "",
+  signal?: AbortSignal,
 ) {
   const messages: ChatMessage[] = [
     { role: "system", content: SYSTEM_PROMPT },
@@ -113,6 +134,22 @@ async function runCurator(
   ];
   const availableIds = new Set(initialCandidates.map((candidate) => candidate.title.id));
   const toolCache: CuratorToolCache = new Map();
+  const catalogue = new Map(
+    initialCandidates.map((candidate) => [candidate.title.id, candidateLine(candidate.title)]),
+  );
+  const sentToolMessages: { message: ToolMessage; compact: string }[] = [];
+  const rememberLines = (content: string) => {
+    const lines = toolResultLines(content);
+
+    for (const entry of lines) {
+      catalogue.set(entry.id, entry.line);
+    }
+
+    return lines.map((entry) => entry.line).join("\n");
+  };
+
+  const availableBlock = () =>
+    [...availableIds].map((id) => catalogue.get(id) ?? id).join("\n") || "none";
 
   decision.candidates(
     candidatesFrom(
@@ -135,6 +172,8 @@ async function runCurator(
   };
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
+    stopIfAborted(signal);
+
     // oxlint-disable-next-line no-await-in-loop
     const response = await runAiMessage(env, {
       feature: "curator",
@@ -159,7 +198,7 @@ async function runCurator(
       messages.push(response, {
         role: "user",
         content: availableIds.size
-          ? `Choose only from these available IDs: ${[...availableIds].join(", ")}. Reply with the required JSON only.`
+          ? `Choose only from these available IDs:\n${availableBlock()}\nReply with the required JSON only.`
           : "Call search_catalogue first. You have not retrieved any titles yet.",
       });
       continue;
@@ -168,7 +207,7 @@ async function runCurator(
     messages.push(response);
 
     // oxlint-disable-next-line no-await-in-loop
-    const toolMessages = await Promise.all(
+    const toolMessages: ToolMessage[] = await Promise.all(
       response.tool_calls.slice(0, 4).map(async (call) => ({
         role: "tool" as const,
         tool_call_id: call.id,
@@ -179,6 +218,17 @@ async function runCurator(
       })),
     );
 
+    const compactable = toolMessages.map((message) => ({
+      message,
+      compact: rememberLines(message.content),
+    }));
+
+    for (const previous of sentToolMessages) {
+      previous.message.content = previous.compact || previous.message.content;
+    }
+
+    sentToolMessages.length = 0;
+    sentToolMessages.push(...compactable);
     messages.push(...toolMessages);
   }
 
@@ -187,18 +237,23 @@ async function runCurator(
   }
 
   recordCandidates();
+  stopIfAborted(signal);
 
-  messages.push({
-    role: "user",
-    content: `Choose only from these available IDs: ${[...availableIds].join(", ")}. Reply with the required JSON only.`,
-  });
-
+  const finalMessages: ChatMessage[] = [
+    ...messages.filter(
+      (message) => message.role !== "tool" && !(message.role === "assistant" && message.tool_calls),
+    ),
+    {
+      role: "user",
+      content: `Available titles:\n${availableBlock()}\nChoose only from these IDs and reply with the required JSON only.`,
+    },
+  ];
   const result = parseCuratorResult(
     await runAiObject(env, {
       feature: "curator",
       decisionId: decision.id,
       viewerId: viewer.viewerId || null,
-      messages,
+      messages: finalMessages,
       attributes: { round: "final" },
       record: decision,
     }),
@@ -217,7 +272,12 @@ export async function* curateStream(
   prompt: string,
   viewerId: string,
   turns: CuratorTurn[] = [],
-  options: { providerIds?: string[]; hour?: number; isWeekend?: boolean } = {},
+  options: {
+    providerIds?: string[];
+    hour?: number;
+    isWeekend?: boolean;
+    signal?: AbortSignal;
+  } = {},
 ): AsyncGenerator<CuratorEvent> {
   const decision = beginDecision(env, {
     feature: "curator",
@@ -267,16 +327,25 @@ export async function* curateStream(
       initialCandidates,
       tasteLine,
       showing.brief,
+      options.signal,
     );
     decision.select(result.titleIds);
     items = await readItems(env.DB, result.titleIds);
   } catch (error) {
     await decision.settle("failed");
 
+    if (isAbortError(error)) {
+      return;
+    }
+
     throw error;
   }
 
   await decision.settle(items.length ? "served" : "empty");
+
+  if (options.signal?.aborted) {
+    return;
+  }
 
   const journey = await mintJourney(env, {
     mode: "curator",
@@ -312,6 +381,10 @@ export async function* curateStream(
   }
 
   const finalSummary = summary.trim() || result.summary;
+
+  if (options.signal?.aborted) {
+    return;
+  }
 
   yield {
     type: "turn",
