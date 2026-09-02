@@ -141,6 +141,13 @@
       "when": 1788256800019,
       "tag": "0020_upstream_usage",
       "breakpoints": false
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1788256800020,
+      "tag": "0021_autovacuum_hot_tables",
+      "breakpoints": false
     }
   ]
 }

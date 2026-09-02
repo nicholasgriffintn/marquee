@@ -1,6 +1,6 @@
 import type { EntryStatus } from "../../src/domain/entries.ts";
 import { importStatus, type ImportedActivity } from "../../src/domain/imports.ts";
-import type { DatabaseTransaction } from "../database/types.ts";
+import type { DatabaseTransaction, DatabaseValue } from "../database/types.ts";
 
 export type ViewingEventType =
   | "status"
@@ -160,54 +160,57 @@ function episodeKeys(events: ViewingEvent[]) {
   ];
 }
 
+const EPISODE_FIELDS = 8;
+
+function episodeRow(events: ViewingEvent[], viewerId: string, titleId: string, key: string) {
+  const [seasonText, episodeText] = key.split(":");
+  const season = Number(seasonText);
+  const episode = Number(episodeText);
+  const scoped = events.filter((event) => event.season === season && event.episode === episode);
+  const pick = (manual: boolean, type: ViewingEventType) =>
+    latest(scoped.filter((event) => isManual(event.source) === manual && event.eventType === type));
+  const watch = pick(true, "episode_watch") ?? pick(false, "episode_watch");
+  const rating = pick(true, "episode_rating") ?? pick(false, "episode_rating");
+  const watched = watch?.watched === 1;
+
+  return [
+    crypto.randomUUID(),
+    viewerId,
+    titleId,
+    season,
+    episode,
+    watched ? 1 : 0,
+    watched ? (watch?.watchedAt ?? watch?.occurredAt ?? null) : null,
+    rating?.rating ?? null,
+  ] satisfies DatabaseValue[];
+}
+
 async function projectEpisodes(
   transaction: DatabaseTransaction,
   viewerId: string,
   titleId: string,
   events: ViewingEvent[],
 ) {
-  for (const key of episodeKeys(events)) {
-    const [seasonText, episodeText] = key.split(":");
-    const season = Number(seasonText);
-    const episode = Number(episodeText);
-    const scoped = events.filter((event) => event.season === season && event.episode === episode);
-    const manualWatch = latest(
-      scoped.filter((event) => isManual(event.source) && event.eventType === "episode_watch"),
-    );
-    const importedWatch = latest(
-      scoped.filter((event) => !isManual(event.source) && event.eventType === "episode_watch"),
-    );
-    const manualRating = latest(
-      scoped.filter((event) => isManual(event.source) && event.eventType === "episode_rating"),
-    );
-    const importedRating = latest(
-      scoped.filter((event) => !isManual(event.source) && event.eventType === "episode_rating"),
-    );
-    const watch = manualWatch ?? importedWatch;
-    const rating = manualRating ?? importedRating;
-    const watched = watch?.watched === 1;
+  const rows = episodeKeys(events).map((key) => episodeRow(events, viewerId, titleId, key));
 
-    // oxlint-disable-next-line no-await-in-loop -- each episode preserves its existing user note
+  if (rows.length > 0) {
+    const tuples = rows.map((_, index) => {
+      const at = (field: number) => `$${index * EPISODE_FIELDS + field}`;
+
+      return `(${at(1)}, ${at(2)}, ${at(3)}, 'episode', ${at(4)}, ${at(5)}, ${at(6)}, ${at(7)}, ${at(8)}, '')`;
+    });
+
     await transaction.execute(
       `INSERT INTO viewing_episode_entries
          (id, viewer_id, title_id, scope, season_number, episode_number,
           watched, watched_at, rating, notes)
-       VALUES ($1, $2, $3, 'episode', $4, $5, $6, $7, $8, '')
+       VALUES ${tuples.join(", ")}
        ON CONFLICT(viewer_id, title_id, scope, season_number, episode_number) DO UPDATE SET
          watched = excluded.watched,
          watched_at = excluded.watched_at,
          rating = excluded.rating,
          updated_at = CURRENT_TIMESTAMP`,
-      [
-        crypto.randomUUID(),
-        viewerId,
-        titleId,
-        season,
-        episode,
-        watched ? 1 : 0,
-        watched ? (watch?.watchedAt ?? watch?.occurredAt ?? null) : null,
-        rating?.rating ?? null,
-      ],
+      rows.flat(),
     );
   }
 

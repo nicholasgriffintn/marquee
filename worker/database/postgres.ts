@@ -1,4 +1,4 @@
-import { Client, types } from "pg";
+import { Pool, types } from "pg";
 
 import type { Database, DatabaseResult, DatabaseTransaction, DatabaseValue } from "./types.ts";
 
@@ -6,26 +6,34 @@ const POSTGRES_BIGINT = 20;
 const POSTGRES_DATE = 1082;
 const POSTGRES_TIMESTAMP = 1114;
 const POSTGRES_TIMESTAMPTZ = 1184;
+const POOL_SIZE = 5;
 
 types.setTypeParser(POSTGRES_BIGINT, (value) => Number(value));
 types.setTypeParser(POSTGRES_DATE, (value) => value);
 types.setTypeParser(POSTGRES_TIMESTAMP, (value) => value);
 types.setTypeParser(POSTGRES_TIMESTAMPTZ, (value) => value);
 
-class PostgresTransaction implements DatabaseTransaction {
-  readonly #client: Client;
+type Queryable = {
+  query(
+    sql: string,
+    values: DatabaseValue[],
+  ): Promise<{ rows: unknown[]; rowCount: number | null }>;
+};
 
-  constructor(client: Client) {
-    this.#client = client;
+class PostgresQueries implements DatabaseTransaction {
+  readonly #queryable: Queryable;
+
+  constructor(queryable: Queryable) {
+    this.#queryable = queryable;
   }
 
   async query<T extends object = Record<string, unknown>>(
     sql: string,
     values: DatabaseValue[] = [],
   ) {
-    const result = await this.#client.query(sql, values);
+    const result = await this.#queryable.query(sql, values);
 
-    return toResult<T>(result.rows, result.rowCount);
+    return toResult<T>(result.rows as T[], result.rowCount);
   }
 
   async first<T extends object = Record<string, unknown>>(
@@ -42,39 +50,45 @@ class PostgresTransaction implements DatabaseTransaction {
   }
 }
 
-export class PostgresDatabase extends PostgresTransaction implements Database {
-  readonly #client: Client;
+export class PostgresDatabase extends PostgresQueries implements Database {
+  readonly #pool: Pool;
 
-  private constructor(client: Client) {
-    super(client);
-    this.#client = client;
+  private constructor(pool: Pool) {
+    super(pool);
+    this.#pool = pool;
   }
 
-  static async connect(connectionString: string) {
-    const client = new Client({ connectionString });
+  static connect(connectionString: string) {
+    const pool = new Pool({ connectionString, max: POOL_SIZE });
 
-    await client.connect();
+    pool.on("error", (error) => {
+      console.error(JSON.stringify({ event: "postgres_idle_client_error", detail: error.message }));
+    });
 
-    return new PostgresDatabase(client);
+    return Promise.resolve(new PostgresDatabase(pool));
   }
 
   async transaction<T>(operation: (transaction: DatabaseTransaction) => Promise<T>) {
+    const client = await this.#pool.connect();
+
     try {
-      await this.#client.query("BEGIN");
+      await client.query("BEGIN");
 
-      const result = await operation(new PostgresTransaction(this.#client));
+      const result = await operation(new PostgresQueries(client));
 
-      await this.#client.query("COMMIT");
+      await client.query("COMMIT");
 
       return result;
     } catch (error) {
-      await this.#client.query("ROLLBACK");
+      await client.query("ROLLBACK").catch(() => undefined);
       throw error;
+    } finally {
+      client.release();
     }
   }
 
   close() {
-    return this.#client.end();
+    return this.#pool.end();
   }
 }
 

@@ -86,19 +86,35 @@ export async function failIngestionRun(env: Bindings, runId: string, error: unkn
 
 const RUN_RETENTION_DAYS = 7;
 const RUN_PRUNE_LIMIT = 20_000;
+const RUN_PRUNE_MAX_BATCHES = 40;
+const RUN_PRUNE_BUDGET_MS = 20_000;
 
 export async function pruneIngestionRuns(env: Bindings) {
-  const result = await env.DB.execute(
-    `DELETE FROM ingestion_runs
-     WHERE id IN (
-       SELECT id FROM ingestion_runs
-       WHERE started_at < (CURRENT_TIMESTAMP + CAST($1 AS INTERVAL))
-       LIMIT $2
-     )`,
-    [`-${RUN_RETENTION_DAYS} days`, RUN_PRUNE_LIMIT],
-  );
+  const deadline = Date.now() + RUN_PRUNE_BUDGET_MS;
+  let removed = 0;
+  let batches = 0;
 
-  logEvent("ingestion_runs_pruned", { removed: result.rowCount });
+  while (batches < RUN_PRUNE_MAX_BATCHES) {
+    // oxlint-disable-next-line no-await-in-loop -- bounded batches keep each delete short-lived
+    const result = await env.DB.execute(
+      `DELETE FROM ingestion_runs
+       WHERE id IN (
+         SELECT id FROM ingestion_runs
+         WHERE started_at < (CURRENT_TIMESTAMP + CAST($1 AS INTERVAL))
+         LIMIT $2
+       )`,
+      [`-${RUN_RETENTION_DAYS} days`, RUN_PRUNE_LIMIT],
+    );
 
-  return result.rowCount;
+    removed += result.rowCount;
+    batches += 1;
+
+    if (result.rowCount < RUN_PRUNE_LIMIT || Date.now() >= deadline) {
+      break;
+    }
+  }
+
+  logEvent("ingestion_runs_pruned", { removed, batches });
+
+  return removed;
 }
