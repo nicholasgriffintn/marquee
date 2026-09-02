@@ -3,14 +3,16 @@ import type { Database, DatabaseTransaction, DatabaseValue } from "./types.ts";
 
 export class LazyDatabase implements Database {
   readonly #connectionString: string;
+  readonly #statementTimeoutMs: number;
   #opening: Promise<PostgresDatabase> | null = null;
 
-  constructor(connectionString: string) {
+  constructor(connectionString: string, statementTimeoutMs: number) {
     this.#connectionString = connectionString;
+    this.#statementTimeoutMs = statementTimeoutMs;
   }
 
   #open() {
-    this.#opening ??= PostgresDatabase.connect(this.#connectionString);
+    this.#opening ??= PostgresDatabase.connect(this.#connectionString, this.#statementTimeoutMs);
 
     return this.#opening;
   }

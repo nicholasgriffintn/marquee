@@ -9,8 +9,8 @@ import {
 import type { Bindings } from "../types.ts";
 import { type EmbeddingCoverage, readEmbeddingCoverage } from "./embeddings.ts";
 
-export const RECONCILE_LIMIT = 2_000;
-export const DEEP_RECONCILE_LIMIT = 8_000;
+export const RECONCILE_LIMIT = 10_000;
+export const DEEP_RECONCILE_LIMIT = 20_000;
 
 export type IndexReadiness = {
   search: {

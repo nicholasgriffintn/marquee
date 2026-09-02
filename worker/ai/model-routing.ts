@@ -1,5 +1,9 @@
+import { withKvCache } from "../lib/cache.ts";
 import { logEvent } from "../lib/logging.ts";
-import { readViewerAiModel } from "../repositories/viewer-ai-models.ts";
+import {
+  readViewerAiModel,
+  type ViewerAiModelConfiguration,
+} from "../repositories/viewer-ai-models.ts";
 import type { Bindings } from "../types.ts";
 import type { ModelTier } from "./policy.ts";
 
@@ -8,6 +12,7 @@ const PROVIDER_MODEL = /^[a-z0-9][a-z0-9._/-]{0,159}$/u;
 const PROVIDER_NATIVE_MODEL = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/u;
 const BYOK_ALIAS = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/u;
 const LAST_RESORT_MODEL = "@cf/openai/gpt-oss-120b";
+const CONFIGURATION_TTL_SECONDS = 300;
 
 const CLOUDFLARE_PROVIDERS = new Set(["cerebras", "openai"]);
 const BYOK_PROVIDER_PATHS = {
@@ -17,27 +22,28 @@ const BYOK_PROVIDER_PATHS = {
 
 type ByokProvider = keyof typeof BYOK_PROVIDER_PATHS;
 
-export type AiModelCandidate = {
-  requestModel: string;
-  recordedModel: string;
-};
+export type AiTransport = "cloudflare" | "byok";
 
-export type AiRoute =
+export type AiModelCandidate =
   | {
-      source: "default" | "viewer";
       transport: "cloudflare";
-      candidates: AiModelCandidate[];
+      requestModel: string;
+      recordedModel: string;
     }
   | {
-      source: "viewer";
       transport: "byok";
       provider: ByokProvider;
       providerPath: string;
       byokAlias: string;
-      candidates: [AiModelCandidate];
+      requestModel: string;
+      recordedModel: string;
     };
 
-const configurations = new WeakMap<Database, Map<string, ReturnType<typeof readViewerAiModel>>>();
+export type AiRoute = {
+  source: "default" | "viewer";
+  transport: AiTransport;
+  candidates: AiModelCandidate[];
+};
 
 function defaultModel(env: Bindings) {
   if (!WORKERS_AI_MODEL.test(env.AI_MODEL)) {
@@ -62,40 +68,29 @@ function fastModel(env: Bindings, normal: string) {
 }
 
 function candidate(model: string): AiModelCandidate {
-  return { requestModel: model, recordedModel: model };
+  return { transport: "cloudflare", requestModel: model, recordedModel: model };
 }
 
-function defaultRoute(env: Bindings, tier: ModelTier): AiRoute {
+function defaultCandidates(env: Bindings, tier: ModelTier) {
   const normal = defaultModel(env);
   const fast = fastModel(env, normal);
   const models = tier === "fast" ? [fast, normal, LAST_RESORT_MODEL] : [normal, LAST_RESORT_MODEL];
 
+  return [...new Set(models)].map(candidate);
+}
+
+function defaultRoute(env: Bindings, tier: ModelTier): AiRoute {
   return {
     source: "default",
     transport: "cloudflare",
-    candidates: [...new Set(models)].map(candidate),
+    candidates: defaultCandidates(env, tier),
   };
 }
 
 function configurationFor(env: Bindings, viewerId: string) {
-  let databaseConfigurations = configurations.get(env.DB);
-
-  if (!databaseConfigurations) {
-    databaseConfigurations = new Map();
-    configurations.set(env.DB, databaseConfigurations);
-  }
-
-  const cached = databaseConfigurations.get(viewerId);
-
-  if (cached) {
-    return cached;
-  }
-
-  const pending = readViewerAiModel(env.DB, viewerId);
-
-  databaseConfigurations.set(viewerId, pending);
-
-  return pending;
+  return withKvCache(env, `ai-model:${viewerId}`, CONFIGURATION_TTL_SECONDS, async () => ({
+    configuration: await readViewerAiModel(env.DB, viewerId),
+  })).then((memo) => memo.configuration);
 }
 
 function configuredModel(provider: string, model: string) {
@@ -118,7 +113,7 @@ function isByokProvider(provider: string): provider is ByokProvider {
   return Object.hasOwn(BYOK_PROVIDER_PATHS, provider);
 }
 
-function byokRoute(provider: string, model: string, alias: string | null): AiRoute {
+function byokCandidate(provider: string, model: string, alias: string | null): AiModelCandidate {
   if (!isByokProvider(provider) || !PROVIDER_NATIVE_MODEL.test(model)) {
     throw new Error("Configured BYOK provider or model is invalid");
   }
@@ -128,21 +123,39 @@ function byokRoute(provider: string, model: string, alias: string | null): AiRou
   }
 
   return {
-    source: "viewer",
     transport: "byok",
     provider,
     providerPath: BYOK_PROVIDER_PATHS[provider],
     byokAlias: alias,
-    candidates: [
-      {
-        requestModel: model,
-        recordedModel: `${provider}/${model}`,
-      },
-    ],
+    requestModel: model,
+    recordedModel: `${provider}/${model}`,
   };
 }
 
-function recordRoute(route: AiRoute, reason?: "guest" | "unconfigured") {
+function viewerRoute(
+  env: Bindings,
+  tier: ModelTier,
+  configuration: ViewerAiModelConfiguration,
+): AiRoute {
+  if (configuration.credentialSource === "byok") {
+    return {
+      source: "viewer",
+      transport: "byok",
+      candidates: [
+        byokCandidate(configuration.provider, configuration.model, configuration.byokAlias),
+        ...defaultCandidates(env, tier),
+      ],
+    };
+  }
+
+  return {
+    source: "viewer",
+    transport: "cloudflare",
+    candidates: [candidate(configuredModel(configuration.provider, configuration.model))],
+  };
+}
+
+function recordRoute(route: AiRoute, reason?: "guest" | "unconfigured" | "invalid") {
   logEvent("ai_route_selected", {
     source: route.source,
     transport: route.transport,
@@ -168,27 +181,16 @@ export async function resolveAiRoute(
     return recordRoute(defaultRoute(env, tier), "unconfigured");
   }
 
-  let route: AiRoute;
-
   try {
-    route =
-      configuration.credentialSource === "byok"
-        ? byokRoute(configuration.provider, configuration.model, configuration.byokAlias)
-        : {
-            source: "viewer",
-            transport: "cloudflare",
-            candidates: [candidate(configuredModel(configuration.provider, configuration.model))],
-          };
-  } catch (error) {
+    return recordRoute(viewerRoute(env, tier, configuration));
+  } catch {
     logEvent("ai_model_configuration_invalid", {
       provider: configuration.provider,
       credentialSource: configuration.credentialSource,
     });
 
-    throw error;
+    return recordRoute(defaultRoute(env, tier), "invalid");
   }
-
-  return recordRoute(route);
 }
 
 export function hasViewerAiModel(env: Bindings, viewerId: string) {

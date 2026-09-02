@@ -1,5 +1,6 @@
 import { logError } from "../lib/logging.ts";
 import { clamp } from "../lib/numbers.ts";
+import { estimateTableRows } from "./table-stats.ts";
 
 export type PersonRecord = { personId: number; name: string; titles: number };
 
@@ -126,6 +127,40 @@ export async function readCreditSeasons(db: Database, titleId: string) {
 }
 
 const TITLES_CHUNK = 5_000;
+const RECOUNT_CHUNK = 200;
+
+export async function recountPersonTitles(db: Database, personIds: number[]) {
+  const ordered = [...new Set(personIds)]
+    .filter((personId) => Number.isInteger(personId) && personId > 0)
+    .toSorted((left, right) => left - right);
+
+  if (ordered.length === 0) {
+    return 0;
+  }
+
+  for (let index = 0; index < ordered.length; index += RECOUNT_CHUNK) {
+    const chunk = ordered.slice(index, index + RECOUNT_CHUNK);
+    const placeholders = chunk.map((_unused, position) => `$${position + 1}`).join(",");
+
+    // oxlint-disable-next-line no-await-in-loop
+    await db.execute(
+      `UPDATE catalog_people AS p
+          SET titles = counted.titles
+         FROM (
+           SELECT person_id, count(DISTINCT title_id) AS titles
+             FROM catalog_credits
+            WHERE person_id IN (${placeholders})
+            GROUP BY person_id
+            ORDER BY person_id
+         ) AS counted
+        WHERE p.person_id = counted.person_id
+          AND p.titles IS DISTINCT FROM counted.titles`,
+      chunk,
+    );
+  }
+
+  return ordered.length;
+}
 
 export async function rebuildPersonTitles(db: Database) {
   let after = 0;
@@ -175,11 +210,7 @@ export async function rebuildPersonTitles(db: Database) {
     after = last;
   }
 
-  const total = await db.first<{ credits: number }>(
-    `SELECT count(*) AS credits FROM catalog_credits`,
-  );
-
-  return total?.credits ?? 0;
+  return estimateTableRows(db, "catalog_credits");
 }
 
 export async function readPerson(db: Database, identifier: string): Promise<PersonRecord | null> {

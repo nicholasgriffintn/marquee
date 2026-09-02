@@ -213,7 +213,7 @@ reelRoutes.get("/:workId", async (context) => {
   const range = context.req.header("range");
 
   if (!range) {
-    context.executionCtx.waitUntil(
+    context.env.defer(
       logRejection(recordPlay(context.env.DB, workId), "reel_play_record_failed", { workId }),
     );
   }

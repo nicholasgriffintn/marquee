@@ -6,7 +6,8 @@ const POSTGRES_BIGINT = 20;
 const POSTGRES_DATE = 1082;
 const POSTGRES_TIMESTAMP = 1114;
 const POSTGRES_TIMESTAMPTZ = 1184;
-const POOL_SIZE = 5;
+const POOL_SIZE = 16;
+const CONNECTION_TIMEOUT_MS = 2_000;
 
 types.setTypeParser(POSTGRES_BIGINT, (value) => Number(value));
 types.setTypeParser(POSTGRES_DATE, (value) => value);
@@ -58,8 +59,14 @@ export class PostgresDatabase extends PostgresQueries implements Database {
     this.#pool = pool;
   }
 
-  static connect(connectionString: string) {
-    const pool = new Pool({ connectionString, max: POOL_SIZE });
+  static connect(connectionString: string, statementTimeoutMs: number) {
+    const pool = new Pool({
+      connectionString,
+      max: POOL_SIZE,
+      connectionTimeoutMillis: CONNECTION_TIMEOUT_MS,
+      statement_timeout: statementTimeoutMs,
+      query_timeout: statementTimeoutMs,
+    });
 
     pool.on("error", (error) => {
       console.error(JSON.stringify({ event: "postgres_idle_client_error", detail: error.message }));

@@ -1,4 +1,5 @@
 import { clamp } from "../lib/numbers.ts";
+import { estimatedRows } from "../lib/sql.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 
 export type IndexReason = "title" | "extensions" | "rebuild";
@@ -115,7 +116,7 @@ export async function takePendingTitles(db: Database, limit: number) {
   const rows = await db.query<{ titleId: string }>(
     `SELECT title_id AS "titleId"
        FROM catalog_index_pending
-       ORDER BY queued_at
+       ORDER BY CASE reason WHEN 'title' THEN 0 WHEN 'extensions' THEN 1 ELSE 2 END, queued_at
        LIMIT $1`,
     [clamp(Math.trunc(limit), 1, 20_000)],
   );
@@ -158,8 +159,8 @@ export async function sampleSearchDrift(db: Database, sampleSize = DRIFT_SAMPLE)
 
 export async function readSearchIndexState(db: Database): Promise<SearchIndexState> {
   const row = await db.first<SearchIndexState>(`SELECT
-         (SELECT count(*) FROM catalog_titles) AS titles,
-         (SELECT count(*) FROM catalog_search) AS indexed,
+         ${estimatedRows("catalog_titles")} AS titles,
+         ${estimatedRows("catalog_search")} AS indexed,
          (SELECT count(*) FROM catalog_index_pending) AS pending,
          (SELECT min(queued_at) FROM catalog_index_pending) AS "oldestPendingAt"`);
 

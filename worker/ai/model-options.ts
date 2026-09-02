@@ -1,4 +1,4 @@
-import type { AiModelCandidate, AiRoute } from "./model-routing.ts";
+import type { AiModelCandidate } from "./model-routing.ts";
 
 type ReasoningEffort = "none" | "low" | "high";
 
@@ -29,12 +29,12 @@ function openAiOptions(model: string): AiModelOptions {
   return { reasoningEffort: "low", supportsTemperature: false };
 }
 
-export function modelOptions(route: AiRoute, candidate: AiModelCandidate): AiModelOptions {
-  if (route.transport === "byok" && route.provider === "openai") {
+export function modelOptions(candidate: AiModelCandidate): AiModelOptions {
+  if (candidate.transport === "byok" && candidate.provider === "openai") {
     return openAiOptions(candidate.requestModel);
   }
 
-  if (route.transport === "byok" && route.provider === "cerebras") {
+  if (candidate.transport === "byok" && candidate.provider === "cerebras") {
     return {
       ...(candidate.requestModel === "zai-glm-4.7"
         ? { reasoningEffort: "none" as const }

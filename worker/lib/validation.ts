@@ -40,7 +40,11 @@ export function isRailRefreshJob(value: unknown): value is RailRefreshJob {
     value.viewerId.length > 0 &&
     value.viewerId.length <= 128 &&
     typeof value.token === "string" &&
-    /^[0-9a-f-]{36}$/u.test(value.token)
+    /^[0-9a-f-]{36}$/u.test(value.token) &&
+    (value.deferrals === undefined ||
+      (typeof value.deferrals === "number" &&
+        Number.isInteger(value.deferrals) &&
+        value.deferrals >= 0))
   );
 }
 

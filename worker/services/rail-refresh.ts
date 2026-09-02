@@ -4,7 +4,8 @@ import type { Bindings, RailRefreshJob } from "../types.ts";
 import { readRailRecord, startGeneration } from "./rail-generation.ts";
 import { readRailRevision } from "./rail-revision.ts";
 
-const QUIET_WINDOW = "15 minutes";
+const QUIET_WINDOW_SECONDS = 900;
+const QUIET_WINDOW = `${QUIET_WINDOW_SECONDS} seconds`;
 const MINIMUM_INTERVAL = "12 hours";
 const MAXIMUM_DIRTY_AGE = "24 hours";
 const CLAIM_RETRY_SECONDS = 60;
@@ -195,5 +196,5 @@ export async function runScheduledRailRefresh(
 
   return (await clearSchedule(env.DB, job.viewerId, job.token, revision))
     ? { action: "complete" }
-    : { action: "defer", delaySeconds: Number.parseInt(QUIET_WINDOW, 10) * 60 };
+    : { action: "defer", delaySeconds: QUIET_WINDOW_SECONDS };
 }

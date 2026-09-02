@@ -74,6 +74,7 @@ export type RailRefreshJob = {
   type: "refresh-rails";
   viewerId: string;
   token: string;
+  deferrals?: number;
 };
 
 export type QueueJob = IngestionJob | RailRefreshJob;
