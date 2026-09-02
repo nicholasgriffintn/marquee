@@ -1,6 +1,6 @@
 import type { MediaTitle } from "../../../src/domain/catalog.ts";
+import { cachedWorkersAiOptions } from "../../ai/workers-ai.ts";
 import { withDeadline } from "../../lib/deadline.ts";
-import { sha256Hex } from "../../lib/hash.ts";
 import { logError } from "../../lib/logging.ts";
 import { normaliseQueryText } from "../../lib/text.ts";
 import { isRecord } from "../../lib/values.ts";
@@ -10,7 +10,6 @@ const RERANK_MODEL = "@cf/baai/bge-reranker-base";
 const RERANK_TEXT_LENGTH = 400;
 const RERANK_QUERY_LENGTH = 512;
 const RERANK_TIMEOUT_MS = 1_200;
-const CACHE_SECONDS = 86_400;
 
 function candidateText(title: MediaTitle) {
   return [
@@ -39,18 +38,15 @@ function parseRanking(result: unknown) {
 }
 
 async function rerankOptions(env: Bindings, query: string, ids: string[]): Promise<AiOptions> {
-  const key = await sha256Hex(`${RERANK_MODEL}:${query}:${ids.join(",")}`);
-
   return {
+    ...(await cachedWorkersAiOptions(
+      env,
+      "rerank",
+      RERANK_MODEL,
+      null,
+      `${query}:${ids.join(",")}`,
+    )),
     signal: AbortSignal.timeout(RERANK_TIMEOUT_MS),
-    gateway: {
-      id: env.AI_GATEWAY_ID,
-      skipCache: false,
-      cacheTtl: CACHE_SECONDS,
-      cacheKey: `marquee-worker-v1-${key}`,
-      collectLog: true,
-      metadata: { feature: "rerank" },
-    },
   };
 }
 
