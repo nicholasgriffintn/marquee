@@ -4,7 +4,6 @@ export const ROUTE_ALIASES: Record<string, string> = {
   "/series": "/listings?type=tv",
   "/new": "/listings?sort=recent",
   "/popular": "/listings?sort=popularity",
-  "/after-hours": "/tour",
   "/people": "/directory",
   "/person": "/directory",
   "/collections": "/directory?tab=collections",

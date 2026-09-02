@@ -77,7 +77,7 @@ export function RoomsTab() {
   return (
     <ErrorBoundary label="The rooms">
       <TabPanel id="rooms" idPrefix="admin">
-        <Panel heading="Screenings">
+        <Panel heading="Screenings" rule="none">
           <p className={styles.note}>
             Every room opened from this account, newest first. Shutting the doors stops new tickets
             and messages; the room and its feed stay for a week.

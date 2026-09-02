@@ -2,6 +2,7 @@
   display: grid;
   gap: 18px;
   max-width: 680px;
+  margin-top: 16px;
 }
 
 .field {

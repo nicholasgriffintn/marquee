@@ -27,7 +27,7 @@ export function PeopleTab({
   return (
     <ErrorBoundary label="The staff list">
       <TabPanel id="people" idPrefix="admin">
-        <Panel heading="People">
+        <Panel heading="People" rule="none">
           {users.length >= PEOPLE_SEARCH_FROM && (
             <div className={styles.filters}>
               <input

@@ -16,7 +16,25 @@
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/*", "!/assets/*"]
+    "run_worker_first": [
+      "/api/*",
+      "/health",
+      "/feeds/*",
+      "/mcp",
+      "/sitemap/*",
+      "/robots.txt",
+      "/sitemap.xml",
+      "/search",
+      "/films",
+      "/series",
+      "/new",
+      "/popular",
+      "/people",
+      "/person",
+      "/collections",
+      "/collection",
+      "/media/*"
+    ]
   },
   "kv_namespaces": [
     {

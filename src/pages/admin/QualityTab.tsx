@@ -51,7 +51,7 @@ export function QualityTab({ revision }: { revision: number }) {
       <TabPanel id="quality" idPrefix="admin">
         {error && <Callout>{error}</Callout>}
 
-        <Panel heading="What the angles are earning">
+        <Panel heading="What the angles are earning" rule="none">
           <p className={styles.note}>
             An angle is the reason a shelf exists — <code>close</code>, <code>acclaimed</code> and{" "}
             <code>widen</code> for the curated rails, or the rail’s own id for the rest. Every title

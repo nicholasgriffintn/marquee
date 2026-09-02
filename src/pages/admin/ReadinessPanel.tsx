@@ -22,7 +22,7 @@ export function ReadinessPanel({ readiness }: { readiness: AdminPipeline["readin
   const projected = Math.max(0, search.titles - search.pending);
 
   return (
-    <Panel heading="Index readiness">
+    <Panel heading="Index readiness" rule="none">
       <p className={styles.note}>
         A row in the search index is not the same as a searchable title: genres, keywords and cast
         are projected from their own tables, and a projection can be present but out of date. Writes

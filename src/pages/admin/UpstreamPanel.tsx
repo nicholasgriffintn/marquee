@@ -110,7 +110,7 @@ export function UpstreamPanel({
   const calls = sources.reduce((total, source) => total + source.calls, 0);
 
   return (
-    <Panel heading="Upstream calls today">
+    <Panel heading="Upstream calls today" rule="none">
       <p className={styles.summary}>
         <strong>{sources.length} sources</strong>
         <span>{calls.toLocaleString()} calls today</span>

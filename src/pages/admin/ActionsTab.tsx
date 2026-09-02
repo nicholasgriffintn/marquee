@@ -16,7 +16,7 @@ export function ActionsTab({
     <ErrorBoundary label="The controls">
       <TabPanel id="actions" idPrefix="admin">
         {ACTION_GROUPS.map((group) => (
-          <Panel heading={group.title} key={group.title}>
+          <Panel heading={group.title} key={group.title} rule="none">
             <p className={styles.note}>{group.note}</p>
             <div className={styles.actions}>
               {group.actions.map((action) => (

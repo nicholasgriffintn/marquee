@@ -98,6 +98,8 @@ async function confirmAlertAddress(context: AppContext) {
   const token = new URL(context.req.url).searchParams.get("token") ?? "";
   const url = destination(context, "/notebook");
 
+  url.hash = "post";
+
   if (!token) {
     url.searchParams.set("alertEmail", "invalid");
 

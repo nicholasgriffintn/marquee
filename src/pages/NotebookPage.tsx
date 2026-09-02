@@ -8,7 +8,7 @@ import { ConnectionsPanel } from "../components/notebook/ConnectionsPanel";
 import { FeedPanel } from "../components/notebook/FeedPanel";
 import { GuestList } from "../components/notebook/GuestList";
 import { ImportPanel } from "../components/notebook/ImportPanel";
-import { NotebookIndex, type Divider } from "../components/notebook/NotebookIndex";
+import { NotebookIndex } from "../components/notebook/NotebookIndex";
 import {
   NotebookAside,
   NotebookEmpty,
@@ -20,7 +20,8 @@ import { ServicesPanel } from "../components/notebook/ServicesPanel";
 import { TasteMap } from "../components/notebook/TasteMap";
 import { UsherMark } from "../components/usher/UsherMark";
 import type { Provider, ProvidersResponse } from "../domain/catalog";
-import type { Belief, Guest } from "../domain/notebook";
+import { NOTEBOOK_DIVIDERS, type Belief, type Guest } from "../domain/notebook";
+import { useNotebookDivider } from "../hooks/useNotebookDivider";
 import { jsonMutation, mutateJson, queryJson } from "../lib/query-client";
 import { Eyebrow, Heading, Page, Text } from "../ui";
 
@@ -29,40 +30,6 @@ import styles from "./NotebookPage.module.css";
 type NotebookResponse = { beliefs: Belief[] };
 
 type GuestResponse = { guests: Guest[] };
-
-const DIVIDERS: Divider[] = [
-  {
-    id: "preferences",
-    label: "Your preferences",
-    aside: "language, location and your cinema",
-  },
-  {
-    id: "notes",
-    label: "What I have written down",
-    aside: "and what you have crossed out",
-  },
-  { id: "shape", label: "The shape of it", aside: "your shelf, laid out flat" },
-  {
-    id: "services",
-    label: "Where you watch",
-    aside: "and what you are paying for",
-  },
-  {
-    id: "room",
-    label: "Who sits with you",
-    aside: "and what they will not sit through",
-  },
-  {
-    id: "post",
-    label: "When I should write",
-    aside: "sparingly, and never twice",
-  },
-  {
-    id: "elsewhere",
-    label: "Elsewhere you have an account",
-    aside: "keys to other houses",
-  },
-];
 
 export function NotebookPage({
   isSignedIn,
@@ -84,6 +51,7 @@ export function NotebookPage({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
   const [reloads, setReloads] = useState(0);
+  const current = useNotebookDivider();
 
   useEffect(() => {
     if (!isSignedIn) {
@@ -216,13 +184,13 @@ export function NotebookPage({
       )}
 
       <div className={styles.body}>
-        <NotebookIndex dividers={DIVIDERS} />
+        <NotebookIndex dividers={NOTEBOOK_DIVIDERS} current={current} />
 
         <div className={styles.pages}>
           <NotebookSection
             id="preferences"
-            number={1}
-            title={DIVIDERS[0].label}
+            hidden={current !== "preferences"}
+            title={NOTEBOOK_DIVIDERS[0].label}
             lede="Set the audio language I should look for and, if you want cinema notes, the one branch that counts as yours."
           >
             <ErrorBoundary label="These preferences">
@@ -232,8 +200,8 @@ export function NotebookPage({
 
           <NotebookSection
             id="notes"
-            number={2}
-            title={DIVIDERS[1].label}
+            hidden={current !== "notes"}
+            title={NOTEBOOK_DIVIDERS[1].label}
             lede="Every line here came from something you did, or something you told me. Where I am guessing, I say so."
           >
             <ErrorBoundary label="These notes">
@@ -251,8 +219,8 @@ export function NotebookPage({
 
           <NotebookSection
             id="shape"
-            number={3}
-            title={DIVIDERS[2].label}
+            hidden={current !== "shape"}
+            title={NOTEBOOK_DIVIDERS[2].label}
             lede="Everything you have marked, placed by what it is rather than what it is called. Close together means alike. The two directions are mine rather than the industry's — where one end has a character to it, I have written it in the margin."
           >
             <ErrorBoundary label="This map">
@@ -262,8 +230,8 @@ export function NotebookPage({
 
           <NotebookSection
             id="services"
-            number={4}
-            title={DIVIDERS[3].label}
+            hidden={current !== "services"}
+            title={NOTEBOOK_DIVIDERS[3].label}
             lede="Tick the ones you actually pay for. I will stop offering you things behind doors you cannot open."
           >
             <ErrorBoundary label="This list of services">
@@ -279,8 +247,8 @@ export function NotebookPage({
 
           <NotebookSection
             id="room"
-            number={5}
-            title={DIVIDERS[4].label}
+            hidden={current !== "room"}
+            title={NOTEBOOK_DIVIDERS[4].label}
             lede="Give me a name and what they will not sit through, and I will keep it in mind when the room is not just you."
           >
             <ErrorBoundary label="This guest list">
@@ -294,8 +262,8 @@ export function NotebookPage({
 
           <NotebookSection
             id="post"
-            number={6}
-            title={DIVIDERS[5].label}
+            hidden={current !== "post"}
+            title={NOTEBOOK_DIVIDERS[5].label}
             lede="Only about things already on your shelf, never more than a handful a week, and never twice about the same thing."
           >
             <ErrorBoundary label="These settings">
@@ -305,8 +273,8 @@ export function NotebookPage({
 
           <NotebookSection
             id="elsewhere"
-            number={7}
-            title={DIVIDERS[6].label}
+            hidden={current !== "elsewhere"}
+            title={NOTEBOOK_DIVIDERS[6].label}
             lede="Bring your history in from somewhere else, or hand a key to something that is not a person."
           >
             <NotebookSubheading>What you brought with you</NotebookSubheading>

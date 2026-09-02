@@ -37,7 +37,7 @@ export function PipelineTab({
         {error && <Callout>{error}</Callout>}
         {pipeline?.readiness && <ReadinessPanel readiness={pipeline.readiness} />}
         {pipeline && pipeline.lastRuns.length > 0 && (
-          <Panel heading="Recent jobs">
+          <Panel heading="Recent jobs" rule={pipeline?.readiness ? "top" : "none"}>
             <p className={styles.note}>Last {pipeline.runWindowHours} hours</p>
             <div className={styles.filters}>
               {RUN_STATUSES.map((status) => (

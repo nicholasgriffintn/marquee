@@ -2,6 +2,16 @@
   scroll-margin-top: 96px;
 }
 
+.section[hidden] {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .section {
+    scroll-margin-top: 144px;
+  }
+}
+
 .divider {
   align-items: baseline;
   border-bottom: 1px solid var(--panel-line);

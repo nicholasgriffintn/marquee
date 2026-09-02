@@ -91,11 +91,7 @@ export function AdminPage({ user }: { user: User }) {
   return (
     <Page>
       <PageHeader
-        heading={
-          <>
-            Admin, and <em>the state of the pipeline.</em>
-          </>
-        }
+        heading="Control Panel"
         description={`Signed in as ${user.name}. Actions here queue real work against the live catalogue and spend the API budgets shown below.`}
       />
 

@@ -55,7 +55,7 @@ export function SourcesTab({
         )}
 
         {ledger?.stats && (
-          <Panel heading="Service directory">
+          <Panel heading="Service directory" rule={overview && overview.sources?.length > 0 ? "top" : "none"}>
             <p className={panelStyles.note}>
               Registry entries against what the last sweep resolved. A service counts as live only
               once it has an upstream match or titles attached to it — configuration on its own

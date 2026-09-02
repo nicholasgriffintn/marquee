@@ -110,7 +110,11 @@ linkRoutes.get("/trakt/callback", async (context) => {
       { contentType: "json" },
     );
 
-    return context.redirect(new URL(`${claimed.returnTo ?? "/shelf"}?linked=trakt`, origin).href);
+    const landing = new URL(claimed.returnTo ?? "/shelf", origin);
+
+    landing.searchParams.set("linked", "trakt");
+
+    return context.redirect(landing.href);
   } catch (error) {
     logError("trakt_link_callback_failed", error);
 

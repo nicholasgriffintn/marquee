@@ -74,7 +74,7 @@ export function OverviewTab({
       <TabPanel id="overview" idPrefix="admin">
         {!overview && loading && <StatusNote busy>Reading the pipeline…</StatusNote>}
         {overview && (
-          <Panel heading="Catalogue">
+          <Panel heading="Catalogue" rule="none">
             <p className={styles.note}>
               Availability is only kept fresh for the working set — everything on a shelf or a
               pinned list, everything a rail can surface, anything with an insight or an air date
@@ -101,7 +101,7 @@ export function OverviewTab({
           </Panel>
         )}
         {overview && overview.backfill.length > 0 && (
-          <Panel heading="Catalogue backfill">
+          <Panel heading="Catalogue backfill" rule="top">
             <p className={styles.note}>
               TMDB stops paginating any single query at page 500, so the sweep walks it as dated
               windows and halves any window that overflows that cap. Each window keeps its own

@@ -105,7 +105,7 @@ export function RevivalReview({ revision: outerRevision = 0 }: { revision?: numb
   );
 
   return (
-    <Panel heading="The vault">
+    <Panel heading="The vault" rule="none">
       <p className={adminStyles.note}>
         Nothing plays until it is approved. A print clears on its own only when every named author
         has a death date and the last of them is more than 70 years past, or when a European archive

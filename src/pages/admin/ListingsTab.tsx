@@ -30,7 +30,7 @@ export function ListingsTab({
       <TabPanel id="listings" idPrefix="admin">
         {error && <Callout>{error}</Callout>}
         {listings && listings.sections.length > 0 && (
-          <Panel heading="Homepage rails">
+          <Panel heading="Homepage rails" rule="none">
             <ul className={styles.list}>
               {listings.sections.map((section) => (
                 <li key={section.id}>

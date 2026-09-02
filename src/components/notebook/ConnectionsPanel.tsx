@@ -30,7 +30,7 @@ export function ConnectionsPanel({ isSignedIn }: { isSignedIn: boolean }) {
           {trakt.needsReconnect ? (
             <a
               className={classNames(styles.button, styles.primary)}
-              href="/api/links/trakt/start?returnTo=/notebook"
+              href="/api/links/trakt/start?returnTo=/notebook%23elsewhere"
             >
               Reconnect
             </a>

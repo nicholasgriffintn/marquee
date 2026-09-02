@@ -7,21 +7,20 @@ import styles from "./NotebookSection.module.css";
 
 export function NotebookSection({
   id,
-  number,
   title,
   lede,
+  hidden = false,
   children,
 }: {
-  id: string;
-  number: number;
+    id: string;
   title: string;
   lede: string;
+    hidden?: boolean;
   children: ReactNode;
 }) {
   return (
-    <section className={styles.section} id={id} aria-labelledby={`${id}-title`}>
+    <section className={styles.section} id={id} aria-labelledby={`${id}-title`} hidden={hidden}>
       <div className={styles.divider}>
-        <i aria-hidden="true">{String(number).padStart(2, "0")}</i>
         <Heading level={2} size="subhead" family="serif" id={`${id}-title`}>
           {title}
         </Heading>

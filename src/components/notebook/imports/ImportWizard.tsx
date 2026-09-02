@@ -200,7 +200,7 @@ export function ImportWizard({
                 <StatusNote>Trakt needs to be reconnected before another import.</StatusNote>
                 <a
                   className={styles.connectButton}
-                  href="/api/links/trakt/start?returnTo=/notebook"
+                  href="/api/links/trakt/start?returnTo=/notebook%23elsewhere"
                 >
                   Reconnect Trakt
                 </a>
@@ -230,7 +230,10 @@ export function ImportWizard({
                 </Button>
               </>
             ) : (
-              <a className={styles.connectButton} href="/api/links/trakt/start?returnTo=/notebook">
+              <a
+                className={styles.connectButton}
+                href="/api/links/trakt/start?returnTo=/notebook%23elsewhere"
+              >
                 Connect Trakt
               </a>
             )

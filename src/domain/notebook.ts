@@ -258,3 +258,45 @@ export function leaning(point: MapPoint, axes: TasteMapResponse["axes"]) {
     ? `Sits toward ${ends.join(" and ")}`
     : "Sits in the middle of both directions";
 }
+
+export type NotebookDivider = { id: string; label: string; aside: string };
+
+export const NOTEBOOK_DIVIDERS: NotebookDivider[] = [
+  {
+    id: "preferences",
+    label: "Your preferences",
+    aside: "language, location and your cinema",
+  },
+  {
+    id: "notes",
+    label: "What I have written down",
+    aside: "and what you have crossed out",
+  },
+  { id: "shape", label: "The shape of it", aside: "your shelf, laid out flat" },
+  {
+    id: "services",
+    label: "Where you watch",
+    aside: "and what you are paying for",
+  },
+  {
+    id: "room",
+    label: "Who sits with you",
+    aside: "and what they will not sit through",
+  },
+  {
+    id: "post",
+    label: "When I should write",
+    aside: "sparingly, and never twice",
+  },
+  {
+    id: "elsewhere",
+    label: "Elsewhere you have an account",
+    aside: "keys to other houses",
+  },
+];
+
+export function notebookDividerId(hash: string) {
+  const id = hash.replace(/^#/u, "");
+
+  return NOTEBOOK_DIVIDERS.some((divider) => divider.id === id) ? id : NOTEBOOK_DIVIDERS[0].id;
+}
