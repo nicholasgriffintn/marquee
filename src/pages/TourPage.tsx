@@ -101,8 +101,6 @@ export function TourPage({
 
   return (
     <div className={classNames(styles.tour, isPresenting && styles.presenting)} ref={rootRef}>
-      <div className={styles.grain} aria-hidden="true" />
-
       <TourRail
         activeIndex={activeIndex}
         isPresenting={isPresenting}
