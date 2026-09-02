@@ -201,13 +201,21 @@ export async function summariseTitleRows(
   }
 
   const ids = [...new Set(rows.map((row) => row.id))];
-  const [genres, providers] = await Promise.all([readGenreMap(db, ids), readProviderMap(db, ids)]);
+  const [genres, providers, details] = await Promise.all([
+    readGenreMap(db, ids),
+    readProviderMap(db, ids),
+    readDetailsMap(db, ids),
+  ]);
 
   return rows.map((row) => {
     const title = withStoredPoster(buildTitleFromRow(row), row.poster_key);
+    const detail = details.get(title.id);
 
     title.genres = genres.get(title.id) ?? [];
     title.providers = providers.get(title.id) ?? [];
+    title.pending = detail?.pending;
+    title.trailerKey = detail?.trailerKey;
+    title.tagline = detail?.tagline;
 
     return title;
   });
