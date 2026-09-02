@@ -320,18 +320,6 @@ export function DetailPanel({
               <ArrowIcon />
             </button>
           )}
-          {canSave && entryState.status === "loaded" && !entryState.entry && (
-            <Button
-              variant="primary"
-              size="lg"
-              surface="paper"
-              fullWidth
-              className={styles.save}
-              onClick={() => onSave(item)}
-            >
-              <PlusIcon /> Save to my shelf
-            </Button>
-          )}
           <WatchOrder label="Before this" entries={watchOrder.before} onOpen={onOpen} />
           <ErrorBoundary label="Where to watch">
             <WatchBlock
@@ -367,6 +355,18 @@ export function DetailPanel({
                 ) : undefined
               }
             />
+          )}
+          {canSave && entryState.status === "loaded" && !entryState.entry && (
+            <Button
+              variant="primary"
+              size="lg"
+              surface="paper"
+              fullWidth
+              className={styles.save}
+              onClick={() => onSave(item)}
+            >
+              <PlusIcon /> Save to my shelf
+            </Button>
           )}
           {canSave && (
             <ErrorBoundary label="The shelf card">
