@@ -4,9 +4,10 @@ import { clamp } from "../../lib/numbers.ts";
 import { searchCatalogue, type CatalogueSearch } from "../../repositories/catalog-search.ts";
 import type { Bindings } from "../../types.ts";
 import { buzzBoosts } from "../buzz.ts";
-import { embedQuery, nearestTo, neighboursOf } from "../embeddings.ts";
+import { embedQuery, nearestMatches, neighboursOf, type Neighbour } from "../embeddings.ts";
+import { WIDE_TOP_K } from "../vector-index.ts";
 import { fuseTitles, rankCandidates, titlesById } from "./candidates.ts";
-import { rerankTitles } from "./rerank.ts";
+import { rerankTitles, type Ranking } from "./rerank.ts";
 import type { BoostSet, Candidate, RetrievalQuery, ScoredSource } from "./types.ts";
 import { BOOST_WEIGHTS, POOL } from "./weights.ts";
 
@@ -83,12 +84,19 @@ async function lexicalTitles(env: Bindings, query: RetrievalQuery, text: string)
   return titles.length ? titles : searchCatalogue(env.DB, { ...search, matchAny: true });
 }
 
-type SemanticResult = { titles: MediaTitle[]; scores: Map<string, number> };
+type SemanticResult = { titles: MediaTitle[]; scores: Map<string, number>; filtered: boolean };
+
+function mergeNeighbours(primary: Neighbour[], extra: Neighbour[]) {
+  const seen = new Set(primary.map((neighbour) => neighbour.id));
+
+  return [...primary, ...extra.filter((neighbour) => !seen.has(neighbour.id))];
+}
 
 async function semanticTitles(
   env: Bindings,
   query: RetrievalQuery,
   text: string,
+  limit: number,
 ): Promise<SemanticResult | null> {
   const vector = await embedQuery(env, text);
 
@@ -96,21 +104,46 @@ async function semanticTitles(
     return null;
   }
 
-  const matches = await nearestTo(env, vector, eligibilityOf(query));
-  const best = matches.reduce((top, match) => Math.max(top, match.score), 0);
+  const search = eligibilityOf(query);
+  const first = await nearestMatches(env, vector, search);
+  const best = first.neighbours.reduce((top, match) => Math.max(top, match.score), 0);
 
   if (best < POOL.vectorMinScore) {
     return null;
   }
 
-  const titles = await eligibleTitles(
+  const pooled = { ...query, sort: "given" as const };
+  let matches = first.neighbours;
+  let titles = await eligibleTitles(
     env,
     matches.map((match) => match.id),
-    { ...query, sort: "given" },
+    pooled,
     POOL.semantic,
   );
 
-  return { titles, scores: new Map(matches.map((match) => [match.id, match.score])) };
+  if (titles.length < limit) {
+    const wide = await nearestMatches(env, vector, search, {
+      topK: WIDE_TOP_K,
+      skipFilter: true,
+    });
+    const merged = mergeNeighbours(matches, wide.neighbours);
+
+    if (merged.length > matches.length) {
+      matches = merged;
+      titles = await eligibleTitles(
+        env,
+        matches.map((match) => match.id),
+        pooled,
+        POOL.semantic,
+      );
+    }
+  }
+
+  return {
+    titles,
+    scores: new Map(matches.map((match) => [match.id, match.score])),
+    filtered: first.filtered,
+  };
 }
 
 async function browseCandidates(env: Bindings, query: RetrievalQuery, limit: number) {
@@ -141,7 +174,7 @@ export async function retrieveCandidates(
 
   const [lexicalResult, semanticResult] = await Promise.allSettled([
     lexicalTitles(env, query, text),
-    semanticTitles(env, query, text),
+    semanticTitles(env, query, text, limit),
   ]);
 
   if (lexicalResult.status === "rejected") {
@@ -171,25 +204,22 @@ export async function retrieveCandidates(
       : []),
   ];
   const shortlist = fuseTitles(sources, pool).slice(0, POOL.rerank);
-  const reranked =
-    shortlist.length > limit
-      ? await rerankTitles(env, text, shortlist)
-      : { ids: [], scores: new Map<string, number>() };
+  const unranked: Ranking = { ids: [], scores: new Map() };
+  const [reranked, boosts] = await Promise.all([
+    shortlist.length > limit ? rerankTitles(env, text, shortlist) : Promise.resolve(unranked),
+    boostsFor(env, [...pool.keys()], query),
+  ]);
 
   if (reranked.ids.length) {
     sources.push({ source: "rerank", ids: reranked.ids, scores: reranked.scores });
   }
 
-  const ranked = rankCandidates({
-    sources,
-    titles: pool,
-    limit,
-    boosts: await boostsFor(env, [...pool.keys()], query),
-  });
+  const ranked = rankCandidates({ sources, titles: pool, limit, boosts });
 
   logEvent("retrieval_ranked", {
     lexical: lexical.length,
     semantic: semantic?.titles.length ?? 0,
+    filtered: semantic?.filtered ?? false,
     pool: pool.size,
     reranked: reranked.ids.length,
     returned: ranked.length,
@@ -210,18 +240,37 @@ export async function retrieveSimilar(
   query: RetrievalQuery = {},
 ): Promise<Candidate[]> {
   const limit = clamp(query.limit ?? 12, 1, MAX_LIMIT);
-  const neighbours = await neighboursOf(env, titleId, SIMILAR_TOP_K);
+  let neighbours = await neighboursOf(env, titleId, SIMILAR_TOP_K);
 
   if (neighbours.length === 0) {
     return [];
   }
 
-  const titles = await eligibleTitles(
+  const pooled: RetrievalQuery = {
+    ...query,
+    sort: "given",
+    excludeIds: [...(query.excludeIds ?? []), titleId],
+  };
+  let titles = await eligibleTitles(
     env,
     neighbours.map((neighbour) => neighbour.id),
-    { ...query, sort: "given", excludeIds: [...(query.excludeIds ?? []), titleId] },
+    pooled,
     poolFor(limit),
   );
+
+  if (titles.length < limit) {
+    const merged = mergeNeighbours(neighbours, await neighboursOf(env, titleId, WIDE_TOP_K));
+
+    if (merged.length > neighbours.length) {
+      neighbours = merged;
+      titles = await eligibleTitles(
+        env,
+        neighbours.map((neighbour) => neighbour.id),
+        pooled,
+        poolFor(limit),
+      );
+    }
+  }
 
   if (titles.length === 0) {
     return [];

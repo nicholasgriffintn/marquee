@@ -25,6 +25,10 @@ export function excerpt(value: string, maximumLength: number) {
     : collapsed;
 }
 
+export function normaliseQueryText(value: string) {
+  return value.trim().toLowerCase().replaceAll(/\s+/gu, " ");
+}
+
 export function yearFrom(value: string) {
   const match = YEAR_PATTERN.exec(value);
 
