@@ -8,7 +8,7 @@ import { hydrateRails } from "./ai-rails.ts";
 import { getPersonalRails } from "./personal-rails.ts";
 import { readRailRecord } from "./rail-generation.ts";
 import { ensureRailRefreshScheduled } from "./rail-refresh.ts";
-import { readRailRevision } from "./rail-revision.ts";
+import { readCachedRailRevision } from "./rail-revision.ts";
 
 export type DeliveryRequest = {
   viewerId: string | null;
@@ -37,7 +37,7 @@ async function curatedDelivery(
 ): Promise<CuratedDelivery> {
   try {
     const [revision, preferences, providerIds] = await Promise.all([
-      readRailRevision(env.DB, viewerId),
+      readCachedRailRevision(env, viewerId),
       readNotebookPreferences(env.DB, viewerId),
       readProviderPreferences(env.DB, viewerId),
     ]);

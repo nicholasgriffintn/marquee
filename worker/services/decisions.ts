@@ -7,9 +7,11 @@ import {
   type DecisionOutcome,
   type ModelCallSink,
 } from "../lib/decisions.ts";
-import { logEvent } from "../lib/logging.ts";
+import { logEvent, logRejection } from "../lib/logging.ts";
 import { writeDecision } from "../repositories/decisions.ts";
 import type { Bindings } from "../types.ts";
+
+export type DeferTask = (task: Promise<unknown>) => void;
 
 export type Decision = ModelCallSink & {
   id: string;
@@ -64,6 +66,22 @@ export function beginDecision(
       await settleDecision(env, draft, outcome);
     },
   };
+}
+
+export async function settleThrough(
+  decision: Decision,
+  outcome: DecisionOutcome,
+  defer?: DeferTask,
+) {
+  const task = decision.settle(outcome);
+
+  if (defer) {
+    defer(logRejection(task, "decision_settle_failed", { decisionId: decision.id }));
+
+    return;
+  }
+
+  await task;
 }
 
 export async function settleDecision(

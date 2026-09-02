@@ -44,6 +44,19 @@ export async function readNotebookPreferences(
     : EMPTY_PREFERENCES;
 }
 
+export async function readPreferredLanguage(db: Database, viewerId: string) {
+  if (!viewerId) {
+    return DEFAULT_PREFERRED_LANGUAGE;
+  }
+
+  const row = await db.first<{ preferredLanguage: string | null }>(
+    `SELECT preferred_language AS "preferredLanguage" FROM viewer_preferences WHERE viewer_id = $1`,
+    [viewerId],
+  );
+
+  return preferredLanguage(row?.preferredLanguage);
+}
+
 export async function saveNotebookPreferences(
   db: Database,
   viewerId: string,

@@ -3,6 +3,8 @@ import { titleHasPreferredAudioLanguage } from "../../src/domain/languages.ts";
 import type { DeliveredRail } from "../../src/domain/rails.ts";
 import { CURATOR_TOOLS, executeCuratorTool, type CuratorToolCache } from "../ai/curator-tools.ts";
 import { runAiMessage, runAiObject } from "../ai/run.ts";
+import { withKvCache } from "../lib/cache.ts";
+import { parseStoredTitleIds } from "../lib/catalog-payload.ts";
 import type { ChatMessage } from "../lib/curator-payload.ts";
 import {
   candidatesFrom,
@@ -13,7 +15,7 @@ import {
 import { logError, logEvent } from "../lib/logging.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { isRecord, parseJson, parseJsonContent } from "../lib/values.ts";
-import { readItems } from "../repositories/catalog-reader.ts";
+import { readSummaryItems } from "../repositories/catalog-reader.ts";
 import { searchCatalogue, type CatalogueSearch } from "../repositories/catalog-search.ts";
 import { readRailFeedback } from "../repositories/usher.ts";
 import { readShelfDetail, readViewerAffinity } from "../repositories/viewer-context.ts";
@@ -38,8 +40,12 @@ import { eligibilityFor, type ViewerState } from "./viewer/state.ts";
 const RAIL_LIMIT = 3;
 const SHORTLIST = 12;
 const SEED_POOL = 30;
+const SEED_OVER_FETCH = 2;
 const RAIL_MIN = 2;
 const RAIL_MAX = 6;
+const HOMEPAGE_SECTIONS = 18;
+const HOMEPAGE_SECTION_ITEMS = 14;
+const HOMEPAGE_IDS_SECONDS = 3_600;
 
 const SYSTEM_PROMPT = [
   "You are Marquee, building ONE themed shelf of films or television for a single viewer.",
@@ -177,32 +183,48 @@ async function neighbours(
   return slice === "near" ? matches.slice(0, 60) : matches.slice(40);
 }
 
-async function seedCandidates(
-  env: Bindings,
-  eligibility: Eligibility,
-  vector: number[] | null,
-  angle: Angle,
-  affinity: ViewerAffinity,
-  wideGenres: string[],
-  claimed: Set<string>,
-) {
-  const base: CatalogueSearch = {
-    ...eligibility,
-    excludeIds: [...eligibility.excludeIds, ...claimed],
-    limit: SEED_POOL,
-    ...angle.search,
+export type SeedBrief = {
+  id: string;
+  title: string;
+  year: number | null;
+  genres: string[];
+  keywords: string[];
+};
+
+export type AngleSeeds = { seeds: SeedBrief[]; candidates: DecisionCandidate[] };
+
+function briefFor(title: MediaTitle): SeedBrief {
+  return {
+    id: title.id,
+    title: title.title,
+    year: title.year,
+    genres: title.genres.slice(0, 3),
+    keywords: (title.keywords ?? []).slice(0, 6),
   };
+}
+
+export async function seedAngle(
+  env: Bindings,
+  input: {
+    eligibility: Eligibility;
+    vector: number[] | null;
+    angle: Angle;
+    affinity: ViewerAffinity;
+    wideGenres: string[];
+  },
+): Promise<AngleSeeds> {
+  const { eligibility, vector, angle, affinity, wideGenres } = input;
+  const pool = SEED_POOL * SEED_OVER_FETCH;
+  const base: CatalogueSearch = { ...eligibility, limit: pool, ...angle.search };
   const sources: TitleSource[] = [];
   const gathered = new Set<string>();
   const take = (source: RetrievalSource, titles: MediaTitle[]) => {
-    const fresh = titles.filter((title) => !claimed.has(title.id));
-
-    for (const title of fresh) {
+    for (const title of titles) {
       gathered.add(title.id);
     }
 
-    if (fresh.length) {
-      sources.push({ source, titles: fresh });
+    if (titles.length) {
+      sources.push({ source, titles });
     }
   };
 
@@ -217,7 +239,7 @@ async function seedCandidates(
             env,
             matches.map((match) => match.id),
             base,
-            SEED_POOL,
+            pool,
           ),
         );
       }
@@ -264,18 +286,13 @@ async function seedCandidates(
     }
   }
 
-  const ranked = rankTitles(sources, { limit: SEED_POOL });
-  const seeds = ranked.map((candidate) => candidate.title);
-
-  for (const title of seeds) {
-    claimed.add(title.id);
-  }
+  const ranked = rankTitles(sources, { limit: pool });
+  const seeds = ranked.map((candidate) => briefFor(candidate.title));
 
   logEvent("rail_seeds", {
     angle: angle.id,
     seeds: seeds.length,
     sources: sources.length,
-    claimed: claimed.size,
   });
 
   return {
@@ -285,6 +302,27 @@ async function seedCandidates(
       origin: `rail_${angle.id}`,
     }),
   };
+}
+
+export function claimSeeds(seeded: ({ angle: Angle } & AngleSeeds)[]) {
+  const claimed = new Set<string>();
+  const byAngle = new Map<string, AngleSeeds>();
+
+  for (const entry of seeded.toSorted((a, b) => a.angle.claimOrder - b.angle.claimOrder)) {
+    const seeds = entry.seeds.filter((seed) => !claimed.has(seed.id)).slice(0, SEED_POOL);
+    const kept = new Set(seeds.map((seed) => seed.id));
+
+    for (const id of kept) {
+      claimed.add(id);
+    }
+
+    byAngle.set(entry.angle.id, {
+      seeds,
+      candidates: entry.candidates.filter((candidate) => kept.has(candidate.titleId)),
+    });
+  }
+
+  return byAngle;
 }
 
 function angleKeywords(affinity: ViewerAffinity, angle: Angle) {
@@ -375,7 +413,7 @@ function parseRail(parsed: unknown, availableIds: Set<string>): RailDraft | null
 
 export type RailBuild = {
   viewerId?: string;
-  seeds?: MediaTitle[];
+  seeds?: SeedBrief[];
   candidates?: DecisionCandidate[];
   shelf?: ShelfDetail[];
   summary?: string;
@@ -415,12 +453,12 @@ export async function buildOneRail(
     return built(null);
   }
 
-  const availableIds = new Set(seeds.map((title) => title.id));
+  const availableIds = new Set(seeds.map((seed) => seed.id));
   const listing = seeds
     .map(
-      (title) =>
-        `${title.id} · ${title.title}${title.year ? ` (${title.year})` : ""} — ${title.genres.slice(0, 3).join(", ")}${
-          title.keywords?.length ? `; ${title.keywords.slice(0, 6).join(", ")}` : ""
+      (seed) =>
+        `${seed.id} · ${seed.title}${seed.year ? ` (${seed.year})` : ""} — ${seed.genres.join(", ")}${
+          seed.keywords.length ? `; ${seed.keywords.join(", ")}` : ""
         }`,
     )
     .join("\n");
@@ -527,19 +565,25 @@ async function titlesInDislikedRails(env: Bindings, viewerId: string, rails: Sto
 }
 
 async function homepageTitleIds(env: Bindings) {
-  const rows = await env.DB.query<{
-    titleIds: string;
-  }>(`SELECT title_ids AS "titleIds" FROM catalog_sections`);
+  const stamp = await env.DB.first<{ updatedAt: string | null }>(
+    `SELECT max(source_updated_at)::text AS "updatedAt" FROM catalog_sections`,
+  );
 
-  return rows.rows.flatMap((row) => {
-    try {
-      const parsed: unknown = JSON.parse(row.titleIds);
+  return withKvCache(
+    env,
+    `rails:homepage-ids:${stamp?.updatedAt ?? ""}`,
+    HOMEPAGE_IDS_SECONDS,
+    async () => {
+      const rows = await env.DB.query<{ titleIds: string }>(
+        `SELECT title_ids AS "titleIds" FROM catalog_sections ORDER BY position, id LIMIT $1`,
+        [HOMEPAGE_SECTIONS],
+      );
 
-      return Array.isArray(parsed) ? parsed.filter(isKnownTitle) : [];
-    } catch {
-      return [];
-    }
-  });
+      return rows.rows.flatMap((row) =>
+        parseStoredTitleIds(row.titleIds).slice(0, HOMEPAGE_SECTION_ITEMS),
+      );
+    },
+  );
 }
 
 export async function hydrateRails(
@@ -550,7 +594,7 @@ export async function hydrateRails(
   providerIds: string[],
 ): Promise<DeliveredRail[]> {
   const titles = (
-    await readItems(
+    await readSummaryItems(
       env.DB,
       rails.flatMap((rail) => rail.titleIds),
       RAIL_LIMIT * RAIL_MAX,
@@ -606,34 +650,13 @@ export async function prepareRails(env: Bindings, viewer: ViewerState, stored: S
     exclude: [...onHomepage, ...disliked],
   });
   const familiar = new Set(affinity.genres.map((genre) => genre.toLowerCase()));
-  const wideGenres = allGenres.filter((genre) => !familiar.has(genre.toLowerCase()));
-  const claimed = new Set<string>();
-  const seeds: Record<string, MediaTitle[]> = {};
-  const candidates: Record<string, DecisionCandidate[]> = {};
-
-  for (const angle of angles.toSorted((a, b) => a.claimOrder - b.claimOrder)) {
-    // oxlint-disable-next-line no-await-in-loop
-    const seeded = await seedCandidates(
-      env,
-      eligibility,
-      vector,
-      angle,
-      affinity,
-      wideGenres,
-      claimed,
-    );
-
-    seeds[angle.id] = seeded.seeds;
-    candidates[angle.id] = seeded.candidates;
-  }
 
   return {
     vector,
     affinity,
     angles,
     shelf,
-    seeds,
-    candidates,
+    wideGenres: allGenres.filter((genre) => !familiar.has(genre.toLowerCase())),
     eligibility,
     summary: preferenceSummary(preferences),
   };

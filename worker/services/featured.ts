@@ -1,9 +1,11 @@
 import type { CatalogSection, MediaTitle } from "../../src/domain/catalog.ts";
 import type { ViewerOrigin } from "../../src/domain/cinema.ts";
+import { DEFAULT_PREFERRED_LANGUAGE } from "../../src/domain/languages.ts";
 import { rankingHash } from "../../src/lib/string.ts";
 import { readCachedValue, writeCachedValue } from "../lib/cache.ts";
 import { logError, logRejection } from "../lib/logging.ts";
 import { readSectionFronts, readSummaryItems } from "../repositories/catalog-reader.ts";
+import { readPreferredLanguage } from "../repositories/notebook-preferences.ts";
 import type { Bindings } from "../types.ts";
 import { readTrendingBuzz } from "./buzz.ts";
 import { getPersonalRails } from "./personal-rails.ts";
@@ -184,13 +186,12 @@ export async function getFeaturedTitle(
   },
 ) {
   const { viewerId, providerIds, origin, now = new Date(), defer } = options;
-  const viewer = await readViewerState(env, viewerId ?? "", { providerIds });
-  const cacheKey = featuredCacheKey(
-    viewerId,
-    providerIds,
-    viewer.preferences.preferredLanguage,
-    dayKey(now),
-  );
+  const language = await readPreferredLanguage(env.DB, viewerId ?? "").catch((error: unknown) => {
+    logError("featured_language_read_failed", error);
+
+    return DEFAULT_PREFERRED_LANGUAGE;
+  });
+  const cacheKey = featuredCacheKey(viewerId, providerIds, language, dayKey(now));
   const cached = await readCachedValue<FeaturedTitle>(cacheKey).catch((error: unknown) => {
     logError("featured_cache_read_failed", error);
 
@@ -200,6 +201,8 @@ export async function getFeaturedTitle(
   if (cached) {
     return cached;
   }
+
+  const viewer = await readViewerState(env, viewerId ?? "", { providerIds });
 
   const [catalogue, trending, personal] = await Promise.all([
     readSectionFronts(env.DB, viewer.providerIds, ITEMS_PER_SECTION),

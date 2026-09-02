@@ -1,7 +1,10 @@
+import { withKvCache } from "../lib/cache.ts";
 import { sha256Hex } from "../lib/hash.ts";
 import { logError } from "../lib/logging.ts";
+import type { Bindings } from "../types.ts";
 
 const REVISION_SCHEME = "r3";
+const REVISION_CACHE_SECONDS = 60;
 
 type RevisionRow = {
   shelf: string | null;
@@ -24,6 +27,7 @@ export async function readRailRevision(db: Database, viewerId: string) {
            (SELECT count(*) || ':' || coalesce(max(created_at)::text, '')
               FROM viewer_signals
              WHERE viewer_id = $1
+               AND type IN ('rejection', 'never')
                AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)) AS signals,
            (SELECT count(*) || ':' || coalesce(max(answered_at)::text, '')
               FROM viewer_answers WHERE viewer_id = $1) AS answers,
@@ -53,4 +57,19 @@ export async function readRailRevision(db: Database, viewerId: string) {
 
     return "";
   }
+}
+
+export async function readCachedRailRevision(env: Bindings, viewerId: string) {
+  const cached = await withKvCache(
+    env,
+    `rail-revision:${viewerId}`,
+    REVISION_CACHE_SECONDS,
+    async () => {
+      const revision = await readRailRevision(env.DB, viewerId);
+
+      return revision ? { revision } : null;
+    },
+  );
+
+  return cached?.revision ?? "";
 }

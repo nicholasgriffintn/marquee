@@ -1,4 +1,5 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
+import type { Belief } from "../../src/domain/notebook.ts";
 import { showingFor, type Showing } from "../../src/domain/usher.ts";
 import { runAiObject } from "../ai/run.ts";
 import { USHER_VOICE } from "../ai/usher-voice.ts";
@@ -11,8 +12,8 @@ import { readBeliefs } from "../repositories/beliefs.ts";
 import { searchCatalogue, type CatalogueSearch } from "../repositories/catalog-search.ts";
 import { readShelfDetail } from "../repositories/viewer-context.ts";
 import type { Bindings } from "../types.ts";
-import { viewerSummary } from "./beliefs.ts";
-import { beginDecision } from "./decisions.ts";
+import { beliefSummary } from "./beliefs.ts";
+import { beginDecision, settleThrough, type DeferTask } from "./decisions.ts";
 import { nearestTo } from "./embeddings.ts";
 import {
   eligibleTitles,
@@ -70,12 +71,14 @@ export async function shortlistFor(
     providerIds?: string[];
     rejected?: string[];
     constraints?: ShortlistConstraints;
+    beliefs?: Promise<Belief[]>;
   } = {},
 ) {
   const constraints = options.constraints ?? {};
-  const viewer = await readViewerState(env, viewerId, {
-    providerIds: options.providerIds,
-  });
+  const [viewer, beliefs] = await Promise.all([
+    readViewerState(env, viewerId, { providerIds: options.providerIds }),
+    options.beliefs ?? readBeliefs(env.DB, viewerId),
+  ]);
   const preferences = viewer.preferences;
   const eligibility = eligibilityFor(viewer, {
     exclude: options.rejected ?? [],
@@ -97,7 +100,7 @@ export async function shortlistFor(
   const pool = poolFor(limit);
   const vector = await tasteVector(env, viewer.entries, preferences, {
     never: viewer.never,
-    summary: await viewerSummary(env, viewerId, preferences),
+    summary: beliefSummary(beliefs) || preferenceSummary(preferences),
   });
   const sources: TitleSource[] = [];
 
@@ -168,14 +171,18 @@ export async function pickOne(
     rejected?: string[];
     hour?: number;
     isWeekend?: boolean;
+    defer?: DeferTask;
   } = {},
 ) {
   const rejected = (options.rejected ?? []).filter(isKnownTitle).slice(0, 40);
   const showing = showingFor(options.hour ?? 20, options.isWeekend ?? false);
+  const beliefs = readBeliefs(env.DB, viewerId);
+  const shelfDetail = readShelfDetail(env.DB, viewerId, 20).catch((): never[] => []);
   const { titles, viewer, candidates } = await shortlistFor(env, viewerId, {
     ...(options.providerIds ? { providerIds: options.providerIds } : {}),
     rejected,
     constraints: { maxRuntime: showing.maxRuntime },
+    beliefs,
   });
   const decision = beginDecision(env, {
     feature: "usher_pick",
@@ -187,7 +194,7 @@ export async function pickOne(
   decision.candidates(candidates);
 
   if (titles.length === 0) {
-    await decision.settle("empty");
+    await settleThrough(decision, "empty", options.defer);
 
     return null;
   }
@@ -203,17 +210,14 @@ export async function pickOne(
     )
     .join("\n");
   const summary = preferenceSummary(viewer.preferences);
-  const [shelf, beliefs] = await Promise.all([
-    readShelfDetail(env.DB, viewerId, 20).catch((): never[] => []),
-    readBeliefs(env.DB, viewerId),
-  ]);
+  const [shelf, viewerBeliefs] = await Promise.all([shelfDetail, beliefs]);
   const factsById = new Map(
     titles.map((title) => [
       title.id,
       factsFor(title, {
         service: serviceFor(title, viewer.providerIds),
         shelf,
-        beliefs,
+        beliefs: viewerBeliefs,
       }),
     ]),
   );
@@ -251,7 +255,7 @@ export async function pickOne(
         const line = typeof parsed.line === "string" ? parsed.line.trim().slice(0, 160) : "";
 
         decision.select([chosen.id]);
-        await decision.settle("served");
+        await settleThrough(decision, "served", options.defer);
 
         return {
           item: chosen,
@@ -268,7 +272,7 @@ export async function pickOne(
   const [chosen] = titles;
 
   decision.select([chosen.id]);
-  await decision.settle("served");
+  await settleThrough(decision, "served", options.defer);
 
   return {
     item: chosen,

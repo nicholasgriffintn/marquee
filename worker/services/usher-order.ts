@@ -12,7 +12,7 @@ import { readBeliefs } from "../repositories/beliefs.ts";
 import { readGuests, type Guest } from "../repositories/guests.ts";
 import { readShelfDetail } from "../repositories/viewer-context.ts";
 import type { Bindings } from "../types.ts";
-import { beginDecision } from "./decisions.ts";
+import { beginDecision, settleThrough, type DeferTask } from "./decisions.ts";
 import { shortlistFor, type ShortlistConstraints } from "./usher-pick.ts";
 import { preferenceSummary } from "./usher.ts";
 import { factBrief, factsFor, serviceFor } from "./why.ts";
@@ -184,10 +184,13 @@ export async function pickToOrder(
     hour?: number;
     isWeekend?: boolean;
     guestIds?: string[];
+    defer?: DeferTask;
   } = {},
 ) {
   const rejected = (options.rejected ?? []).filter(isKnownTitle).slice(0, 40);
   const showing = showingFor(options.hour ?? 20, options.isWeekend ?? false);
+  const beliefs = readBeliefs(env.DB, viewerId);
+  const shelfDetail = readShelfDetail(env.DB, viewerId, 20).catch((): never[] => []);
   const everyone = await readGuests(env.DB, viewerId);
   const guests = options.guestIds?.length
     ? everyone.filter((guest) => options.guestIds?.includes(guest.id))
@@ -196,6 +199,7 @@ export async function pickToOrder(
     ...(options.providerIds ? { providerIds: options.providerIds } : {}),
     rejected,
     constraints: constraintsFor(order, guests),
+    beliefs,
   });
   const decision = beginDecision(env, {
     feature: "usher_order",
@@ -207,23 +211,30 @@ export async function pickToOrder(
   decision.candidates(candidates);
 
   if (titles.length === 0) {
-    await decision.settle("empty");
+    await settleThrough(decision, "empty", options.defer);
 
     return null;
   }
 
-  const [shelf, beliefs] = await Promise.all([
-    readShelfDetail(env.DB, viewerId, 20).catch((): never[] => []),
-    readBeliefs(env.DB, viewerId),
-  ]);
+  const [shelf, viewerBeliefs] = await Promise.all([shelfDetail, beliefs]);
+  const briefed = new Map(
+    titles.map((title) => {
+      const service = serviceFor(title, viewer.providerIds);
+
+      return [
+        title.id,
+        { service, facts: factsFor(title, { service, shelf, beliefs: viewerBeliefs }) },
+      ];
+    }),
+  );
   const dress = (item: MediaTitle, line: string) => {
-    const service = serviceFor(item, viewer.providerIds);
+    const brief = briefed.get(item.id);
 
     return {
       item,
       line,
-      service,
-      facts: factsFor(item, { service, shelf, beliefs }),
+      service: brief?.service ?? serviceFor(item, viewer.providerIds),
+      facts: brief?.facts ?? [],
     };
   };
 
@@ -265,11 +276,7 @@ export async function pickToOrder(
         `Tonight's options:\n${listing}`,
         "",
         titles
-          .map((title) => {
-            const service = serviceFor(title, viewer.providerIds);
-
-            return `${title.id} — ${factBrief(factsFor(title, { service, shelf, beliefs }))}`;
-          })
+          .map((title) => `${title.id} — ${factBrief(briefed.get(title.id)?.facts ?? [])}`)
           .join("\n"),
       ].join("\n"),
     },
@@ -277,7 +284,7 @@ export async function pickToOrder(
   const settle = async (pick: string, backups: { item: MediaTitle }[]) => {
     decision.select([pick, ...backups.map((backup) => backup.item.id)]);
 
-    await decision.settle("served");
+    await settleThrough(decision, "served", options.defer);
   };
 
   const fallback = async () => {
