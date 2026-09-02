@@ -52,7 +52,7 @@ export const POLICIES = {
   },
   insight: {
     anonymous: { limiter: "INSIGHT_RATE_LIMITER", message: "Steady on. I am still reading." },
-    member: { limiter: "CURATOR_RATE_LIMITER", message: "Steady on. I am still reading." },
+    member: { limiter: "INSIGHT_RATE_LIMITER", message: "Steady on. I am still reading." },
     bots: "strict",
   },
   usher: {

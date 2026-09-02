@@ -9,7 +9,7 @@ import {
 } from "../domain/rails";
 import { queryJson } from "../lib/query-client";
 
-const RETRY_DELAYS = [10_000, 30_000];
+const RETRY_DELAYS = [5_000, 10_000, 20_000, 30_000, 30_000, 30_000];
 const SHELF_CHANGE_DEBOUNCE_MS = 4_000;
 
 type Settled = { viewerId: string; done: boolean; curated: DeliveredRail[] };

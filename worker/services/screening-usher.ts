@@ -23,21 +23,44 @@ const INFRASTRUCTURE = [
   "Sign-in is GitHub OAuth or a magic link; API tokens are scoped bearer tokens; an MCP server sits at /mcp for agents. Telemetry goes to Analytics Engine.",
 ].join(" ");
 
-function houseNotes() {
-  return TOUR_STOPS.map((stop) => {
+const STOP_NOTES = new Map<string, string>(
+  TOUR_STOPS.map((stop) => {
     const note = TOUR_NOTES[stop.id];
     const code = note.code.map((link) => `${link.path} (${link.what})`).join("; ");
 
     return [
-      `## ${stop.name}: ${note.heading}`,
-      note.standfirst,
-      stop.receipt,
-      ...note.body,
-      code ? `Code: ${code}` : "",
-    ]
-      .filter(Boolean)
-      .join("\n");
-  }).join("\n\n");
+      stop.id,
+      [
+        `## ${stop.name}: ${note.heading}`,
+        note.standfirst,
+        stop.receipt,
+        ...note.body,
+        code ? `Code: ${code}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    ];
+  }),
+);
+
+const STOP_INDEX = new Map<string, string>(
+  TOUR_STOPS.map((stop) => [stop.id, `- ${stop.name}: ${TOUR_NOTES[stop.id].heading}`]),
+);
+
+function houseNotes(stageId: string | null) {
+  const here = stageId ? STOP_NOTES.get(stageId) : undefined;
+  const elsewhere = [...STOP_INDEX]
+    .filter(([id]) => id !== stageId)
+    .map(([, line]) => line)
+    .join("\n");
+
+  return [
+    INFRASTRUCTURE,
+    here ?? "",
+    `## The other stops on the tour\nAsk the booth for detail on any of these.\n${elsewhere}`,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 export type UsherQuestion = {
@@ -59,7 +82,10 @@ export async function answerAsUsher(env: WorkerBindings, input: UsherQuestion) {
       messages: [
         { role: "system", content: USHER_VOICE },
         { role: "system", content: BRIEF },
-        { role: "system", content: `# House notes\n\n${INFRASTRUCTURE}\n\n${houseNotes()}` },
+        {
+          role: "system",
+          content: `# House notes\n\n${houseNotes(input.stage?.id ?? null)}`,
+        },
         {
           role: "system",
           content: `The party is currently at ${input.stage ? `${input.stage.name} ("${input.stage.prompt}")` : "the step outside"}.\n${input.house}\nRecent chatter:\n${input.recent.join("\n") || "(quiet)"}`,

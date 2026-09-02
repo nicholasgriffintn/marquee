@@ -4,7 +4,7 @@ import {
   type PolicyResult,
   type RelevanceResult,
 } from "../../src/domain/evaluation.ts";
-import { logEvent } from "../lib/logging.ts";
+import { errorMessage, logEvent } from "../lib/logging.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
 import { matchPolicy } from "../security/policies.ts";
 import { searchCatalogue, searchCatalogueHybrid } from "../services/catalog.ts";
@@ -13,6 +13,20 @@ import { GOLDEN_QUERIES, type GoldenQuery } from "./golden-queries.ts";
 import { POLICY_FIXTURES } from "./policy-fixtures.ts";
 
 const RESULT_LIMIT = 40;
+const WAVE_SIZE = 3;
+
+function failedFixture(fixture: GoldenQuery, error: unknown): RelevanceResult {
+  return {
+    id: fixture.id,
+    query: fixture.query,
+    mode: fixture.mode,
+    within: fixture.within,
+    verdict: "fail",
+    ranks: fixture.expect.map((titleId) => ({ titleId, rank: null })),
+    intruders: [],
+    note: `The fixture threw: ${errorMessage(error)}`,
+  };
+}
 
 function rankOf(items: { id: string }[], titleId: string) {
   const index = items.findIndex((item) => item.id === titleId);
@@ -96,9 +110,20 @@ export async function runEvaluation(env: Bindings): Promise<EvaluationReport> {
   );
   const relevance: RelevanceResult[] = [];
 
-  for (const fixture of GOLDEN_QUERIES) {
-    // oxlint-disable-next-line no-await-in-loop -- serial by design, see above
-    relevance.push(await runGoldenQuery(env, fixture, known));
+  for (let index = 0; index < GOLDEN_QUERIES.length; index += WAVE_SIZE) {
+    const wave = GOLDEN_QUERIES.slice(index, index + WAVE_SIZE);
+    // oxlint-disable-next-line no-await-in-loop -- waves run in parallel, one wave at a time
+    const settled = await Promise.allSettled(
+      wave.map((fixture) => runGoldenQuery(env, fixture, known)),
+    );
+
+    relevance.push(
+      ...settled.map((outcome, position) =>
+        outcome.status === "fulfilled"
+          ? outcome.value
+          : failedFixture(wave[position], outcome.reason),
+      ),
+    );
   }
 
   const policy = runPolicyFixtures();
