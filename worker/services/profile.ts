@@ -18,6 +18,7 @@ import {
   insertManualRemovalEvent,
   insertManualTitleEvents,
 } from "../repositories/viewing-events.ts";
+import { syncSeriesEntry } from "./seasons.ts";
 
 const MAX_THOUGHTS_LENGTH = 2_000;
 
@@ -87,7 +88,7 @@ export async function updateProfile(
 
   const thoughts =
     typeof input.thoughts === "string" ? input.thoughts.trim().slice(0, MAX_THOUGHTS_LENGTH) : "";
-  const entry = await db.transaction(async (transaction) => {
+  let entry = await db.transaction(async (transaction) => {
     await insertManualTitleEvents(transaction, viewerId, {
       titleId,
       status,
@@ -101,6 +102,11 @@ export async function updateProfile(
       thoughts,
     });
   });
+
+  if (titleId.startsWith("tv:")) {
+    await syncSeriesEntry(db, viewerId, titleId);
+    entry = await readViewingEntry(db, viewerId, titleId);
+  }
 
   return { ok: true, payload: { entry } };
 }

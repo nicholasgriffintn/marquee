@@ -397,6 +397,7 @@ export function DetailPanel({
                   entry={entryState.entry}
                   title={item.title}
                   isSeries={isSeries}
+                  seriesProgress={progress}
                   confirmRemove={() => window.confirm(removalDisclosure(isSeries))}
                   onRemove={onRemove}
                   onSave={onSaveEntry}
@@ -488,7 +489,7 @@ export function DetailPanel({
                 tracker={tracker}
                 seasons={seasons}
                 jumpTo={jump}
-                onTracked={entry ? undefined : onTracked}
+                onTracked={onTracked}
               />
             </ErrorBoundary>
           </TabPanel>

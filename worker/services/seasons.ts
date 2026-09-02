@@ -15,7 +15,6 @@ import { claimBudget } from "../repositories/budgets.ts";
 import { storeCredits } from "../repositories/catalog-writer.ts";
 import {
   readEpisodeEntries,
-  readWatchedEpisodes,
   saveEpisodeEntry,
   setEpisodesWatched,
   type EpisodeEntryInput,
@@ -232,6 +231,14 @@ function slotKey(slot: { season: number; episode: number }) {
   return `${slot.season}:${slot.episode}`;
 }
 
+function meanRating(entries: EpisodeEntry[]) {
+  const ratings = entries.flatMap((entry) => (entry.rating === null ? [] : [entry.rating]));
+
+  return ratings.length
+    ? Math.round((ratings.reduce((total, rating) => total + rating, 0) / ratings.length) * 10) / 10
+    : null;
+}
+
 export async function getShowProgress(
   db: Database,
   viewerId: string,
@@ -241,30 +248,23 @@ export async function getShowProgress(
     readStoredSeasons(db, titleId),
     readEpisodeEntries(db, viewerId, titleId),
   ]);
-  const watched = entries.filter((entry) => entry.scope === "episode" && entry.watched);
+  const episodes = entries.filter((entry) => entry.scope === "episode" && entry.season > 0);
+  const watched = episodes.filter((entry) => entry.watched);
   const byKey = new Set(watched.map(slotKey));
   const counted = stored.filter((season) => season.seasonNumber > 0);
   const seasons = counted.map((season) => {
-    const inSeason = watched.filter((entry) => entry.season === season.seasonNumber);
-    const ratings = entries.flatMap((entry) =>
-      entry.season === season.seasonNumber && entry.scope === "episode" && entry.rating
-        ? [entry.rating]
-        : [],
-    );
+    const inSeason = episodes.filter((entry) => entry.season === season.seasonNumber);
+    const watchedInSeason = inSeason.filter((entry) => entry.watched);
+    const rated = inSeason.filter((entry) => entry.rating !== null);
 
     return {
       season: season.seasonNumber,
       episodes: season.episodes.length || season.episodeCount,
       aired: airedCount(season),
-      watched: inSeason.length,
-      rated: ratings.length,
-      noted: entries.filter(
-        (entry) => entry.season === season.seasonNumber && entry.notes.trim().length > 0,
-      ).length,
-      averageRating: ratings.length
-        ? Math.round((ratings.reduce((total, score) => total + score, 0) / ratings.length) * 10) /
-          10
-        : null,
+      watched: watchedInSeason.length,
+      rated: rated.length,
+      noted: inSeason.filter((entry) => entry.notes.trim().length > 0).length,
+      averageRating: meanRating(inSeason),
     };
   });
   const ordered = watched.toSorted(
@@ -277,47 +277,58 @@ export async function getShowProgress(
 
   return {
     titleId,
-    watched: watched.filter((entry) => entry.season > 0).length,
+    watched: watched.length,
     aired: seasons.reduce((total, season) => total + season.aired, 0),
+    rated: episodes.filter((entry) => entry.rating !== null).length,
+    noted: episodes.filter((entry) => entry.notes.trim().length > 0).length,
+    averageRating: meanRating(episodes),
     seasons,
     furthest,
     upNext,
   };
 }
 
-async function syncShelfProgress(db: Database, viewerId: string, titleId: string) {
-  const [watched, stored] = await Promise.all([
-    readWatchedEpisodes(db, viewerId, titleId),
-    readStoredSeasons(db, titleId),
-  ]);
-  const counted = watched.filter((entry) => entry.season > 0);
-  const aired = stored
-    .filter((season) => season.seasonNumber > 0)
-    .reduce((total, season) => total + airedCount(season), 0);
-  const isComplete = aired > 0 && counted.length >= aired;
-  const status = counted.length === 0 ? "watchlist" : isComplete ? "watched" : "watching";
+export async function syncSeriesEntry(db: Database, viewerId: string, titleId: string) {
+  const progress = await getShowProgress(db, viewerId, titleId);
+  const isComplete = progress.aired > 0 && progress.watched >= progress.aired;
+  const status = progress.watched === 0 ? "watchlist" : isComplete ? "watched" : "watching";
+  const rating = progress.averageRating === null ? null : Math.round(progress.averageRating);
 
   await db.execute(
-    `INSERT INTO viewing_entries (id, viewer_id, title_id, status)
-       VALUES ($1, $2, $3, $4)
+    `INSERT INTO viewing_entries
+         (id, viewer_id, title_id, status, rating, status_source, rating_source, projected_at)
+       VALUES ($1, $2, $3, $4, $5, 'episodes', $6, CURRENT_TIMESTAMP)
        ON CONFLICT(viewer_id, title_id) DO UPDATE SET
          status = CASE
-           WHEN viewing_entries.status IN ('watchlist', 'watching') THEN excluded.status
-           ELSE viewing_entries.status
+           WHEN viewing_entries.status = 'dropped' THEN viewing_entries.status
+           ELSE excluded.status
          END,
+         rating = excluded.rating,
+         status_source = CASE
+           WHEN viewing_entries.status = 'dropped' THEN viewing_entries.status_source
+           ELSE 'episodes'
+         END,
+         rating_source = excluded.rating_source,
+         projected_at = CURRENT_TIMESTAMP,
          updated_at = CURRENT_TIMESTAMP`,
-    [crypto.randomUUID(), viewerId, titleId, status],
+    [crypto.randomUUID(), viewerId, titleId, status, rating, rating === null ? null : "episodes"],
   );
+
+  return progress;
 }
 
 export async function recordEpisodeEntry(db: Database, viewerId: string, input: EpisodeEntryInput) {
+  const entryInput =
+    input.scope === "episode" && (input.rating !== null || input.notes.trim().length > 0)
+      ? { ...input, watched: true }
+      : input;
   const entry = await db.transaction(async (transaction) => {
-    await insertManualEpisodeEvents(transaction, viewerId, input);
+    await insertManualEpisodeEvents(transaction, viewerId, entryInput);
 
-    return saveEpisodeEntry(transaction, viewerId, input);
+    return saveEpisodeEntry(transaction, viewerId, entryInput);
   });
 
-  await syncShelfProgress(db, viewerId, input.titleId);
+  await syncSeriesEntry(db, viewerId, entryInput.titleId);
 
   return entry;
 }
@@ -355,7 +366,7 @@ export async function markEpisodes(
       });
     }
   });
-  await syncShelfProgress(env.DB, viewerId, titleId);
+  await syncSeriesEntry(env.DB, viewerId, titleId);
 
   return numbers.length;
 }

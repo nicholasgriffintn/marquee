@@ -57,6 +57,9 @@ export type ShowProgress = {
   titleId: string;
   watched: number;
   aired: number;
+  rated: number;
+  noted: number;
+  averageRating: number | null;
   seasons: SeasonProgress[];
   furthest: { season: number; episode: number } | null;
   upNext: { season: number; episode: number } | null;
@@ -116,10 +119,6 @@ export function episodeEntryFor(
   return entries.get(entryKey("episode", season, episode)) ?? null;
 }
 
-export function seasonEntryFor(entries: Map<string, EpisodeEntry>, season: number) {
-  return entries.get(entryKey("season", season, SEASON_ENTRY_EPISODE)) ?? null;
-}
-
 export function seasonProgress(
   season: SeasonSummary,
   episodes: Episode[],
@@ -131,7 +130,7 @@ export function seasonProgress(
 
     return entry ? [entry] : [];
   });
-  const ratings = marked.flatMap((entry) => (entry.rating ? [entry.rating] : []));
+  const ratings = marked.flatMap((entry) => (entry.rating === null ? [] : [entry.rating]));
 
   return {
     season: season.seasonNumber,

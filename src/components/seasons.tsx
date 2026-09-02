@@ -6,11 +6,12 @@ import {
   episodeLabel,
   hasAired,
   runtimeLabel,
-  seasonEntryFor,
+  seasonProgress,
   seasonLabel,
   type Episode,
   type EpisodeEntry,
   type SeasonDetail,
+  type SeasonProgress,
   type SeasonSummary,
 } from "../domain/seasons";
 import type { EpisodePatch, EpisodeTracker, SeasonsState } from "../hooks/useSeasons";
@@ -222,7 +223,7 @@ function EpisodeRow({
                 label={`Notes on ${episode.name}`}
                 notes={entry?.notes ?? ""}
                 placeholder="What did you make of it?"
-                onSave={(notes) => onSave({ ...patch, notes })}
+                onSave={(notes) => onSave({ ...patch, notes, watched: notes ? true : watched })}
               />
             )}
           </div>
@@ -235,23 +236,19 @@ function EpisodeRow({
 function SeasonHeader({
   summary,
   detail,
-  watched,
-  aired,
-  entry,
+  progress,
   canTrack,
-  onSave,
   onMarkSeason,
 }: {
   summary: SeasonSummary;
   detail: SeasonDetail | null;
-  watched: number;
-  aired: number;
-  entry: EpisodeEntry | null;
+  progress: SeasonProgress | null;
   canTrack: boolean;
-  onSave: (patch: EpisodePatch) => void;
   onMarkSeason: (watched: boolean) => void;
 }) {
   const total = detail?.episodes.length || summary.episodeCount;
+  const watched = progress?.watched ?? 0;
+  const aired = progress?.aired ?? 0;
   const percent = aired > 0 ? Math.round((Math.min(watched, aired) / aired) * 100) : 0;
   const overview = detail?.overview || summary.overview;
 
@@ -287,17 +284,16 @@ function SeasonHeader({
               {watched < aired ? "Mark the series watched" : "Clear the series"}
             </Button>
           </div>
-          <StarRow
-            label={`Rate ${seasonLabel(summary.seasonNumber, summary.name)}`}
-            rating={entry?.rating ?? null}
-            onRate={(rating) => onSave({ scope: "season", season: summary.seasonNumber, rating })}
-          />
-          <NoteEditor
-            label={`Notes on ${seasonLabel(summary.seasonNumber, summary.name)}`}
-            notes={entry?.notes ?? ""}
-            placeholder="How did the run hold up?"
-            onSave={(notes) => onSave({ scope: "season", season: summary.seasonNumber, notes })}
-          />
+          {progress && Boolean(progress.rated || progress.noted) && (
+            <Text size="xs" tone="inkMuted" className={styles.rollup}>
+              {progress.averageRating === null
+                ? "No episode ratings yet"
+                : `${progress.averageRating.toFixed(1)}/5 from ${progress.rated} rated episode${progress.rated === 1 ? "" : "s"}`}
+              {progress.noted
+                ? ` · ${progress.noted} episode note${progress.noted === 1 ? "" : "s"}`
+                : ""}
+            </Text>
+          )}
         </div>
       )}
     </div>
@@ -365,12 +361,9 @@ export function SeasonsBlock({
   }
 
   const progress = tracker.progress;
-  const seasonStats = progress?.seasons.find((row) => row.season === selected) ?? null;
-  const aired =
-    seasonStats?.aired ??
-    season?.episodes.filter((episode) => hasAired(episode.airDate)).length ??
-    0;
-  const watchedHere = seasonStats?.watched ?? 0;
+  const seasonStats =
+    progress?.seasons.find((row) => row.season === selected) ??
+    (summary ? seasonProgress(summary, season?.episodes ?? [], tracker.entries) : null);
 
   const seasonOptions: DropdownOption[] = seasons.map((tab) => {
     const stats = progress?.seasons.find((row) => row.season === tab.seasonNumber) ?? null;
@@ -425,11 +418,8 @@ export function SeasonsBlock({
         <SeasonHeader
           summary={summary}
           detail={season}
-          watched={watchedHere}
-          aired={aired}
-          entry={seasonEntryFor(tracker.entries, summary.seasonNumber)}
+          progress={seasonStats}
           canTrack={canTrack}
-          onSave={save}
           onMarkSeason={(watched) => mark(summary.seasonNumber, watched)}
         />
       )}

@@ -15,7 +15,7 @@ export type WithDatabase<Environment extends DatabaseBinding> = Environment & {
   defer: (task: Promise<unknown>) => void;
 };
 
-export const REQUEST_STATEMENT_TIMEOUT_MS = 8_000;
+export const REQUEST_STATEMENT_TIMEOUT_MS = 15_000;
 export const BACKGROUND_STATEMENT_TIMEOUT_MS = 120_000;
 
 export function openDatabase<Environment extends DatabaseBinding>(

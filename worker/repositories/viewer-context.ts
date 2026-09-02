@@ -66,17 +66,22 @@ export async function readViewerAffinity(db: Database, viewerId: string) {
 
 export async function readShelfDetail(db: Database, viewerId: string, limit = 20) {
   const rows = await db.query<{
+    titleId: string;
     title: string;
     year: number | null;
     status: string;
     rating: number | null;
     thoughts: string;
     genres: string | null;
+    keywords: string | null;
   }>(
-    `SELECT t.title, t.year, v.status, v.rating, v.thoughts,
+    `SELECT t.id AS "titleId", t.title, t.year, v.status, v.rating, v.thoughts,
               (SELECT json_agg(genre)::text FROM
                 (SELECT genre FROM catalog_title_genres
-                  WHERE title_id = t.id ORDER BY position)) AS genres
+                  WHERE title_id = t.id ORDER BY position)) AS genres,
+              (SELECT json_agg(keyword)::text FROM
+                (SELECT keyword FROM catalog_title_keywords
+                  WHERE title_id = t.id ORDER BY position)) AS keywords
        FROM viewing_entries AS v
        JOIN catalog_titles AS t ON t.id = v.title_id
        WHERE v.viewer_id = $1

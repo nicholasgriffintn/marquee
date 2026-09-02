@@ -64,18 +64,6 @@ export async function readEpisodeEntries(db: Database, viewerId: string, titleId
   return rows.rows.map(toEntry);
 }
 
-export async function readWatchedEpisodes(db: Database, viewerId: string, titleId: string) {
-  const rows = await db.query<{ season: number; episode: number }>(
-    `SELECT season_number AS season, episode_number AS episode
-       FROM viewing_episode_entries
-       WHERE viewer_id = $1 AND title_id = $2 AND scope = 'episode' AND watched = 1
-       ORDER BY season_number DESC, episode_number DESC`,
-    [viewerId, titleId],
-  );
-
-  return rows.rows;
-}
-
 function upsertEntry(transaction: DatabaseTransaction, viewerId: string, entry: EpisodeEntryInput) {
   const episode = entry.scope === "season" ? SEASON_ENTRY_EPISODE : entry.episode;
 

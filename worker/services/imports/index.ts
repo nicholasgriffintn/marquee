@@ -21,6 +21,7 @@ import {
 import { projectViewingTitle } from "../../repositories/viewing-events.ts";
 import type { Bindings } from "../../types.ts";
 import { getCatalogueItems } from "../catalog.ts";
+import { syncSeriesEntry } from "../seasons.ts";
 import { reprojectRemovedImport } from "./commit.ts";
 import { parseImportedActivity, parseImportRunInput } from "./validation.ts";
 
@@ -256,6 +257,11 @@ export async function removeViewerImport(env: Bindings, viewerId: string, runId:
   for (const titleId of titleIds) {
     // oxlint-disable-next-line no-await-in-loop -- removal must rebuild each affected projection
     await projectViewingTitle(env.DB, viewerId, titleId);
+
+    if (titleId.startsWith("tv:")) {
+      // oxlint-disable-next-line no-await-in-loop -- each series roll-up follows its projection
+      await syncSeriesEntry(env.DB, viewerId, titleId);
+    }
   }
 
   logEvent("viewer_import_removed", { runId, source: run.source, titles: titleIds.length });

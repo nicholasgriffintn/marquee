@@ -10,6 +10,7 @@ export const sitemapRoutes = new Hono<{ Bindings: Bindings }>();
 const PAGE_SIZE = 10_000;
 const CACHE = "public, max-age=3600";
 const SITEMAP_CACHE_SECONDS = 86_400;
+const sitemapCache = edgeCache(SITEMAP_CACHE_SECONDS);
 
 const STATIC_PATHS = [
   { path: "/", priority: "1.0", changefreq: "hourly" },
@@ -73,9 +74,7 @@ function countTitles(env: Bindings) {
   });
 }
 
-sitemapRoutes.use("*", edgeCache(SITEMAP_CACHE_SECONDS));
-
-sitemapRoutes.get("/robots.txt", (context) => {
+sitemapRoutes.get("/robots.txt", sitemapCache, (context) => {
   const origin = canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN);
   const body = [
     "User-agent: *",
@@ -95,7 +94,7 @@ sitemapRoutes.get("/robots.txt", (context) => {
   return served(body, "text/plain; charset=UTF-8");
 });
 
-sitemapRoutes.get("/sitemap.xml", async (context) => {
+sitemapRoutes.get("/sitemap.xml", sitemapCache, async (context) => {
   const origin = canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN);
   const total = await countTitles(context.env);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -114,7 +113,7 @@ sitemapRoutes.get("/sitemap.xml", async (context) => {
   );
 });
 
-sitemapRoutes.get("/sitemap/pages.xml", (context) => {
+sitemapRoutes.get("/sitemap/pages.xml", sitemapCache, (context) => {
   const origin = canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN);
 
   return served(
@@ -143,7 +142,7 @@ function urlset(entries: string[]) {
   );
 }
 
-sitemapRoutes.get("/sitemap/people.xml", async (context) => {
+sitemapRoutes.get("/sitemap/people.xml", sitemapCache, async (context) => {
   const origin = canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN);
   const { rows: results } = await context.env.DB.query<{ personId: number }>(
     `SELECT person_id AS "personId" FROM catalog_people WHERE titles > 0 ORDER BY titles DESC LIMIT $1`,
@@ -159,7 +158,7 @@ sitemapRoutes.get("/sitemap/people.xml", async (context) => {
   );
 });
 
-sitemapRoutes.get("/sitemap/collections.xml", async (context) => {
+sitemapRoutes.get("/sitemap/collections.xml", sitemapCache, async (context) => {
   const origin = canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN);
   const { rows: results } = await context.env.DB.query<{ id: number }>(
     `SELECT DISTINCT collection_id AS id
@@ -178,7 +177,7 @@ sitemapRoutes.get("/sitemap/collections.xml", async (context) => {
   );
 });
 
-sitemapRoutes.get("/sitemap/revival.xml", async (context) => {
+sitemapRoutes.get("/sitemap/revival.xml", sitemapCache, async (context) => {
   const origin = canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN);
   const { rows: results } = await context.env.DB.query<{
     id: string;
@@ -224,7 +223,7 @@ async function renderTitlesPage(env: Bindings, origin: string, page: number) {
   ].join("");
 }
 
-sitemapRoutes.get("/sitemap/titles/:file", async (context) => {
+sitemapRoutes.get("/sitemap/titles/:file", sitemapCache, async (context) => {
   const matched = /^([1-9][0-9]*)\.xml$/u.exec(context.req.param("file"));
   const page = matched ? Number(matched[1]) : 0;
 

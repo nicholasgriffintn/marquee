@@ -285,9 +285,11 @@ export type CatalogResponse = {
   fetchedAt: string;
 };
 
+export type FeaturedSource = "personal" | "trending" | "catalogue";
+
 export type FeaturedTitleResponse = {
   item: MediaTitle | null;
-  source: "personal" | "trending" | "catalogue" | null;
+  source: FeaturedSource | null;
   fetchedAt: string;
 };
 

@@ -11,6 +11,31 @@
   margin-top: -6px;
 }
 
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.summary div {
+  align-items: baseline;
+  display: flex;
+  gap: var(--space-3);
+}
+
+.summary dt {
+  color: var(--muted-on-paper);
+  flex: 0 0 92px;
+  font-size: var(--type-sm);
+}
+
+.summary dd {
+  color: var(--ink);
+  font: var(--weight-heavy) var(--type-label-sm) var(--mono);
+  margin: 0;
+}
+
 .status {
   align-items: center;
   color: var(--ink);

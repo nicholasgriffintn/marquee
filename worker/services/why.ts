@@ -1,24 +1,35 @@
 import type { MediaTitle, ProviderAvailability } from "../../src/domain/catalog.ts";
 import { beliefSteersPicks, type Belief } from "../../src/domain/notebook.ts";
 import { isStreamingOffer } from "../../src/domain/providers.ts";
+import { jsonStringList } from "../lib/values.ts";
 import type { readShelfDetail } from "../repositories/viewer-context.ts";
 
 export type ShelfEntry = Awaited<ReturnType<typeof readShelfDetail>>[number];
 
-function parseGenres(value: string | null) {
-  if (!value) {
-    return [];
-  }
+const POSITIVE_RATING = 4;
 
-  try {
-    const parsed: unknown = JSON.parse(value);
+const GENRE_EXPANSIONS: Record<string, string[]> = {
+  "action & adventure": ["action", "adventure"],
+  "sci-fi & fantasy": ["science fiction", "fantasy"],
+  "war & politics": ["war", "politics"],
+};
 
-    return Array.isArray(parsed)
-      ? parsed.filter((entry): entry is string => typeof entry === "string")
-      : [];
-  } catch {
-    return [];
-  }
+function genreTraits(genres: string[]) {
+  return new Set(
+    genres.flatMap((genre) => {
+      const normalised = genre.trim().toLowerCase();
+
+      return normalised ? (GENRE_EXPANSIONS[normalised] ?? [normalised]) : [];
+    }),
+  );
+}
+
+function keywordTraits(keywords: string[]) {
+  return new Set(keywords.map((keyword) => keyword.trim().toLowerCase()).filter(Boolean));
+}
+
+function sharedValues(left: Set<string>, right: Set<string>) {
+  return [...left].filter((value) => right.has(value));
 }
 
 function runtimeFact(title: MediaTitle) {
@@ -32,22 +43,50 @@ function runtimeFact(title: MediaTitle) {
 }
 
 function shelfAnchor(title: MediaTitle, shelf: ShelfEntry[]) {
-  const genres = new Set(title.genres.map((genre) => genre.toLowerCase()));
-  const match = shelf.find((entry) => {
-    if (entry.title === title.title || entry.status === "dropped") {
-      return false;
-    }
+  const genres = genreTraits(title.genres);
+  const keywords = keywordTraits(title.keywords ?? []);
+  const [match] = shelf
+    .flatMap((entry) => {
+      if (
+        entry.titleId === title.id ||
+        entry.title === title.title ||
+        entry.status === "dropped" ||
+        entry.rating === null ||
+        entry.rating < POSITIVE_RATING
+      ) {
+        return [];
+      }
 
-    return parseGenres(entry.genres).some((genre) => genres.has(genre.toLowerCase()));
-  });
+      const sharedGenres = sharedValues(genres, genreTraits(jsonStringList(entry.genres)));
+      const sharedKeywords = sharedValues(keywords, keywordTraits(jsonStringList(entry.keywords)));
+      const traits = [...new Set([...sharedKeywords, ...sharedGenres])];
+
+      if (traits.length < 2) {
+        return [];
+      }
+
+      return [
+        {
+          entry,
+          traits,
+          score: sharedKeywords.length * 3 + sharedGenres.length * 2,
+        },
+      ];
+    })
+    .toSorted(
+      (left, right) =>
+        right.score - left.score ||
+        (right.entry.rating ?? 0) - (left.entry.rating ?? 0) ||
+        left.entry.title.localeCompare(right.entry.title),
+    );
 
   if (!match) {
     return "";
   }
 
-  return match.rating
-    ? `like ${match.title}, which you gave ${match.rating} out of 5`
-    : `same corner as ${match.title} on your shelf`;
+  const shared = match.traits.slice(0, 2).join(" and ");
+
+  return `shares ${shared} with ${match.entry.title}, which you gave ${match.entry.rating} out of 5`;
 }
 
 function beliefFact(title: MediaTitle, beliefs: Belief[]) {

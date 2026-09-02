@@ -120,6 +120,7 @@ const ORDER_PROMPT = [
   "A viewer has told you who is in the room, how long they have, and what they are in the mood for.",
   "Pick one title you would stake your name on, then two backups in case they turn the first one down.",
   "Each gets one sentence on why, in your own voice. Use only the facts you are given about a title; never invent a comparison, a runtime or a service.",
+  "Treat a comparison as supporting evidence, not as sufficient reason on its own.",
   "Never repeat a title across the three.",
   'Reply with JSON only: {"pick":{"titleId":"","line":""},"backups":[{"titleId":"","line":""},{"titleId":"","line":""}]}.',
 ].join(" ");

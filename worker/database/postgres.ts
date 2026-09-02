@@ -8,6 +8,7 @@ const POSTGRES_TIMESTAMP = 1114;
 const POSTGRES_TIMESTAMPTZ = 1184;
 const POOL_SIZE = 16;
 const CONNECTION_TIMEOUT_MS = 2_000;
+const QUERY_TIMEOUT_HEADROOM_MS = 5_000;
 
 types.setTypeParser(POSTGRES_BIGINT, (value) => Number(value));
 types.setTypeParser(POSTGRES_DATE, (value) => value);
@@ -65,7 +66,7 @@ export class PostgresDatabase extends PostgresQueries implements Database {
       max: POOL_SIZE,
       connectionTimeoutMillis: CONNECTION_TIMEOUT_MS,
       statement_timeout: statementTimeoutMs,
-      query_timeout: statementTimeoutMs,
+      query_timeout: statementTimeoutMs + QUERY_TIMEOUT_HEADROOM_MS,
     });
 
     pool.on("error", (error) => {

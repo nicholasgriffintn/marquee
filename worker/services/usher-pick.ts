@@ -33,6 +33,7 @@ const PICK_PROMPT = [
   USHER_VOICE,
   "You are picking exactly one thing for this viewer to watch tonight. Commit to it.",
   "Give one sentence on why, in your own voice. Use only the facts you are given; never invent a comparison, a runtime or a service.",
+  "Treat a comparison as supporting evidence, not as sufficient reason on its own.",
   'Reply with JSON only: {"titleId":"","line":""}.',
 ].join(" ");
 

@@ -171,7 +171,7 @@ function episodeRow(events: ViewingEvent[], viewerId: string, titleId: string, k
     latest(scoped.filter((event) => isManual(event.source) === manual && event.eventType === type));
   const watch = pick(true, "episode_watch") ?? pick(false, "episode_watch");
   const rating = pick(true, "episode_rating") ?? pick(false, "episode_rating");
-  const watched = watch?.watched === 1;
+  const watched = watch?.watched === 1 || (rating !== null && rating.rating !== null);
 
   return [
     crypto.randomUUID(),
@@ -180,7 +180,9 @@ function episodeRow(events: ViewingEvent[], viewerId: string, titleId: string, k
     season,
     episode,
     watched ? 1 : 0,
-    watched ? (watch?.watchedAt ?? watch?.occurredAt ?? null) : null,
+    watched
+      ? (watch?.watchedAt ?? watch?.occurredAt ?? rating?.occurredAt ?? rating?.recordedAt ?? null)
+      : null,
     rating?.rating ?? null,
   ] satisfies DatabaseValue[];
 }

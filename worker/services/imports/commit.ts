@@ -14,6 +14,7 @@ import {
   projectViewingTitle,
 } from "../../repositories/viewing-events.ts";
 import type { Bindings } from "../../types.ts";
+import { syncSeriesEntry } from "../seasons.ts";
 
 const COMMIT_CHUNK = 50;
 const CLAIMABLE = ["ready", "needs_review"] as const;
@@ -70,6 +71,11 @@ export async function commitViewerImport(env: Bindings, viewerId: string, runId:
   for (const titleId of titleIds) {
     // oxlint-disable-next-line no-await-in-loop -- projections use isolated title transactions
     await projectViewingTitle(env.DB, viewerId, titleId);
+
+    if (titleId.startsWith("tv:")) {
+      // oxlint-disable-next-line no-await-in-loop -- each series roll-up follows its projection
+      await syncSeriesEntry(env.DB, viewerId, titleId);
+    }
   }
 
   await recordImportCommit(env.DB, viewerId, runId, committed);

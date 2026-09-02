@@ -3,7 +3,7 @@ import { sha256Hex } from "../lib/hash.ts";
 import { logError } from "../lib/logging.ts";
 import type { Bindings } from "../types.ts";
 
-const REVISION_SCHEME = "r3";
+const REVISION_SCHEME = "r4";
 const REVISION_CACHE_SECONDS = 60;
 
 type RevisionRow = {

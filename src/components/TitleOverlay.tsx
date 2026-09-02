@@ -172,7 +172,7 @@ export function TitleOverlay({
   onStatus: (titleId: string, status: EntryStatus) => void;
   onUpdateDraft: (titleId: string, patch: Partial<ViewingEntry>) => void;
   onTracked: () => void;
-  onLoadEntry: (titleId: string, signal: AbortSignal) => Promise<void>;
+  onLoadEntry: (titleId: string, signal?: AbortSignal) => Promise<void>;
   onRetryTitle: () => void;
   selectedProviderIds: string[];
   layout?: "overlay" | "page";
@@ -285,7 +285,10 @@ export function TitleOverlay({
       onRemove={onRemove}
       onStatus={onStatus}
       onUpdateDraft={onUpdateDraft}
-      onTracked={onTracked}
+      onTracked={() => {
+        onTracked();
+        void onLoadEntry(titleId);
+      }}
       onRetryEntry={() => void retryEntry()}
       selectedProviderIds={selectedProviderIds}
     />

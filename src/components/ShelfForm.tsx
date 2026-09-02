@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { runConfirmedRemoval } from "../domain/profile-entry";
+import type { ShowProgress } from "../domain/seasons";
 import { classNames } from "../lib/class-names";
 import { isEntryStatus, type EntryStatus, type ViewingEntry } from "../types";
 import { Button, Eyebrow, StarIcon, Text, TextArea } from "../ui";
@@ -14,12 +15,20 @@ const STATUSES: { value: EntryStatus; label: string }[] = [
   { value: "dropped", label: "Dropped" },
 ];
 
+const STATUS_LABELS: Record<EntryStatus, string> = {
+  watchlist: "On my watchlist",
+  watching: "Watching",
+  watched: "Watched",
+  dropped: "Dropped",
+};
+
 const PENDING_MS = 2_500;
 
 export function ShelfForm({
   entry,
   title,
   isSeries = false,
+  seriesProgress = null,
   confirmRemove,
   onRemove,
   onSave,
@@ -29,6 +38,7 @@ export function ShelfForm({
   entry: ViewingEntry;
   title: string;
   isSeries?: boolean;
+  seriesProgress?: ShowProgress | null;
   confirmRemove: () => boolean;
   onRemove: (titleId: string) => void;
   onSave: (entry: ViewingEntry) => void;
@@ -55,17 +65,88 @@ export function ShelfForm({
     }, PENDING_MS);
   }
 
+  if (isSeries) {
+    const status: EntryStatus =
+      entry.status === "dropped"
+        ? "dropped"
+        : seriesProgress?.watched === 0
+          ? "watchlist"
+          : seriesProgress &&
+              seriesProgress.aired > 0 &&
+              seriesProgress.watched >= seriesProgress.aired
+            ? "watched"
+            : seriesProgress
+              ? "watching"
+              : entry.status;
+    const rating = seriesProgress?.averageRating ?? entry.rating;
+    const rated = seriesProgress?.rated ?? 0;
+    const noted = seriesProgress?.noted ?? 0;
+
+    return (
+      <div className={styles.form}>
+        <Eyebrow size="sm" weight="heavy" tracking="wide" tone="inkMuted">
+          On your shelf
+        </Eyebrow>
+        <Text size="xs" tone="inkMuted" italic className={styles.scope}>
+          The whole show follows the episodes you mark, rate and make notes on.
+        </Text>
+        <dl className={styles.summary}>
+          <div>
+            <dt>Watch status</dt>
+            <dd>{STATUS_LABELS[status]}</dd>
+          </div>
+          <div>
+            <dt>Your rating</dt>
+            <dd>
+              {rating === null
+                ? "No episode ratings yet"
+                : `${rating.toFixed(1)}/5${rated ? ` from ${rated} episode${rated === 1 ? "" : "s"}` : ""}`}
+            </dd>
+          </div>
+          <div>
+            <dt>Notes</dt>
+            <dd>
+              {noted ? `${noted} episode note${noted === 1 ? "" : "s"}` : "No episode notes yet"}
+            </dd>
+          </div>
+        </dl>
+        <div className={styles.actions}>
+          <Button
+            variant="secondary"
+            size="lg"
+            surface="paper"
+            disabled={pending !== null}
+            onClick={() =>
+              guard("save", () =>
+                onStatus(entry.titleId, status === "dropped" ? "watchlist" : "dropped"),
+              )
+            }
+          >
+            {status === "dropped" ? "Resume tracking" : "Stop watching"}
+          </Button>
+          <Button
+            variant="danger"
+            size="lg"
+            surface="paper"
+            disabled={pending !== null}
+            onClick={() =>
+              runConfirmedRemoval(confirmRemove, () =>
+                guard("remove", () => onRemove(entry.titleId)),
+              )
+            }
+          >
+            {pending === "remove" ? "Removing…" : "Remove from shelf"}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.form}>
       <Eyebrow size="sm" weight="heavy" tracking="wide" tone="inkMuted">
         On your shelf
       </Eyebrow>
-      {isSeries && (
-        <Text size="xs" tone="inkMuted" italic className={styles.scope}>
-          The whole show. Individual episodes and runs keep their own marks above.
-        </Text>
-      )}
-
       <label className={styles.status}>
         Watch status
         <select

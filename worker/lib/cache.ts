@@ -5,7 +5,7 @@ import { logError, logRejection } from "./logging.ts";
 
 const edgeCaches = caches as unknown as { default: Cache };
 
-const CACHE_VERSION = "2";
+const CACHE_VERSION = "3";
 
 function versionedKey(url: string) {
   const key = new URL(url);
@@ -113,7 +113,18 @@ export function edgeCache(seconds: number): MiddlewareHandler<{ Bindings: Bindin
 
     const response = context.res;
 
-    if (response.status !== 200 || response.headers.get("cache-control")?.includes("no-store")) {
+    const cacheControl = response.headers.get("cache-control") ?? "";
+    const directives = new Set(
+      cacheControl.split(",").map((directive) => directive.trim().toLowerCase()),
+    );
+
+    if (
+      response.status !== 200 ||
+      !directives.has("public") ||
+      directives.has("private") ||
+      directives.has("no-store") ||
+      response.headers.has("set-cookie")
+    ) {
       return response;
     }
 

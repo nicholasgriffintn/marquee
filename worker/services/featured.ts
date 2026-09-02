@@ -1,31 +1,23 @@
-import type { CatalogSection, MediaTitle } from "../../src/domain/catalog.ts";
+import type { CatalogSection, FeaturedSource, MediaTitle } from "../../src/domain/catalog.ts";
 import type { ViewerOrigin } from "../../src/domain/cinema.ts";
 import { DEFAULT_PREFERRED_LANGUAGE } from "../../src/domain/languages.ts";
-import { rankingHash } from "../../src/lib/string.ts";
 import { readCachedValue, writeCachedValue } from "../lib/cache.ts";
 import { logError, logRejection } from "../lib/logging.ts";
 import { readSectionFronts, readSummaryItems } from "../repositories/catalog-reader.ts";
 import { readPreferredLanguage } from "../repositories/notebook-preferences.ts";
 import type { Bindings } from "../types.ts";
 import { readTrendingBuzz } from "./buzz.ts";
+import { chooseFeatured, type FeaturedCandidate } from "./featured-selection.ts";
 import { getPersonalRails } from "./personal-rails.ts";
-import { readRecentRails } from "./rail-generation.ts";
+import { readLatestRails } from "./rail-generation.ts";
 import type { StoredRail } from "./rail-identity.ts";
 import { eligibilityGate, type Eligibility } from "./viewer/eligibility.ts";
 import { eligibilityFor, readViewerState, type ViewerState } from "./viewer/state.ts";
 
 const ITEMS_PER_SOURCE = 8;
 const ITEMS_PER_SECTION = 2;
-const DAY_MS = 86_400_000;
 const FEATURED_CACHE_SECONDS = 300;
-const SOURCE_PRIORITY: Record<FeaturedSource, number> = {
-  personal: 3,
-  trending: 2,
-  catalogue: 1,
-};
 
-type FeaturedSource = "personal" | "trending" | "catalogue";
-type FeaturedCandidate = { item: MediaTitle; source: FeaturedSource };
 type FeaturedTitle = {
   item: MediaTitle | null;
   source: FeaturedSource | null;
@@ -73,7 +65,7 @@ function candidatePool(
       }
 
       seen.add(item.id);
-      candidates.push({ item, source: source.source });
+      candidates.push({ item, source: source.source, position: added });
       added += 1;
     }
   }
@@ -81,59 +73,12 @@ function candidatePool(
   return candidates;
 }
 
-function weightedRank(candidate: FeaturedCandidate, identity: string, day: string) {
-  const hash = rankingHash(`${day}:${identity}:${candidate.item.id}`);
-  const uniform = (hash + 1) / (2 ** 32 + 1);
-
-  return -Math.log(uniform) / SOURCE_PRIORITY[candidate.source];
-}
-
-function bestFor(candidates: FeaturedCandidate[], identity: string, day: string, excludedId = "") {
-  let best: FeaturedCandidate | null = null;
-  let bestRank = Number.POSITIVE_INFINITY;
-
-  for (const candidate of candidates) {
-    if (candidate.item.id === excludedId) {
-      continue;
-    }
-
-    const rank = weightedRank(candidate, identity, day);
-
-    if (
-      rank < bestRank ||
-      (rank === bestRank && candidate.item.id.localeCompare(best?.item.id ?? "") < 0)
-    ) {
-      best = candidate;
-      bestRank = rank;
-    }
-  }
-
-  return best;
-}
-
-function chooseFeatured(candidates: FeaturedCandidate[], identity: string, now: Date) {
-  const today = dayKey(now);
-  const first = bestFor(candidates, identity, today);
-
-  if (!first || candidates.length === 1) {
-    return first;
-  }
-
-  const yesterday = new Date(now.getTime() - DAY_MS);
-  const previous = bestFor(candidates, identity, dayKey(yesterday));
-
-  return previous?.item.id === first.item.id
-    ? (bestFor(candidates, identity, today, first.item.id) ?? first)
-    : first;
-}
-
 function featuredCacheKey(
-  viewerId: string | null,
   providerIds: string[],
   preferredLanguage: string,
   day: string,
 ) {
-  return `featured:${day}:${viewerId ?? "front-of-house"}:${preferredLanguage}:${providerIds.toSorted().join(",")}`;
+  return `featured:${day}:front-of-house:${preferredLanguage}:${providerIds.toSorted().join(",")}`;
 }
 
 function frontIds(rails: StoredRail[]) {
@@ -154,7 +99,7 @@ function frontIds(rails: StoredRail[]) {
 
 async function personalItems(env: Bindings, viewer: ViewerState, origin: ViewerOrigin | null) {
   const [stored, personal] = await Promise.all([
-    readRecentRails(env.DB, viewer.viewerId),
+    readLatestRails(env.DB, viewer.viewerId),
     getPersonalRails(env, viewer.viewerId, origin),
   ]);
   const storedIds = frontIds(stored);
@@ -191,12 +136,14 @@ export async function getFeaturedTitle(
 
     return DEFAULT_PREFERRED_LANGUAGE;
   });
-  const cacheKey = featuredCacheKey(viewerId, providerIds, language, dayKey(now));
-  const cached = await readCachedValue<FeaturedTitle>(cacheKey).catch((error: unknown) => {
-    logError("featured_cache_read_failed", error);
+  const cacheKey = featuredCacheKey(providerIds, language, dayKey(now));
+  const cached = viewerId
+    ? null
+    : await readCachedValue<FeaturedTitle>(cacheKey).catch((error: unknown) => {
+        logError("featured_cache_read_failed", error);
 
-    return null;
-  });
+        return null;
+      });
 
   if (cached) {
     return cached;
@@ -215,7 +162,10 @@ export async function getFeaturedTitle(
       { source: "trending", items: trending },
       { source: "catalogue", items: sectionFronts(catalogue) },
     ],
-    eligibilityFor(viewer, { availability: "confirmed-or-unknown" }),
+    eligibilityFor(viewer, {
+      availability: "confirmed-or-unknown",
+      exclude: viewer.entries.map((entry) => entry.titleId),
+    }),
   );
   const featured = chooseFeatured(candidates, viewerId ?? "front-of-house", now);
   const result: FeaturedTitle = {
@@ -224,7 +174,7 @@ export async function getFeaturedTitle(
     fetchedAt: now.toISOString(),
   };
 
-  if (result.item) {
+  if (result.item && !viewerId) {
     const write = logRejection(
       writeCachedValue(cacheKey, result, FEATURED_CACHE_SECONDS),
       "featured_cache_write_failed",
