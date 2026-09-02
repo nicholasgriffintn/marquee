@@ -150,7 +150,7 @@ catalogRoutes.get("/featured", async (context) => {
         viewerId: principal?.user.id ?? null,
         providerIds,
         origin: edgeOrigin(context.req.raw),
-        defer: (task) => context.executionCtx.waitUntil(task),
+        defer: context.env.defer,
       }),
     );
   } catch (error) {
