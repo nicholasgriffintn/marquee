@@ -43,12 +43,6 @@ import { RailsWorkflow } from "./workflows/rails.ts";
 
 const app = new Hono<{ Bindings: Bindings }>();
 
-app.use("*", async (context, next) => {
-  console.log("Request recieved", context.req.path);
-
-  await next();
-})
-
 app.use("/api/*", async (context, next) => {
   const isNativeExchange = context.req.path === "/api/auth/native/exchange";
 
