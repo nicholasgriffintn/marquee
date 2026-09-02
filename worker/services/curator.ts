@@ -184,6 +184,7 @@ async function runCurator(
       toolChoice: availableIds.size === 0 ? "required" : "auto",
       attributes: { round },
       record: decision,
+      ...(signal ? { signal } : {}),
     });
 
     if (!response.tool_calls?.length) {
@@ -256,6 +257,7 @@ async function runCurator(
       messages: finalMessages,
       attributes: { round: "final" },
       record: decision,
+      ...(signal ? { signal } : {}),
     }),
     availableIds,
   );
@@ -371,6 +373,7 @@ export async function* curateStream(
         { role: "system", content: NARRATION_PROMPT },
         { role: "user", content: `Request: ${prompt}\nSelection: ${selection}` },
       ],
+      ...(options.signal ? { signal: options.signal } : {}),
     })) {
       summary += delta;
       yield { type: "delta", text: delta };
