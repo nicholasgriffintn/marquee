@@ -15,8 +15,14 @@ export type WithDatabase<Environment extends DatabaseBinding> = Environment & {
   defer: (task: Promise<unknown>) => void;
 };
 
-export function openDatabase<Environment extends DatabaseBinding>(env: Environment) {
-  const database = new LazyDatabase(env.HYPERDRIVE.connectionString);
+export const REQUEST_STATEMENT_TIMEOUT_MS = 8_000;
+export const BACKGROUND_STATEMENT_TIMEOUT_MS = 120_000;
+
+export function openDatabase<Environment extends DatabaseBinding>(
+  env: Environment,
+  statementTimeoutMs = REQUEST_STATEMENT_TIMEOUT_MS,
+) {
+  const database = new LazyDatabase(env.HYPERDRIVE.connectionString, statementTimeoutMs);
   const deferred: Promise<unknown>[] = [];
   const runtime: WithDatabase<Environment> = {
     ...env,
@@ -33,7 +39,7 @@ export async function withDatabase<Environment extends DatabaseBinding, Result>(
   env: Environment,
   operation: (runtime: WithDatabase<Environment>) => Promise<Result>,
 ) {
-  const { database, deferred, runtime } = openDatabase(env);
+  const { database, deferred, runtime } = openDatabase(env, BACKGROUND_STATEMENT_TIMEOUT_MS);
 
   try {
     return await operation(runtime);
