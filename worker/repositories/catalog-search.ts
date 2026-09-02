@@ -7,6 +7,7 @@ import {
   type CatalogTitleRow,
   withStoredPoster,
 } from "../lib/catalog-payload.ts";
+import { MAX_QUERY_TOKENS, tsQueryFromTokens } from "../lib/fts.ts";
 import { preferredAudioLanguageCondition } from "../lib/languages.ts";
 import { clamp } from "../lib/numbers.ts";
 import { providerFilterSql } from "../lib/providers.ts";
@@ -19,9 +20,9 @@ export type CatalogueSort = "trending" | "popularity" | "score" | "recent" | "re
 export type SearchScope = "title" | "everything";
 
 const SCORE_SORT_MIN_VOTES = 50;
-const MAX_QUERY_TOKENS = 8;
 const INCLUDE_ID_LIMIT = 500;
 const EXCLUDE_ID_LIMIT = 2_000;
+const RANKED_CANDIDATE_LIMIT = 500;
 
 const WEIGHTED_RATING = "t.weighted_rating";
 const BLENDED_RATING = "t.blended_rating";
@@ -83,14 +84,8 @@ const ORDER_BY: Record<CatalogueSort, string> = {
   given: "t.popularity DESC",
 };
 
-function ftsMatchQuery(raw: string, scope: SearchScope = "everything", matchAny = false) {
-  const tokens = searchTokens(raw).slice(0, MAX_QUERY_TOKENS);
-
-  if (tokens.length === 0) {
-    return null;
-  }
-
-  return tokens.map((token) => `${token}:*`).join(matchAny ? " | " : " & ");
+function ftsMatchQuery(raw: string, matchAny = false) {
+  return tsQueryFromTokens(searchTokens(raw).slice(0, MAX_QUERY_TOKENS), matchAny);
 }
 
 function lowered(values: string[] | undefined, limit: number) {
@@ -176,11 +171,15 @@ function eligibilityClause(search: CatalogueSearch, bindings: DatabaseValue[]): 
   }
 
   if (languages.length) {
+    const languageProviderParameter = providerIds.length
+      ? `$${bindings.push(JSON.stringify(providerIds))}`
+      : undefined;
+
     conditions.push(
       `(${languages
         .map((language) =>
           preferredAudioLanguageCondition("t", `$${bindings.push(language)}`, {
-            providerIdsExpression: providerIdsParameter,
+            providerIdsExpression: languageProviderParameter,
           }),
         )
         .join(" OR ")})`,
@@ -254,19 +253,35 @@ async function hydrate(db: Database, rows: CatalogTitleRow[]): Promise<MediaTitl
   return hydrated.map((title, index) => withStoredPoster(title, rows[index]?.poster_key));
 }
 
-export async function searchCatalogue(db: Database, search: CatalogueSearch) {
-  const match = search.query?.trim()
-    ? ftsMatchQuery(search.query.trim().slice(0, 120), search.scope, search.matchAny)
-    : null;
+function exactTitlesFirst(rows: CatalogTitleRow[], needle: string) {
+  if (!needle) {
+    return rows;
+  }
+
+  const isExact = (row: CatalogTitleRow) =>
+    row.title.toLowerCase() === needle || row.original_title.toLowerCase() === needle;
+
+  return [...rows.filter(isExact), ...rows.filter((row) => !isExact(row))];
+}
+
+export async function searchCatalogueRows(db: Database, search: CatalogueSearch) {
+  const query = (search.query ?? "").trim().slice(0, 120);
+  const match = query ? ftsMatchQuery(query, search.matchAny) : null;
   const limit = clamp(Math.floor(search.limit ?? 12), 1, 60);
   const offset = clamp(Math.floor(search.offset ?? 0), 0, 2_000);
   const sort = search.sort ?? (match ? "relevance" : "popularity");
+  const scope: SearchScope = search.scope === "title" ? "title" : "everything";
+  const document = scope === "title" ? "title_document" : "document";
   const bindings: DatabaseValue[] = [];
-  const conditions = match
-    ? [
-        `catalog_search.${search.scope === "title" ? "title_document" : "document"} @@ to_tsquery('simple', $${bindings.push(match)})`,
-      ]
-    : [];
+  const matchParameter = match ? `$${bindings.push(match)}` : null;
+  const bounded = Boolean(matchParameter) && sort === "relevance";
+  const candidateParameter = bounded
+    ? `$${bindings.push(Math.max(RANKED_CANDIDATE_LIMIT, offset + limit))}`
+    : null;
+  const conditions =
+    matchParameter && !bounded
+      ? [`catalog_search.${document} @@ to_tsquery('simple', ${matchParameter})`]
+      : [];
   const eligibility = eligibilityClause(
     { ...search, minVotes: requiredVotes(search, sort) },
     bindings,
@@ -279,10 +294,9 @@ export async function searchCatalogue(db: Database, search: CatalogueSearch) {
   }
 
   let orderBy = ORDER_BY[match ? sort : sort === "relevance" ? "popularity" : sort];
-  const searchDocument = search.scope === "title" ? "title_document" : "document";
 
-  if (match && sort === "relevance" && search.scope !== "title") {
-    orderBy = `ts_rank_cd(catalog_search.${searchDocument}, to_tsquery('simple', $${bindings.push(match)}), 32) DESC,
+  if (bounded && scope !== "title") {
+    orderBy = `ts_rank_cd(candidates.${document}, to_tsquery('simple', ${matchParameter}), 32) DESC,
       t.popularity DESC`;
   }
 
@@ -293,20 +307,23 @@ export async function searchCatalogue(db: Database, search: CatalogueSearch) {
                  WHERE value = t.id)`;
   }
 
-  if (match && search.scope === "title" && sort === "relevance") {
-    const needle = (search.query ?? "").trim().toLowerCase().slice(0, 120);
-
-    const titleParameter = `$${bindings.push(needle)}`;
-    const originalTitleParameter = `$${bindings.push(needle)}`;
-
-    orderBy = `(CASE WHEN lower(t.title) = ${titleParameter} OR lower(t.original_title) = ${originalTitleParameter} THEN 0 ELSE 1 END), t.popularity DESC`;
-  }
-
-  const from = match
-    ? "catalog_search JOIN catalog_titles AS t ON t.id = catalog_search.title_id"
-    : "catalog_titles AS t";
+  const candidates = bounded
+    ? `WITH candidates AS MATERIALIZED (
+         SELECT s.title_id${scope === "title" ? "" : `, s.${document}`}
+           FROM catalog_search AS s
+           JOIN catalog_titles AS c ON c.id = s.title_id
+          WHERE s.${document} @@ to_tsquery('simple', ${matchParameter})
+          ORDER BY c.popularity DESC
+          LIMIT ${candidateParameter}
+       ) `
+    : "";
+  const from = bounded
+    ? "candidates JOIN catalog_titles AS t ON t.id = candidates.title_id"
+    : match
+      ? "catalog_search JOIN catalog_titles AS t ON t.id = catalog_search.title_id"
+      : "catalog_titles AS t";
   const rows = await db.query<CatalogTitleRow>(
-    `SELECT ${catalogTitleColumns("t")}
+    `${candidates}SELECT ${catalogTitleColumns("t")}
        FROM ${from}
        ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
        ORDER BY ${orderBy}
@@ -314,17 +331,23 @@ export async function searchCatalogue(db: Database, search: CatalogueSearch) {
     bindings,
   );
 
-  return hydrate(db, rows.rows);
+  return bounded && scope === "title"
+    ? exactTitlesFirst(rows.rows, query.toLowerCase())
+    : rows.rows;
 }
 
-export async function searchTitlesFirst(db: Database, search: CatalogueSearch) {
+export async function searchCatalogue(db: Database, search: CatalogueSearch) {
+  return hydrate(db, await searchCatalogueRows(db, search));
+}
+
+export async function searchTitlesFirstRows(db: Database, search: CatalogueSearch) {
   const limit = clamp(Math.floor(search.limit ?? 12), 1, 60);
 
   if (!search.query?.trim()) {
-    return searchCatalogue(db, search);
+    return searchCatalogueRows(db, search);
   }
 
-  const byTitle = await searchCatalogue(db, {
+  const byTitle = await searchCatalogueRows(db, {
     ...search,
     scope: "title",
     limit,
@@ -334,15 +357,19 @@ export async function searchTitlesFirst(db: Database, search: CatalogueSearch) {
     return byTitle;
   }
 
-  const found = new Set(byTitle.map((title) => title.id));
-  const rest = await searchCatalogue(db, {
+  const found = new Set(byTitle.map((row) => row.id));
+  const rest = await searchCatalogueRows(db, {
     ...search,
     scope: "everything",
-    limit,
+    limit: limit - byTitle.length,
     excludeIds: [...(search.excludeIds ?? []), ...found],
   });
 
-  return [...byTitle, ...rest.filter((title) => !found.has(title.id))].slice(0, limit);
+  return [...byTitle, ...rest.filter((row) => !found.has(row.id))].slice(0, limit);
+}
+
+export async function searchTitlesFirst(db: Database, search: CatalogueSearch) {
+  return hydrate(db, await searchTitlesFirstRows(db, search));
 }
 
 export type BrowseTrendingFilter = {
@@ -355,24 +382,50 @@ export type BrowseTrendingFilter = {
   minVotes: number;
 };
 
-async function trendingCandidates(db: Database, filter: BrowseTrendingFilter) {
-  const bindings: DatabaseValue[] = [];
+function trendingConditions(filter: BrowseTrendingFilter, bindings: DatabaseValue[]) {
   const eligibility = eligibilityClause(filter, bindings);
-  const conditions = [
-    `b.article <> ''`,
-    `b.views >= ${MIN_TRENDING_VIEWS}`,
-    ...eligibility.conditions,
-  ];
+
+  return [`b.article <> ''`, `b.views >= ${MIN_TRENDING_VIEWS}`, ...eligibility.conditions].join(
+    " AND ",
+  );
+}
+
+const TRENDING_ORDER = "ORDER BY b.score DESC, t.popularity DESC";
+const TRENDING_FROM = "FROM title_buzz AS b JOIN catalog_titles AS t ON t.id = b.title_id";
+
+async function trendingPage(
+  db: Database,
+  filter: BrowseTrendingFilter,
+  limit: number,
+  offset: number,
+) {
+  const bindings: DatabaseValue[] = [];
+  const where = trendingConditions(filter, bindings);
   const rows = await db.query<CatalogTitleRow>(
     `SELECT ${catalogTitleColumns("t")}
-       FROM title_buzz AS b
-       JOIN catalog_titles AS t ON t.id = b.title_id
-       WHERE ${conditions.join(" AND ")}
-       ORDER BY b.score DESC, t.popularity DESC`,
+       ${TRENDING_FROM}
+       WHERE ${where}
+       ${TRENDING_ORDER}
+       LIMIT $${bindings.push(limit)} OFFSET $${bindings.push(offset)}`,
     bindings,
   );
 
   return rows.rows;
+}
+
+async function trendingIds(db: Database, filter: BrowseTrendingFilter) {
+  const bindings: DatabaseValue[] = [];
+  const where = trendingConditions(filter, bindings);
+  const rows = await db.query<{ id: string }>(
+    `SELECT t.id
+       ${TRENDING_FROM}
+       WHERE ${where}
+       ${TRENDING_ORDER}
+       LIMIT $${bindings.push(EXCLUDE_ID_LIMIT)}`,
+    bindings,
+  );
+
+  return rows.rows.map((row) => row.id);
 }
 
 export async function browseTrending(
@@ -381,13 +434,13 @@ export async function browseTrending(
   limit: number,
   offset: number,
 ) {
-  const candidates = await trendingCandidates(db, filter);
-  const page = candidates.slice(offset, offset + limit);
+  const page = await trendingPage(db, filter, limit, offset);
 
-  if (page.length >= limit || offset + limit <= candidates.length) {
+  if (page.length >= limit) {
     return hydrate(db, page);
   }
 
+  const trending = await trendingIds(db, filter);
   const rest = await searchCatalogue(db, {
     mediaType: filter.mediaType,
     genres: filter.genres,
@@ -397,9 +450,9 @@ export async function browseTrending(
     availability: filter.availability,
     minVotes: filter.minVotes,
     sort: "popularity",
-    excludeIds: candidates.map((row) => row.id),
+    excludeIds: trending,
     limit: limit - page.length,
-    offset: Math.max(0, offset - candidates.length),
+    offset: Math.max(0, offset - trending.length),
   });
 
   return [...(await hydrate(db, page)), ...rest];

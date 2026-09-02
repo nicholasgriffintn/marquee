@@ -1,6 +1,7 @@
 import type { MediaTitle, ProvidersResponse, TitleBuzz } from "../../src/domain/catalog.ts";
 import { getProviderLedger } from "../jobs/provider-ledger.ts";
 import { withKvCache, writeKvValue } from "../lib/cache.ts";
+import { sha256Hex } from "../lib/hash.ts";
 import { logError, logEvent } from "../lib/logging.ts";
 import {
   readAvailability,
@@ -29,6 +30,8 @@ import { readNextEpisode, readTonight } from "./schedule.ts";
 import { traktUpcoming } from "./trakt.ts";
 
 const HYBRID_SEARCH_LIMIT = 24;
+const SEARCH_CACHE_SECONDS = 90;
+const TONIGHT_TRAKT_TIMEOUT_MS = 2_000;
 
 async function readBuzzFor(db: Database, ids: string[]) {
   try {
@@ -72,13 +75,29 @@ export async function getCatalogue(env: Bindings, providerIds: string[]) {
   };
 }
 
-export async function searchCatalogue(env: Bindings, query: string, providerIds: string[]) {
-  const catalogue = await readCatalog(env.DB, query, providerIds);
-  const items = catalogue?.sections[0]?.items ?? [];
+async function searchCacheKey(mode: string, query: string, providerIds: string[]) {
+  const normalised = query.trim().toLowerCase().replaceAll(/\s+/gu, " ");
+  const providers = await sha256Hex(providerIds.toSorted().join(","), 8);
+
+  return `search:${mode}:${providers}:${normalised}`;
+}
+
+export async function searchCatalogue(
+  env: Bindings,
+  query: string,
+  providerIds: string[],
+  defer?: (task: Promise<unknown>) => void,
+) {
+  const items = await withKvCache(
+    env,
+    await searchCacheKey("keyword", query, providerIds),
+    SEARCH_CACHE_SECONDS,
+    async () => (await readCatalog(env.DB, query, providerIds))?.sections[0]?.items ?? [],
+  );
   let pending: MediaTitle[] = [];
 
   try {
-    pending = await findGapTitles(env, query, items);
+    pending = await findGapTitles(env, query, items, defer);
   } catch (error) {
     logError("pending_lookup_failed", error, { area: "search" });
   }
@@ -92,12 +111,18 @@ export async function searchCatalogue(env: Bindings, query: string, providerIds:
 }
 
 export async function searchCatalogueHybrid(env: Bindings, query: string, providerIds: string[]) {
-  const items = await retrieveTitles(env, {
-    text: query,
-    providerIds,
-    availability: "confirmed-or-unknown",
-    limit: HYBRID_SEARCH_LIMIT,
-  });
+  const items = await withKvCache(
+    env,
+    await searchCacheKey("hybrid", query, providerIds),
+    SEARCH_CACHE_SECONDS,
+    () =>
+      retrieveTitles(env, {
+        text: query,
+        providerIds,
+        availability: "confirmed-or-unknown",
+        limit: HYBRID_SEARCH_LIMIT,
+      }),
+  );
 
   return {
     items: await withBuzz(env.DB, items),
@@ -366,7 +391,10 @@ export async function getTonight(
   origin: string,
   limit: number,
 ) {
-  const scheduled = await readTonight(env, viewerId, limit);
+  const [scheduled, calendar] = await Promise.all([
+    readTonight(env, viewerId, limit),
+    viewerId ? traktUpcoming(env, viewerId, origin, TONIGHT_TRAKT_TIMEOUT_MS) : [],
+  ]);
 
   if (!viewerId) {
     return { episodes: scheduled, fetchedAt: new Date().toISOString() };
@@ -375,7 +403,6 @@ export async function getTonight(
   const seen = new Set(
     scheduled.map((episode) => `${episode.showName}|${episode.airsAt.slice(0, 10)}`),
   );
-  const calendar = await traktUpcoming(env, viewerId, origin);
   const extra = calendar
     .filter((episode) => !seen.has(`${episode.showName}|${episode.airsAt.slice(0, 10)}`))
     .map((episode) => ({

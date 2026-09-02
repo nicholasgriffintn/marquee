@@ -1,5 +1,9 @@
 import type { AnimeDetails, MediaTitle } from "../../src/domain/catalog.ts";
-import { buildTitleFromRow, type CatalogTitleRow } from "../lib/catalog-payload.ts";
+import {
+  buildTitleFromRow,
+  type CatalogTitleRow,
+  withStoredPoster,
+} from "../lib/catalog-payload.ts";
 import { readAnimeCoreMap, writeAnimeCoreRows } from "./catalog-anime-core.ts";
 import {
   readAnimeCompanyMap,
@@ -186,6 +190,35 @@ export function hydrateTitleRows(db: Database, rows: CatalogTitleRow[]) {
     db,
     rows.map((row) => buildTitleFromRow(row)),
   );
+}
+
+export async function summariseTitleRows(
+  db: Database,
+  rows: CatalogTitleRow[],
+): Promise<MediaTitle[]> {
+  if (rows.length === 0) {
+    return [];
+  }
+
+  const ids = [...new Set(rows.map((row) => row.id))];
+  const [genres, providers, details] = await Promise.all([
+    readGenreMap(db, ids),
+    readProviderMap(db, ids),
+    readDetailsMap(db, ids),
+  ]);
+
+  return rows.map((row) => {
+    const title = withStoredPoster(buildTitleFromRow(row), row.poster_key);
+    const detail = details.get(title.id);
+
+    title.genres = genres.get(title.id) ?? [];
+    title.providers = providers.get(title.id) ?? [];
+    title.pending = detail?.pending;
+    title.trailerKey = detail?.trailerKey;
+    title.tagline = detail?.tagline;
+
+    return title;
+  });
 }
 
 export async function persistTitleExtensions(db: Database, titles: MediaTitle[]) {

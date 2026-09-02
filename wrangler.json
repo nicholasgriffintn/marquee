@@ -61,7 +61,7 @@
       "name": "SEARCH_RATE_LIMITER",
       "namespace_id": "764217",
       "simple": {
-        "limit": 30,
+        "limit": 90,
         "period": 60
       }
     },
@@ -261,7 +261,7 @@
         "max_batch_timeout": 10,
         "max_retries": 3,
         "dead_letter_queue": "marquee-ingestion-dead-letter",
-        "max_concurrency": 1,
+        "max_concurrency": 3,
         "retry_delay": 30
       },
       {

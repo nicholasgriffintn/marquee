@@ -1,6 +1,5 @@
 import type { CatalogResponse, CatalogSection, MediaTitle } from "../../src/domain/catalog.ts";
 import {
-  buildTitleFromRow,
   CATALOG_TITLE_COLUMNS,
   type CatalogTitleRow,
   parseSectionAudience,
@@ -11,10 +10,8 @@ import { logError } from "../lib/logging.ts";
 import { clamp } from "../lib/numbers.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { READ_CHUNK } from "./catalog-array-utils.ts";
-import { hydrateTitleRows } from "./catalog-arrays.ts";
-import { readGenreMap } from "./catalog-genres.ts";
-import { readProviderMap } from "./catalog-providers.ts";
-import { availabilityCondition, searchTitlesFirst } from "./catalog-search.ts";
+import { hydrateTitleRows, summariseTitleRows } from "./catalog-arrays.ts";
+import { availabilityCondition, searchTitlesFirstRows } from "./catalog-search.ts";
 
 type SectionRow = {
   id: string;
@@ -124,19 +121,8 @@ export async function readSummaryItems(db: Database, ids: string[], limit = 30) 
        FROM catalog_titles WHERE id IN (${uniqueIds.map((_, position) => `$${position + 1}`).join(",")})`,
     [...uniqueIds],
   );
-  const [genres, providers] = await Promise.all([
-    readGenreMap(db, uniqueIds),
-    readProviderMap(db, uniqueIds),
-  ]);
   const byId = new Map(
-    result.rows.map((row) => {
-      const title = withStoredPoster(buildTitleFromRow(row), row.poster_key);
-
-      title.genres = genres.get(title.id) ?? [];
-      title.providers = providers.get(title.id) ?? [];
-
-      return [title.id, title] as const;
-    }),
+    (await summariseTitleRows(db, result.rows)).map((title) => [title.id, title] as const),
   );
 
   return uniqueIds.flatMap((id) => byId.get(id) ?? []);
@@ -321,12 +307,13 @@ export async function readAvailability(db: Database, titleId: string) {
 }
 
 async function readSearchResults(db: Database, query: string, providerIds: string[]) {
-  const items = await searchTitlesFirst(db, {
+  const rows = await searchTitlesFirstRows(db, {
     query,
     providerIds,
     availability: "confirmed-or-unknown",
     limit: 30,
   });
+  const items = await summariseTitleRows(db, rows);
 
   return {
     sections: [
