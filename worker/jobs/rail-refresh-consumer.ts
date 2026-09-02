@@ -3,14 +3,28 @@ import { isRailRefreshJob } from "../lib/validation.ts";
 import { runScheduledRailRefresh } from "../services/rail-refresh.ts";
 import type { Bindings, RailRefreshJob } from "../types.ts";
 
+const MAX_DEFERRALS = 30;
+
 async function defer(
   message: Message<unknown>,
   env: Bindings,
   job: RailRefreshJob,
   delaySeconds: number,
 ) {
+  const deferrals = (job.deferrals ?? 0) + 1;
+
+  if (deferrals > MAX_DEFERRALS) {
+    logError("rail_refresh_deferrals_exhausted", new Error("Rail refresh never claimed"), {
+      messageId: message.id,
+      deferrals,
+    });
+    message.ack();
+
+    return;
+  }
+
   try {
-    await env.RAIL_REFRESH_QUEUE.send(job, { delaySeconds });
+    await env.RAIL_REFRESH_QUEUE.send({ ...job, deferrals }, { delaySeconds });
     message.ack();
   } catch (error) {
     logError("rail_refresh_defer_failed", error, { attempt: message.attempts });

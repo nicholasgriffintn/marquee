@@ -128,7 +128,7 @@ profileRoutes.post("/", async (context) => {
       });
 
       if (body.status === "watched" && isKnownTitle(body.titleId)) {
-        context.executionCtx.waitUntil(
+        context.env.defer(
           logRejection(creditJourney(context.env, user.id, body.titleId), "journey_credit_failed", {
             titleId: body.titleId,
           }),

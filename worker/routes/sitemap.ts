@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 
 import { titleSlug } from "../../src/domain/catalog.ts";
+import { edgeCache, withKvCache } from "../lib/cache.ts";
 import { canonicalOrigin } from "../lib/security.ts";
 import type { Bindings } from "../types.ts";
 
@@ -8,6 +9,7 @@ export const sitemapRoutes = new Hono<{ Bindings: Bindings }>();
 
 const PAGE_SIZE = 10_000;
 const CACHE = "public, max-age=3600";
+const SITEMAP_CACHE_SECONDS = 86_400;
 
 const STATIC_PATHS = [
   { path: "/", priority: "1.0", changefreq: "hourly" },
@@ -61,11 +63,17 @@ function served(body: string, contentType = "application/xml; charset=UTF-8") {
   });
 }
 
-async function countTitles(db: Database) {
-  const row = await db.first<{ total: number }>("SELECT COUNT(*) AS total FROM catalog_titles");
+function countTitles(env: Bindings) {
+  return withKvCache(env, "sitemap:title-count", SITEMAP_CACHE_SECONDS, async () => {
+    const row = await env.DB.first<{ total: number }>(
+      "SELECT COUNT(*) AS total FROM catalog_titles",
+    );
 
-  return row?.total ?? 0;
+    return row?.total ?? 0;
+  });
 }
+
+sitemapRoutes.use("*", edgeCache(SITEMAP_CACHE_SECONDS));
 
 sitemapRoutes.get("/robots.txt", (context) => {
   const origin = canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN);
@@ -89,7 +97,7 @@ sitemapRoutes.get("/robots.txt", (context) => {
 
 sitemapRoutes.get("/sitemap.xml", async (context) => {
   const origin = canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN);
-  const total = await countTitles(context.env.DB);
+  const total = await countTitles(context.env);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const entries = [
     `${origin}/sitemap/pages.xml`,
@@ -186,6 +194,36 @@ sitemapRoutes.get("/sitemap/revival.xml", async (context) => {
   );
 });
 
+async function renderTitlesPage(env: Bindings, origin: string, page: number) {
+  const { rows: results } = await env.DB.query<TitleRow>(
+    `SELECT media_type, tmdb_id, title, updated_at
+       FROM catalog_titles
+      ORDER BY popularity DESC, id
+      LIMIT $1 OFFSET $2`,
+    [PAGE_SIZE, (page - 1) * PAGE_SIZE],
+  );
+
+  if (results.length === 0) {
+    return "";
+  }
+
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ...results.map((row) => {
+      const location = `${origin}/${row.media_type}/${row.tmdb_id}/${titleSlug(row.title)}`;
+      const changed = lastModified(row.updated_at);
+
+      return (
+        `<url><loc>${escapeXml(location)}</loc>` +
+        (changed ? `<lastmod>${changed}</lastmod>` : "") +
+        "<changefreq>weekly</changefreq></url>"
+      );
+    }),
+    "</urlset>",
+  ].join("");
+}
+
 sitemapRoutes.get("/sitemap/titles/:file", async (context) => {
   const matched = /^([1-9][0-9]*)\.xml$/u.exec(context.req.param("file"));
   const page = matched ? Number(matched[1]) : 0;
@@ -195,33 +233,12 @@ sitemapRoutes.get("/sitemap/titles/:file", async (context) => {
   }
 
   const origin = canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN);
-  const { rows: results } = await context.env.DB.query<TitleRow>(
-    `SELECT media_type, tmdb_id, title, updated_at
-       FROM catalog_titles
-      ORDER BY popularity DESC, id
-      LIMIT $1 OFFSET $2`,
-    [PAGE_SIZE, (page - 1) * PAGE_SIZE],
+  const body = await withKvCache(
+    context.env,
+    `sitemap:titles:${origin}:${page}`,
+    SITEMAP_CACHE_SECONDS,
+    () => renderTitlesPage(context.env, origin, page),
   );
 
-  if (results.length === 0) {
-    return missing();
-  }
-
-  return served(
-    [
-      '<?xml version="1.0" encoding="UTF-8"?>',
-      '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-      ...results.map((row) => {
-        const location = `${origin}/${row.media_type}/${row.tmdb_id}/${titleSlug(row.title)}`;
-        const changed = lastModified(row.updated_at);
-
-        return (
-          `<url><loc>${escapeXml(location)}</loc>` +
-          (changed ? `<lastmod>${changed}</lastmod>` : "") +
-          "<changefreq>weekly</changefreq></url>"
-        );
-      }),
-      "</urlset>",
-    ].join(""),
-  );
+  return body ? served(body) : missing();
 });

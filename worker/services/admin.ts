@@ -8,6 +8,7 @@ import {
   queueStaleAvailability,
   queueVectorReindex,
 } from "../jobs/ingestion.ts";
+import { estimatedRows } from "../lib/sql.ts";
 import { resumeSource } from "../repositories/budgets.ts";
 import { readCinemaCoverage } from "../repositories/cinemas.ts";
 import { readBackfillProgress } from "../repositories/discover.ts";
@@ -59,17 +60,17 @@ async function catalogueStats(env: Bindings) {
          (SELECT count(*) FROM title_schedule WHERE airs_at >= CURRENT_TIMESTAMP) AS upcoming,
          (SELECT count(*) FROM catalog_sections) AS sections,
          cc.cinemas, cc."cinemasPlaced",
-         (SELECT count(*) FROM cinema_films) AS "cinemaFilms",
+         ${estimatedRows("cinema_films")} AS "cinemaFilms",
          (SELECT count(*) FROM cinema_screenings WHERE business_day >= CURRENT_DATE) AS screenings,
          (SELECT count(*) FROM cinema_interest WHERE last_seen_at > (CURRENT_TIMESTAMP - INTERVAL '30 day')) AS "interestCells",
-         (SELECT count(*) FROM viewing_entries) AS "shelfEntries",
+         ${estimatedRows("viewing_entries")} AS "shelfEntries",
          uu.users, uu."alertReady",
          va."alertsSent", va."alertsWeek",
-         (SELECT count(*) FROM viewer_signals) AS signals,
+         ${estimatedRows("viewer_signals")} AS signals,
          (SELECT count(*) FROM viewer_beliefs WHERE revoked_at IS NULL) AS beliefs,
-         (SELECT count(*) FROM catalog_people) AS people,
-         (SELECT count(*) FROM catalog_seasons) AS seasons,
-         (SELECT count(*) FROM title_insights) AS insights,
+         ${estimatedRows("catalog_people")} AS people,
+         ${estimatedRows("catalog_seasons")} AS seasons,
+         ${estimatedRows("title_insights")} AS insights,
          (SELECT count(DISTINCT title_id) FROM title_awards) AS "titleAwards",
          (SELECT count(DISTINCT person_id) FROM person_awards) AS "personAwards",
          (SELECT count(DISTINCT title_id) FROM title_visual_format) AS "visualFormat",
@@ -88,7 +89,7 @@ async function catalogueStats(env: Bindings) {
             sum(CASE WHEN media_type = 'tv' THEN 1 ELSE 0 END) AS shows,
             sum(CASE WHEN poster_key IS NOT NULL THEN 1 ELSE 0 END) AS posters,
             sum(CASE WHEN mal_id IS NOT NULL THEN 1 ELSE 0 END) AS "animeIds",
-            (SELECT count(*) FROM catalog_title_anime) AS "animeDetails"
+            ${estimatedRows("catalog_title_anime")} AS "animeDetails"
           FROM catalog_titles) AS tt,
          (SELECT
             count(*) AS cinemas,
