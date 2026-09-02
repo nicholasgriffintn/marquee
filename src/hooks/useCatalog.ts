@@ -4,6 +4,8 @@ import type { CatalogResponse } from "../domain/catalog";
 import { useProviders } from "./useProviders";
 import { useResource } from "./useResource";
 
+const CATALOGUE_STALE_MS = 15 * 60_000;
+
 const EMPTY_CATALOGUE: CatalogResponse = {
   sections: [],
   source: "TMDB",
@@ -16,7 +18,11 @@ export function useCatalog(providerIds: string[], isReady: boolean) {
   const providers = useProviders();
   const { data, error, isLoading } = useResource<CatalogResponse>(
     `/api/catalog${providerKey ? `?providers=${encodeURIComponent(providerKey)}` : ""}`,
-    { enabled: isReady, errorMessage: "Live catalogue is unavailable" },
+    {
+      enabled: isReady,
+      errorMessage: "Live catalogue is unavailable",
+      staleTime: CATALOGUE_STALE_MS,
+    },
   );
   const catalogue = data ?? EMPTY_CATALOGUE;
   const titlesById = useMemo(

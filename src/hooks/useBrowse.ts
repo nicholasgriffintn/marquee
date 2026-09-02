@@ -5,6 +5,7 @@ import { queryJson } from "../lib/query-client";
 import { useResource } from "./useResource";
 
 const NO_FACETS: string[] = [];
+const FACET_STALE_MS = 60 * 60_000;
 
 export type BrowseFilters = {
   mediaType?: "movie" | "tv";
@@ -117,19 +118,25 @@ export function useBrowse(filters: BrowseFilters) {
 }
 
 export function useKeywords(limit: number) {
-  const { data } = useResource<{ keywords: string[] }>(`/api/catalog/keywords?limit=${limit}`);
+  const { data } = useResource<{ keywords: string[] }>(`/api/catalog/keywords?limit=${limit}`, {
+    staleTime: FACET_STALE_MS,
+  });
 
   return data?.keywords ?? NO_FACETS;
 }
 
 export function useFilmingPlaces(limit: number) {
-  const { data } = useResource<{ places: string[] }>(`/api/catalog/places?limit=${limit}`);
+  const { data } = useResource<{ places: string[] }>(`/api/catalog/places?limit=${limit}`, {
+    staleTime: FACET_STALE_MS,
+  });
 
   return data?.places ?? NO_FACETS;
 }
 
 export function useGenres(limit: number) {
-  const { data } = useResource<{ genres: string[] }>(`/api/catalog/genres?limit=${limit}`);
+  const { data } = useResource<{ genres: string[] }>(`/api/catalog/genres?limit=${limit}`, {
+    staleTime: FACET_STALE_MS,
+  });
 
   return data?.genres ?? NO_FACETS;
 }

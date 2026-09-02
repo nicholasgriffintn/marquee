@@ -131,7 +131,7 @@ export function App() {
     isViewerReady && isHome,
     profile.shelfKey,
   );
-  const search = useSearch(query, selectedProviderIds);
+  const search = useSearch(query, selectedProviderIds, isViewerReady);
   const curator = useCurator();
   const usher = useUsher(session.user?.id ?? "");
   const pinned = usePinned(isSignedIn);

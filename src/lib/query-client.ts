@@ -43,12 +43,21 @@ async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
 export function jsonQueryOptions<T>(path: string, identity = "") {
   return queryOptions({
     queryKey: ["resource", path, identity],
-    queryFn: () => fetchJson<T>(path),
+    queryFn: ({ signal }) => fetchJson<T>(path, { signal }),
+    placeholderData: (previous, previousQuery) =>
+      previousQuery?.queryKey[1] === path ? previous : undefined,
   });
 }
 
 export function queryJson<T>(path: string, identity = "") {
   return queryClient.fetchQuery(jsonQueryOptions<T>(path, identity));
+}
+
+export function cancelJsonQuery(path: string, identity = "") {
+  return queryClient.cancelQueries({
+    queryKey: jsonQueryOptions(path, identity).queryKey,
+    exact: true,
+  });
 }
 
 export function queryJsonFresh<T>(path: string) {

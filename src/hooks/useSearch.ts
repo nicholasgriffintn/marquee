@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { MediaTitle } from "../domain/catalog";
 import { shouldRefineSearch } from "../domain/search-query";
 import { startJourneys } from "../lib/journey";
-import { queryJson, QueryError } from "../lib/query-client";
+import { cancelJsonQuery, queryJson, QueryError } from "../lib/query-client";
 
 type SearchResponse = {
   items: MediaTitle[];
@@ -11,8 +11,9 @@ type SearchResponse = {
   journey?: string;
 };
 
-const KEYWORD_DEBOUNCE_MS = 250;
+const KEYWORD_DEBOUNCE_MS = 300;
 const HYBRID_SETTLE_MS = 400;
+const MIN_QUERY_LENGTH = 3;
 
 function searchUrl(trimmed: string, providerKey: string, hybrid: boolean) {
   const parameters = new URLSearchParams({ query: trimmed });
@@ -34,7 +35,7 @@ function mergeRefined(current: MediaTitle[], refined: MediaTitle[]) {
   return [...refined, ...current.filter((item) => !seen.has(item.id))];
 }
 
-export function useSearch(query: string, providerIds: string[]) {
+export function useSearch(query: string, providerIds: string[], enabled: boolean) {
   const [items, setItems] = useState<MediaTitle[]>([]);
   const [error, setError] = useState("");
   const [isSearching, setIsSearching] = useState(false);
@@ -49,19 +50,21 @@ export function useSearch(query: string, providerIds: string[]) {
     startJourneys(next, journey);
   }, []);
 
-  const isShort = trimmed.length < 2;
+  const isIdle = !enabled || trimmed.length < MIN_QUERY_LENGTH;
 
   useEffect(() => {
-    if (isShort) {
+    if (isIdle) {
       return undefined;
     }
 
+    const keywordPath = searchUrl(trimmed, providerKey, false);
+    const hybridPath = searchUrl(trimmed, providerKey, true);
     let active = true;
     let hybridTimer: number | undefined;
 
     async function refine() {
       try {
-        const response = await queryJson<SearchResponse>(searchUrl(trimmed, providerKey, true));
+        const response = await queryJson<SearchResponse>(hybridPath);
 
         if (active) {
           serve(mergeRefined(served.current, response.items), response.journey);
@@ -80,7 +83,7 @@ export function useSearch(query: string, providerIds: string[]) {
         setIsRefining(false);
 
         try {
-          const response = await queryJson<SearchResponse>(searchUrl(trimmed, providerKey, false));
+          const response = await queryJson<SearchResponse>(keywordPath);
 
           if (active) {
             serve(response.items, response.journey);
@@ -113,13 +116,16 @@ export function useSearch(query: string, providerIds: string[]) {
       if (hybridTimer !== undefined) {
         window.clearTimeout(hybridTimer);
       }
+
+      void cancelJsonQuery(keywordPath);
+      void cancelJsonQuery(hybridPath);
     };
-  }, [isShort, providerKey, serve, trimmed]);
+  }, [isIdle, providerKey, serve, trimmed]);
 
   return {
-    items: isShort ? [] : items,
-    error: isShort ? "" : error,
-    isSearching: isShort ? false : isSearching,
-    isRefining: isShort ? false : isRefining,
+    items: isIdle ? [] : items,
+    error: isIdle ? "" : error,
+    isSearching: isIdle ? false : isSearching,
+    isRefining: isIdle ? false : isRefining,
   };
 }
