@@ -52,8 +52,35 @@ export function parseJson(value: string): unknown {
 
 const CODE_FENCE = /^```(?:json)?\s*|\s*```$/gu;
 
+function jsonSpan(value: string) {
+  const object = value.indexOf("{");
+  const array = value.indexOf("[");
+  const start = object === -1 ? array : array === -1 ? object : Math.min(object, array);
+
+  if (start === -1) {
+    return null;
+  }
+
+  const end = value.lastIndexOf(value[start] === "{" ? "}" : "]");
+
+  return end > start ? value.slice(start, end + 1) : null;
+}
+
 export function parseJsonContent(value: string | null | undefined): unknown {
-  return value ? parseJson(value.trim().replaceAll(CODE_FENCE, "")) : null;
+  if (!value) {
+    return null;
+  }
+
+  const content = value.trim().replaceAll(CODE_FENCE, "");
+  const parsed = parseJson(content);
+
+  if (parsed !== null) {
+    return parsed;
+  }
+
+  const span = jsonSpan(content);
+
+  return span ? parseJson(span) : null;
 }
 
 export function isNullableString(value: unknown): value is string | null {

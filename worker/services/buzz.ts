@@ -263,12 +263,14 @@ export async function syncBuzz(env: Bindings) {
     // oxlint-disable-next-line no-await-in-loop
     await env.DB.transaction(async (transaction) => {
       for (const row of measured.slice(index, index + 50)) {
+        const score = buzzScore(row.views, row.previousViews);
+
         // oxlint-disable-next-line no-await-in-loop
         await transaction.execute(
           `INSERT INTO title_buzz
              (title_id, article, source, views, previous_views, delta, score, measured_at,
-              world_views, world_previous_views, world_score)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP, $8, $9, $10)
+              world_views, world_previous_views, world_score, buzz_rank)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP, $8, $9, $10, $11)
            ON CONFLICT(title_id) DO UPDATE SET
              article = excluded.article,
              source = excluded.source,
@@ -279,7 +281,8 @@ export async function syncBuzz(env: Bindings) {
              measured_at = CURRENT_TIMESTAMP,
              world_views = excluded.world_views,
              world_previous_views = excluded.world_previous_views,
-             world_score = excluded.world_score`,
+             world_score = excluded.world_score,
+             buzz_rank = excluded.buzz_rank`,
           [
             row.titleId,
             row.article,
@@ -287,10 +290,11 @@ export async function syncBuzz(env: Bindings) {
             row.views,
             row.previousViews,
             (row.views - row.previousViews) / Math.max(1, row.previousViews),
-            buzzScore(row.views, row.previousViews),
+            score,
             row.views,
             row.previousViews,
-            buzzScore(row.views, row.previousViews),
+            score,
+            score,
           ],
         );
       }
@@ -367,8 +371,8 @@ export async function readTrendingBuzz(env: Bindings, limit = 20) {
      FROM title_buzz AS b
      JOIN catalog_titles AS t ON t.id = b.title_id
      WHERE b.article <> '' AND b.views >= ${MIN_TRENDING_VIEWS}
-       AND GREATEST(b.world_score, b.score) > 0
-     ORDER BY GREATEST(b.world_score, b.score) DESC
+       AND b.buzz_rank > 0
+     ORDER BY b.buzz_rank DESC
      LIMIT $1`,
     [clamp(limit, 1, 60)],
   );
