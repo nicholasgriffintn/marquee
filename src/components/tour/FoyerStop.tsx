@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { MediaTitle } from "../../domain/catalog";
+import { shouldRefineSearch } from "../../domain/search-query";
 import { TOUR_OPENERS } from "../../domain/tour";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useResource } from "../../hooks/useResource";
@@ -27,6 +28,38 @@ function laneUrl(query: string, hybrid: boolean) {
   }
 
   return `/api/catalog/search?${parameters}`;
+}
+
+function tallyLine({
+  isRunning,
+  askedMeaning,
+  keywordCount,
+  meaningCount,
+  meaningOnlyCount,
+}: {
+  isRunning: boolean;
+  askedMeaning: boolean;
+  keywordCount: number;
+  meaningCount: number;
+  meaningOnlyCount: number;
+}) {
+  if (isRunning) {
+    return "Still reading. The lanes do not finish together.";
+  }
+
+  if (!askedMeaning && keywordCount > 0) {
+    return "The words had it outright, so the model was never asked. That lane only opens when the words come up short.";
+  }
+
+  if (keywordCount === 0 && meaningCount === 0) {
+    return "Nothing in the building under that, either way. The index is only as good as what has been read.";
+  }
+
+  if (meaningOnlyCount > 0) {
+    return `${meaningOnlyCount} of those ${meaningOnlyCount === 1 ? "was" : "were"} found by meaning alone. The words never had them.`;
+  }
+
+  return "Both lanes agree on this one. That happens when you nearly know the title.";
 }
 
 function Lane({
@@ -91,9 +124,12 @@ export function FoyerStop({
   }, [debounced, enabled, report]);
 
   const keyword = useResource<SearchResponse>(laneUrl(debounced, false), { enabled });
-  const meaning = useResource<SearchResponse>(laneUrl(debounced, true), { enabled });
   const keywordItems = keyword.data?.items ?? NO_ITEMS;
-  const meaningItems = meaning.data?.items ?? NO_ITEMS;
+  const wantsMeaning = enabled && !keyword.isLoading && shouldRefineSearch(debounced, keywordItems);
+  const meaning = useResource<SearchResponse>(laneUrl(debounced, true), {
+    enabled: wantsMeaning,
+  });
+  const meaningItems = wantsMeaning ? (meaning.data?.items ?? NO_ITEMS) : NO_ITEMS;
 
   const onlyMeaning = useMemo(() => {
     const known = new Set(keywordItems.slice(0, LANE_LIMIT).map((item) => item.id));
@@ -106,12 +142,13 @@ export function FoyerStop({
     );
   }, [keywordItems, meaningItems]);
 
-  const tally =
-    meaningItems.length === 0 && keywordItems.length === 0
-      ? "Nothing in the building under that, either way. The index is only as good as what has been read."
-      : onlyMeaning.size > 0
-        ? `${onlyMeaning.size} of those ${onlyMeaning.size === 1 ? "was" : "were"} found by meaning alone. The words never had them.`
-        : "Both lanes agree on this one. That happens when you nearly know the title.";
+  const tally = tallyLine({
+    isRunning: keyword.isLoading || (wantsMeaning && meaning.isLoading),
+    askedMeaning: wantsMeaning,
+    keywordCount: keywordItems.length,
+    meaningCount: meaningItems.length,
+    meaningOnlyCount: onlyMeaning.size,
+  });
 
   return (
     <div className={styles.foyer}>
@@ -146,11 +183,15 @@ export function FoyerStop({
           heading="What the meaning found"
           note="embeddings, interleaved and reranked"
           items={meaningItems}
-          isLoading={meaning.isLoading}
+          isLoading={keyword.isLoading || meaning.isLoading}
           marked={onlyMeaning}
           onOpen={onOpen}
           tone="meaning"
-          empty="Nothing close enough to bother you with."
+          empty={
+            wantsMeaning
+              ? "Nothing close enough to bother you with."
+              : "The words already had it. No sense paying the model to agree."
+          }
         />
       </div>
 

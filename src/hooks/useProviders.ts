@@ -15,9 +15,12 @@ const EMPTY_STATS: ProvidersResponse["stats"] = {
   titlesCovered: 0,
 };
 
+const PROVIDERS_STALE_MS = 5 * 60_000;
+
 export function useProviders() {
   const { data, error } = useResource<ProvidersResponse>("/api/catalog/providers", {
     errorMessage: "Live catalogue is unavailable",
+    staleTime: PROVIDERS_STALE_MS,
   });
 
   return {

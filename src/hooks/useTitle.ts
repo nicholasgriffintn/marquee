@@ -3,23 +3,24 @@ import { useResource } from "./useResource";
 
 export function useTitle(titleId: string | undefined, known: Map<string, MediaTitle>) {
   const resolved = titleId ? (known.get(titleId) ?? null) : null;
-  const { data, error, isLoading, reload } = useResource<{ items: MediaTitle[] }>(
-    titleId && !resolved ? `/api/catalog/items?ids=${encodeURIComponent(titleId)}` : null,
+  const { data, error, isLoading, isRefreshing, reload } = useResource<{ items: MediaTitle[] }>(
+    titleId ? `/api/catalog/items?ids=${encodeURIComponent(titleId)}` : null,
     { errorMessage: "Title details are unavailable right now." },
   );
   const fetched = data?.items[0] ?? null;
+  const isBusy = isLoading || isRefreshing;
 
   if (!titleId) {
     return { title: null, error: "", isLoading: false, isMissing: false, reload };
   }
 
-  const title = resolved ?? (fetched?.id === titleId ? fetched : null);
+  const title = fetched?.id === titleId ? fetched : resolved;
 
   return {
     title,
-    error: title || isLoading ? "" : error,
-    isLoading: !title && isLoading,
-    isMissing: !title && !isLoading && !error,
+    error: title || isBusy ? "" : error,
+    isLoading: !title && isBusy,
+    isMissing: !title && !isBusy && !error,
     reload,
   };
 }
