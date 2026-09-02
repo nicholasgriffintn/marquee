@@ -1,13 +1,22 @@
 import type { MediaTitle } from "../../src/domain/catalog.ts";
 import { cachedWorkersAiOptions } from "../ai/workers-ai.ts";
+import { withDeadline } from "../lib/deadline.ts";
 import { sha256Hex } from "../lib/hash.ts";
 import { errorMessage, logError, logEvent } from "../lib/logging.ts";
 import { clamp } from "../lib/numbers.ts";
+import { normaliseQueryText } from "../lib/text.ts";
 import { isRecord, vectorValues } from "../lib/values.ts";
+import { rowPlaceholders } from "../repositories/catalog-array-utils.ts";
 import { readItems } from "../repositories/catalog-reader.ts";
 import type { CatalogueSearch } from "../repositories/catalog-search.ts";
 import type { Bindings } from "../types.ts";
-import { queryTitleVectors, titleVectorMetadata } from "./vector-index.ts";
+import {
+  NO_MATCHES,
+  queryTitleVectors,
+  titleVectorMetadata,
+  VECTOR_QUERY_TIMEOUT_MS,
+  type VectorQueryOptions,
+} from "./vector-index.ts";
 
 export const EMBEDDING_MODEL = "@cf/baai/bge-m3";
 
@@ -45,7 +54,7 @@ function parseVectors(result: unknown) {
   );
 }
 
-async function embedTexts(env: Bindings, texts: string[]) {
+async function embedTexts(env: Bindings, texts: string[], timeoutMs?: number) {
   if (texts.length === 0) {
     return [];
   }
@@ -54,28 +63,52 @@ async function embedTexts(env: Bindings, texts: string[]) {
     text: texts.map((text) => text.slice(0, MAX_TEXT_LENGTH)),
     truncate_inputs: true,
   };
+  const options = await cachedWorkersAiOptions(env, "embedding", EMBEDDING_MODEL, input);
   const result = await env.AI.run(
     EMBEDDING_MODEL,
     input,
-    await cachedWorkersAiOptions(env, "embedding", EMBEDDING_MODEL, input),
+    timeoutMs === undefined ? options : { ...options, signal: AbortSignal.timeout(timeoutMs) },
   );
 
   return parseVectors(result);
 }
 
+const QUERY_EMBED_TIMEOUT_MS = 1_500;
+
 export async function embedQuery(env: Bindings, text: string) {
-  const [vector] = await embedTexts(env, [text]);
+  const normalised = normaliseQueryText(text);
+
+  if (!normalised) {
+    return null;
+  }
+
+  const [vector] = await withDeadline<number[][]>(
+    embedTexts(env, [normalised], QUERY_EMBED_TIMEOUT_MS),
+    QUERY_EMBED_TIMEOUT_MS,
+    [],
+  );
 
   return vector ?? null;
 }
 
 const RETRY_MINUTES = 30;
 const MAX_RETRY_MINUTES = 24 * 60;
+const MAX_ERROR_LENGTH = 200;
 
-function markEmbedded(db: DatabaseTransaction, titleId: string, hash: string) {
-  return db.execute(
-    `INSERT INTO title_embeddings (title_id, model, content_hash, embedded_at)
-     VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+async function markEmbedded(db: Database, titles: MediaTitle[], hashById: Map<string, string>) {
+  const rows = titles.flatMap((title) => {
+    const hash = hashById.get(title.id);
+
+    return hash === undefined ? [] : [[title.id, EMBEDDING_MODEL, hash]];
+  });
+
+  if (rows.length === 0) {
+    return;
+  }
+
+  await db.execute(
+    `INSERT INTO title_embeddings (title_id, model, content_hash)
+     VALUES ${rowPlaceholders(rows.length, 3)}
      ON CONFLICT(title_id) DO UPDATE SET
        model = excluded.model,
        content_hash = excluded.content_hash,
@@ -83,17 +116,30 @@ function markEmbedded(db: DatabaseTransaction, titleId: string, hash: string) {
        attempts = 0,
        next_attempt_at = NULL,
        error = NULL`,
-    [titleId, EMBEDDING_MODEL, hash],
+    rows.flat(),
   );
+}
+
+function failurePlaceholders(rows: number) {
+  return Array.from(
+    { length: rows },
+    (_unusedRow, row) =>
+      `($${row * 3 + 1}, $${row * 3 + 2}, NULL, 1,` +
+      ` (CURRENT_TIMESTAMP + INTERVAL '${RETRY_MINUTES} minute'), $${row * 3 + 3})`,
+  ).join(", ");
 }
 
 // A failed title keeps a marker so the next selection can step over it instead of
 // re-reading the same head of the popularity queue on every sweep.
-function markEmbeddingFailure(db: DatabaseTransaction, titleId: string, reason: string) {
-  return db.execute(
+async function recordFailures(env: Bindings, titles: MediaTitle[], reason: string) {
+  if (titles.length === 0) {
+    return;
+  }
+
+  await env.DB.execute(
     `INSERT INTO title_embeddings
        (title_id, model, content_hash, attempts, next_attempt_at, error)
-     VALUES ($1, $2, NULL, 1, (CURRENT_TIMESTAMP + INTERVAL '${RETRY_MINUTES} minute'), $3)
+     VALUES ${failurePlaceholders(titles.length)}
      ON CONFLICT(title_id) DO UPDATE SET
        model = excluded.model,
        content_hash = NULL,
@@ -102,17 +148,8 @@ function markEmbeddingFailure(db: DatabaseTransaction, titleId: string, reason: 
          + LEAST(${MAX_RETRY_MINUTES}, ${RETRY_MINUTES} * (title_embeddings.attempts + 1))
            * INTERVAL '1 minute',
        error = excluded.error`,
-    [titleId, EMBEDDING_MODEL, reason.slice(0, 200)],
+    titles.flatMap((title) => [title.id, EMBEDDING_MODEL, reason.slice(0, MAX_ERROR_LENGTH)]),
   );
-}
-
-function recordFailures(env: Bindings, titles: MediaTitle[], reason: string) {
-  return env.DB.transaction(async (transaction) => {
-    for (const title of titles) {
-      // oxlint-disable-next-line no-await-in-loop
-      await markEmbeddingFailure(transaction, title.id, reason);
-    }
-  });
 }
 
 async function storedHashes(env: Bindings, titleIds: string[]) {
@@ -137,16 +174,22 @@ export async function embedTitles(
     return 0;
   }
 
-  const hashes = await Promise.all(titles.map((title) => contentHash(embeddingText(title))));
+  const hashById = new Map(
+    await Promise.all(
+      titles.map(async (title): Promise<[string, string]> => [
+        title.id,
+        await contentHash(embeddingText(title)),
+      ]),
+    ),
+  );
   const known = await storedHashes(
     env,
     titles.map((title) => title.id),
   );
-  const stale = (title: MediaTitle, index: number) =>
-    options.force === true || known.get(title.id) !== hashes[index];
+  const stale = (title: MediaTitle) =>
+    options.force === true || known.get(title.id) !== hashById.get(title.id);
   const pending = titles.filter(stale);
-  const unchanged = titles.filter((title, index) => !stale(title, index));
-  const hashById = new Map(titles.map((title, index) => [title.id, hashes[index]]));
+  const unchanged = titles.filter((title) => !stale(title));
   let stored = 0;
   let failed = 0;
 
@@ -171,12 +214,7 @@ export async function embedTitles(
       );
 
       // oxlint-disable-next-line no-await-in-loop
-      await env.DB.transaction(async (transaction) => {
-        for (const title of wave) {
-          // oxlint-disable-next-line no-await-in-loop
-          await markEmbedded(transaction, title.id, hashById.get(title.id) as string);
-        }
-      });
+      await markEmbedded(env.DB, wave, hashById);
 
       stored += wave.length;
     } catch (error) {
@@ -187,14 +225,7 @@ export async function embedTitles(
     }
   }
 
-  if (unchanged.length) {
-    await env.DB.transaction(async (transaction) => {
-      for (const title of unchanged) {
-        // oxlint-disable-next-line no-await-in-loop
-        await markEmbedded(transaction, title.id, hashById.get(title.id) as string);
-      }
-    });
-  }
+  await markEmbedded(env.DB, unchanged, hashById);
 
   logEvent("titles_embedded", { count: stored, skipped: unchanged.length, failed });
 
@@ -209,21 +240,32 @@ export async function embedTitles(
 
 const VECTOR_READ_BATCH = 20;
 
-export async function readVectors(env: Bindings, titleIds: string[]) {
+export async function readVectors(
+  env: Bindings,
+  titleIds: string[],
+  timeoutMs: number | null = VECTOR_QUERY_TIMEOUT_MS,
+) {
   const unique = [...new Set(titleIds)];
-  const byId = new Map<string, number[]>();
+  const waves: string[][] = [];
 
   for (let index = 0; index < unique.length; index += VECTOR_READ_BATCH) {
-    const wave = unique.slice(index, index + VECTOR_READ_BATCH);
-    // oxlint-disable-next-line no-await-in-loop
-    const vectors = await env.VECTORS.getByIds(wave);
+    waves.push(unique.slice(index, index + VECTOR_READ_BATCH));
+  }
 
-    for (const vector of vectors) {
-      const values = vectorValues(vector.values);
+  const results = await Promise.all(
+    waves.map((wave) =>
+      timeoutMs === null
+        ? env.VECTORS.getByIds(wave)
+        : withDeadline<VectorizeVector[]>(env.VECTORS.getByIds(wave), timeoutMs, []),
+    ),
+  );
+  const byId = new Map<string, number[]>();
 
-      if (values) {
-        byId.set(vector.id, values);
-      }
+  for (const vector of results.flat()) {
+    const values = vectorValues(vector.values);
+
+    if (values) {
+      byId.set(vector.id, values);
     }
   }
 
@@ -262,7 +304,7 @@ export async function reindexVectorMetadata(env: Bindings, after: string) {
   }
 
   const titles = await readItems(env.DB, titleIds, titleIds.length);
-  const stored = await readVectors(env, titleIds);
+  const stored = await readVectors(env, titleIds, null);
   const pending = titles.flatMap((title) => {
     const values = stored.get(title.id);
 
@@ -333,15 +375,35 @@ export async function readEmbeddingCoverage(env: Bindings): Promise<EmbeddingCov
 
 export type Neighbour = { id: string; score: number };
 
-export async function nearestTo(env: Bindings, vector: number[], search: CatalogueSearch) {
-  const matches = await queryTitleVectors(env, vector, search);
+export type NeighbourMatches = { neighbours: Neighbour[]; filtered: boolean };
 
-  return matches.matches.map((match): Neighbour => ({ id: match.id, score: match.score }));
+export async function nearestMatches(
+  env: Bindings,
+  vector: number[],
+  search: CatalogueSearch,
+  options: VectorQueryOptions = {},
+): Promise<NeighbourMatches> {
+  const { matches, filtered } = await queryTitleVectors(env, vector, search, options);
+
+  return {
+    neighbours: matches.map((match): Neighbour => ({ id: match.id, score: match.score })),
+    filtered,
+  };
+}
+
+export async function nearestTo(env: Bindings, vector: number[], search: CatalogueSearch) {
+  const { neighbours } = await nearestMatches(env, vector, search);
+
+  return neighbours;
 }
 
 export async function neighboursOf(env: Bindings, titleId: string, topK = 24) {
   try {
-    const matches = await env.VECTORS.queryById(titleId, { topK, returnMetadata: "none" });
+    const matches = await withDeadline(
+      env.VECTORS.queryById(titleId, { topK, returnMetadata: "none" }),
+      VECTOR_QUERY_TIMEOUT_MS,
+      NO_MATCHES,
+    );
 
     return matches.matches
       .filter((match) => match.id !== titleId)

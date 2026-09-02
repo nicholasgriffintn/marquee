@@ -315,6 +315,7 @@ export async function buildTasteMap(
   const byId = await readVectors(
     env,
     weighted.map((entry) => entry.titleId),
+    null,
   );
   const missing = weighted.map((entry) => entry.titleId).filter((titleId) => !byId.has(titleId));
   const found = weighted.flatMap((entry) => {
