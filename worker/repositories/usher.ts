@@ -1,6 +1,7 @@
 import { clamp } from "../lib/numbers.ts";
 import { isRecord, parseJson } from "../lib/values.ts";
 import { rebuildPersonTitles } from "./people.ts";
+import { estimateTableRows } from "./table-stats.ts";
 
 export type UsherRecord = {
   status: "new" | "in-progress" | "done" | "dismissed";
@@ -194,7 +195,5 @@ export async function popularPeople(db: Database, limit: number) {
 export async function rebuildPeopleIndex(db: Database) {
   await rebuildPersonTitles(db);
 
-  const total = await db.first<{ people: number }>(`SELECT count(*) AS people FROM catalog_people`);
-
-  return total?.people ?? 0;
+  return estimateTableRows(db, "catalog_people");
 }
