@@ -183,7 +183,9 @@ catalogRoutes.get("/search", async (context) => {
     const startedAt = Date.now();
     const results = hybrid
       ? await searchCatalogueHybrid(context.env, query, providerIds)
-      : await searchCatalogue(context.env, query, providerIds);
+      : await searchCatalogue(context.env, query, providerIds, (task) =>
+          context.executionCtx.waitUntil(task),
+        );
     const journey = await mintJourney(context.env, {
       mode: "search",
       angle: hybrid ? "search_hybrid" : "search_keyword",

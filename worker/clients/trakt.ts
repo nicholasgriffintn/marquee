@@ -128,13 +128,18 @@ export function refreshTraktTokens(env: Bindings, refreshToken: string, redirect
   });
 }
 
-async function requestTrakt(env: Bindings, path: string, accessToken: string) {
+async function requestTrakt(
+  env: Bindings,
+  path: string,
+  accessToken: string,
+  timeoutMs = READ_TIMEOUT_MS,
+) {
   assertConfigured(env);
 
   const response = await upstreamFetch(`${API_BASE}${path}`, {
     headers: traktHeaders(env, accessToken),
     source: "trakt",
-    timeoutMs: READ_TIMEOUT_MS,
+    timeoutMs,
   });
 
   if (response.status === 401) {
@@ -373,12 +378,18 @@ export async function getTraktHistory(env: Bindings, accessToken: string) {
   return [...parseHistory(movies, "movie"), ...parseHistory(episodes, "tv")];
 }
 
-export async function getTraktCalendar(env: Bindings, accessToken: string, days = 7) {
+export async function getTraktCalendar(
+  env: Bindings,
+  accessToken: string,
+  days = 7,
+  timeoutMs?: number,
+) {
   const start = new Date().toISOString().slice(0, 10);
   const payload = await requestTrakt(
     env,
     `/calendars/my/shows/${start}/${clamp(days, 1, 33)}`,
     accessToken,
+    timeoutMs,
   );
 
   return records(payload).flatMap((item): TraktEpisode[] => {

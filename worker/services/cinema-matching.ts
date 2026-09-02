@@ -1,7 +1,11 @@
+import { tsQueryFromTokens } from "../lib/fts.ts";
 import { clamp } from "../lib/numbers.ts";
 import type { UnmatchedFilm } from "../repositories/cinemas.ts";
 
 const MAX_TOKENS = 8;
+const EXACT_LIMIT = 5;
+const CANDIDATE_LIMIT = 500;
+const RANKED_LIMIT = 25;
 
 const EVENT_PHRASE =
   /\b(\d{1,3}(st|nd|rd|th)\s+anniversary|anniversary\s+re[-\s]?release|in\s+concert|live\s+in\s+concert)\b/giu;
@@ -96,37 +100,73 @@ export function scoreCandidate(film: UnmatchedFilm, candidate: CandidateRow) {
 
 export const MATCH_THRESHOLD = 0.62;
 
-export async function findTitleForFilm(db: Database, film: UnmatchedFilm) {
-  const cleaned = cleanFilmTitle(film.sourceTitle);
-  const searchTokens = tokens(cleaned);
+const CANDIDATE_COLUMNS = `t.id, t.title, t.original_title AS "originalTitle", t.year,
+     t.runtime_minutes AS "runtimeMinutes",
+     t.popularity`;
 
-  if (searchTokens.length === 0) {
-    return { titleId: null, confidence: 0 };
-  }
-
-  const expression = searchTokens.map((token) => `${token}:*`).join(" | ");
-  const rows = await db.query<CandidateRow>(
-    `SELECT t.id, t.title, t.original_title AS "originalTitle", t.year,
-              t.runtime_minutes AS "runtimeMinutes",
-              t.popularity
-       FROM catalog_search AS s
-       JOIN catalog_titles AS t ON t.id = s.title_id
-       WHERE s.title_document @@ to_tsquery('simple', $1)
+function exactCandidates(db: Database, cleaned: string) {
+  return db.query<CandidateRow>(
+    `SELECT ${CANDIDATE_COLUMNS}
+       FROM catalog_titles AS t
+       WHERE lower(t.title) = $1
          AND t.media_type = 'movie'
-       ORDER BY ts_rank_cd(s.title_document, to_tsquery('simple', $2), 32) DESC
-       LIMIT 25`,
-    [expression, expression],
+       ORDER BY t.popularity DESC
+       LIMIT ${EXACT_LIMIT}`,
+    [cleaned.toLowerCase()],
   );
+}
 
+function rankedCandidates(db: Database, expression: string) {
+  return db.query<CandidateRow>(
+    `WITH candidates AS MATERIALIZED (
+       SELECT s.title_id, s.title_document
+         FROM catalog_search AS s
+         JOIN catalog_titles AS c ON c.id = s.title_id
+        WHERE s.title_document @@ to_tsquery('simple', $1)
+          AND c.media_type = 'movie'
+        ORDER BY c.popularity DESC
+        LIMIT ${CANDIDATE_LIMIT}
+     )
+     SELECT ${CANDIDATE_COLUMNS}
+       FROM candidates
+       JOIN catalog_titles AS t ON t.id = candidates.title_id
+       ORDER BY ts_rank_cd(candidates.title_document, to_tsquery('simple', $1), 32) DESC
+       LIMIT ${RANKED_LIMIT}`,
+    [expression],
+  );
+}
+
+function bestCandidate(film: UnmatchedFilm, candidates: CandidateRow[]) {
   let best: { titleId: string; confidence: number } | null = null;
 
-  for (const candidate of rows.rows) {
+  for (const candidate of candidates) {
     const confidence = scoreCandidate(film, candidate);
 
     if (!best || confidence > best.confidence) {
       best = { titleId: candidate.id, confidence };
     }
   }
+
+  return best;
+}
+
+export async function findTitleForFilm(db: Database, film: UnmatchedFilm) {
+  const cleaned = cleanFilmTitle(film.sourceTitle);
+  const searchTokens = tokens(cleaned);
+  const expression = tsQueryFromTokens(searchTokens, true);
+
+  if (!expression) {
+    return { titleId: null, confidence: 0 };
+  }
+
+  const exact = bestCandidate(film, (await exactCandidates(db, cleaned)).rows);
+
+  if (exact && exact.confidence >= MATCH_THRESHOLD) {
+    return exact;
+  }
+
+  const ranked = bestCandidate(film, (await rankedCandidates(db, expression)).rows);
+  const best = (ranked?.confidence ?? 0) > (exact?.confidence ?? 0) ? ranked : exact;
 
   return best && best.confidence >= MATCH_THRESHOLD
     ? best

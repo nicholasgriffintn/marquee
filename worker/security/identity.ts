@@ -32,13 +32,14 @@ async function resolveIdentity(env: Bindings, request: Request): Promise<Identit
 }
 
 function anonymousKey(request: Request) {
-  const address = request.headers.get("cf-connecting-ip")?.trim().slice(0, 64);
+  const guest = parseCookies(request.headers.get("cookie") ?? "")
+    .get(GUEST_COOKIE)
+    ?.trim()
+    .slice(0, 64);
 
-  if (address) {
-    return address;
+  if (guest) {
+    return guest;
   }
 
-  const guest = parseCookies(request.headers.get("cookie") ?? "").get(GUEST_COOKIE);
-
-  return guest?.slice(0, 64) || "anonymous";
+  return request.headers.get("cf-connecting-ip")?.trim().slice(0, 64) || "anonymous";
 }

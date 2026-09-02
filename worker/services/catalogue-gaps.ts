@@ -8,7 +8,7 @@ import {
   hasAdequateResults,
   hasTitleIntent,
 } from "../lib/catalogue-gaps.ts";
-import { logEvent } from "../lib/logging.ts";
+import { logEvent, logRejection } from "../lib/logging.ts";
 import { enqueue } from "../lib/queue.ts";
 import { imdbIdFrom } from "../lib/text.ts";
 import { readBudgetRoom } from "../repositories/budgets.ts";
@@ -143,7 +143,12 @@ async function discoverGap(env: Bindings, query: string, queryKey: string, known
   return queued.map(pendingTitle);
 }
 
-export async function findGapTitles(env: Bindings, query: string, known: MediaTitle[]) {
+export async function findGapTitles(
+  env: Bindings,
+  query: string,
+  known: MediaTitle[],
+  defer?: (task: Promise<unknown>) => void,
+) {
   if (!env.OMDB_API_KEY || !hasTitleIntent(query) || hasAdequateResults(query, known)) {
     return [];
   }
@@ -156,9 +161,19 @@ export async function findGapTitles(env: Bindings, query: string, known: MediaTi
     return cached;
   }
 
-  const pending = await discoverGap(env, query, queryKey, known);
+  const discover = async () => {
+    const pending = await discoverGap(env, query, queryKey, known);
 
-  await writeCachedValue(cacheKey, pending, GAP_DISCOVERY.resultCacheSeconds);
+    await writeCachedValue(cacheKey, pending, GAP_DISCOVERY.resultCacheSeconds);
 
-  return pending;
+    return pending;
+  };
+
+  if (!defer) {
+    return discover();
+  }
+
+  defer(logRejection(discover(), "catalogue_gap_discovery_failed", { queryKey }));
+
+  return [];
 }

@@ -191,7 +191,12 @@ export async function importTraktHistory(env: Bindings, viewerId: string, origin
   return run.id;
 }
 
-export async function traktUpcoming(env: Bindings, viewerId: string, origin: string) {
+export async function traktUpcoming(
+  env: Bindings,
+  viewerId: string,
+  origin: string,
+  timeoutMs?: number,
+) {
   const accessToken = await traktAccessToken(env, viewerId, origin);
 
   if (!accessToken) {
@@ -199,7 +204,7 @@ export async function traktUpcoming(env: Bindings, viewerId: string, origin: str
   }
 
   try {
-    return await getTraktCalendar(env, accessToken, 7);
+    return await getTraktCalendar(env, accessToken, 7, timeoutMs);
   } catch (error) {
     logError("trakt_calendar_failed", error, { viewerId });
 
