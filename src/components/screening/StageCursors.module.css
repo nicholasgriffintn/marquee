@@ -1,0 +1,70 @@
+.layer {
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  position: absolute;
+  z-index: 5;
+}
+
+.cursor {
+  position: absolute;
+  transition:
+    left 0.12s linear,
+    top 0.12s linear;
+}
+
+.pointer {
+  display: block;
+  height: 20px;
+  width: 16px;
+}
+
+.tag {
+  align-items: center;
+  background: var(--ink);
+  border: 1px solid var(--acid);
+  color: var(--white);
+  display: inline-flex;
+  font: var(--weight-bold) var(--type-label) / 1 var(--mono);
+  gap: 4px;
+  letter-spacing: var(--tracking-label);
+  margin-left: 10px;
+  padding: 2px 6px 2px 2px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.tag svg {
+  background: var(--panel-tile);
+  border-radius: 50%;
+}
+
+@keyframes floatUp {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 0) scale(0.6);
+  }
+
+  15% {
+    opacity: 1;
+    transform: translate(-50%, -12px) scale(1.1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -90px) scale(1);
+  }
+}
+
+.reaction {
+  animation: floatUp 2.2s ease-out forwards;
+  font-size: 26px;
+  line-height: 1;
+  position: absolute;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reaction {
+    animation-duration: 0.01s;
+  }
+}

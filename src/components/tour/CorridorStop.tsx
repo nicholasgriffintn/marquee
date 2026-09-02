@@ -4,6 +4,7 @@ import { sharedTraits, type MediaTitle } from "../../domain/catalog";
 import { useResource } from "../../hooks/useResource";
 import { useTitlePath } from "../../hooks/useTitlePath";
 import { Callout, Skeleton } from "../../ui";
+import { useScreeningRoom, useStageReport } from "../screening/ScreeningContext";
 import { TitleArt } from "../TitleArt";
 import { TitlePicker } from "./TitlePicker";
 
@@ -31,6 +32,9 @@ export function CorridorStop({
   const [picked, setPicked] = useState<{ from: MediaTitle | null; to: MediaTitle | null } | null>(
     null,
   );
+  const report = useStageReport("corridor");
+  const steer = useScreeningRoom()?.room?.steer ?? null;
+  const steered = steer?.phase === "walk" && steer.from && steer.to ? steer : null;
 
   const seedFrom = useResource<{ items: MediaTitle[] }>(seedUrl(SEED_FROM), {
     enabled: isActive && !picked,
@@ -39,11 +43,17 @@ export function CorridorStop({
     enabled: isActive && !picked,
   });
 
-  const from = picked ? picked.from : (seedFrom.data?.items[0] ?? null);
-  const to = picked ? picked.to : (seedTo.data?.items[0] ?? null);
+  const from = steered?.from ?? (picked ? picked.from : (seedFrom.data?.items[0] ?? null));
+  const to = steered?.to ?? (picked ? picked.to : (seedTo.data?.items[0] ?? null));
 
   function choose(end: "from" | "to", item: MediaTitle | null) {
-    setPicked({ from, to, [end]: item });
+    const next = { from, to, [end]: item };
+
+    setPicked(next);
+
+    if (next.from && next.to && next.from.id !== next.to.id) {
+      report("walk", `${next.from.title} → ${next.to.title}`);
+    }
   }
 
   const walk = useTitlePath(from?.id ?? "", to?.id ?? "", isActive);

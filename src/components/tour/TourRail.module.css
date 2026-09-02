@@ -53,6 +53,17 @@
   color: var(--acid);
 }
 
+.crowd {
+  background: var(--coral);
+  border-radius: 8px;
+  color: var(--ink);
+  font-size: var(--type-label-sm);
+  font-style: normal;
+  margin-left: 5px;
+  padding: 1px 5px;
+  vertical-align: 1px;
+}
+
 .controls {
   align-items: center;
   display: flex;
@@ -104,6 +115,17 @@
 .present {
   border-color: var(--acid);
   color: var(--acid);
+}
+
+.doors {
+  background: var(--coral);
+  border-color: var(--coral);
+  color: var(--ink);
+}
+
+.doors:hover:not(:disabled) {
+  background: var(--coral);
+  box-shadow: 3px 3px 0 var(--blue);
 }
 
 @media (max-width: 860px) {

@@ -1,0 +1,157 @@
+@keyframes bulb {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+
+  45% {
+    opacity: 1;
+  }
+}
+
+@keyframes flicker {
+  0%,
+  18%,
+  22%,
+  64%,
+  70%,
+  100% {
+    opacity: 1;
+  }
+
+  20%,
+  66% {
+    opacity: 0.15;
+  }
+
+  68% {
+    opacity: 0.6;
+  }
+}
+
+@keyframes sweep {
+  0%,
+  100% {
+    transform: rotate(-3deg);
+  }
+
+  50% {
+    transform: rotate(3deg);
+  }
+}
+
+@keyframes projector {
+  0%,
+  100% {
+    opacity: 0.1;
+  }
+
+  50% {
+    opacity: 0.18;
+  }
+}
+
+.facade {
+  display: block;
+  fill: none;
+  height: auto;
+  overflow: visible;
+  stroke: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  width: 100%;
+}
+
+.board {
+  fill: var(--ink);
+  font-family: var(--mono);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.06em;
+}
+
+.head {
+  fill: var(--muted-on-paper);
+  font-family: var(--mono);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.18em;
+}
+
+.tag {
+  fill: var(--ink);
+  font-family: var(--mono);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.14em;
+}
+
+.serif {
+  fill: var(--ink);
+  font-family: var(--serif);
+}
+
+.sans {
+  fill: var(--ink);
+  font-family: var(--sans);
+  font-weight: var(--weight-heavy);
+}
+
+.placeholder {
+  stroke: var(--paper-line);
+  stroke-dasharray: 6 4;
+  stroke-width: 3;
+}
+
+.bulb {
+  animation: bulb 3.4s infinite;
+  fill: var(--acid);
+  opacity: 0.35;
+}
+
+.bulb:nth-child(2n) {
+  animation-delay: 0.7s;
+}
+
+.bulb:nth-child(3n) {
+  animation-delay: 1.5s;
+}
+
+.dead {
+  animation: none;
+  fill: var(--line);
+  opacity: 1;
+}
+
+.glow {
+  filter: drop-shadow(0 0 10px rgba(201, 243, 93, 0.45));
+}
+
+.neon {
+  fill: var(--coral);
+  filter: drop-shadow(0 0 5px rgba(255, 110, 86, 0.9));
+  font-family: var(--sans);
+  font-weight: var(--weight-heavy);
+}
+
+.flicker {
+  animation: flicker 7s infinite;
+}
+
+.beam {
+  animation: sweep 8s ease-in-out infinite;
+  fill: var(--acid);
+  opacity: 0.2;
+}
+
+.projection {
+  animation: projector 3s ease-in-out infinite;
+  fill: var(--acid);
+  opacity: 0.14;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bulb,
+  .flicker,
+  .beam,
+  .projection {
+    animation: none;
+  }
+}

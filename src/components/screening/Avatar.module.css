@@ -1,0 +1,9 @@
+.avatar {
+  display: block;
+  fill: none;
+  flex: none;
+  overflow: visible;
+  stroke: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}

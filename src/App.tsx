@@ -64,6 +64,9 @@ const SourcesPage = lazy(() =>
   import("./pages/SourcesPage").then((m) => ({ default: m.SourcesPage })),
 );
 const UsherPage = lazy(() => import("./pages/UsherPage").then((m) => ({ default: m.UsherPage })));
+const ScreeningPage = lazy(() =>
+  import("./pages/ScreeningPage").then((m) => ({ default: m.ScreeningPage })),
+);
 const AdminPage = lazy(() => import("./pages/AdminPage").then((m) => ({ default: m.AdminPage })));
 const RevivalPage = lazy(() =>
   import("./pages/RevivalPage").then((m) => ({ default: m.RevivalPage })),
@@ -524,11 +527,24 @@ export function App() {
               <Route path="/usher" element={<UsherPage />} />
 
               <Route
+                path="/screening"
+                element={
+                  <Suspense fallback={<RouteFallback />}>
+                    <ScreeningPage
+                      isSignedIn={isSignedIn}
+                      isAdmin={session.user?.role === "admin"}
+                    />
+                  </Suspense>
+                }
+              />
+
+              <Route
                 path="/tour"
                 element={
                   <Suspense fallback={<RouteFallback />}>
                     <TourPage
                       isSignedIn={isSignedIn}
+                      isAdmin={session.user?.role === "admin"}
                       pad={{
                         state: usher.order,
                         guests: usher.guests,

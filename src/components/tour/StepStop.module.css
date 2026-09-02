@@ -62,7 +62,34 @@
 }
 
 .building {
-  width: clamp(280px, 32vw, 420px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: clamp(280px, 34vw, 440px);
+}
+
+.plate {
+  align-items: baseline;
+  border-top: 1px dashed var(--panel-line);
+  color: var(--muted);
+  display: flex;
+  font: var(--weight-bold) var(--type-label) / 1.4 var(--mono);
+  gap: var(--space-3);
+  justify-content: space-between;
+  letter-spacing: var(--tracking-label-wide);
+  margin: 0;
+  padding-top: var(--space-2);
+  text-transform: uppercase;
+}
+
+.plate span {
+  color: var(--acid);
+}
+
+.plate em {
+  font-style: normal;
+  font-weight: var(--weight-regular);
+  text-align: right;
 }
 
 @media (max-width: 900px) {

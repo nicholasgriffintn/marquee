@@ -16,6 +16,7 @@ import { OverviewTab } from "./admin/OverviewTab";
 import { PeopleTab } from "./admin/PeopleTab";
 import { PipelineTab } from "./admin/PipelineTab";
 import { QualityTab } from "./admin/QualityTab";
+import { RoomsTab } from "./admin/RoomsTab";
 import { SourcesTab } from "./admin/SourcesTab";
 
 import adminStyles from "./admin/admin.module.css";
@@ -137,6 +138,8 @@ export function AdminPage({ user }: { user: User }) {
       {tab === "actions" && (
         <ActionsTab pending={admin.pending} onRun={(action) => void admin.run(action)} />
       )}
+
+      {tab === "rooms" && <RoomsTab />}
 
       {tab === "pipeline" && <PipelineTab overview={overview} revision={pipelineRevision} />}
 

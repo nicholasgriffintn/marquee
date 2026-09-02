@@ -28,7 +28,14 @@ const LISTING_KINDS: Record<string, { one: string; many: string }> = {
   all: { one: "film or TV series", many: "films and TV" },
 };
 
-export const NOINDEX_PATHS = new Set(["/search", "/sign-in", "/shelf", "/admin", "/notebook"]);
+export const NOINDEX_PATHS = new Set([
+  "/search",
+  "/sign-in",
+  "/shelf",
+  "/admin",
+  "/notebook",
+  "/screening",
+]);
 
 const STATIC_CARDS: Record<string, { title: string; description: string }> = {
   "/": {
@@ -54,6 +61,11 @@ const STATIC_CARDS: Record<string, { title: string; description: string }> = {
     title: "The tour — a walk round the building after closing · Marquee",
     description:
       "Nine stops with the Usher and a torch: how the search actually works, how he picks, and what plays on the small screen at the back.",
+  },
+  "/screening": {
+    title: "A screening — the room decides · Marquee",
+    description:
+      "A shared room with a link: get a ticket, vote when the host opens a poll, and ask the Usher.",
   },
   "/revival": {
     title: "The revival house — free public domain films to watch online · Marquee",

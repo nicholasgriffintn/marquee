@@ -9,6 +9,7 @@ export const TABS = [
   { id: "quality", label: "Quality" },
   { id: "vault", label: "The vault" },
   { id: "people", label: "People" },
+  { id: "rooms", label: "Rooms" },
 ] as const;
 
 export type AdminTab = (typeof TABS)[number]["id"];

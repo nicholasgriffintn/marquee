@@ -4,6 +4,7 @@ import { hasBearerCredential } from "./auth/api-tokens.ts";
 import { authRoutes } from "./auth/routes.ts";
 import { openDatabase, withDatabase } from "./database/runtime.ts";
 import { CuratorSession } from "./durable/curator-session.ts";
+import { Screening } from "./durable/screening.ts";
 import { consumeDeadLetters, consumeIngestion } from "./jobs/ingestion-consumer.ts";
 import { scheduleIngestion } from "./jobs/ingestion-scheduler.ts";
 import { consumeRailRefresh, consumeRailRefreshDeadLetters } from "./jobs/rail-refresh-consumer.ts";
@@ -30,6 +31,7 @@ import { pageMetadataRoutes } from "./routes/page-metadata.ts";
 import { profileRoutes } from "./routes/profile.ts";
 import { reelRoutes } from "./routes/reel.ts";
 import { revivalRoutes } from "./routes/revival.ts";
+import { screeningRoutes } from "./routes/screenings.ts";
 import { sitemapRoutes } from "./routes/sitemap.ts";
 import { usherRoutes } from "./routes/usher.ts";
 import { bearerScopeGuard } from "./security/bearer-scopes.ts";
@@ -120,6 +122,8 @@ app.route("/api/events", eventRoutes);
 
 app.route("/api/page-metadata", pageMetadataRoutes);
 
+app.route("/api/screenings", screeningRoutes);
+
 app.route("/feeds", feedRoutes);
 
 app.route("/mcp", mcpRoutes);
@@ -166,7 +170,7 @@ app.onError((error, context) => {
   return context.json({ error: "Unexpected server error" }, 500);
 });
 
-export { CatalogSweep, CuratorSession, DigestWorkflow, RailsWorkflow };
+export { CatalogSweep, CuratorSession, DigestWorkflow, RailsWorkflow, Screening };
 
 export default {
   async fetch(request, env, context) {

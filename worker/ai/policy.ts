@@ -15,7 +15,8 @@ export type AiFeature =
   | "insight"
   | "note_facets"
   | "usher_order"
-  | "usher_pick";
+  | "usher_pick"
+  | "usher_answer";
 
 export type ModelTier = "fast" | "primary";
 
@@ -90,6 +91,15 @@ const POLICIES: Record<AiFeature, AiPolicy> = {
     maxTokens: 160,
     temperature: 0.2,
     schema: USHER_PICK_SCHEMA,
+  },
+  usher_answer: {
+    collectLog: true,
+    cache: { enabled: false },
+    tier: "fast",
+    timeoutMs: 20_000,
+    maxTokens: 260,
+    temperature: 0.4,
+    schema: null,
   },
 };
 

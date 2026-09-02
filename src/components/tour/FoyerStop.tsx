@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { MediaTitle } from "../../domain/catalog";
 import { TOUR_OPENERS } from "../../domain/tour";
@@ -6,6 +6,7 @@ import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useResource } from "../../hooks/useResource";
 import { classNames } from "../../lib/class-names";
 import { Chip, Skeleton, Text } from "../../ui";
+import { useStageReport } from "../screening/ScreeningContext";
 import { SearchField } from "../SearchField";
 import { TourTitles } from "./TourTitles";
 
@@ -79,6 +80,15 @@ export function FoyerStop({
   const [query, setQuery] = useState(TOUR_OPENERS[0]);
   const debounced = useDebouncedValue(query.trim(), DEBOUNCE_MS);
   const enabled = isActive && debounced.length > 1;
+  const report = useStageReport("foyer");
+  const reportedRef = useRef(debounced);
+
+  useEffect(() => {
+    if (enabled && debounced !== reportedRef.current) {
+      reportedRef.current = debounced;
+      report("ask", debounced);
+    }
+  }, [debounced, enabled, report]);
 
   const keyword = useResource<SearchResponse>(laneUrl(debounced, false), { enabled });
   const meaning = useResource<SearchResponse>(laneUrl(debounced, true), { enabled });

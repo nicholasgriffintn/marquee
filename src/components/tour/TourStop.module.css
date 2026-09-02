@@ -19,7 +19,7 @@
   flex-direction: column;
   gap: var(--space-6);
   margin: 0 auto;
-  max-width: 1180px;
+  max-width: var(--stop-max, 1180px);
   width: 100%;
 }
 

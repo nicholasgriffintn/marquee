@@ -346,6 +346,10 @@
       {
         "name": "CURATOR_SESSION",
         "class_name": "CuratorSession"
+      },
+      {
+        "name": "SCREENING",
+        "class_name": "Screening"
       }
     ]
   },
@@ -353,6 +357,10 @@
     {
       "tag": "v1",
       "new_sqlite_classes": ["CuratorSession"]
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["Screening"]
     }
   ]
 }

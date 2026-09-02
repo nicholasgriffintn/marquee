@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 
 import { queryJsonFresh, QueryError } from "../../lib/query-client";
 import { Button } from "../../ui";
+import { useStageReport } from "../screening/ScreeningContext";
 
 import styles from "./DoorStop.module.css";
 
@@ -12,6 +13,7 @@ const KNOCK_LIMIT = 3;
 export function DoorStop() {
   const [knocks, setKnocks] = useState<Knock[]>([]);
   const [isKnocking, setIsKnocking] = useState(false);
+  const report = useStageReport("door");
 
   const knock = useCallback(async () => {
     setIsKnocking(true);
@@ -20,19 +22,16 @@ export function DoorStop() {
       const answer = await queryJsonFresh<{ line: string }>("/api/catalog/door");
 
       setKnocks((current) => [...current, { id: current.length, ok: true, line: answer.line }]);
+      report("knock", answer.line);
     } catch (error) {
-      setKnocks((current) => [
-        ...current,
-        {
-          id: current.length,
-          ok: false,
-          line: error instanceof QueryError ? error.message : "The door did not answer at all.",
-        },
-      ]);
+      const line = error instanceof QueryError ? error.message : "The door did not answer at all.";
+
+      setKnocks((current) => [...current, { id: current.length, ok: false, line }]);
+      report("refused", line);
     } finally {
       setIsKnocking(false);
     }
-  }, []);
+  }, [report]);
 
   const refused = knocks.some((entry) => !entry.ok);
 

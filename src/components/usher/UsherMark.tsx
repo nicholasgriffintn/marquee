@@ -60,27 +60,15 @@ const FACES: Record<UsherFace, ReactElement> = {
   ),
 };
 
-export function UsherMark({
+export function UsherFigure({
   face = "idle",
   crop = "full",
-  className,
 }: {
   face?: UsherFace;
   crop?: "full" | "head";
-  className?: string;
 }) {
   return (
-    <svg
-      className={classNames(styles.mark, className)}
-      viewBox={crop === "head" ? "108 98 296 200" : "0 0 600 512"}
-      // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- the svg paths are the image, role=img is the standard pattern
-      role="img"
-      aria-label="The Usher"
-      fill="none"
-      stroke="#11130f"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
+    <g fill="none" stroke="#11130f" strokeLinecap="round" strokeLinejoin="round">
       {crop === "full" && (
         <g>
           <path d={LIMBS} strokeWidth="36" />
@@ -117,6 +105,28 @@ export function UsherMark({
         <circle cx="256" cy="338" r="8" />
       </g>
       {FACES[face]}
+    </g>
+  );
+}
+
+export function UsherMark({
+  face = "idle",
+  crop = "full",
+  className,
+}: {
+  face?: UsherFace;
+  crop?: "full" | "head";
+  className?: string;
+}) {
+  return (
+    <svg
+      className={classNames(styles.mark, className)}
+      viewBox={crop === "head" ? "108 98 296 200" : "0 0 600 512"}
+      // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- the svg paths are the image, role=img is the standard pattern
+      role="img"
+      aria-label="The Usher"
+    >
+      <UsherFigure face={face} crop={crop} />
     </svg>
   );
 }

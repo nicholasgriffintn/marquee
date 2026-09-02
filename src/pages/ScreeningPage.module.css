@@ -1,0 +1,9 @@
+.room {
+  margin: 0 auto;
+  max-width: 760px;
+}
+
+.issue {
+  color: var(--coral);
+  font: var(--weight-regular) var(--type-body) / 1.5 var(--sans);
+}

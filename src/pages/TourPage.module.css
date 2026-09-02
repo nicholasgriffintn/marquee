@@ -18,3 +18,17 @@
 .presenting [data-stop] {
   --chrome: 60px;
 }
+
+.withRoom {
+  --gutter: var(--space-5);
+  --stop-max: none;
+
+  padding-right: 360px;
+}
+
+@media (max-width: 1100px) {
+  .withRoom {
+    padding-bottom: 46vh;
+    padding-right: 0;
+  }
+}

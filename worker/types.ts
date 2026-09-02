@@ -1,6 +1,7 @@
 import type { ExternalIds } from "../src/domain/catalog.ts";
 import type { EntryStatus } from "../src/domain/entries.ts";
 import type { DatabaseBinding, WithDatabase } from "./database/runtime.ts";
+import type { Screening } from "./durable/screening.ts";
 
 export type WorkerBindings = DatabaseBinding & {
   ASSETS: Fetcher;
@@ -50,6 +51,7 @@ export type WorkerBindings = DatabaseBinding & {
   RAILS_WORKFLOW: Workflow<RailsParameters>;
   DIGEST_WORKFLOW: Workflow;
   CURATOR_SESSION: DurableObjectNamespace;
+  SCREENING: DurableObjectNamespace<Screening>;
   MEDIA: R2Bucket;
   CACHE: KVNamespace;
   TRAKT_CLIENT_ID?: string;

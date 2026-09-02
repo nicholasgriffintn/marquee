@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 
 import type { TourStop as Stop } from "../../domain/tour";
 import { classNames } from "../../lib/class-names";
+import { StageCursors } from "../screening/StageCursors";
 import { UsherMark } from "../usher/UsherMark";
 import { TechNote } from "./TechNote";
 
@@ -62,6 +63,8 @@ export function TourStop({
           </button>
         </footer>
       </div>
+
+      <StageCursors stage={stop.id} />
 
       {isExplaining && <TechNote stop={stop} onClose={() => setIsExplaining(false)} />}
     </section>

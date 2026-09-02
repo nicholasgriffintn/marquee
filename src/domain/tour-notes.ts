@@ -40,6 +40,14 @@ export const TOUR_NOTES: Record<TourStopId, TourNote> = {
       { path: "src/pages/TourPage.tsx", what: "This page" },
       { path: "src/domain/tour.ts", what: "The definitions for each section" },
       { path: "worker/services/building.ts", what: "The queries that get the counters data" },
+      {
+        path: "src/components/tour/facades",
+        what: "The four frontages, drawn from the live board",
+      },
+      {
+        path: "worker/durable/poll.ts",
+        what: "The ballot box behind the frontage vote, a Durable Object",
+      },
     ],
   },
 

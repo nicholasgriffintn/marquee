@@ -81,6 +81,18 @@ async function gatewayHeaders(call: AiCall, body: string) {
   };
 }
 
+function failureMessage(route: AiRoute, status: number) {
+  if (route.transport === "cloudflare" && (status === 401 || status === 403)) {
+    return `Cloudflare Workers AI rejected AI_GATEWAY_TOKEN with status ${status}: the token must be an account API token with Workers AI Read and AI Gateway Run permissions`;
+  }
+
+  if (route.transport === "byok" && (status === 401 || status === 403)) {
+    return `AI Gateway rejected the BYOK request for ${route.provider} with status ${status}: check the gateway authentication token and the ${route.byokAlias} key alias`;
+  }
+
+  return `Cloudflare AI Gateway request failed with status ${status}`;
+}
+
 function completionsUrl(env: Bindings, route: AiRoute) {
   return route.transport === "byok"
     ? `https://gateway.ai.cloudflare.com/v1/${env.CLOUDFLARE_ACCOUNT_ID}/${env.AI_GATEWAY_ID}/${route.providerPath}`
@@ -226,7 +238,7 @@ async function completeOnce(
     report(null);
 
     throw new AiGatewayError(
-      `Cloudflare AI Gateway request failed with status ${response.status}`,
+      failureMessage(call.route, response.status),
       response.status,
       call.route.transport,
     );

@@ -40,3 +40,7 @@ export function normaliseTitle(value: string) {
     .replaceAll(/\s+/gu, " ")
     .trim();
 }
+
+export function truncateLabel(value: string, maxLength: number) {
+  return value.length > maxLength ? `${value.slice(0, Math.max(maxLength - 1, 0))}…` : value;
+}
