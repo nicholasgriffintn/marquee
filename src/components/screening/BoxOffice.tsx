@@ -113,7 +113,7 @@ export function BoxOffice({
               </StatusNote>
             ) : (
               <ol className={styles.cinemas}>
-                {(ballot?.options ?? []).map((option, index) => (
+                {(ballot?.options ?? []).map((option) => (
                   <li key={option.id}>
                     <button
                       type="button"
@@ -125,10 +125,7 @@ export function BoxOffice({
                         {isFacadeId(option.id) && <CinemaFacade id={option.id} showing={showing} />}
                       </span>
                       <span className={styles.copy}>
-                        <strong>
-                          <i>{String(index + 1).padStart(2, "0")}</i>
-                          {option.label}
-                        </strong>
+                        <strong>{option.label}</strong>
                         <small>{option.blurb}</small>
                       </span>
                     </button>

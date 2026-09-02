@@ -12,10 +12,10 @@ export function NotebookSection({
   hidden = false,
   children,
 }: {
-    id: string;
+  id: string;
   title: string;
   lede: string;
-    hidden?: boolean;
+  hidden?: boolean;
   children: ReactNode;
 }) {
   return (
