@@ -96,6 +96,17 @@ export const POLICIES = {
     member: { limiter: "MEMBER_RATE_LIMITER", message: STEADY_ON },
     bots: "open",
   },
+  imports: {
+    anonymous: {
+      limiter: "CURATOR_FREE_RATE_LIMITER",
+      message: "Imports are for members. Sign in first.",
+    },
+    member: {
+      limiter: "CURATOR_RATE_LIMITER",
+      message: "One import at a time. The last one is still going through.",
+    },
+    bots: "strict",
+  },
 } as const satisfies Record<string, Policy>;
 
 export type PolicyName = keyof typeof POLICIES;
@@ -119,6 +130,9 @@ export const RULES: readonly Rule[] = [
   { path: "/api/events", policy: "telemetry" },
   { path: "/api/usher/pick", methods: ["POST"], policy: "usher" },
   { path: "/api/usher/order", methods: ["POST"], policy: "usher" },
+  { path: "/api/profile/imports", methods: ["POST"], policy: "imports" },
+  { path: "/api/profile/imports/*/preview", methods: ["POST"], policy: "imports" },
+  { path: "/api/profile/imports/*/commit", methods: ["POST"], policy: "imports" },
   { path: "/api/profile/imports", methods: WRITE_METHODS, policy: "write" },
   { path: "/api/profile/imports/*", methods: WRITE_METHODS, policy: "write" },
   { path: "/api/links/trakt/start", policy: "auth" },
@@ -144,5 +158,20 @@ export function matchPolicy(path: string, method: string) {
 }
 
 function matchesPath(pattern: string, path: string) {
-  return pattern.endsWith("/*") ? path.startsWith(pattern.slice(0, -1)) : pattern === path;
+  if (!pattern.includes("*")) {
+    return pattern === path;
+  }
+
+  const patternSegments = pattern.split("/");
+  const pathSegments = path.split("/");
+  const trailing = patternSegments.at(-1) === "*";
+  const compared = trailing ? patternSegments.length - 1 : patternSegments.length;
+
+  if (trailing ? pathSegments.length <= compared : pathSegments.length !== compared) {
+    return false;
+  }
+
+  return patternSegments
+    .slice(0, compared)
+    .every((segment, index) => segment === "*" || segment === pathSegments[index]);
 }

@@ -80,9 +80,7 @@ export function BrowsePage({
     sortParam === "trending"
       ? sortParam
       : preset.sort;
-  const filterable = providers.filter(
-    (provider) => provider.status === "feed" && Boolean(provider.tmdbProviderIds?.length),
-  );
+  const filterable = providers.filter((provider) => provider.capabilities.includes("preference"));
   const shownKeywords = [
     ...selectedKeywords,
     ...keywords.filter((keyword) => !selectedKeywords.includes(keyword)),

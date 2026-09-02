@@ -218,6 +218,7 @@ async function requestTmdb(env: Bindings, path: string, parameters: Record<strin
 
   const response = await upstreamFetch(url, {
     headers: { authorization: `Bearer ${env.TMDB_API_TOKEN}` },
+    source: "tmdb",
     timeoutMs: TIMEOUT_MS,
     cacheTtl: path.startsWith("/watch/providers") ? PROVIDERS_CACHE_TTL : CACHE_TTL,
   });

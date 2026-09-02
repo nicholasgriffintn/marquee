@@ -488,6 +488,8 @@ const BUDGET_SAMPLES: Record<string, (db: Database) => Promise<SampleResult>> = 
   anilist: (db) => enrichmentSourceSample(db, "anilist"),
 };
 
+export const BUDGET_SAMPLE_SOURCES = new Set(Object.keys(BUDGET_SAMPLES));
+
 export async function readOverviewSample(
   env: Bindings,
   type: "count" | "budget",

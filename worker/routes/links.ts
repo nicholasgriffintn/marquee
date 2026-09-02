@@ -5,6 +5,7 @@ import { exchangeTraktCode, getTraktUser, traktAuthorizeUrl } from "../clients/t
 import { jsonResponse } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
 import { canonicalOrigin, safeReturnPath } from "../lib/security.ts";
+import { TokenEncryptionUnavailable } from "../lib/token-crypto.ts";
 import {
   claimLinkState,
   deleteLink,
@@ -33,7 +34,11 @@ linkRoutes.get("/", async (context) => {
         {
           provider: "trakt",
           connected: Boolean(trakt),
-          available: Boolean(context.env.TRAKT_CLIENT_ID && context.env.TRAKT_CLIENT_SECRET),
+          available: Boolean(
+            context.env.TRAKT_CLIENT_ID &&
+            context.env.TRAKT_CLIENT_SECRET &&
+            context.env.TOKEN_ENCRYPTION_KEY,
+          ),
           account: trakt?.accountLabel ?? null,
           syncedAt: trakt?.syncedAt ?? null,
           needsReconnect: Boolean(trakt?.brokenAt),
@@ -52,6 +57,12 @@ linkRoutes.get("/trakt/start", async (context) => {
 
   if (!context.env.TRAKT_CLIENT_ID || !context.env.TRAKT_CLIENT_SECRET) {
     return jsonResponse({ error: "Trakt is not configured" }, 503);
+  }
+
+  if (!context.env.TOKEN_ENCRYPTION_KEY) {
+    logError("trakt_link_start_refused", new TokenEncryptionUnavailable());
+
+    return jsonResponse({ error: "Account linking is not configured" }, 503);
   }
 
   try {
@@ -103,7 +114,10 @@ linkRoutes.get("/trakt/callback", async (context) => {
   } catch (error) {
     logError("trakt_link_callback_failed", error);
 
-    return context.redirect(new URL("/shelf?linkError=trakt_failed", origin).href);
+    const reason =
+      error instanceof TokenEncryptionUnavailable ? "link_storage_unavailable" : "trakt_failed";
+
+    return context.redirect(new URL(`/shelf?linkError=${reason}`, origin).href);
   }
 });
 

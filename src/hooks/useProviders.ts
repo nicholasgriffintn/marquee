@@ -6,10 +6,13 @@ const NO_SOURCES: string[] = [];
 
 const EMPTY_STATS: ProvidersResponse["stats"] = {
   configured: 0,
-  feeds: 0,
-  links: 0,
-  markers: 0,
+  live: 0,
+  stale: 0,
+  unresolved: 0,
+  outOfScope: 0,
+  failed: 0,
   longTail: 0,
+  titlesCovered: 0,
 };
 
 export function useProviders() {

@@ -1,3 +1,4 @@
+import { flushUpstreamUsage } from "../lib/upstream-usage.ts";
 import { LazyDatabase } from "./lazy.ts";
 import type { Database } from "./types.ts";
 
@@ -29,6 +30,7 @@ export async function withDatabase<Environment extends DatabaseBinding, Result>(
   try {
     return await operation(runtime);
   } finally {
+    await flushUpstreamUsage(runtime);
     await database.close();
   }
 }

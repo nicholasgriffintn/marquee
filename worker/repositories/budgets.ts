@@ -1,3 +1,4 @@
+import { UPSTREAM_SOURCES, type UpstreamSourceId } from "../../src/domain/sources.ts";
 import { escalate, type BackoffPolicy } from "../lib/backoff.ts";
 import { logEvent } from "../lib/logging.ts";
 import type { Bindings, EnrichmentSource } from "../types.ts";
@@ -11,24 +12,22 @@ type BudgetRow = {
   consecutivePauses: number;
 };
 
-export type BudgetSource = Exclude<EnrichmentSource, "poster">;
+export type BudgetSource = UpstreamSourceId;
 
-const BUDGET_ALIAS: Partial<Record<EnrichmentSource, BudgetSource>> = {
+const BUDGET_ALIAS: Partial<Record<BudgetableSource, BudgetSource>> = {
   poster: "omdb",
 };
 
-export const SOURCE_BUDGETS: Record<
-  BudgetSource,
-  { windowKind: "day" | "month"; callLimit: number }
-> = {
-  tmdb: { windowKind: "day", callLimit: 12_000 },
-  justwatch: { windowKind: "day", callLimit: 20_000 },
-  omdb: { windowKind: "day", callLimit: 500_000 },
-  mal: { windowKind: "day", callLimit: 20_000 },
-  anilist: { windowKind: "day", callLimit: 20_000 },
-};
+export type BudgetableSource = EnrichmentSource | UpstreamSourceId;
 
-export function budgetSource(source: EnrichmentSource): BudgetSource {
+export const SOURCE_BUDGETS = Object.fromEntries(
+  Object.values(UPSTREAM_SOURCES).map((configured) => [
+    configured.id,
+    { windowKind: configured.window, callLimit: configured.callLimit },
+  ]),
+) as Record<BudgetSource, { windowKind: "day" | "month"; callLimit: number }>;
+
+export function budgetSource(source: BudgetableSource): BudgetSource {
   return BUDGET_ALIAS[source] ?? (source as BudgetSource);
 }
 
@@ -88,7 +87,7 @@ export async function ensureBudgets(env: Bindings) {
   return reconciled;
 }
 
-export async function readBudgetRoom(env: Bindings, source: EnrichmentSource) {
+export async function readBudgetRoom(env: Bindings, source: BudgetableSource) {
   const resolved = budgetSource(source);
   const configured = SOURCE_BUDGETS[resolved];
   const row = await env.DB.first<{ room: number }>(
@@ -107,7 +106,7 @@ export async function readBudgetRoom(env: Bindings, source: EnrichmentSource) {
 
 const SWEEP_HOURS = 3;
 
-export async function readBudgetPace(env: Bindings, source: EnrichmentSource) {
+export async function readBudgetPace(env: Bindings, source: BudgetableSource) {
   const resolved = budgetSource(source);
   const configured = SOURCE_BUDGETS[resolved];
   const expression = windowExpression(configured.windowKind);
@@ -142,7 +141,7 @@ export async function readBudgetPace(env: Bindings, source: EnrichmentSource) {
   return Math.floor(row.room / sweeps);
 }
 
-export async function claimBudget(env: Bindings, source: EnrichmentSource, reserve = 0) {
+export async function claimBudget(env: Bindings, source: BudgetableSource, reserve = 0) {
   const resolved = budgetSource(source);
   const expression = windowExpression(SOURCE_BUDGETS[resolved].windowKind);
   const protectedCalls = Math.max(0, Math.trunc(reserve));
@@ -178,7 +177,7 @@ export async function claimBudget(env: Bindings, source: EnrichmentSource, reser
   return (await claim()).rowCount > 0;
 }
 
-export async function pauseSource(env: Bindings, source: EnrichmentSource, policy: BackoffPolicy) {
+export async function pauseSource(env: Bindings, source: BudgetableSource, policy: BackoffPolicy) {
   const resolved = budgetSource(source);
   const current = await env.DB.first<{ consecutivePauses: number }>(
     `SELECT consecutive_pauses AS "consecutivePauses" FROM source_budgets WHERE source = $1`,
@@ -199,14 +198,14 @@ export async function pauseSource(env: Bindings, source: EnrichmentSource, polic
   logEvent("source_paused", { source, minutes, consecutive: consecutive + 1 });
 }
 
-export async function resetBackoff(env: Bindings, source: EnrichmentSource) {
+export async function resetBackoff(env: Bindings, source: BudgetableSource) {
   await env.DB.execute(
     `UPDATE source_budgets SET consecutive_pauses = 0 WHERE source = $1 AND consecutive_pauses <> 0`,
     [budgetSource(source)],
   );
 }
 
-export async function resumeSource(env: Bindings, source: EnrichmentSource) {
+export async function resumeSource(env: Bindings, source: BudgetableSource) {
   await env.DB.execute(
     `UPDATE source_budgets
      SET paused_until = NULL, updated_at = CURRENT_TIMESTAMP

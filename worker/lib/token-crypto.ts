@@ -38,11 +38,18 @@ function parseEnvelope(value: string) {
     : null;
 }
 
+export class TokenEncryptionUnavailable extends Error {
+  constructor() {
+    super("TOKEN_ENCRYPTION_KEY is not configured, so no token can be stored");
+    this.name = "TokenEncryptionUnavailable";
+  }
+}
+
 export async function encryptOAuthToken(env: Bindings, plaintext: string): Promise<string> {
   if (!env.TOKEN_ENCRYPTION_KEY) {
-    logError("token_encryption_key_missing", new Error("TOKEN_ENCRYPTION_KEY is not configured"));
+    logError("token_encryption_key_missing", new TokenEncryptionUnavailable());
 
-    return plaintext;
+    throw new TokenEncryptionUnavailable();
   }
 
   const { iv, ciphertext } = await keyringFor(env.TOKEN_ENCRYPTION_KEY).encrypt(
@@ -53,9 +60,6 @@ export async function encryptOAuthToken(env: Bindings, plaintext: string): Promi
   return `${ENVELOPE_PREFIX}:${iv}:${ciphertext}`;
 }
 
-// Rows written before this feature shipped (or while TOKEN_ENCRYPTION_KEY was
-// unset) hold plaintext tokens; anything that doesn't parse as our envelope
-// is returned unchanged so those links keep working until the next save.
 export async function decryptOAuthToken(env: Bindings, stored: string): Promise<string> {
   const envelope = parseEnvelope(stored);
 

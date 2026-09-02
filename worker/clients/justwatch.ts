@@ -51,6 +51,7 @@ export async function getJustwatchAvailability(
   const response = await upstreamFetch(API_URL, {
     method: "POST",
     headers: { "content-type": "application/json" },
+    source: "justwatch",
     timeoutMs: TIMEOUT_MS,
     body: JSON.stringify({
       operationName: "MarqueeTitleOffers",

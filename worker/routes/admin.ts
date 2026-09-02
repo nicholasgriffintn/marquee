@@ -1,11 +1,11 @@
 import { Hono } from "hono";
 
 import { ADMIN_ACTIONS, isAdminAction } from "../../src/domain/admin.ts";
+import { isUpstreamSource } from "../../src/domain/sources.ts";
 import { requireAdmin, type AuthVariables } from "../auth/session.ts";
 import { runEvaluation } from "../evaluation/runner.ts";
 import { readJsonObject } from "../lib/http.ts";
 import { logError, logEvent } from "../lib/logging.ts";
-import { SOURCE_BUDGETS } from "../repositories/budgets.ts";
 import { readDecisionBoard } from "../repositories/decisions.ts";
 import {
   isRevivalId,
@@ -22,10 +22,11 @@ import {
   readAdminListings,
   readAdminOverview,
   readAdminPipeline,
+  readAdminProviders,
   runAdminAction,
 } from "../services/admin.ts";
 import { readAngleBoard } from "../services/angle-scores.ts";
-import type { Bindings, EnrichmentSource } from "../types.ts";
+import type { Bindings } from "../types.ts";
 
 export const adminRoutes = new Hono<{
   Bindings: Bindings;
@@ -58,6 +59,18 @@ adminRoutes.get("/pipeline", async (context) => {
     logError("admin_pipeline_failed", error, { area: "admin" });
 
     return context.json({ error: "Could not read the pipeline" }, 500);
+  }
+});
+
+adminRoutes.get("/providers", async (context) => {
+  try {
+    context.header("cache-control", "no-store");
+
+    return context.json(await readAdminProviders(context.env));
+  } catch (error) {
+    logError("admin_providers_failed", error, { area: "providers" });
+
+    return context.json({ error: "Could not read the provider ledger" }, 500);
   }
 });
 
@@ -127,12 +140,12 @@ adminRoutes.post("/actions/:action", async (context) => {
 adminRoutes.post("/sources/:source/resume", async (context) => {
   const source = context.req.param("source");
 
-  if (!Object.hasOwn(SOURCE_BUDGETS, source)) {
+  if (!isUpstreamSource(source)) {
     return context.json({ error: "Unknown source" }, 400);
   }
 
   try {
-    return context.json(await clearSourcePause(context.env, source as EnrichmentSource));
+    return context.json(await clearSourcePause(context.env, source));
   } catch (error) {
     logError("admin_resume_failed", error, { area: "admin", source });
 

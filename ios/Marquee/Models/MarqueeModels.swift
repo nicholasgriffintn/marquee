@@ -449,8 +449,13 @@ struct MarqueeProvider: Codable, Identifiable {
   let name: String
   let category: String
   let homepage: URL?
-  let status: String?
+  let state: String?
+  let capabilities: [String]?
+  let reason: String?
+  let titles: Int?
   let tmdbProviderIds: [Int]?
+
+  var isSelectable: Bool { (capabilities ?? []).contains("preference") }
 }
 
 struct ProvidersResponse: Codable { let providers: [MarqueeProvider] }

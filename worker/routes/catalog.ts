@@ -447,7 +447,7 @@ catalogRoutes.get("/collections/:id", edgeCache(3_600), async (context) => {
 
 catalogRoutes.get("/providers", edgeCache(300), async (context) => {
   try {
-    const providers = await getProviderCatalogue(context.env.DB);
+    const providers = await getProviderCatalogue(context.env);
 
     if (!providers) {
       return context.json({ error: "Provider catalogue is warming up" }, 503);

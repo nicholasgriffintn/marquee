@@ -1,3 +1,4 @@
+import { traceUpstream } from "../../lib/upstream-usage.ts";
 import { numberAt, records, stringAt } from "../../lib/values.ts";
 import { UPSTREAM_AGENT } from "../fetch.ts";
 import {
@@ -20,16 +21,18 @@ const MAX_SITES = 40;
 const IGNORED_ATTRIBUTES = new Set(["reserved", "unreserved", "allocated"]);
 
 async function fetchText(url: string) {
-  const response = await fetch(url, {
-    headers: {
-      accept: "text/html,application/xhtml+xml",
-      "accept-language": "en-GB,en;q=0.9",
-      "user-agent": UPSTREAM_AGENT,
-    },
-    redirect: "follow",
-    signal: AbortSignal.timeout(20_000),
-    cf: { cacheEverything: true, cacheTtl: 21_600 },
-  });
+  const response = await traceUpstream("picturehouse", () =>
+    fetch(url, {
+      headers: {
+        accept: "text/html,application/xhtml+xml",
+        "accept-language": "en-GB,en;q=0.9",
+        "user-agent": UPSTREAM_AGENT,
+      },
+      redirect: "follow",
+      signal: AbortSignal.timeout(20_000),
+      cf: { cacheEverything: true, cacheTtl: 21_600 },
+    }),
+  );
 
   if (!response.ok) {
     throw new CinemaSourceError(`Picturehouse answered ${response.status}`, response.status);
@@ -39,18 +42,20 @@ async function fetchText(url: string) {
 }
 
 async function postForm(form: Record<string, string>) {
-  const response = await fetch(LISTINGS, {
-    method: "POST",
-    headers: {
-      accept: "application/json",
-      "content-type": "application/x-www-form-urlencoded",
-      "x-requested-with": "XMLHttpRequest",
-      "user-agent": UPSTREAM_AGENT,
-    },
-    body: new URLSearchParams(form).toString(),
-    signal: AbortSignal.timeout(20_000),
-    cf: { cacheEverything: true, cacheTtl: 900 },
-  });
+  const response = await traceUpstream("picturehouse", () =>
+    fetch(LISTINGS, {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/x-www-form-urlencoded",
+        "x-requested-with": "XMLHttpRequest",
+        "user-agent": UPSTREAM_AGENT,
+      },
+      body: new URLSearchParams(form).toString(),
+      signal: AbortSignal.timeout(20_000),
+      cf: { cacheEverything: true, cacheTtl: 900 },
+    }),
+  );
 
   if (!response.ok) {
     throw new CinemaSourceError(`Picturehouse answered ${response.status}`, response.status);

@@ -4,6 +4,7 @@ export const TABS = [
   { id: "overview", label: "Overview" },
   { id: "actions", label: "Actions" },
   { id: "pipeline", label: "Pipeline" },
+  { id: "sources", label: "Sources" },
   { id: "listings", label: "Listings" },
   { id: "quality", label: "Quality" },
   { id: "vault", label: "The vault" },
@@ -15,6 +16,7 @@ export type AdminTab = (typeof TABS)[number]["id"];
 export const READS_DATA = new Set<AdminTab>([
   "overview",
   "pipeline",
+  "sources",
   "listings",
   "quality",
   "vault",

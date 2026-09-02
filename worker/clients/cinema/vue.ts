@@ -23,7 +23,7 @@ function result(payload: unknown) {
 }
 
 async function listCinemas(): Promise<SourceCinema[]> {
-  const payload = await fetchSourceJson(`${BASE}/cinemas`);
+  const payload = await fetchSourceJson("vue", `${BASE}/cinemas`);
   const groups = records(result(payload));
 
   return groups.flatMap((group) =>
@@ -51,7 +51,10 @@ async function listCinemas(): Promise<SourceCinema[]> {
 }
 
 async function filmsAt(siteId: string): Promise<SourceFilm[]> {
-  const payload = await fetchSourceJson(`${BASE}/films?cinemaId=${encodeURIComponent(siteId)}`);
+  const payload = await fetchSourceJson(
+    "vue",
+    `${BASE}/films?cinemaId=${encodeURIComponent(siteId)}`,
+  );
 
   return records(result(payload)).flatMap((film): SourceFilm[] => {
     const filmId = stringAt(film, "filmId");
@@ -77,7 +80,7 @@ async function filmsAt(siteId: string): Promise<SourceFilm[]> {
 }
 
 async function daysFor(siteId: string, filmId: string) {
-  const payload = await fetchSourceJson(DATE_QUERY(siteId, filmId));
+  const payload = await fetchSourceJson("vue", DATE_QUERY(siteId, filmId));
 
   return records(result(payload)).flatMap((entry) => {
     const showingDate = stringAt(entry, "showingDate");

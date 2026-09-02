@@ -68,6 +68,7 @@ export async function findArticle(names: (string | null)[], year: number | null,
 
   const response = await upstreamFetch(url, {
     headers: { "user-agent": UPSTREAM_AGENT },
+    source: "wikimedia",
     timeoutMs: TIMEOUT_MS,
     cacheTtl: SEARCH_CACHE_TTL,
   });
@@ -128,6 +129,7 @@ async function dailyViews(path: string) {
     // oxlint-disable-next-line no-await-in-loop
     response = await upstreamFetch(`${METRICS_BASE}/${path}`, {
       headers: { "user-agent": UPSTREAM_AGENT },
+      source: "wikimedia",
       timeoutMs: TIMEOUT_MS,
       cacheTtl: VIEWS_CACHE_TTL,
     });

@@ -17,15 +17,61 @@ export type AdminOverview = {
     pagesDone: number;
     totalPages: number;
   }[];
-  budgets: {
-    source: string;
-    callLimit: number;
-    used: number;
-    windowKind: string;
-    pausedUntil: string | null;
-    consecutivePauses: number;
-  }[];
+  sources: SourceHealth[];
   fetchedAt: string;
+};
+
+export type SourceHealth = {
+  source: string;
+  label: string;
+  kind: string;
+  powers: string;
+  optional: boolean;
+  enforced: boolean;
+  credential: string | null;
+  credentialState: "configured" | "missing" | "open";
+  windowKind: string;
+  callLimit: number;
+  claimed: number;
+  pausedUntil: string | null;
+  consecutivePauses: number;
+  calls: number;
+  failures: number;
+  averageLatencyMs: number;
+  lastStatus: number | null;
+  lastSuccessAt: string | null;
+  lastErrorAt: string | null;
+  lastError: string | null;
+  sampled: boolean;
+  state: "healthy" | "degraded" | "failing" | "paused" | "unconfigured" | "idle";
+};
+
+export type AdminProviders = {
+  providers: {
+    id: string;
+    name: string;
+    category: string;
+    capabilities: string[];
+    state: "live" | "stale" | "unresolved" | "out-of-scope" | "failed";
+    reason: string | null;
+    titles: number;
+    tmdbProviderIds: number[];
+    homepage: string | null;
+  }[];
+  unmapped: { providerId: string; name: string; titles: number; resolvesNow: string | null }[];
+  errors: { source: string; detail: string }[];
+  stats: {
+    configured: number;
+    live: number;
+    stale: number;
+    unresolved: number;
+    outOfScope: number;
+    failed: number;
+    longTail: number;
+    titlesCovered: number;
+  } | null;
+  sources: string[];
+  fetchedAt: string | null;
 };
 
 export type AdminPipeline = {

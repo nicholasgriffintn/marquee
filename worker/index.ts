@@ -12,6 +12,7 @@ import { hasTrustedOrigin } from "./lib/http.ts";
 import { logError, logEvent, logRejection } from "./lib/logging.ts";
 import { canonicalOrigin } from "./lib/security.ts";
 import { withPageMetadata } from "./lib/share.ts";
+import { flushUpstreamUsage } from "./lib/upstream-usage.ts";
 import { adminRoutes } from "./routes/admin.ts";
 import { aliasRoutes } from "./routes/aliases.ts";
 import { catalogRoutes } from "./routes/catalog.ts";
@@ -65,7 +66,23 @@ app.use("*", apiGuard);
 
 app.use("/api/*", bearerScopeGuard);
 
-app.get("/health", (context) => context.json({ ok: true, service: "marquee" }));
+app.get("/health", async (context) => {
+  context.header("cache-control", "no-store");
+
+  const database = await context.env.DB.first<{ ok: number }>("SELECT 1 AS ok").then(
+    () => true,
+    (error: unknown) => {
+      logError("health_database_unreachable", error);
+
+      return false;
+    },
+  );
+
+  return context.json(
+    { ok: database, service: "marquee", database: database ? "up" : "down" },
+    database ? 200 : 503,
+  );
+});
 
 app.route("/", sitemapRoutes);
 
@@ -158,7 +175,11 @@ export default {
     try {
       return await app.fetch(request, runtime, context);
     } finally {
-      context.waitUntil(database.close());
+      context.waitUntil(
+        logRejection(flushUpstreamUsage(runtime), "upstream_usage_flush_failed").then(() =>
+          database.close(),
+        ),
+      );
     }
   },
   scheduled(controller, env, context) {

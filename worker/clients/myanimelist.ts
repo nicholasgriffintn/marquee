@@ -273,6 +273,7 @@ export async function getMalAnimeDetails(
   url.search = new URLSearchParams({ fields: FIELDS }).toString();
 
   const response = await upstreamFetch(url, {
+    source: "mal",
     timeoutMs: TIMEOUT_MS,
     headers: { "X-MAL-CLIENT-ID": env.MAL_CLIENT_ID },
   });

@@ -1,4 +1,6 @@
 import type { ScreeningPrecision } from "../../../src/domain/cinema.ts";
+import type { UpstreamSourceId } from "../../../src/domain/sources.ts";
+import { traceUpstream } from "../../lib/upstream-usage.ts";
 import { UPSTREAM_AGENT } from "../fetch.ts";
 import { upstreamError } from "../upstream.ts";
 
@@ -62,19 +64,25 @@ export function horizonDays(days: number, from = new Date()) {
   );
 }
 
-export async function fetchSourceJson(url: string, init: RequestInit = {}) {
+export async function fetchSourceJson(
+  source: UpstreamSourceId,
+  url: string,
+  init: RequestInit = {},
+) {
   const headers = new Headers(init.headers);
 
   headers.set("accept", "application/json");
   headers.set("accept-language", "en-GB,en;q=0.9");
   headers.set("user-agent", UPSTREAM_AGENT);
 
-  const response = await fetch(url, {
-    ...init,
-    headers,
-    signal: AbortSignal.timeout(15_000),
-    cf: { cacheEverything: true, cacheTtl: 900 },
-  });
+  const response = await traceUpstream(source, () =>
+    fetch(url, {
+      ...init,
+      headers,
+      signal: AbortSignal.timeout(15_000),
+      cf: { cacheEverything: true, cacheTtl: 900 },
+    }),
+  );
 
   if (!response.ok) {
     throw new CinemaSourceError(`Source answered ${response.status}`, response.status);

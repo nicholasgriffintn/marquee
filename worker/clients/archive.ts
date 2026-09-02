@@ -87,7 +87,11 @@ export function archivePageCap() {
 }
 
 async function readJson(url: string) {
-  const response = await upstreamFetch(url, { timeoutMs: TIMEOUT_MS, cacheTtl: CACHE_TTL });
+  const response = await upstreamFetch(url, {
+    source: "archive",
+    timeoutMs: TIMEOUT_MS,
+    cacheTtl: CACHE_TTL,
+  });
 
   if (!response.ok) {
     throw new Error(`Internet Archive responded ${response.status}`);

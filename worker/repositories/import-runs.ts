@@ -581,3 +581,22 @@ export async function deleteImportRun(db: Database, viewerId: string, runId: str
 
   return result.rowCount > 0;
 }
+
+const ABANDONED_RUN_DAYS = 30;
+
+const ABANDONED_STATUSES = ["staging", "matching", "ready", "needs_review", "failed"];
+
+export async function pruneImportRuns(db: Database) {
+  const statuses = ABANDONED_STATUSES.map((_, index) => `$${index + 1}`).join(",");
+  const result = await db.execute(
+    `DELETE FROM viewer_import_runs
+      WHERE status IN (${statuses})
+        AND updated_at < (CURRENT_TIMESTAMP - CAST($${ABANDONED_STATUSES.length + 1} AS INTERVAL))
+        AND NOT EXISTS (
+          SELECT 1 FROM viewing_events WHERE import_run_id = viewer_import_runs.id
+        )`,
+    [...ABANDONED_STATUSES, `${ABANDONED_RUN_DAYS} days`],
+  );
+
+  return result.rowCount;
+}

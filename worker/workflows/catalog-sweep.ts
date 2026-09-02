@@ -8,7 +8,9 @@ import { GAP_DISCOVERY } from "../lib/catalogue-gaps.ts";
 import { ensureBudgets } from "../repositories/budgets.ts";
 import { pruneCatalogueGaps } from "../repositories/catalogue-gaps.ts";
 import { pruneScreenings } from "../repositories/cinemas.ts";
+import { pruneImportRuns } from "../repositories/import-runs.ts";
 import { storeProviders } from "../repositories/providers.ts";
+import { pruneSourceUsage } from "../repositories/source-usage.ts";
 import { rebuildPeopleIndex } from "../repositories/usher.ts";
 import { rebuildWorkingSet } from "../repositories/working-set.ts";
 import { syncAdaptations } from "../services/adaptations.ts";
@@ -23,6 +25,7 @@ import {
 import { queueRevivalMirrors } from "../services/revival-mirror.ts";
 import { checkRevivalRights } from "../services/revival-rights.ts";
 import { queueRevivalSources } from "../services/revival.ts";
+import { reportSourceHealth } from "../services/source-health.ts";
 import { syncTitlePlaces } from "../services/title-places.ts";
 import { syncVisualFormat } from "../services/visual-format.ts";
 import type { CatalogSweepParameters, WorkerBindings } from "../types.ts";
@@ -62,6 +65,10 @@ export class CatalogSweep extends WorkflowEntrypoint<WorkerBindings, CatalogSwee
 
     await step.do("reconcile budgets", { retries: RETRIES }, () =>
       withDatabase(this.env, ensureBudgets),
+    );
+
+    await step.do("report source health", { retries: RETRIES }, () =>
+      withDatabase(this.env, reportSourceHealth),
     );
 
     await step.do("sync catalogue head", { retries: RETRIES }, async () => {
@@ -203,6 +210,14 @@ export class CatalogSweep extends WorkflowEntrypoint<WorkerBindings, CatalogSwee
 
     await step.do("prune catalogue gaps", { retries: RETRIES }, async () =>
       withDatabase(this.env, (env) => pruneCatalogueGaps(env.DB, GAP_DISCOVERY.retentionDays)),
+    );
+
+    await step.do("prune upstream usage", { retries: RETRIES }, async () =>
+      withDatabase(this.env, (env) => pruneSourceUsage(env.DB)),
+    );
+
+    await step.do("prune abandoned imports", { retries: RETRIES }, async () =>
+      withDatabase(this.env, (env) => pruneImportRuns(env.DB)),
     );
 
     await step.do("warm catalogue facets", { retries: RETRIES }, async () =>

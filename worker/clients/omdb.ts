@@ -247,6 +247,7 @@ async function requestOmdb(
   url.search = new URLSearchParams({ apikey: env.OMDB_API_KEY, ...params }).toString();
 
   const response = await upstreamFetch(url, {
+    source: "omdb",
     timeoutMs: options.timeoutMs,
     cacheTtl: options.cacheTtl,
   });
@@ -339,6 +340,7 @@ export async function getOmdbPoster(env: Bindings, imdbId: string, height = POST
 
   const response = await upstreamFetch(url, {
     headers: { accept: "image/*" },
+    source: "omdb",
     timeoutMs: POSTER_TIMEOUT_MS,
     cacheTtl: RATINGS_CACHE_TTL,
   });

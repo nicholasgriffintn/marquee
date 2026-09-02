@@ -6,6 +6,7 @@ import { parseAssistantMessage, parseUsage, type ChatMessage } from "../lib/cura
 import type { ModelCallSink } from "../lib/decisions.ts";
 import { sha256Hex } from "../lib/hash.ts";
 import { logEvent } from "../lib/logging.ts";
+import { traceUpstream } from "../lib/upstream-usage.ts";
 import { isRecord } from "../lib/values.ts";
 import type { Bindings } from "../types.ts";
 import { UpstreamError } from "./upstream.ts";
@@ -274,7 +275,7 @@ async function completeOnce(
 
 async function fetchCompletion(url: string, init: RequestInit, report: (usage: null) => void) {
   try {
-    return await fetch(url, init);
+    return await traceUpstream("ai-gateway", () => fetch(url, init));
   } catch (error) {
     report(null);
 
@@ -299,18 +300,21 @@ export async function* streamAiCompletion(env: Bindings, call: AiCall) {
     stream: true,
   });
 
-  const response = await fetch(completionsUrl(env, call.route), {
-    method: "POST",
-    headers: {
-      accept: "text/event-stream",
-      ...authenticationHeaders(env, call.route),
-      "cf-aig-request-timeout": String(call.timeoutMs),
-      ...(await gatewayHeaders(call, body)),
-      "content-type": "application/json",
-    },
-    body,
-    signal: AbortSignal.timeout(call.timeoutMs),
-  });
+  const headers = {
+    accept: "text/event-stream",
+    ...authenticationHeaders(env, call.route),
+    "cf-aig-request-timeout": String(call.timeoutMs),
+    ...(await gatewayHeaders(call, body)),
+    "content-type": "application/json",
+  };
+  const response = await traceUpstream("ai-gateway", () =>
+    fetch(completionsUrl(env, call.route), {
+      method: "POST",
+      headers,
+      body,
+      signal: AbortSignal.timeout(call.timeoutMs),
+    }),
+  );
 
   if (!response.ok || !response.body) {
     throw new AiGatewayError(

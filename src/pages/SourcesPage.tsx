@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { ProviderBadge } from "../components/ProviderBadge";
 import { SourceStatus } from "../components/sources/SourceStatus";
 import type { Provider, ProvidersResponse } from "../domain/catalog";
-import type { ProviderCategory } from "../domain/providers";
+import { providerStateCopy, type ProviderCategory, type ProviderState } from "../domain/providers";
 import { Callout, Heading, Page, PageHeader, Stat, StatGrid, Text } from "../ui";
 
 import styles from "./SourcesPage.module.css";
@@ -110,20 +110,7 @@ const CATEGORIES: { name: ProviderCategory; aside: string }[] = [
   },
 ];
 
-const STATUS_COPY: Record<string, { label: string; note: string }> = {
-  feed: {
-    label: "We can see inside",
-    note: "Live availability. I know what is on there tonight.",
-  },
-  link: {
-    label: "We can only point",
-    note: "No feed to read, so I send you to the door and wish you luck.",
-  },
-  marker: {
-    label: "On the board, nothing behind it",
-    note: "Listed so you know it exists. I have nothing to tell you about it yet.",
-  },
-};
+const STATES: ProviderState[] = ["live", "stale", "unresolved", "out-of-scope", "failed"];
 
 export function SourcesPage({
   providers,
@@ -215,22 +202,26 @@ export function SourcesPage({
       </section>
       <StatGrid surface="accent" columns={4} className={styles.summary}>
         <Stat value={stats.configured} label="services listed" size="lg" />
-        <Stat value={stats.feeds} label="with availability data" size="lg" />
-        <Stat value={stats.links} label="link out only" size="lg" />
-        <Stat value={stats.markers} label="listed, no data yet" size="lg" />
+        <Stat value={stats.live} label="answering right now" size="lg" />
+        <Stat value={stats.stale + stats.failed} label="not answering" size="lg" />
+        <Stat value={stats.unresolved + stats.outOfScope} label="no listings to read" size="lg" />
       </StatGrid>
 
       <section className={styles.tiers} aria-labelledby="tiers-title">
         <Heading level={2} size="label" tone="accent" id="tiers-title" className={styles.rule}>
-          Three kinds of door
+          What each label means
         </Heading>
+        <Text tone="muted" leading="relaxed" className={styles.attributionLede}>
+          Every service on this page is wired to the same availability sweep. These labels say what
+          that sweep found last time it ran, not what I hope it will find.
+        </Text>
         <dl className={styles.tierList}>
-          {["feed", "link", "marker"].map((status) => (
-            <div key={status}>
-              <SourceStatus as="dt" status={status} className={styles.tierLabel}>
-                {STATUS_COPY[status]?.label}
+          {STATES.map((state) => (
+            <div key={state}>
+              <SourceStatus as="dt" state={state} className={styles.tierLabel}>
+                {providerStateCopy(state)?.label || ""}
               </SourceStatus>
-              <dd>{STATUS_COPY[status]?.note}</dd>
+              <dd>{providerStateCopy(state).note}</dd>
             </div>
           ))}
         </dl>
@@ -270,19 +261,24 @@ export function SourcesPage({
                         ) : (
                           <strong>{provider.name}</strong>
                         )}
-                        {provider.stale && (
-                          <span
-                            className={styles.stale}
-                            title={`${provider.sourceLabel} did not answer on the last sweep. This is the last good listing.`}
-                          >
-                            not answering
+                        {provider.state !== "live" && provider.reason && (
+                          <span className={styles.stale} title={provider.reason}>
+                            {provider.state === "unresolved"
+                              ? "no match"
+                              : provider.state === "out-of-scope"
+                                ? "live events"
+                                : "not answering"}
                           </span>
                         )}
                       </span>
-                      <small>{provider.sourceLabel}</small>
+                      <small>
+                        {provider.titles > 0
+                          ? `${provider.titles.toLocaleString()} titles · ${provider.sourceLabel}`
+                          : provider.sourceLabel}
+                      </small>
                     </span>
-                    <SourceStatus status={provider.status}>
-                      {STATUS_COPY[provider.status]?.label ?? provider.status}
+                    <SourceStatus state={provider.state}>
+                      {providerStateCopy(provider.state)?.label || "Unknown"}
                     </SourceStatus>
                   </li>
                 ))}

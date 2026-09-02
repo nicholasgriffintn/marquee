@@ -157,8 +157,8 @@ export function TonightPage({
     return () => window.clearTimeout(timer);
   }, [isUsherMode]);
   const readyFeatured = isHeroReady ? featured : undefined;
-  const filterableProviders = providers.filter(
-    (provider) => provider.status === "feed" && Boolean(provider.tmdbProviderIds?.length),
+  const filterableProviders = providers.filter((provider) =>
+    provider.capabilities?.includes("preference"),
   );
 
   const trendingSection = useMemo(
@@ -173,7 +173,7 @@ export function TonightPage({
 
   function toggleProvider(id: string) {
     onSelectProviders(
-      selectedProviderIds.includes(id)
+      selectedProviderIds?.includes(id)
         ? selectedProviderIds.filter((providerId) => providerId !== id)
         : [...selectedProviderIds, id],
     );
