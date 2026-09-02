@@ -22,7 +22,7 @@ cinemaRoutes.get("/near", async (context) => {
   const radiusKm = clampRadius(context.req.query("radius"));
 
   try {
-    context.executionCtx.waitUntil(
+    context.env.defer(
       logRejection(rememberInterest(context.env, origin), "cinema_interest_failed", {
         area: "cinema",
       }),
@@ -41,7 +41,7 @@ cinemaRoutes.get("/showing", async (context) => {
   const radiusKm = clampRadius(context.req.query("radius"));
 
   try {
-    context.executionCtx.waitUntil(
+    context.env.defer(
       logRejection(rememberInterest(context.env, origin), "cinema_interest_failed", {
         area: "cinema",
       }),
@@ -66,7 +66,7 @@ cinemaRoutes.get("/titles/:mediaType/:tmdbId", async (context) => {
   try {
     const origin = edgeOrigin(context.req.raw);
 
-    context.executionCtx.waitUntil(
+    context.env.defer(
       logRejection(rememberInterest(context.env, origin), "cinema_interest_failed", {
         area: "cinema",
       }),

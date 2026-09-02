@@ -270,13 +270,7 @@ notebookRoutes.get("/map", async (context) => {
 
   try {
     const schedule = (task: Promise<unknown>) => {
-      const logged = logRejection(task, "taste_map_task_failed");
-
-      try {
-        context.executionCtx.waitUntil(logged);
-      } catch {
-        void logged;
-      }
+      context.env.defer(logRejection(task, "taste_map_task_failed"));
     };
 
     return jsonResponse(await buildTasteMap(context.env, user.id, { schedule }));

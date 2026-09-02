@@ -153,11 +153,11 @@ export class CatalogSweep extends WorkflowEntrypoint<WorkerBindings, CatalogSwee
       await this.env.INGESTION_QUEUE.send({ type: "refresh-people" });
     });
 
-    await step.do("index people", { retries: RETRIES }, async () =>
-      withDatabase(this.env, (env) => rebuildPeopleIndex(env.DB)),
-    );
-
     if (deep) {
+      await step.do("index people", { retries: RETRIES }, async () =>
+        withDatabase(this.env, (env) => rebuildPeopleIndex(env.DB)),
+      );
+
       await step.do("sweep public domain sources", { retries: RETRIES }, async () =>
         withDatabase(this.env, queueRevivalSources),
       );
