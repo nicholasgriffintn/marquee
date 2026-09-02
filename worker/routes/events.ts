@@ -60,7 +60,7 @@ eventRoutes.post("/", async (context) => {
   recordEvent(context.env, event);
 
   if (name === "provider_exit" && principal && titleId) {
-    context.executionCtx.waitUntil(
+    context.env.defer(
       logRejection(
         recordSignal(context.env.DB, principal.user.id, {
           type: "provider_exit",

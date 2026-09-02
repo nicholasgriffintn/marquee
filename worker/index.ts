@@ -174,15 +174,15 @@ export { CatalogSweep, CuratorSession, DigestWorkflow, RailsWorkflow, Screening 
 
 export default {
   async fetch(request, env, context) {
-    const { database, runtime } = openDatabase(env);
+    const { database, deferred, runtime } = openDatabase(env);
 
     try {
       return await app.fetch(request, runtime, context);
     } finally {
       context.waitUntil(
-        logRejection(flushUpstreamUsage(runtime), "upstream_usage_flush_failed").then(() =>
-          database.close(),
-        ),
+        Promise.allSettled(deferred)
+          .then(() => logRejection(flushUpstreamUsage(runtime), "upstream_usage_flush_failed"))
+          .then(() => database.close()),
       );
     }
   },
