@@ -5,6 +5,7 @@ import type {
   ProvidersResponse,
   SectionAudience,
 } from "../../src/domain/catalog.ts";
+import { PROVIDER_LEDGER_VERSION } from "../../src/domain/providers.ts";
 import { isKnownTitle } from "./validation.ts";
 import { isNullableString, isNumberArray, isRecord, isStringArray, parseJson } from "./values.ts";
 
@@ -162,29 +163,40 @@ function isProvider(value: unknown): value is Provider {
     typeof value.mark === "string" &&
     typeof value.name === "string" &&
     typeof value.category === "string" &&
-    typeof value.integration === "string" &&
-    typeof value.status === "string" &&
     typeof value.sourceLabel === "string" &&
+    isStringArray(value.capabilities) &&
+    typeof value.state === "string" &&
+    isNullableString(value.reason) &&
     typeof value.displayPriority === "number" &&
+    typeof value.titles === "number" &&
     isNullableString(value.homepage) &&
     isNumberArray(value.tmdbProviderIds)
   );
 }
 
+function isLedgerError(value: unknown): value is { source: string; detail: string } {
+  return isRecord(value) && typeof value.source === "string" && typeof value.detail === "string";
+}
+
 function isProvidersResponse(value: unknown): value is ProvidersResponse {
   return (
     isRecord(value) &&
+    value.version === PROVIDER_LEDGER_VERSION &&
     Array.isArray(value.providers) &&
     value.providers.every(isProvider) &&
     value.region === "GB" &&
     isStringArray(value.sources) &&
-    isStringArray(value.errors) &&
+    Array.isArray(value.errors) &&
+    value.errors.every(isLedgerError) &&
     isRecord(value.stats) &&
     typeof value.stats.configured === "number" &&
-    typeof value.stats.feeds === "number" &&
-    typeof value.stats.links === "number" &&
-    typeof value.stats.markers === "number" &&
+    typeof value.stats.live === "number" &&
+    typeof value.stats.stale === "number" &&
+    typeof value.stats.unresolved === "number" &&
+    typeof value.stats.outOfScope === "number" &&
+    typeof value.stats.failed === "number" &&
     typeof value.stats.longTail === "number" &&
+    typeof value.stats.titlesCovered === "number" &&
     typeof value.fetchedAt === "string"
   );
 }

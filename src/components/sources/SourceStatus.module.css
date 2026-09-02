@@ -4,14 +4,22 @@
   letter-spacing: 0.08em;
 }
 
-.feed {
+.live {
   color: var(--acid);
 }
 
-.link {
+.stale {
   color: #a6b9ff;
 }
 
-.marker {
+.unresolved {
   color: var(--muted);
+}
+
+.outOfScope {
+  color: var(--muted);
+}
+
+.failed {
+  color: #ff9a8b;
 }

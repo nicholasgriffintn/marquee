@@ -1,5 +1,5 @@
 import type { TitleIdentifiers } from "./identifiers";
-import type { ProviderCategory, ProviderIntegration, ProviderStatus } from "./providers";
+import type { ProviderCapability, ProviderCategory, ProviderState } from "./providers";
 import { slugify } from "./slug";
 
 export type MediaType = "movie" | "tv";
@@ -9,13 +9,14 @@ export type Provider = {
   mark: string;
   name: string;
   category: ProviderCategory;
-  integration: ProviderIntegration;
-  status: ProviderStatus;
   sourceLabel: string;
+  capabilities: ProviderCapability[];
+  state: ProviderState;
+  reason: string | null;
   displayPriority: number;
   homepage: string | null;
   tmdbProviderIds: number[];
-  stale?: boolean;
+  titles: number;
 };
 
 export type ProviderAvailability = {
@@ -290,17 +291,26 @@ export type FeaturedTitleResponse = {
   fetchedAt: string;
 };
 
+export type ProviderLedgerError = {
+  source: string;
+  detail: string;
+};
+
 export type ProvidersResponse = {
+  version: number;
   providers: Provider[];
   region: "GB";
   sources: string[];
-  errors: string[];
+  errors: ProviderLedgerError[];
   stats: {
     configured: number;
-    feeds: number;
-    links: number;
-    markers: number;
+    live: number;
+    stale: number;
+    unresolved: number;
+    outOfScope: number;
+    failed: number;
     longTail: number;
+    titlesCovered: number;
   };
   fetchedAt: string;
 };

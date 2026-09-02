@@ -103,7 +103,7 @@ export function PipelineTab({
                   source.attempted > 0
                     ? Math.round((source.silentFailures / source.attempted) * 100)
                     : 0;
-                const budget = overview?.budgets.find((row) => row.source === source.source);
+                const budget = overview?.sources.find((row) => row.source === source.source);
                 const pausedUntil = budget?.pausedUntil
                   ? parseDatabaseDate(budget.pausedUntil)
                   : null;

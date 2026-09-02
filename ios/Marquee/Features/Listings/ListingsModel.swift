@@ -75,9 +75,7 @@ final class ListingsModel: ObservableObject {
     genres = values.0
     keywords = values.1
     places = values.2
-    providers = values.3.filter {
-      $0.status == "feed" && !($0.tmdbProviderIds ?? []).isEmpty
-    }
+    providers = values.3.filter { $0.isSelectable }
     loadedFacets = true
   }
 

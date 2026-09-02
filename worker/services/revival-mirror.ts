@@ -2,6 +2,7 @@ import { UPSTREAM_AGENT } from "../clients/fetch.ts";
 import { UpstreamError } from "../clients/upstream.ts";
 import { errorStatus, isPermanentHttpStatus } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
+import { traceUpstream } from "../lib/upstream-usage.ts";
 import {
   completeMirror,
   failMirror,
@@ -46,12 +47,14 @@ function parseParts(raw: string): StoredPart[] {
 }
 
 async function probeSource(url: string) {
-  const response = await fetch(url, {
-    method: "HEAD",
-    redirect: "follow",
-    headers: { "user-agent": UPSTREAM_AGENT },
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-  });
+  const response = await traceUpstream("mirror", () =>
+    fetch(url, {
+      method: "HEAD",
+      redirect: "follow",
+      headers: { "user-agent": UPSTREAM_AGENT },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    }),
+  );
 
   if (!response.ok) {
     throw new UpstreamError(`source responded ${response.status}`, response.status);
@@ -68,11 +71,13 @@ async function probeSource(url: string) {
 }
 
 async function copyWholeObject(env: Bindings, id: string, url: string, contentType: string) {
-  const response = await fetch(url, {
-    redirect: "follow",
-    headers: { "user-agent": UPSTREAM_AGENT },
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-  });
+  const response = await traceUpstream("mirror", () =>
+    fetch(url, {
+      redirect: "follow",
+      headers: { "user-agent": UPSTREAM_AGENT },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    }),
+  );
 
   if (!response.ok || !response.body) {
     throw new UpstreamError(`source responded ${response.status}`, response.status);
@@ -153,14 +158,16 @@ async function mirrorInParts(
   for (let index = 0; index < PARTS_PER_RUN && offset < totalBytes; index += 1) {
     const end = Math.min(offset + PART_BYTES, totalBytes) - 1;
     // oxlint-disable-next-line no-await-in-loop
-    const response = await fetch(url, {
-      redirect: "follow",
-      headers: {
-        range: `bytes=${offset}-${end}`,
-        "user-agent": UPSTREAM_AGENT,
-      },
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    });
+    const response = await traceUpstream("mirror", () =>
+      fetch(url, {
+        redirect: "follow",
+        headers: {
+          range: `bytes=${offset}-${end}`,
+          "user-agent": UPSTREAM_AGENT,
+        },
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      }),
+    );
 
     if (response.status !== 206 || !response.body) {
       throw new UpstreamError(`range request responded ${response.status}`, response.status);

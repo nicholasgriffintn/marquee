@@ -11,6 +11,8 @@ import { isRecord, numberAt, recordAt, records, stringAt } from "./values.ts";
 
 const PHYSICAL_PRESENTATIONS = new Set(["DVD", "BLURAY", "_4K_BLURAY"]);
 
+const OFF_DOMAIN_MONETIZATION = new Set(["CINEMA"]);
+
 const OFFER_LABELS: Record<string, string> = {
   FLATRATE: "Subscription",
   FLATRATE_AND_BUY: "Subscription",
@@ -19,7 +21,6 @@ const OFFER_LABELS: Record<string, string> = {
   FAST: "Free with ads",
   RENT: "Rent",
   BUY: "Buy",
-  CINEMA: "Cinema",
 };
 
 const OFFER_KINDS: Record<string, ProviderOfferKind> = {
@@ -96,6 +97,7 @@ export function parseJustwatchAvailability(
       !monetizationType ||
       !packageId ||
       !name ||
+      OFF_DOMAIN_MONETIZATION.has(monetizationType) ||
       (presentationType && PHYSICAL_PRESENTATIONS.has(presentationType))
     ) {
       continue;

@@ -114,6 +114,7 @@ export async function searchEuropeana(apiKey: string, country: string, page: num
 
   const response = await upstreamFetch(url, {
     headers: { "x-api-key": apiKey },
+    source: "europeana",
     timeoutMs: TIMEOUT_MS,
     cacheTtl: CACHE_TTL,
   });

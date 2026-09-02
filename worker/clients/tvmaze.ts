@@ -51,7 +51,11 @@ function scheduleUrl(countryCode: string | null, date: string) {
 export async function getTvmazeSchedule(countryCode: string | null, date: string) {
   const url = scheduleUrl(countryCode, date);
 
-  const response = await upstreamFetch(url, { timeoutMs: TIMEOUT_MS, cacheTtl: CACHE_TTL });
+  const response = await upstreamFetch(url, {
+    source: "tvmaze",
+    timeoutMs: TIMEOUT_MS,
+    cacheTtl: CACHE_TTL,
+  });
 
   if (!response.ok) {
     throw new TvmazeError(`TVmaze request failed (${response.status})`, response.status);

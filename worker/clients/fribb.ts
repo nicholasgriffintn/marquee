@@ -65,7 +65,11 @@ function idsFrom(entry: Record<string, unknown>): ExternalIds {
 }
 
 export async function readAnimeListVersion() {
-  const response = await upstreamFetch(LIST_URL, { timeoutMs: TIMEOUT_MS, method: "HEAD" });
+  const response = await upstreamFetch(LIST_URL, {
+    source: "fribb",
+    timeoutMs: TIMEOUT_MS,
+    method: "HEAD",
+  });
 
   if (!response.ok) {
     throw new FribbError(`Anime list version check failed (${response.status})`, response.status);
@@ -81,7 +85,11 @@ export async function readAnimeListVersion() {
 }
 
 export async function readAnimeMappings(): Promise<AnimeMapping[]> {
-  const response = await upstreamFetch(LIST_URL, { timeoutMs: TIMEOUT_MS, cacheTtl: CACHE_TTL });
+  const response = await upstreamFetch(LIST_URL, {
+    source: "fribb",
+    timeoutMs: TIMEOUT_MS,
+    cacheTtl: CACHE_TTL,
+  });
 
   if (!response.ok) {
     throw new FribbError(`Anime list request failed (${response.status})`, response.status);

@@ -107,6 +107,7 @@ export async function readCommonsFiles(names: string[]) {
 
   const response = await upstreamFetch(url, {
     headers: { "user-agent": UPSTREAM_AGENT },
+    source: "commons",
     timeoutMs: TIMEOUT_MS,
     cacheTtl: CACHE_TTL,
   });

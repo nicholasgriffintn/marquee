@@ -18,6 +18,7 @@ export async function readArticleSummary(article: string): Promise<ArticleSummar
   const path = encodeURIComponent(article.replaceAll(" ", "_"));
   const response = await upstreamFetch(`${SUMMARY_BASE}/${path}`, {
     headers: { "user-agent": UPSTREAM_AGENT },
+    source: "wikipedia",
     timeoutMs: TIMEOUT_MS,
     cacheTtl: CACHE_TTL,
   });

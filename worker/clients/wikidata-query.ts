@@ -59,6 +59,7 @@ async function fetchQuery(url: URL, options: QueryOptions) {
     // oxlint-disable-next-line no-await-in-loop
     const response = await upstreamFetch(url, {
       headers: { accept: "application/sparql-results+json", "user-agent": UPSTREAM_AGENT },
+      source: "wikidata",
       timeoutMs: options.timeoutMs,
       cacheTtl: options.cacheTtl,
     });

@@ -43,6 +43,7 @@ function collection(payload: unknown, key: string) {
 async function listCinemas(): Promise<SourceCinema[]> {
   const until = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
   const payload = await fetchSourceJson(
+    "cineworld",
     `${BASE}/cinemas/with-event/until/${until}?attr=&lang=en_GB`,
   );
 
@@ -74,6 +75,7 @@ async function listCinemas(): Promise<SourceCinema[]> {
 async function datesFor(siteId: string, horizon: number) {
   const until = new Date(Date.now() + horizon * 86_400_000).toISOString().slice(0, 10);
   const payload = await fetchSourceJson(
+    "cineworld",
     `${BASE}/dates/in-cinema/${encodeURIComponent(siteId)}/until/${until}?attr=&lang=en_GB`,
   );
   const inner = body(payload);
@@ -92,6 +94,7 @@ async function harvest(cinema: SourceCinema, horizon: number): Promise<SourceHar
   for (const date of dates) {
     // oxlint-disable-next-line no-await-in-loop
     const payload = await fetchSourceJson(
+      "cineworld",
       `${BASE}/film-events/in-cinema/${encodeURIComponent(cinema.siteId)}/at-date/${date}?attr=&lang=en_GB`,
     );
 

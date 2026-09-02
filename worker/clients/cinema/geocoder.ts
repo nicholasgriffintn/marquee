@@ -1,3 +1,4 @@
+import { traceUpstream } from "../../lib/upstream-usage.ts";
 import { UPSTREAM_AGENT } from "../fetch.ts";
 import { CinemaSourceError } from "./types.ts";
 
@@ -24,16 +25,18 @@ export async function geocodeChain(brand: string): Promise<GeocodedVenue[]> {
     "",
   )}",i](49.8,-8.7,60.9,1.8);out tags center;`;
 
-  const response = await fetch(OVERPASS, {
-    method: "POST",
-    headers: {
-      "content-type": "application/x-www-form-urlencoded",
-      "user-agent": UPSTREAM_AGENT,
-    },
-    body: new URLSearchParams({ data: query }).toString(),
-    signal: AbortSignal.timeout(60_000),
-    cf: { cacheEverything: true, cacheTtl: 604_800 },
-  });
+  const response = await traceUpstream("overpass", () =>
+    fetch(OVERPASS, {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        "user-agent": UPSTREAM_AGENT,
+      },
+      body: new URLSearchParams({ data: query }).toString(),
+      signal: AbortSignal.timeout(60_000),
+      cf: { cacheEverything: true, cacheTtl: 604_800 },
+    }),
+  );
 
   if (!response.ok) {
     throw new CinemaSourceError(`Overpass answered ${response.status}`, response.status);

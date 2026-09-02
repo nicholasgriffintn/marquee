@@ -16,6 +16,7 @@ export async function queryAnalytics<T>(env: Bindings, sql: string): Promise<T[]
     `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/analytics_engine/sql`,
     {
       method: "POST",
+      source: "cloudflare-analytics",
       timeoutMs: TIMEOUT_MS,
       headers: {
         authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,

@@ -2,8 +2,6 @@ import { useState } from "react";
 
 import { ErrorBoundary } from "../../components/ErrorBoundary";
 import type { AdminOverview } from "../../hooks/useAdmin";
-import { classNames } from "../../lib/class-names";
-import { parseDatabaseDate } from "../../lib/dates";
 import { Panel, Stat, StatGrid, StatusNote, TabPanel } from "../../ui";
 import { COUNT_LABELS } from "./config";
 import { ProgressBar } from "./ProgressBar";
@@ -60,20 +58,14 @@ function backfillSummary(rows: BackfillRow[]) {
   return [...byMedia.entries()];
 }
 
-function stamp(value: string) {
-  return parseDatabaseDate(value)?.toLocaleString() ?? "never";
-}
-
-type Sample = { type: "count" | "budget"; key: string; label: string };
+type Sample = { type: "count"; key: string; label: string };
 
 export function OverviewTab({
   overview,
   loading,
-  onResume,
 }: {
   overview: AdminOverview | null;
   loading: boolean;
-  onResume: (source: string) => void;
 }) {
   const [sample, setSample] = useState<Sample | null>(null);
 
@@ -134,48 +126,6 @@ export function OverviewTab({
                 </li>
               ))}
             </ul>
-          </Panel>
-        )}
-        {overview && overview.budgets.length > 0 && (
-          <Panel heading="Call budgets">
-            <div className={styles.budgets}>
-              {overview.budgets.map((budget) => (
-                <div
-                  key={budget.source}
-                  className={classNames(styles.budget, budget.pausedUntil && styles.budgetPaused)}
-                >
-                  <strong>{budget.source}</strong>
-                  <span>
-                    {budget.pausedUntil
-                      ? `rate limited until ${stamp(budget.pausedUntil)}`
-                      : `${budget.used.toLocaleString()} / ${budget.callLimit.toLocaleString()} per ${budget.windowKind}`}
-                  </span>
-                  <ProgressBar done={budget.used} total={budget.callLimit} />
-                  <button
-                    type="button"
-                    className={styles.budgetAction}
-                    onClick={() =>
-                      setSample({
-                        type: "budget",
-                        key: budget.source,
-                        label: budget.source,
-                      })
-                    }
-                  >
-                    See sample
-                  </button>
-                  {budget.pausedUntil && (
-                    <button
-                      type="button"
-                      className={styles.budgetAction}
-                      onClick={() => onResume(budget.source)}
-                    >
-                      Resume now
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
           </Panel>
         )}
       </TabPanel>

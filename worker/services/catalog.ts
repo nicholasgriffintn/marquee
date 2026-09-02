@@ -1,6 +1,7 @@
-import type { MediaTitle, TitleBuzz } from "../../src/domain/catalog.ts";
+import type { MediaTitle, ProvidersResponse, TitleBuzz } from "../../src/domain/catalog.ts";
+import { getProviderLedger } from "../jobs/provider-ledger.ts";
 import { withKvCache, writeKvValue } from "../lib/cache.ts";
-import { logError } from "../lib/logging.ts";
+import { logError, logEvent } from "../lib/logging.ts";
 import {
   readAvailability,
   readCatalog,
@@ -19,7 +20,7 @@ import {
   searchCatalogue as queryCatalogue,
   searchTitlesFirst,
 } from "../repositories/catalog-search.ts";
-import { readProviders } from "../repositories/providers.ts";
+import { readProviders, storeProviders } from "../repositories/providers.ts";
 import type { Bindings } from "../types.ts";
 import { applyBuzz, readBuzz, readTrendingBuzz } from "./buzz.ts";
 import { findGapTitles } from "./catalogue-gaps.ts";
@@ -177,8 +178,30 @@ export async function getAnimeRecommendations(db: Database, titleId: string) {
   };
 }
 
-export async function getProviderCatalogue(db: Database) {
-  return readProviders(db);
+let rebuilding: Promise<ProvidersResponse> | null = null;
+
+export async function getProviderCatalogue(env: Bindings) {
+  const stored = await readProviders(env.DB);
+
+  if (stored) {
+    return stored;
+  }
+
+  rebuilding ??= getProviderLedger(env)
+    .then(async (ledger) => {
+      await storeProviders(env.DB, ledger);
+      logEvent("provider_ledger_rebuilt", {
+        providers: ledger.providers.length,
+        live: ledger.stats.live,
+      });
+
+      return ledger;
+    })
+    .finally(() => {
+      rebuilding = null;
+    });
+
+  return rebuilding;
 }
 
 export async function getTitleAvailability(env: Bindings, titleId: string) {

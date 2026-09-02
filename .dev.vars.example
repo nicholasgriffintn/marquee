@@ -4,7 +4,6 @@ TRAKT_CLIENT_ID=your-trakt-client-id
 TRAKT_CLIENT_SECRET=your-trakt-client-secret
 EUROPEANA_API_KEY=your-europeana-api-key
 MAL_CLIENT_ID=
-MAL_CLIENT_SECRET=
 
 CLOUDFLARE_ACCOUNT_ID=your-cloudflare-account-id
 CLOUDFLARE_API_TOKEN=your-cloudflare-analytics-token
@@ -12,6 +11,8 @@ AI_GATEWAY_TOKEN=your-cloudflare-ai-gateway-run-token
 
 GITHUB_CLIENT_ID=your-github-oauth-app-client-id
 GITHUB_CLIENT_SECRET=your-github-oauth-app-client-secret
+# Any high-entropy string. Without it no linked account can be stored at all.
+TOKEN_ENCRYPTION_KEY=generate-a-long-random-string
 
 LOCAL_DEV=true
 # Set to "on" only when you deliberately want the cron sync pipelines to run locally

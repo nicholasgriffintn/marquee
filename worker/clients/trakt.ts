@@ -105,6 +105,7 @@ async function requestToken(env: Bindings, body: Record<string, string>) {
       client_id: env.TRAKT_CLIENT_ID,
       client_secret: env.TRAKT_CLIENT_SECRET,
     }),
+    source: "trakt",
     timeoutMs: TOKEN_TIMEOUT_MS,
   });
 
@@ -132,6 +133,7 @@ async function requestTrakt(env: Bindings, path: string, accessToken: string) {
 
   const response = await upstreamFetch(`${API_BASE}${path}`, {
     headers: traktHeaders(env, accessToken),
+    source: "trakt",
     timeoutMs: READ_TIMEOUT_MS,
   });
 
@@ -151,6 +153,7 @@ async function requestTraktPage(env: Bindings, path: string, accessToken: string
   const separator = path.includes("?") ? "&" : "?";
   const response = await upstreamFetch(`${API_BASE}${path}${separator}limit=100&page=${page}`, {
     headers: traktHeaders(env, accessToken),
+    source: "trakt",
     timeoutMs: READ_TIMEOUT_MS,
   });
 
@@ -211,6 +214,7 @@ async function postTrakt(env: Bindings, path: string, accessToken: string, body:
     method: "POST",
     headers: { ...traktHeaders(env, accessToken), "content-type": "application/json" },
     body: JSON.stringify(body),
+    source: "trakt",
     timeoutMs: WRITE_TIMEOUT_MS,
   });
 

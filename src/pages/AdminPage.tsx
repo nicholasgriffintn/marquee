@@ -16,6 +16,7 @@ import { OverviewTab } from "./admin/OverviewTab";
 import { PeopleTab } from "./admin/PeopleTab";
 import { PipelineTab } from "./admin/PipelineTab";
 import { QualityTab } from "./admin/QualityTab";
+import { SourcesTab } from "./admin/SourcesTab";
 
 import adminStyles from "./admin/admin.module.css";
 import styles from "./AdminPage.module.css";
@@ -28,6 +29,7 @@ export function AdminPage({ user }: { user: User }) {
   const [pipelineRevision, setPipelineRevision] = useState(0);
   const [listingsRevision, setListingsRevision] = useState(0);
   const [qualityRevision, setQualityRevision] = useState(0);
+  const [sourcesRevision, setSourcesRevision] = useState(0);
   const tab = TABS.find((entry) => entry.id === params.get("tab"))?.id ?? "overview";
 
   const { usersLoaded, loadUsers } = admin;
@@ -66,6 +68,12 @@ export function AdminPage({ user }: { user: User }) {
 
     if (tab === "quality") {
       setQualityRevision((current) => current + 1);
+
+      return;
+    }
+
+    if (tab === "sources") {
+      setSourcesRevision((current) => current + 1);
 
       return;
     }
@@ -124,19 +132,21 @@ export function AdminPage({ user }: { user: User }) {
         }
       />
 
-      {tab === "overview" && (
-        <OverviewTab
-          overview={overview}
-          loading={admin.loading}
-          onResume={(source) => void admin.resume(source)}
-        />
-      )}
+      {tab === "overview" && <OverviewTab overview={overview} loading={admin.loading} />}
 
       {tab === "actions" && (
         <ActionsTab pending={admin.pending} onRun={(action) => void admin.run(action)} />
       )}
 
       {tab === "pipeline" && <PipelineTab overview={overview} revision={pipelineRevision} />}
+
+      {tab === "sources" && (
+        <SourcesTab
+          overview={overview}
+          revision={sourcesRevision}
+          onResume={(source) => void admin.resume(source)}
+        />
+      )}
 
       {tab === "listings" && <ListingsTab overview={overview} revision={listingsRevision} />}
 

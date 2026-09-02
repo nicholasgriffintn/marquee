@@ -85,6 +85,7 @@ export async function getAniListDetails(anilistId: number): Promise<AniListDetai
 
   const response = await upstreamFetch(API_URL, {
     method: "POST",
+    source: "anilist",
     timeoutMs: TIMEOUT_MS,
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ query: QUERY, variables: { id: anilistId } }),

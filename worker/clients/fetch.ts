@@ -1,4 +1,8 @@
+import type { UpstreamSourceId } from "../../src/domain/sources.ts";
+import { traceUpstream } from "../lib/upstream-usage.ts";
+
 type UpstreamRequest = {
+  source: UpstreamSourceId;
   timeoutMs: number;
   headers?: Record<string, string>;
   cacheTtl?: number;
@@ -10,19 +14,21 @@ export const UPSTREAM_AGENT =
   "Marquee/1.0 (personal streaming discovery; https://marquee.pashi.app)";
 
 export function upstreamFetch(url: string | URL, request: UpstreamRequest) {
-  return fetch(url, {
-    method: request.method,
-    body: request.body,
-    headers: {
-      accept: "application/json",
-      "user-agent": UPSTREAM_AGENT,
-      ...request.headers,
-    },
-    signal: AbortSignal.timeout(request.timeoutMs),
-    ...(request.cacheTtl
-      ? { cf: { cacheEverything: true, cacheTtl: request.cacheTtl } }
-      : undefined),
-  });
+  return traceUpstream(request.source, () =>
+    fetch(url, {
+      method: request.method,
+      body: request.body,
+      headers: {
+        accept: "application/json",
+        "user-agent": UPSTREAM_AGENT,
+        ...request.headers,
+      },
+      signal: AbortSignal.timeout(request.timeoutMs),
+      ...(request.cacheTtl
+        ? { cf: { cacheEverything: true, cacheTtl: request.cacheTtl } }
+        : undefined),
+    }),
+  );
 }
 
 export async function readCappedArrayBuffer(response: Response, maxBytes: number) {

@@ -1,4 +1,6 @@
 import type { AdminAction } from "../../src/domain/admin.ts";
+import { findRegistryProvider } from "../../src/domain/providers.ts";
+import { upstreamSourceLabel, type UpstreamSourceId } from "../../src/domain/sources.ts";
 import type { UserRole } from "../auth/model.ts";
 import {
   queueEmbeddings,
@@ -6,7 +8,7 @@ import {
   queueStaleAvailability,
   queueVectorReindex,
 } from "../jobs/ingestion.ts";
-import { readBudgets, resumeSource } from "../repositories/budgets.ts";
+import { resumeSource } from "../repositories/budgets.ts";
 import { readCinemaCoverage } from "../repositories/cinemas.ts";
 import { readBackfillProgress } from "../repositories/discover.ts";
 import { rebuildPeopleIndex } from "../repositories/usher.ts";
@@ -16,12 +18,14 @@ import { syncAdaptations } from "./adaptations.ts";
 import { dispatchAlerts, previewAlerts } from "./alerts/dispatch.ts";
 import { computeAngleScores } from "./angle-scores.ts";
 import { syncAwards } from "./awards.ts";
+import { getProviderCatalogue } from "./catalog.ts";
 import { queueCinemaDirectories, queueCinemaScreenings } from "./cinema-sync.ts";
 import { advanceDiscoverFrontier } from "./discover.ts";
 import { EMBEDDING_MODEL } from "./embeddings.ts";
 import { readIndexReadiness, rebuildSearchIndex, reconcileSearchIndex } from "./index-readiness.ts";
 import { queueRevivalMirrors } from "./revival-mirror.ts";
 import { queueRevivalSources } from "./revival.ts";
+import { readSourceHealth } from "./source-health.ts";
 import { syncTitlePlaces } from "./title-places.ts";
 import { syncVisualFormat } from "./visual-format.ts";
 import { syncWorldBoard } from "./world-board.ts";
@@ -257,17 +261,76 @@ async function enrichmentStats(env: Bindings) {
 }
 
 export async function readAdminOverview(env: Bindings) {
-  const [catalogue, backfill, budgets] = await Promise.all([
+  const [catalogue, backfill, sources] = await Promise.all([
     catalogueStats(env),
     readBackfillProgress(env.DB),
-    readBudgets(env),
+    readSourceHealth(env),
   ]);
 
   return {
     catalogue,
     backfill,
-    budgets,
+    sources,
     fetchedAt: new Date().toISOString(),
+  };
+}
+
+async function readUnmappedOffers(db: Database) {
+  const result = await db.query<{ providerId: string; name: string; titles: number }>(
+    `SELECT provider_id AS "providerId", name, count(*) AS titles
+       FROM catalog_title_providers
+      WHERE provider_id LIKE 'justwatch:%'
+      GROUP BY provider_id, name
+      ORDER BY titles DESC
+      LIMIT 40`,
+  );
+
+  return result.rows.map((row) => {
+    const resolved = findRegistryProvider(row.name);
+
+    return {
+      providerId: row.providerId,
+      name: row.name,
+      titles: row.titles,
+      resolvesNow: resolved?.id ?? null,
+    };
+  });
+}
+
+export async function readAdminProviders(env: Bindings) {
+  const [ledger, unmapped] = await Promise.all([
+    getProviderCatalogue(env),
+    readUnmappedOffers(env.DB),
+  ]);
+
+  if (!ledger) {
+    return {
+      providers: [],
+      unmapped,
+      errors: [{ source: "Ledger", detail: "No provider sweep has been stored yet" }],
+      stats: null,
+      sources: [],
+      fetchedAt: null,
+    };
+  }
+
+  return {
+    unmapped,
+    providers: ledger.providers.map((provider) => ({
+      id: provider.id,
+      name: provider.name,
+      category: provider.category,
+      capabilities: provider.capabilities,
+      state: provider.state,
+      reason: provider.reason,
+      titles: provider.titles,
+      tmdbProviderIds: provider.tmdbProviderIds,
+      homepage: provider.homepage,
+    })),
+    errors: ledger.errors,
+    stats: ledger.stats,
+    sources: ledger.sources,
+    fetchedAt: ledger.fetchedAt,
   };
 }
 
@@ -559,10 +622,10 @@ export async function runAdminAction(env: Bindings, action: AdminAction) {
   return { detail: `Queued ${job.type}` };
 }
 
-export async function clearSourcePause(env: Bindings, source: EnrichmentSource) {
+export async function clearSourcePause(env: Bindings, source: UpstreamSourceId) {
   await resumeSource(env, source);
 
-  return { detail: `${source} resumed` };
+  return { detail: `${upstreamSourceLabel(source)} resumed` };
 }
 
 export async function listAdminUsers(env: Bindings) {

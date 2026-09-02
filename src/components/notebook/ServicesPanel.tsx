@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 import type { Provider, ProvidersResponse } from "../../domain/catalog";
-import type { ProviderCategory } from "../../domain/providers";
+import type { ProviderCategory, ProviderState } from "../../domain/providers";
 import { classNames } from "../../lib/class-names";
 import { Callout, CloseIcon, ExternalLinkIcon, MinusIcon, PlusIcon } from "../../ui";
 import { ProviderBadge } from "../ProviderBadge";
@@ -23,8 +23,16 @@ const CATEGORIES: Array<{ id: string; name: ProviderCategory }> = [
 
 const OPEN_BY_DEFAULT = new Set(["subscription", "broadcaster"]);
 
-function hasLiveFeed(provider: Provider) {
-  return provider.status === "feed" && Boolean(provider.tmdbProviderIds?.length);
+const STATE_LABELS: Record<ProviderState, string> = {
+  live: "LIVE",
+  stale: "LAST KNOWN",
+  unresolved: "NO MATCH",
+  "out-of-scope": "LIVE EVENTS",
+  failed: "NOT ANSWERING",
+};
+
+function canSelect(provider: Provider) {
+  return provider.capabilities.includes("preference");
 }
 
 export function ServicesPanel({
@@ -173,7 +181,7 @@ export function ServicesPanel({
 
               {group.shown.map((provider) => {
                 const isSelected = selectedProviderIds.includes(provider.id);
-                const isLive = hasLiveFeed(provider);
+                const selectable = canSelect(provider);
 
                 return (
                   <div
@@ -183,34 +191,40 @@ export function ServicesPanel({
                     <ProviderBadge provider={provider} className={styles.badge} />
                     <div className={styles.name}>
                       <strong>{provider.name}</strong>
-                      <span>{provider.sourceLabel}</span>
+                      <span>
+                        {provider.titles > 0
+                          ? `${provider.titles.toLocaleString()} titles · ${provider.sourceLabel}`
+                          : provider.sourceLabel}
+                      </span>
                     </div>
-                    <SourceStatus status={provider.status}>
-                      {provider.status === "marker" ? "TBD" : provider.status.toUpperCase()}
+                    <SourceStatus state={provider.state}>
+                      {STATE_LABELS[provider.state]}
                     </SourceStatus>
-                    {provider.status === "feed" && (
+                    {selectable ? (
                       <button
                         type="button"
                         className={styles.action}
-                        disabled={!isLive}
                         aria-pressed={isSelected}
                         aria-label={`${provider.name}${isSelected ? ", selected" : ""}`}
                         onClick={() => toggleProvider(provider.id)}
                       >
-                        {isLive ? (isSelected ? "Included" : "Add") : "Unavailable"}
+                        {isSelected ? "Included" : "Add"}
                       </button>
-                    )}
-                    {provider.status === "link" && provider.homepage && (
+                    ) : provider.homepage ? (
                       <a
                         className={styles.action}
                         href={provider.homepage}
                         target="_blank"
                         rel="noreferrer"
+                        title={provider.reason ?? undefined}
                       >
                         Open <ExternalLinkIcon />
                       </a>
+                    ) : (
+                      <span className={styles.markerAction} title={provider.reason ?? undefined}>
+                        —
+                      </span>
                     )}
-                    {provider.status === "marker" && <span className={styles.markerAction}>—</span>}
                   </div>
                 );
               })}

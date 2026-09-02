@@ -111,7 +111,11 @@ export async function searchScreeningRoom(page: number) {
   url.searchParams.set("sp", String(Math.max(1, page)));
   url.searchParams.set("at", "results,pagination");
 
-  const response = await upstreamFetch(url, { timeoutMs: TIMEOUT_MS, cacheTtl: CACHE_TTL });
+  const response = await upstreamFetch(url, {
+    source: "loc",
+    timeoutMs: TIMEOUT_MS,
+    cacheTtl: CACHE_TTL,
+  });
 
   if (!response.ok) {
     throw new Error(`Library of Congress responded ${response.status}`);

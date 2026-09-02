@@ -1,54 +1,30 @@
-import type { BackoffPolicy } from "../lib/backoff.ts";
+import { UPSTREAM_SOURCES } from "../../src/domain/sources.ts";
 import { logEvent } from "../lib/logging.ts";
 import {
+  budgetSource,
   claimBudget,
   isRateLimited,
   isRefused,
   pauseSource,
   resetBackoff,
+  type BudgetableSource,
 } from "../repositories/budgets.ts";
-import type { Bindings, EnrichmentSource } from "../types.ts";
+import type { Bindings } from "../types.ts";
 
-const BACKOFF: Record<EnrichmentSource, { rateLimited: BackoffPolicy; refused: BackoffPolicy }> = {
-  mal: {
-    rateLimited: { baseMinutes: 60, capMinutes: 60 * 12 },
-    refused: { baseMinutes: 60 * 24 * 7, capMinutes: 60 * 24 * 7 },
-  },
-  justwatch: {
-    rateLimited: { baseMinutes: 30, capMinutes: 60 * 6 },
-    refused: { baseMinutes: 60 * 24 * 7, capMinutes: 60 * 24 * 7 },
-  },
-  omdb: {
-    rateLimited: { baseMinutes: 10, capMinutes: 60 * 6 },
-    refused: { baseMinutes: 60 * 24 * 7, capMinutes: 60 * 24 * 7 },
-  },
-  tmdb: {
-    rateLimited: { baseMinutes: 30, capMinutes: 60 * 6 },
-    refused: { baseMinutes: 60 * 24 * 7, capMinutes: 60 * 24 * 7 },
-  },
-  poster: {
-    rateLimited: { baseMinutes: 10, capMinutes: 60 * 6 },
-    refused: { baseMinutes: 60 * 24 * 7, capMinutes: 60 * 24 * 7 },
-  },
-  anilist: {
-    rateLimited: { baseMinutes: 30, capMinutes: 60 * 6 },
-    refused: { baseMinutes: 60, capMinutes: 60 * 12 },
-  },
-};
+function backoffFor(source: BudgetableSource) {
+  const configured = UPSTREAM_SOURCES[budgetSource(source)];
 
-const DEFAULT_BACKOFF = {
-  rateLimited: { baseMinutes: 30, capMinutes: 60 * 6 },
-  refused: { baseMinutes: 60 * 24 * 7, capMinutes: 60 * 24 * 7 },
-};
+  return { rateLimited: configured.rateLimited, refused: configured.refused };
+}
 
 export type SourceAttempt<T> = { limited: true } | { limited: false; value: T };
 
 export async function withRateLimitPause<T>(
   env: Bindings,
-  source: EnrichmentSource,
+  source: BudgetableSource,
   run: () => Promise<T>,
 ): Promise<SourceAttempt<T>> {
-  const policy = BACKOFF[source] ?? DEFAULT_BACKOFF;
+  const policy = backoffFor(source);
 
   try {
     const value = await run();
@@ -79,7 +55,7 @@ export async function withRateLimitPause<T>(
 
 export async function withSourceBudget<T>(
   env: Bindings,
-  source: EnrichmentSource,
+  source: BudgetableSource,
   run: () => Promise<T>,
   reserve = 0,
 ): Promise<T | null> {

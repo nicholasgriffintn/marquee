@@ -357,7 +357,7 @@ struct TonightProviderStrip: View {
   let onSelect: (Set<String>) -> Void
 
   private var filterable: [MarqueeProvider] {
-    providers.filter { $0.status == "feed" && !($0.tmdbProviderIds ?? []).isEmpty }
+    providers.filter { $0.isSelectable }
   }
 
   var body: some View {

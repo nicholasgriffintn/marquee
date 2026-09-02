@@ -406,6 +406,8 @@ export function PrivacyPolicyPage() {
               <li>
                 Normalised import records and their viewing events are kept with your account until
                 you remove that import or erase the account. Original import files are not stored.
+                An import you start but never finish is deleted automatically after 30 days, along
+                with everything staged for it.
               </li>
               <li>
                 AI curator conversations expire after one hour of inactivity. Temporary sign-in and

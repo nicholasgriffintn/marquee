@@ -185,12 +185,15 @@ ingestion, and who gets a note of his own on the admin page.
 
 ## What it runs on
 
-Cloudflare Workers throughout — D1, R2, Queues, Workflows, Vectorize, Workers AI, Images and Email
-Service. `wrangler.json` declares all of it, and `wrangler` creates most of it for you on first
-deploy.
+Cloudflare Workers throughout — Hyperdrive in front of Postgres, R2, KV, Queues, Workflows,
+Vectorize, Workers AI, Images, Durable Objects and Email Service. `wrangler.json` declares all of
+it, and `wrangler` creates most of it for you on first deploy. The catalogue itself lives in
+Postgres; nothing is stored in D1.
 
 Outside data needs keys. Every client checks for its own and stands down quietly without it, so a
-partial setup runs; it just knows less.
+partial setup runs; it just knows less. The one exception is `TOKEN_ENCRYPTION_KEY`: without it no
+linked account can be stored, and the box office stops offering the option rather than writing a
+token in the clear.
 
 | Key                            | Gives you                                          |
 | ------------------------------ | -------------------------------------------------- |
@@ -202,6 +205,7 @@ partial setup runs; it just knows less.
 | `CLOUDFLARE_ACCOUNT_ID`        | AI Gateway and Analytics Engine account            |
 | `CLOUDFLARE_API_TOKEN`         | Analytics Engine queries                           |
 | `AI_GATEWAY_TOKEN`             | AI Gateway requests; grant only AI Gateway Run     |
+| `TOKEN_ENCRYPTION_KEY`         | Encrypting linked-account tokens at rest           |
 
 TMDB is the one you cannot really run without. Air dates come from TVmaze, the trending rail from
 Wikipedia pageviews, and the revival house's UK term checks from Wikidata; none of those needs a
@@ -210,7 +214,10 @@ European side of the revival house — without it the other two sources still ru
 
 A name only reaches `env` if it is listed under `secrets.required` in `wrangler.json`. Defining that
 list switches off Wrangler's inference from `.dev.vars`, so anything you add to `.dev.vars` and not
-to the list is silently absent at runtime. Add the name in both places.
+to the list is silently absent at runtime. Add the name in both places. "Required" there means
+"declared", not "the deployment refuses to start" - leave an optional key blank and only the feature
+behind it stands down. `/admin?tab=sources` names every upstream, whether its credential is present,
+and what it last did.
 
 ## Running it locally
 
@@ -232,7 +239,7 @@ Fill in `.dev.vars` from the table above. For sign-in, create a GitHub OAuth app
 `http://localhost:8787/api/auth/callback/github` as its callback URL. For Trakt, an application at
 <https://trakt.tv/oauth/applications> with `http://localhost:8787/api/links/trakt/callback`.
 
-D1 and the queues run locally. Nothing syncs on its own — crons do not fire on a timer, and the
+Postgres runs in Docker (`pnpm db:local:setup`) and the queues run locally. Nothing syncs on its own — crons do not fire on a timer, and the
 scheduled handler is a no-op while `LOCAL_DEV=true`, so no third-party rate limit is spent while you
 work. Run jobs by hand from `/admin`, which has a button for each one and takes the same code path
 the crons take in production. To exercise the cron entrypoint itself, set `LOCAL_SYNC=on` and hit
@@ -247,9 +254,11 @@ There's also a native SwiftUI client that lives in [`ios/`](ios/README.md), you 
 Set the secrets listed under `secrets.required` in `wrangler.json`, then:
 
 ```bash
-pnpm db:migrate:remote
+pnpm db:migrate:prod
 pnpm deploy
 ```
+
+`db:migrate:prod` reads `PROD_DATABASE_URL` from `.dev.vars`.
 
 Migrations are a separate step — `pnpm deploy` only type-checks, builds and ships. Point the
 `routes` entry in `wrangler.json` at your own domain, set `SITE_ORIGIN` if the Worker is served
