@@ -44,9 +44,9 @@ export async function saveViewingEntry(
     `INSERT INTO viewing_entries
          (id, viewer_id, title_id, status, rating, thoughts, last_watched_at,
           status_source, rating_source, projected_at)
-       VALUES ($1, $2, $3, $4, $5, $6,
-               CASE WHEN $4 = 'watched' THEN CURRENT_TIMESTAMP ELSE NULL END,
-               'marquee', CASE WHEN $5 IS NULL THEN NULL ELSE 'marquee' END, CURRENT_TIMESTAMP)
+       VALUES ($1, $2, $3, $4::text, $5::int, $6,
+               CASE WHEN $4::text = 'watched' THEN CURRENT_TIMESTAMP ELSE NULL END,
+               'marquee', CASE WHEN $5::int IS NULL THEN NULL ELSE 'marquee' END, CURRENT_TIMESTAMP)
        ON CONFLICT(viewer_id, title_id) DO UPDATE SET
          status = excluded.status,
          rating = excluded.rating,
