@@ -4,10 +4,11 @@ import {
   titleMatchesPreferredLanguage,
 } from "../../src/domain/languages.ts";
 import type { DeliveredRail } from "../../src/domain/rails.ts";
+import { withKvCache } from "../lib/cache.ts";
 import { logError } from "../lib/logging.ts";
 import { titleCase } from "../lib/text.ts";
 import { readFollowedPeople } from "../repositories/beliefs.ts";
-import { readItems } from "../repositories/catalog-reader.ts";
+import { readSummaryItems } from "../repositories/catalog-reader.ts";
 import { readNearbyCinemas, readShowingTitles } from "../repositories/cinemas.ts";
 import { readNotebookPreferences } from "../repositories/notebook-preferences.ts";
 import { readPerson, readPersonTitleIds } from "../repositories/people.ts";
@@ -19,6 +20,8 @@ const RAIL_SIZE = 14;
 const PEOPLE_RAILS = 3;
 const CINEMA_RADIUS_KM = 30;
 const CINEMA_HORIZON_DAYS = 7;
+const PERSONAL_CACHE_SECONDS = 300;
+const ORIGIN_PRECISION = 2;
 
 function placeName(origin: ViewerOrigin | null) {
   return origin?.label?.trim() || null;
@@ -40,7 +43,7 @@ async function peopleRails(
     names.map(async (name) => {
       const person = await readPerson(env.DB, name);
       const ids = person ? await readPersonTitleIds(env.DB, person.personId, RAIL_SIZE * 2) : [];
-      const items = (await readItems(env.DB, ids, RAIL_SIZE * 2))
+      const items = (await readSummaryItems(env.DB, ids, RAIL_SIZE * 2))
         .filter((item) => titleHasPreferredAudioLanguage(item, [preferredLanguage], providerIds))
         .slice(0, RAIL_SIZE);
       const label = titleCase(name);
@@ -90,7 +93,7 @@ async function cinemaRail(
 
   const showing = await readShowingTitles(env.DB, cinemaIds, CINEMA_HORIZON_DAYS, RAIL_SIZE * 2);
   const items = (
-    await readItems(
+    await readSummaryItems(
       env.DB,
       showing.map((row) => row.titleId),
       RAIL_SIZE * 2,
@@ -122,6 +125,18 @@ async function cinemaRail(
   };
 }
 
+function personalCacheKey(
+  viewerId: string | null,
+  origin: ViewerOrigin | null,
+  providerIds: string[],
+) {
+  const place = origin
+    ? `${origin.latitude.toFixed(ORIGIN_PRECISION)},${origin.longitude.toFixed(ORIGIN_PRECISION)}`
+    : "";
+
+  return `personal-rails:${viewerId ?? "front-of-house"}:${place}:${providerIds.toSorted().join(",")}`;
+}
+
 export async function getPersonalRails(
   env: Bindings,
   viewerId: string | null,
@@ -135,18 +150,26 @@ export async function getPersonalRails(
         ])
       : [null, null];
     const language = preferences?.preferredLanguage ?? "en";
-    const [people, cinema] = await Promise.all([
-      viewerId ? peopleRails(env, viewerId, language, providerIds ?? []) : Promise.resolve([]),
-      cinemaRail(env, origin, {
-        cinemaId: preferences?.preferredCinemaId ?? null,
-        cinemaName: preferences?.preferredCinemaName ?? null,
-        location: preferences?.preferredLocation ?? "",
-        language,
-        required: Boolean(viewerId),
-      }),
-    ]);
 
-    return [...people, cinema].filter((rail): rail is DeliveredRail => rail !== null);
+    return await withKvCache(
+      env,
+      personalCacheKey(viewerId, origin, providerIds ?? []),
+      PERSONAL_CACHE_SECONDS,
+      async () => {
+        const [people, cinema] = await Promise.all([
+          viewerId ? peopleRails(env, viewerId, language, providerIds ?? []) : Promise.resolve([]),
+          cinemaRail(env, origin, {
+            cinemaId: preferences?.preferredCinemaId ?? null,
+            cinemaName: preferences?.preferredCinemaName ?? null,
+            location: preferences?.preferredLocation ?? "",
+            language,
+            required: Boolean(viewerId),
+          }),
+        ]);
+
+        return [...people, cinema].filter((rail): rail is DeliveredRail => rail !== null);
+      },
+    );
   } catch (error) {
     logError("personal_rails_failed", error, { area: "catalogue" });
 

@@ -5,7 +5,15 @@ import { withDatabase } from "../database/runtime.ts";
 import type { DecisionDraft } from "../lib/decisions.ts";
 import { recordEvent } from "../lib/events.ts";
 import { logEvent } from "../lib/logging.ts";
-import { buildOneRail, dedupeRails, prepareRails, type BuiltRail } from "../services/ai-rails.ts";
+import {
+  buildOneRail,
+  claimSeeds,
+  dedupeRails,
+  prepareRails,
+  seedAngle,
+  type AngleSeeds,
+  type BuiltRail,
+} from "../services/ai-rails.ts";
 import { settleDecision } from "../services/decisions.ts";
 import { persistRails, readRailRecord, releaseGeneration } from "../services/rail-generation.ts";
 import type { StoredRail } from "../services/rail-identity.ts";
@@ -82,6 +90,29 @@ export class RailsWorkflow extends WorkflowEntrypoint<WorkerBindings, RailsParam
     const prepared = await step.do("read taste", { retries: RETRIES }, () =>
       withDatabase(this.env, (env) => prepareRails(env, viewer, record.rails)),
     );
+    const seeded = await Promise.all(
+      prepared.angles.map((angle) =>
+        step
+          .do(`seed ${angle.id}`, { retries: RETRIES }, () =>
+            withDatabase(this.env, (env) =>
+              seedAngle(env, {
+                eligibility: prepared.eligibility,
+                vector: prepared.vector,
+                angle,
+                affinity: prepared.affinity,
+                wideGenres: prepared.wideGenres,
+              }),
+            ),
+          )
+          .catch((): AngleSeeds => ({ seeds: [], candidates: [] })),
+      ),
+    );
+    const claimed = claimSeeds(
+      prepared.angles.map((angle, index) => ({
+        angle,
+        ...(seeded[index] ?? { seeds: [], candidates: [] }),
+      })),
+    );
     const toolCache: CuratorToolCache = new Map();
     const built = await Promise.all(
       prepared.angles.map((angle) =>
@@ -90,8 +121,8 @@ export class RailsWorkflow extends WorkflowEntrypoint<WorkerBindings, RailsParam
             withDatabase(this.env, (env) =>
               buildOneRail(env, viewer, prepared.eligibility, angle, {
                 viewerId,
-                seeds: prepared.seeds[angle.id] ?? [],
-                candidates: prepared.candidates[angle.id] ?? [],
+                seeds: claimed.get(angle.id)?.seeds ?? [],
+                candidates: claimed.get(angle.id)?.candidates ?? [],
                 shelf: prepared.shelf,
                 summary: prepared.summary,
                 toolCache,

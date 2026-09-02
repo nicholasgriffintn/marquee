@@ -1,7 +1,7 @@
 import { getTvmazeSchedule, type ScheduledEpisode } from "../clients/tvmaze.ts";
 import { hoursFrom, startOfHour, utcDay } from "../lib/dates.ts";
 import { logError, logEvent } from "../lib/logging.ts";
-import { readItems } from "../repositories/catalog-reader.ts";
+import { readSummaryItems } from "../repositories/catalog-reader.ts";
 import type { Bindings } from "../types.ts";
 
 const COUNTRIES: (string | null)[] = ["GB", "US", null];
@@ -172,7 +172,7 @@ export async function readTonight(
     ).rows;
   }
 
-  const titles = await readItems(
+  const titles = await readSummaryItems(
     env.DB,
     rows.flatMap((row) => (row.titleId ? [row.titleId] : [])),
     limit,

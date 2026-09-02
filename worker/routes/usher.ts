@@ -247,6 +247,7 @@ usherRoutes.post("/pick", async (context) => {
       rejected: Array.isArray(body?.rejected) ? body.rejected.filter(isKnownTitle) : [],
       hour: viewerHour(body?.hour),
       isWeekend: body?.isWeekend === true,
+      defer: (task) => context.executionCtx.waitUntil(task),
     });
 
     if (!pick) {
@@ -304,6 +305,7 @@ usherRoutes.post("/order", async (context) => {
       rejected: Array.isArray(body?.rejected) ? body.rejected.filter(isKnownTitle) : [],
       hour: viewerHour(body?.hour),
       isWeekend: body?.isWeekend === true,
+      defer: (task) => context.executionCtx.waitUntil(task),
     });
 
     if (!result) {

@@ -136,17 +136,29 @@ export async function readSignals(
 }
 
 export async function readRefusals(db: Database, viewerId: string) {
-  const signals = await readSignals(db, viewerId, ["rejection", "never"], 300);
-  const titleIds = (type: SignalType) => [
-    ...new Set(
-      signals
-        .filter((signal) => signal.type === type)
-        .map((signal) => signal.titleId)
-        .filter(Boolean),
-    ),
-  ];
+  if (!viewerId) {
+    return { never: [], rejected: [] };
+  }
 
-  return { never: titleIds("never"), rejected: titleIds("rejection") };
+  try {
+    const rows = await db.query<{ type: string; titleId: string }>(
+      `SELECT DISTINCT type, title_id AS "titleId"
+           FROM viewer_signals
+          WHERE viewer_id = $1
+            AND type IN ('rejection', 'never')
+            AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)
+            AND title_id IS NOT NULL`,
+      [viewerId],
+    );
+    const titleIds = (type: SignalType) =>
+      rows.rows.flatMap((row) => (row.type === type ? [row.titleId] : []));
+
+    return { never: titleIds("never"), rejected: titleIds("rejection") };
+  } catch (error) {
+    logError("refusal_read_failed", error);
+
+    return { never: [], rejected: [] };
+  }
 }
 
 export async function recentExitFor(db: Database, viewerId: string, titleId: string, days = 45) {
