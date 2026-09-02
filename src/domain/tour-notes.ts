@@ -25,7 +25,7 @@ export const TOUR_NOTES: Record<TourStopId, TourNote> = {
     body: [
       "I made sure that this page would call the same endpoints as the rest of the site calls so that you get a proper demo.",
       "There are no fixtures or faked data on this page so if something is down, it will error just like the product does.",
-      "For this page in particular, you will see a counter for the total count of titles, this comes from Postgres via Hyperdrive, cached on the edge with Cloudflare",
+      "For this page in particular, you will see a counter for the total count of titles, this comes from Postgres via Hyperdrive, cached on the edge with Cloudflare.",
     ],
     diagram: {
       lanes: [],
@@ -44,12 +44,13 @@ export const TOUR_NOTES: Record<TourStopId, TourNote> = {
   },
 
   foyer: {
-    heading: "Accurate results for search and recomendations",
+    heading: "Accurate results for search and recommendations",
     standfirst: "Using Postgres for precision requirements and embeddings for meaning",
     body: [
-      "Marquee has a number of surfaces that have different search and matching requirements so we use two different ways to match",
-      "Postgres is used for a full-text search using the tsvector data type and inccludes titles, synopses, keywords and credited names. It gets ordered by ts_rank_cd and is intended to be fast and very literal, it will only match what you actually typed.",
+      "Marquee has a number of surfaces that have different search and matching requirements so we use two different ways to match.",
+      "Postgres is used for a full-text search using the tsvector data type and includes titles, synopses, keywords and credited names. It gets ordered by ts_rank_cd and is intended to be fast and very literal, it will only match what you actually typed.",
       "To provide results with meaning, we are using bge-m3 with Vectorize to provide nearest neighbour results. Vectorize has a number of embeddings within it and these include various metadata indexes, including the type of media and the year.",
+      "Both of these can then be fused if required and then in a number of applications, they are reranked by bge-reranker-base which scores each candidate against the original query instead of comparing vectors and allows the results to still be relevant to the query.",
     ],
     diagram: {
       lanes: [
@@ -94,13 +95,13 @@ export const TOUR_NOTES: Record<TourStopId, TourNote> = {
 
   pad: {
     heading: "Recommendations powered by AI",
-    standfirst: "Using constraiants from users and a shortlist for speed",
+    standfirst: "Using constraints from users and a shortlist for speed",
     body: [
-      "When a user queries the platform for a recomendation, they provide us with a number of constiants for the recommendation they want, in the example above, you provide us answers to three questions. These are used as filters for the retriveal of the search that provides a shortlist of available titles for the next step.",
-      "That shortlist is then passed down to the AI which  will be a model provided from Workers AI most of the time.",
-      "The model is provided a basic prompt alongside this shortlist and will then pick and explain its decision based on all of this information",
-      "The decision is then returned to the user but we also store a hash of the prompt version against a decision, this allows us to track how different candidates perform across recommendations. The prompt itself is not store and rows in decisions will expire after 90  days.",
-      'We ar eusing wo models by default @cf/meta/llama-4-scout-17b-16e-instruct as a "fast model" and then @cf/moonshotai/kimi-k2.6 for slower queries that require more thought, this can also be configured individually for each user.',
+      "When a user queries the platform for a recommendation, they provide us with a number of constraints for the recommendation they want, in the example above, you provide us answers to three questions. These are used as filters for the retrieval of the search that provides a shortlist of available titles for the next step.",
+      "That shortlist is then passed down to the AI which will be a model provided from Workers AI most of the time.",
+      "The model is provided a basic prompt alongside this shortlist and will then pick and explain its decision based on all of this information.",
+      "The decision is then returned to the user but we also store a hash of the prompt version against a decision, this allows us to track how different candidates perform across recommendations. The prompt itself is not stored and rows in decisions will expire after 90 days.",
+      'We are using two models by default @cf/meta/llama-4-scout-17b-16e-instruct as a "fast model" and then @cf/moonshotai/kimi-k2.6 for slower queries that require more thought, this can also be configured individually for each user.',
     ],
     diagram: {
       lanes: [],
@@ -117,7 +118,7 @@ export const TOUR_NOTES: Record<TourStopId, TourNote> = {
     code: [
       {
         path: "worker/services/usher-order.ts",
-        what: "The logic behind the constriants, shortlist and prompt",
+        what: "The logic behind the constraints, shortlist and prompt",
       },
       { path: "worker/services/decisions.ts", what: "How decisions are stored" },
       { path: "worker/ai/run.ts", what: "The model routing and AI gateway config" },
@@ -128,10 +129,10 @@ export const TOUR_NOTES: Record<TourStopId, TourNote> = {
     heading: "Providing useful recommendations",
     standfirst: "Walking a line to find the best, nearest film across waypoints",
     body: [
-      "One suggestion for the search algo for Marquee might be to use Naive hill-climbing, which would mean that we would improve on the result by making small changes as we search",
-      "That wouldn't work here as the nearest neighbours of a film are usually its own sequels, we end up with a poor result or obvious recommendations like recommending Aliens if you saw Alien",
-      "I want something a bit more interesting than that so it was a straight line algo instead. At each fraction along the line that the algo walks, it will query Vectorize to see which title sits nearest to the current point, at the point that it find a good matc, it will return it.",
-      "The algo will reject a candidate if it is barely a step aware from the previous title it was on. It will also reject a candidate if it is not closer to the far end than the step before.",
+      "One suggestion for the search algo for Marquee might be to use naive hill-climbing, which would mean that we would improve on the result by making small changes as we search.",
+      "That wouldn't work here as the nearest neighbours of a film are usually its own sequels, we end up with a poor result or obvious recommendations like recommending Aliens if you saw Alien.",
+      "I want something a bit more interesting than that so it was a straight line algo instead. At each fraction along the line that the algo walks, it will query Vectorize to see which title sits nearest to the current point, at the point that it finds a good match, it will return it.",
+      "The algo will reject a candidate if it is barely a step away from the previous title it was on. It will also reject a candidate if it is not closer to the far end than the step before.",
       "It won't go on infinitely though, if it can't find a qualifier, it will stop early.",
     ],
     diagram: {
@@ -161,10 +162,10 @@ export const TOUR_NOTES: Record<TourStopId, TourNote> = {
     heading: "Reviving old content",
     standfirst: "How I show archival content and hope that I won't get sued",
     body: [
-      "As I was developing Marquee I thought that it would be great to have our own little streaming space but Marque definitely isn't big enough to stream modern filsm. Instead, I thought a good idea would be to use archival videos and so the Rivival House was born.",
-      "This feature collects archival content from the Internet Archive, LoC and Europeana. This content is then classified using author metadata from Wikipedia.",
+      "As I was developing Marquee I thought that it would be great to have our own little streaming space but Marquee definitely isn't big enough to stream modern films. Instead, I thought a good idea would be to use archival videos and so the Revival House was born.",
+      "This feature collects archival content from the Internet Archive, LoC and Europeana. This content is then classified using author metadata from Wikidata.",
       "With the author data, we work out when the death date of the contributors was. That allows us to clear the UK term for public domain content and stream it from our own R2 mirror bucket. If we cannot confirm then we will fall back to streaming directly from the content provider themselves.",
-      "Our R2 bucket is a copied version of the content. When the first user plays an apprroved piece of content, a queue item will be triggered to copy it to our S3 bucket in 32MB parts using multipart upload. This all happens in the background and can be stopped then started. No need to hold the whole file in the worker.",
+      "Our R2 bucket is a copied version of the content. When the first user plays an approved piece of content, a queue item will be triggered to copy it to our R2 bucket in 32MB parts using multipart upload. This all happens in the background and can be stopped then started. No need to hold the whole file in the worker.",
     ],
     diagram: {
       lanes: [],
@@ -188,8 +189,8 @@ export const TOUR_NOTES: Record<TourStopId, TourNote> = {
     heading: "Providing location aware data",
     standfirst: "Using Cloudflare's edge as a geo identifier.",
     body: [
-      "Cloudflare already gives us geo data for free on every request arriving to our worker, we can use this with a bounding box to work our roughly where th euser is, without needing to use any other APIs",
-      "This can be used for various places but in particular, we are using it for cinema recommendations to show user's a list of cinemas that are currently showing their content, near where they are.",
+      "Cloudflare already gives us geo data for free on every request arriving at our worker, we can use this with a bounding box to work out roughly where the user is, without needing to use any other APIs.",
+      "This can be used for various places but in particular, we are using it for cinema recommendations to show users a list of cinemas that are currently showing their content, near where they are.",
     ],
     diagram: {
       lanes: [],
@@ -212,8 +213,8 @@ export const TOUR_NOTES: Record<TourStopId, TourNote> = {
     heading: "Keeping Marquee public",
     standfirst: "Using rate limiting and bot checks so that our data can be open",
     body: [
-      "In order to keep Marquee public and open without costing me a ton of money and stopping the database from blowing up, we are using centralised rate limtiing and bot checks across routes.",
-      "Each path then has its own polcy to define the budget for that route. We configure rate limiting with Cloudflare' built in rate limiting feature and use the metadata that Cloudflare already supplies to us on every request for the bot checks.",
+      "In order to keep Marquee public and open without costing me a ton of money and stopping the database from blowing up, we are using centralised rate limiting and bot checks across routes.",
+      "Each path then has its own policy to define the budget for that route. We configure rate limiting with Cloudflare's built-in rate limiting feature and use the metadata that Cloudflare already supplies to us on every request for the bot checks.",
     ],
     diagram: {
       lanes: [],
@@ -229,7 +230,7 @@ export const TOUR_NOTES: Record<TourStopId, TourNote> = {
       { path: "worker/security/guard.ts", what: "The middleware that is applied to every route" },
       {
         path: "worker/security/policies.ts",
-        what: "Individual polciies for all the routes",
+        what: "Individual policies for all the routes",
       },
       { path: "worker/security/bots.ts", what: "The bot assessment and its stances" },
     ],
@@ -241,7 +242,7 @@ export const TOUR_NOTES: Record<TourStopId, TourNote> = {
     body: [
       "Marquee is performing an ingestion across two main jobs. It has a light pass that is triggered every three hours and then a nightly pass that will fan over as many of TMDB's discover pages as possible.",
       "In the background, this uses Cloudflare Workflows and Queues to conduct these jobs. Workflows is particularly awesome as it will survive restarts and will automatically retry individual steps for us. Alongside that, it has great auditing.",
-      "If any records are changed, we automatically has it and then make an embedding for that content.",
+      "If any records are changed, we automatically hash it and then make an embedding for that content.",
     ],
     diagram: {
       lanes: [],
