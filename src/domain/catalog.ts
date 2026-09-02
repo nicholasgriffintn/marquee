@@ -348,42 +348,63 @@ export function personPath(personId: number) {
 
 const PERSONAL_SPACING = 3;
 
+export type HomeSectionGroups = {
+  pinned: CatalogSection[];
+  ai: CatalogSection[];
+  browse: CatalogSection[];
+};
+
+export function groupHomeSections(
+  pinned: CatalogSection[],
+  curated: CatalogSection[],
+  personal: CatalogSection[],
+  general: CatalogSection[],
+): HomeSectionGroups {
+  const seen = new Set<string>();
+  const groups: HomeSectionGroups = { pinned: [], ai: [], browse: [] };
+  const queue = [...personal];
+
+  const push = (group: CatalogSection[], section: CatalogSection) => {
+    if (!seen.has(section.id) && section.items.length > 0) {
+      seen.add(section.id);
+      group.push(section);
+    }
+  };
+
+  for (const section of pinned) {
+    push(groups.pinned, section);
+  }
+
+  for (const section of curated) {
+    push(groups.ai, section);
+  }
+
+  for (const [index, section] of general.entries()) {
+    push(groups.browse, section);
+
+    const next = (index + 1) % PERSONAL_SPACING === 0 ? queue.shift() : undefined;
+
+    if (next) {
+      push(groups.browse, next);
+    }
+  }
+
+  for (const section of queue) {
+    push(groups.browse, section);
+  }
+
+  return groups;
+}
+
 export function weaveSections(
   pinned: CatalogSection[],
   curated: CatalogSection[],
   personal: CatalogSection[],
   general: CatalogSection[],
 ) {
-  const seen = new Set<string>();
-  const woven: CatalogSection[] = [];
-  const queue = [...personal];
+  const groups = groupHomeSections(pinned, curated, personal, general);
 
-  const push = (section: CatalogSection) => {
-    if (!seen.has(section.id) && section.items.length > 0) {
-      seen.add(section.id);
-      woven.push(section);
-    }
-  };
-
-  for (const section of [...pinned, ...curated]) {
-    push(section);
-  }
-
-  for (const [index, section] of general.entries()) {
-    push(section);
-
-    const next = (index + 1) % PERSONAL_SPACING === 0 ? queue.shift() : undefined;
-
-    if (next) {
-      push(next);
-    }
-  }
-
-  for (const section of queue) {
-    push(section);
-  }
-
-  return woven;
+  return [...groups.pinned, ...groups.ai, ...groups.browse];
 }
 
 export function sharedTraits(left: MediaTitle, right: MediaTitle, limit = 3) {

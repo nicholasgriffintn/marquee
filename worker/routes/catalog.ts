@@ -144,6 +144,7 @@ catalogRoutes.get("/featured", async (context) => {
 
   try {
     context.header("cache-control", "private, max-age=300");
+    context.header("vary", "Cookie, Authorization");
 
     return context.json(
       await getFeaturedTitle(context.env, {

@@ -21,7 +21,7 @@ import { UsherConsole } from "../components/usher/UsherConsole";
 import { UsherHero } from "../components/usher/UsherHero";
 import { UsherOnboarding } from "../components/usher/UsherOnboarding";
 import { UsherOrder } from "../components/usher/UsherOrder";
-import type { CatalogSection, MediaTitle, Provider } from "../domain/catalog";
+import type { CatalogSection, HomeSectionGroups, MediaTitle, Provider } from "../domain/catalog";
 import type { Guest } from "../domain/notebook";
 import { isCuratedRailId, isViewerShelfId } from "../domain/rails";
 import type { TonightOrder, UsherMoment } from "../domain/usher";
@@ -64,7 +64,7 @@ export function TonightPage({
   isSessionLoading,
   error,
   providerError,
-  sections,
+  sectionGroups,
   featured,
   isHeroReady,
   episodes,
@@ -103,7 +103,7 @@ export function TonightPage({
   isSessionLoading: boolean;
   error: string;
   providerError: string;
-  sections: CatalogSection[];
+  sectionGroups: HomeSectionGroups;
   featured: MediaTitle | undefined;
   isHeroReady: boolean;
   episodes: ScheduledEpisode[];
@@ -170,12 +170,31 @@ export function TonightPage({
     }),
     [trending],
   );
+  const hasSections = Object.values(sectionGroups).some((sections) => sections.length > 0);
 
   function toggleProvider(id: string) {
     onSelectProviders(
       selectedProviderIds?.includes(id)
         ? selectedProviderIds.filter((providerId) => providerId !== id)
         : [...selectedProviderIds, id],
+    );
+  }
+
+  function renderSection(section: CatalogSection) {
+    return (
+      <ErrorBoundary key={section.id} label={`The ${section.title} shelf`}>
+        <ContentRail
+          section={section}
+          byUsher={isViewerShelfId(section.id)}
+          onOpen={onOpen}
+          onSeen={isCuratedRailId(section.id) ? onRailSeen : undefined}
+          trailing={
+            usherMoment?.id === `rail-feedback:${section.id}` ? (
+              <UsherCard moment={usherMoment} onAction={onUsherAction} onDismiss={onUsherDismiss} />
+            ) : undefined
+          }
+        />
+      </ErrorBoundary>
     );
   }
 
@@ -358,8 +377,10 @@ export function TonightPage({
           <i>AI</i> Building your shelves…
         </p>
       )}
-      {trending.length > 1 || sections.length > 0 ? (
+      {trending.length > 1 || episodes.length > 0 || hasSections ? (
         <div className={styles.rails}>
+          {sectionGroups.pinned.map(renderSection)}
+          {sectionGroups.ai.map(renderSection)}
           {trending.length > 1 && (
             <ErrorBoundary label="The trending shelf">
               <ContentRail section={trendingSection} ranked onOpen={onOpen} />
@@ -396,25 +417,7 @@ export function TonightPage({
               </section>
             </ErrorBoundary>
           )}
-          {sections.map((section) => (
-            <ErrorBoundary key={section.id} label={`The ${section.title} shelf`}>
-              <ContentRail
-                section={section}
-                byUsher={isViewerShelfId(section.id)}
-                onOpen={onOpen}
-                onSeen={isCuratedRailId(section.id) ? onRailSeen : undefined}
-                trailing={
-                  usherMoment?.id === `rail-feedback:${section.id}` ? (
-                    <UsherCard
-                      moment={usherMoment}
-                      onAction={onUsherAction}
-                      onDismiss={onUsherDismiss}
-                    />
-                  ) : undefined
-                }
-              />
-            </ErrorBoundary>
-          ))}
+          {sectionGroups.browse.map(renderSection)}
         </div>
       ) : (
         isLoading && (

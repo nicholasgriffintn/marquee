@@ -7,7 +7,13 @@ import { SiteFooter } from "./components/SiteFooter";
 import { SiteHeader } from "./components/SiteHeader";
 import { TitleOverlay } from "./components/TitleOverlay";
 import { ManagersDoor } from "./components/usher/ManagersDoor";
-import { titlePath, weaveSections, type CatalogSection, type MediaTitle } from "./domain/catalog";
+import {
+  groupHomeSections,
+  titlePath,
+  weaveSections,
+  type CatalogSection,
+  type MediaTitle,
+} from "./domain/catalog";
 import { asideFor, type UsherMoment } from "./domain/usher";
 import { useCatalog } from "./hooks/useCatalog";
 import { useCurator } from "./hooks/useCurator";
@@ -255,8 +261,9 @@ export function App() {
 
     void navigate("/", { viewTransition: true });
   }, [background, navigate]);
-  const sections = useMemo(
-    () => weaveSections(pinned.sections, rails.curated, rails.personal, catalog.catalogue.sections),
+  const sectionGroups = useMemo(
+    () =>
+      groupHomeSections(pinned.sections, rails.curated, rails.personal, catalog.catalogue.sections),
     [catalog.catalogue, pinned.sections, rails.curated, rails.personal],
   );
   const heroSections = useMemo(
@@ -486,7 +493,7 @@ export function App() {
                     isSessionLoading={!isViewerReady}
                     error={catalog.error}
                     providerError={catalog.providerError}
-                    sections={sections}
+                    sectionGroups={sectionGroups}
                     featured={featured}
                     isHeroReady={isHeroReady}
                     episodes={episodes}

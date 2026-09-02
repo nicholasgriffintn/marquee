@@ -74,11 +74,12 @@ function candidatePool(
 }
 
 function featuredCacheKey(
+  viewerId: string | null,
   providerIds: string[],
   preferredLanguage: string,
   day: string,
 ) {
-  return `featured:${day}:front-of-house:${preferredLanguage}:${providerIds.toSorted().join(",")}`;
+  return `featured:${day}:${viewerId ?? "front-of-house"}:${preferredLanguage}:${providerIds.toSorted().join(",")}`;
 }
 
 function frontIds(rails: StoredRail[]) {
@@ -136,14 +137,12 @@ export async function getFeaturedTitle(
 
     return DEFAULT_PREFERRED_LANGUAGE;
   });
-  const cacheKey = featuredCacheKey(providerIds, language, dayKey(now));
-  const cached = viewerId
-    ? null
-    : await readCachedValue<FeaturedTitle>(cacheKey).catch((error: unknown) => {
-        logError("featured_cache_read_failed", error);
+  const cacheKey = featuredCacheKey(viewerId, providerIds, language, dayKey(now));
+  const cached = await readCachedValue<FeaturedTitle>(cacheKey).catch((error: unknown) => {
+    logError("featured_cache_read_failed", error);
 
-        return null;
-      });
+    return null;
+  });
 
   if (cached) {
     return cached;
@@ -174,7 +173,7 @@ export async function getFeaturedTitle(
     fetchedAt: now.toISOString(),
   };
 
-  if (result.item && !viewerId) {
+  if (result.item) {
     const write = logRejection(
       writeCachedValue(cacheKey, result, FEATURED_CACHE_SECONDS),
       "featured_cache_write_failed",
