@@ -42,7 +42,7 @@ export function UsherOrder({
   onOpen: (item: MediaTitle) => void;
   onAnother: () => void;
   onEdit: () => void;
-  onClose: () => void;
+  onClose?: () => void;
 }) {
   const [answers, setAnswers] = useState<Partial<TonightOrder>>({});
   const [reply, setReply] = useState("");
@@ -84,7 +84,7 @@ export function UsherOrder({
         <UsherHero empty={!pick?.item.backdropUrl}>
           {pick?.item.backdropUrl && <HeroArt item={pick.item} />}
           <HeroGradient />
-          <UsherExit onClick={onClose} />
+          {onClose && <UsherExit onClick={onClose} />}
           <UsherFigure face={face} />
 
           <UsherHeroCopy>
@@ -171,7 +171,7 @@ export function UsherOrder({
   return (
     <UsherHero empty>
       <HeroGradient />
-      <UsherExit onClick={onClose} />
+      {onClose && <UsherExit onClick={onClose} />}
       <UsherFigure face="idle" />
 
       <UsherHeroCopy>

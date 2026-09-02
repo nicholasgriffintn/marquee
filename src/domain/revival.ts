@@ -276,6 +276,13 @@ export function tagSlug(value: string) {
   return slugify(value);
 }
 
+/** The soundest print on offer: our own copy first, and never a rough one if there is a choice. */
+export function bestPrint<T extends { mirrored: boolean; condition: PrintCondition }>(prints: T[]) {
+  const watchable = prints.filter((print) => print.condition !== "rough");
+
+  return watchable.find((print) => print.mirrored) ?? watchable[0] ?? prints[0];
+}
+
 export function runtimeLabel(seconds: number | null) {
   if (!seconds) {
     return null;

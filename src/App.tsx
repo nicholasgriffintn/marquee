@@ -73,6 +73,7 @@ const RevivalScreenPage = lazy(() =>
     default: m.RevivalScreenPage,
   })),
 );
+const TourPage = lazy(() => import("./pages/TourPage").then((m) => ({ default: m.TourPage })));
 const NotebookPage = lazy(() =>
   import("./pages/NotebookPage").then((m) => ({ default: m.NotebookPage })),
 );
@@ -521,6 +522,27 @@ export function App() {
               />
 
               <Route path="/usher" element={<UsherPage />} />
+
+              <Route
+                path="/tour"
+                element={
+                  <Suspense fallback={<RouteFallback />}>
+                    <TourPage
+                      isSignedIn={isSignedIn}
+                      pad={{
+                        state: usher.order,
+                        guests: usher.guests,
+                        onStart: usher.openOrder,
+                        onSubmit: (order, guestIds) =>
+                          void usher.placeOrder(order, selectedProviderIds, guestIds),
+                        onAnother: () => void usher.reorder(selectedProviderIds),
+                        onEdit: usher.editOrder,
+                      }}
+                      onOpen={openTitle}
+                    />
+                  </Suspense>
+                }
+              />
 
               <Route
                 path="/revival"

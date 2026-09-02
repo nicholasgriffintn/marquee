@@ -48,6 +48,9 @@ export function SiteFooter() {
         </Text>
       </div>
       <nav className={styles.legal} aria-label="Legal">
+        <Link className={styles.link} to="/tour">
+          Take the tour
+        </Link>
         <Link className={styles.link} to="/privacy">
           Privacy
         </Link>

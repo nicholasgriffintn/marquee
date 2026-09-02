@@ -1,0 +1,115 @@
+.diagram {
+  background: var(--paper-deep);
+  border: 1px solid var(--paper-line);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-4);
+}
+
+.flow {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.lanes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+.lane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.laneName {
+  color: var(--acid-ink);
+  font: var(--weight-bold) var(--type-label) / 1 var(--mono);
+  letter-spacing: var(--tracking-label-wide);
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.row {
+  align-items: stretch;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.cell {
+  align-items: center;
+  display: flex;
+  gap: var(--space-2);
+}
+
+.arrow {
+  color: var(--muted-on-paper);
+  font: var(--weight-bold) var(--type-md) / 1 var(--mono);
+}
+
+.merge {
+  color: var(--muted-on-paper);
+  font: var(--weight-bold) var(--type-lg) / 1 var(--mono);
+}
+
+.node {
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 104px;
+  padding: var(--space-2) var(--space-3);
+}
+
+.node strong {
+  color: var(--ink);
+  font: var(--weight-bold) var(--type-xs) / 1.25 var(--mono);
+  letter-spacing: 0.04em;
+}
+
+.node small {
+  color: var(--muted-on-paper);
+  font: var(--weight-regular) var(--type-label-lg) / 1.35 var(--sans);
+}
+
+.input {
+  border-style: dashed;
+}
+
+.store {
+  background: var(--paper-deep);
+  box-shadow: inset 3px 0 0 var(--muted-on-paper);
+}
+
+.model {
+  box-shadow: inset 3px 0 0 var(--coral);
+}
+
+.output {
+  box-shadow: inset 3px 0 0 var(--acid-ink);
+}
+
+.output strong {
+  color: var(--acid-ink);
+}
+
+.caption {
+  border-top: 1px solid var(--paper-line);
+  color: var(--muted-on-paper);
+  font: var(--weight-regular) var(--type-sm) / var(--leading-relaxed) var(--sans);
+  padding-top: var(--space-3);
+}
+
+@media (max-width: 620px) {
+  .node {
+    min-width: 88px;
+  }
+}

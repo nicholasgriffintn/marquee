@@ -1,0 +1,131 @@
+.picker {
+  display: flex;
+  flex: 1 1 240px;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: 320px;
+  position: relative;
+}
+
+.label {
+  color: var(--muted);
+  font: var(--weight-bold) var(--type-label) / 1.2 var(--mono);
+  letter-spacing: var(--tracking-label-wide);
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.input {
+  background: var(--panel-tile);
+  border: 1px solid var(--panel-line);
+  color: var(--white);
+  font: var(--weight-regular) var(--type-body) / 1.2 var(--sans);
+  height: var(--control-height);
+  padding: 0 var(--space-3);
+  width: 100%;
+}
+
+.input:focus-visible {
+  border-color: var(--acid);
+  outline: none;
+}
+
+.results {
+  background: var(--panel);
+  border: 1px solid var(--panel-line);
+  display: flex;
+  flex-direction: column;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  position: absolute;
+  top: 100%;
+  width: 100%;
+  z-index: 3;
+}
+
+.results button {
+  align-items: baseline;
+  background: none;
+  border: 0;
+  color: var(--white);
+  cursor: pointer;
+  display: flex;
+  font: var(--weight-regular) var(--type-sm) / 1.3 var(--sans);
+  gap: var(--space-2);
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  width: 100%;
+}
+
+.results button:hover {
+  background: var(--panel-raised);
+}
+
+.results small {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: var(--type-xs);
+}
+
+.chosen {
+  align-items: center;
+  background: var(--panel-tile);
+  border: 1px solid var(--panel-line);
+  display: flex;
+  gap: var(--space-3);
+  height: var(--control-height);
+  padding: 0 var(--space-2);
+}
+
+.art {
+  flex: none;
+  height: 30px;
+  overflow: hidden;
+  width: 20px;
+}
+
+.art > * {
+  display: block;
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.chosenCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.chosenCopy strong {
+  color: var(--white);
+  font: var(--weight-medium) var(--type-sm) / 1.2 var(--sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chosenCopy small {
+  color: var(--muted);
+  font: var(--weight-regular) var(--type-xs) / 1 var(--mono);
+}
+
+.swap {
+  background: none;
+  border: 1px solid var(--panel-line);
+  color: var(--muted);
+  cursor: pointer;
+  flex: none;
+  font: var(--weight-bold) var(--type-label) / 1 var(--mono);
+  letter-spacing: var(--tracking-label);
+  margin-left: auto;
+  padding: var(--space-2);
+  text-transform: uppercase;
+}
+
+.swap:hover {
+  color: var(--white);
+}

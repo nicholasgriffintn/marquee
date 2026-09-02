@@ -50,6 +50,11 @@ const STATIC_CARDS: Record<string, { title: string; description: string }> = {
     title: "The Usher — thirty years on the door · Marquee",
     description: "Who the Usher is, and why he has opinions about what you should watch tonight.",
   },
+  "/tour": {
+    title: "The tour — a walk round the building after closing · Marquee",
+    description:
+      "Nine stops with the Usher and a torch: how the search actually works, how he picks, and what plays on the small screen at the back.",
+  },
   "/revival": {
     title: "The revival house — free public domain films to watch online · Marquee",
     description:

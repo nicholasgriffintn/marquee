@@ -96,6 +96,11 @@ export const POLICIES = {
     member: { limiter: "MEMBER_RATE_LIMITER", message: STEADY_ON },
     bots: "open",
   },
+  door: {
+    anonymous: { limiter: "DOOR_RATE_LIMITER", message: STEADY_ON },
+    member: { limiter: "DOOR_RATE_LIMITER", message: STEADY_ON },
+    bots: "strict",
+  },
   imports: {
     anonymous: {
       limiter: "CURATOR_FREE_RATE_LIMITER",
@@ -124,6 +129,7 @@ export const RULES: readonly Rule[] = [
   { path: "/api/auth/native/*", policy: "auth" },
   { path: "/api/auth/tokens", methods: WRITE_METHODS, policy: "auth" },
   { path: "/api/auth/tokens/*", methods: WRITE_METHODS, policy: "auth" },
+  { path: "/api/catalog/door", policy: "door" },
   { path: "/api/catalog/search", policy: "search" },
   { path: "/api/curator", methods: ["POST"], policy: "curator" },
   { path: "/api/curator/insight/*", policy: "insight" },

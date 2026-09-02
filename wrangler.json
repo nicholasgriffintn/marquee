@@ -136,6 +136,14 @@
         "limit": 60,
         "period": 60
       }
+    },
+    {
+      "name": "DOOR_RATE_LIMITER",
+      "namespace_id": "764227",
+      "simple": {
+        "limit": 3,
+        "period": 60
+      }
     }
   ],
   "vars": {

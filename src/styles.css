@@ -68,6 +68,7 @@
   --space-10: 96px;
 
   --gutter: clamp(24px, 5vw, 82px);
+  --header-height: 78px;
   --control-height: 43px;
   --control-height-sm: 34px;
   --shadow-pop: 5px 5px 0 var(--blue);

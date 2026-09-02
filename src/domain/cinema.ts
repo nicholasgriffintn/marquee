@@ -52,6 +52,14 @@ export type LocalShowing = {
   nearestDistanceKm: number | null;
 };
 
+export type LocalShowings = {
+  items: LocalShowing[];
+  cinemas: Cinema[];
+  origin: ViewerOrigin | null;
+  radiusKm: number;
+  fetchedAt: string;
+};
+
 export const DEFAULT_RADIUS_KM = 16;
 export const MAX_RADIUS_KM = 80;
 export const SHOWING_HORIZON_DAYS = 7;
