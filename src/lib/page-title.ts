@@ -16,6 +16,8 @@ const ROUTE_TITLES: Record<string, string> = {
   "/privacy": "Privacy policy · Marquee",
   "/terms": "Terms of use · Marquee",
   "/usher": "The Usher (1974) — Marquee",
+  "/tour": "The tour · Marquee",
+  "/after-hours": "The tour · Marquee",
   "/search": "Listings · Marquee",
   "/films": "Listings · Marquee",
   "/series": "Listings · Marquee",

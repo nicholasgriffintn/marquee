@@ -33,6 +33,7 @@ import {
 } from "../repositories/people.ts";
 import { readPlacesForTitle } from "../repositories/title-places.ts";
 import { getTitleAdaptations } from "../services/adaptations.ts";
+import { readBuilding } from "../services/building.ts";
 import {
   browseCatalogue,
   getCatalogue,
@@ -52,6 +53,7 @@ import {
 import { getFeaturedTitle } from "../services/featured.ts";
 import { deliverRails } from "../services/rail-delivery.ts";
 import { getSeason, getSeasonIndex } from "../services/seasons.ts";
+import { walkBetweenTitles } from "../services/title-path.ts";
 import type { Bindings } from "../types.ts";
 
 const TONIGHT_DEFAULT_LIMIT = 12;
@@ -66,6 +68,8 @@ const GENRES_DEFAULT_LIMIT = 40;
 const SEASON_LIMIT = 100;
 const RAILS_CACHE_SECONDS = 120;
 const MAX_TMDB_ID = 9_999_999_999;
+const TITLE_ID_LIMIT = 24;
+const PATH_HOPS = 6;
 
 export const catalogRoutes = new Hono<{
   Bindings: Bindings;
@@ -203,6 +207,18 @@ catalogRoutes.get("/search", async (context) => {
 
     return context.json({ error: "Search is unavailable" }, 500);
   }
+});
+
+catalogRoutes.get("/building", edgeCache(600), async (context) => {
+  context.header("cache-control", "public, max-age=600");
+
+  return context.json(await readBuilding(context.env));
+});
+
+catalogRoutes.get("/door", async (context) => {
+  context.header("cache-control", "no-store");
+
+  return context.json({ open: true, line: "Evening. In you come." });
 });
 
 catalogRoutes.get("/genres", edgeCache(3_600), async (context) => {
@@ -527,6 +543,25 @@ catalogRoutes.get("/titles/:titleId/credits", edgeCache(3_600), async (context) 
     logError("title_credits_failed", error, { area: "catalogue", titleId });
 
     return context.json(empty);
+  }
+});
+
+catalogRoutes.get("/titles/:titleId/path", edgeCache(3_600), async (context) => {
+  const fromId = context.req.param("titleId");
+  const toId = queryText(context, "to", TITLE_ID_LIMIT);
+
+  if (!isKnownTitle(fromId) || !isKnownTitle(toId)) {
+    return context.json({ error: "Unknown title" }, 404);
+  }
+
+  try {
+    context.header("cache-control", "public, max-age=3600");
+
+    return context.json(await walkBetweenTitles(context.env, fromId, toId, PATH_HOPS));
+  } catch (error) {
+    logError("catalogue_read_failed", error, { area: "path" });
+
+    return context.json({ error: "I cannot get from one to the other just now" }, 500);
   }
 });
 

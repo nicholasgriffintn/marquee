@@ -19,6 +19,7 @@ const STATIC_PATHS = [
   { path: "/privacy", priority: "0.2", changefreq: "yearly" },
   { path: "/terms", priority: "0.2", changefreq: "yearly" },
   { path: "/usher", priority: "0.3", changefreq: "yearly" },
+  { path: "/tour", priority: "0.4", changefreq: "monthly" },
 ];
 
 type TitleRow = {

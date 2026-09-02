@@ -1,0 +1,83 @@
+.foyer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.ask {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.field {
+  max-width: 620px;
+}
+
+.openers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.lanes {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+.lane {
+  border: 1px solid var(--panel-line);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.meaning {
+  border-color: var(--acid-ink);
+}
+
+.laneHead {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+}
+
+.laneHead span {
+  color: var(--white);
+  font: var(--weight-bold) var(--type-label-lg) / 1.2 var(--mono);
+  letter-spacing: var(--tracking-label-wide);
+  text-transform: uppercase;
+}
+
+.meaning .laneHead span {
+  color: var(--acid);
+}
+
+.laneHead em {
+  color: var(--muted);
+  font: var(--weight-regular) var(--type-xs) / 1.4 var(--sans);
+  font-style: normal;
+}
+
+.laneSkeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.rowSkeleton {
+  height: 62px;
+}
+
+.empty {
+  color: var(--muted);
+  font: var(--weight-regular) var(--type-sm) / 1.5 var(--sans);
+  margin: 0;
+}
+
+.tally {
+  margin: 0;
+}

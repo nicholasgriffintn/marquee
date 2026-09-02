@@ -383,3 +383,14 @@ export function weaveSections(
 
   return woven;
 }
+
+export function sharedTraits(left: MediaTitle, right: MediaTitle, limit = 3) {
+  const known = new Set([
+    ...(right.genres ?? []).map((value) => value.toLowerCase()),
+    ...(right.keywords ?? []).map((value) => value.toLowerCase()),
+  ]);
+
+  return [...(left.genres ?? []), ...(left.keywords ?? [])]
+    .filter((value) => known.has(value.toLowerCase()))
+    .slice(0, limit);
+}

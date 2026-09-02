@@ -1,0 +1,20 @@
+.pad {
+  border: 1px solid var(--panel-line);
+  overflow: hidden;
+}
+
+.shut {
+  align-items: flex-start;
+  border: 1px dashed var(--panel-line);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-6);
+}
+
+.shutLine {
+  color: var(--white);
+  font: var(--weight-regular) var(--type-subhead) / var(--leading-snug) var(--serif);
+  margin: 0;
+  max-width: 46ch;
+}

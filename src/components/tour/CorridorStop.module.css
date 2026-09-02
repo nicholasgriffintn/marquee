@@ -1,0 +1,120 @@
+.corridor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.ends {
+  align-items: flex-end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  max-width: 760px;
+}
+
+.arrow {
+  color: var(--acid);
+  font: var(--weight-bold) var(--type-subhead) / 1 var(--mono);
+  padding-bottom: 6px;
+}
+
+.walk {
+  display: flex;
+  gap: var(--space-3);
+  list-style: none;
+  margin: 0;
+  overflow-x: auto;
+  padding: 0 0 var(--space-2);
+}
+
+.hop {
+  align-items: stretch;
+  display: flex;
+  flex: none;
+  gap: var(--space-3);
+}
+
+.because {
+  border-left: 1px dashed var(--acid-ink);
+  color: var(--muted);
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  font: var(--weight-regular) var(--type-xs) / 1.4 var(--sans);
+  gap: var(--space-1);
+  justify-content: center;
+  margin: 0;
+  padding-left: var(--space-3);
+  width: 126px;
+}
+
+.because span {
+  color: var(--acid);
+  font: var(--weight-bold) var(--type-label) / 1.2 var(--mono);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.step {
+  background: var(--panel-tile);
+  border: 1px solid var(--panel-line);
+  color: var(--white);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  text-align: left;
+  transition: border-color var(--duration) var(--ease);
+  width: 116px;
+}
+
+.step:hover {
+  border-color: var(--acid);
+}
+
+.art {
+  aspect-ratio: 2 / 3;
+  display: block;
+  overflow: hidden;
+}
+
+.art > * {
+  display: block;
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.copy strong {
+  font: var(--weight-medium) var(--type-sm) / 1.25 var(--sans);
+}
+
+.copy small {
+  color: var(--muted);
+  font: var(--weight-regular) var(--type-xs) / 1 var(--mono);
+}
+
+.hopSkeleton {
+  height: 210px;
+  width: 116px;
+}
+
+.verdict {
+  color: var(--muted);
+  font: var(--weight-regular) var(--type-sm) / var(--leading-relaxed) var(--sans);
+  margin: 0;
+  max-width: 68ch;
+}
+
+@media (max-width: 780px) {
+  .arrow {
+    display: none;
+  }
+}
