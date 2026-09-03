@@ -9,6 +9,7 @@ import type {
 import { EXTERNAL_ID_FIELDS, EXTERNAL_ID_OWNERS } from "../../src/domain/catalog.ts";
 import { mergeLanguageCodes } from "../../src/domain/languages.ts";
 import { computeBlendedRating, computeWeightedRating } from "../lib/ratings.ts";
+import { retryTransient } from "../lib/retry.ts";
 import { READ_CHUNK, rowPlaceholders } from "./catalog-array-utils.ts";
 import { persistTitleExtensions } from "./catalog-arrays.ts";
 import { projectTitles } from "./catalog-index.ts";
@@ -157,6 +158,7 @@ export async function storeCatalog(db: Database, catalogue: CatalogResponse) {
 const PEOPLE_ROWS_PER_STATEMENT = 12; // 12 * 7 columns = 84 bound params
 const CREDIT_ROWS_PER_STATEMENT = 9; // 9 * 10 columns = 90 bound params
 const STATEMENTS_PER_BATCH = 10;
+const DEADLOCK_ATTEMPTS = 3;
 const PEOPLE_CHUNK = PEOPLE_ROWS_PER_STATEMENT * STATEMENTS_PER_BATCH;
 const CREDIT_CHUNK = CREDIT_ROWS_PER_STATEMENT * STATEMENTS_PER_BATCH;
 
@@ -280,30 +282,47 @@ export async function storeCredits(db: Database, credits: TitleCredits[]) {
     people.set(entry.person.id, entry.person);
   }
 
-  const roster = [...people.values()];
+  const roster = [...people.values()].toSorted((left, right) => left.id - right.id);
+  const orderedEntries = entries.toSorted((left, right) =>
+    left.entry.creditId.localeCompare(right.entry.creditId),
+  );
 
   for (let index = 0; index < roster.length; index += PEOPLE_CHUNK) {
     const chunk = roster.slice(index, index + PEOPLE_CHUNK);
 
     // oxlint-disable-next-line no-await-in-loop
-    await db.transaction(async (transaction) => {
-      for (let offset = 0; offset < chunk.length; offset += PEOPLE_ROWS_PER_STATEMENT) {
-        // oxlint-disable-next-line no-await-in-loop
-        await upsertPeople(transaction, chunk.slice(offset, offset + PEOPLE_ROWS_PER_STATEMENT));
-      }
-    });
+    await retryTransient(
+      () =>
+        db.transaction(async (transaction) => {
+          for (let offset = 0; offset < chunk.length; offset += PEOPLE_ROWS_PER_STATEMENT) {
+            // oxlint-disable-next-line no-await-in-loop
+            await upsertPeople(
+              transaction,
+              chunk.slice(offset, offset + PEOPLE_ROWS_PER_STATEMENT),
+            );
+          }
+        }),
+      DEADLOCK_ATTEMPTS,
+    );
   }
 
-  for (let index = 0; index < entries.length; index += CREDIT_CHUNK) {
-    const chunk = entries.slice(index, index + CREDIT_CHUNK);
+  for (let index = 0; index < orderedEntries.length; index += CREDIT_CHUNK) {
+    const chunk = orderedEntries.slice(index, index + CREDIT_CHUNK);
 
     // oxlint-disable-next-line no-await-in-loop
-    await db.transaction(async (transaction) => {
-      for (let offset = 0; offset < chunk.length; offset += CREDIT_ROWS_PER_STATEMENT) {
-        // oxlint-disable-next-line no-await-in-loop
-        await upsertCredits(transaction, chunk.slice(offset, offset + CREDIT_ROWS_PER_STATEMENT));
-      }
-    });
+    await retryTransient(
+      () =>
+        db.transaction(async (transaction) => {
+          for (let offset = 0; offset < chunk.length; offset += CREDIT_ROWS_PER_STATEMENT) {
+            // oxlint-disable-next-line no-await-in-loop
+            await upsertCredits(
+              transaction,
+              chunk.slice(offset, offset + CREDIT_ROWS_PER_STATEMENT),
+            );
+          }
+        }),
+      DEADLOCK_ATTEMPTS,
+    );
   }
 
   await recountPersonTitles(

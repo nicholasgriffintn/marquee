@@ -1,5 +1,5 @@
 const TRANSIENT =
-  /internal error|failed to parse body as json|network connection lost|storage caused object to be reset|connection (?:reset|terminated unexpectedly)|server closed the connection unexpectedly/iu;
+  /internal error|failed to parse body as json|network connection lost|storage caused object to be reset|connection (?:reset|terminated unexpectedly)|server closed the connection unexpectedly|deadlock detected|remaining connection slots are reserved|too many connections/iu;
 
 const BACKOFF_STEP_MS = 100;
 const BACKOFF_JITTER_MS = 50;
