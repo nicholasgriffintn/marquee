@@ -10,9 +10,11 @@
   gap: 7px;
 }
 
-.field > span {
+.field > span,
+.genreGroup legend {
   color: var(--paper);
   font: var(--weight-medium) var(--type-body) / 1.2 var(--sans);
+  padding: 0;
 }
 
 .field input,
@@ -39,9 +41,29 @@
   opacity: 0.45;
 }
 
-.field small {
+.genreGroup {
+  border: 0;
+  margin: 0;
+  min-inline-size: 0;
+  padding: 0;
+}
+
+.genres {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: 7px;
+}
+
+.field small,
+.genreGroup small {
   color: var(--muted);
   font: var(--weight-regular) var(--type-sm) / 1.4 var(--sans);
+}
+
+.genreGroup small {
+  display: block;
+  margin-top: 7px;
 }
 
 .actions {

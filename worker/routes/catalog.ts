@@ -145,9 +145,10 @@ catalogRoutes.get("/rails", requireAuthentication, async (context) => {
 catalogRoutes.get("/featured", async (context) => {
   const providerIds = validProviderIds(queryList(context, "providers", PROVIDER_LIMIT));
   const principal = await sessionPrincipal(context.env, context.req.raw);
+  const refresh = Boolean(context.req.query("refresh"));
 
   try {
-    context.header("cache-control", "private, max-age=300");
+    context.header("cache-control", refresh ? "no-store" : "private, max-age=300");
     context.header("vary", "Cookie, Authorization");
 
     return context.json(
@@ -155,6 +156,7 @@ catalogRoutes.get("/featured", async (context) => {
         viewerId: principal?.user.id ?? null,
         providerIds,
         origin: edgeOrigin(context.req.raw),
+        refresh,
         defer: context.env.defer,
       }),
     );

@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 
 import type { Cinema } from "../../domain/cinema";
+import { isMutedGenre, MUTED_GENRE_LIMIT } from "../../domain/genres";
 import { DEFAULT_PREFERRED_LANGUAGE, PREFERRED_LANGUAGES } from "../../domain/languages";
+import { useGenres } from "../../hooks/useBrowse";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { jsonMutation, mutateJson, queryJson } from "../../lib/query-client";
-import { Button } from "../../ui";
+import { Button, Chip } from "../../ui";
 import { NotebookGroup } from "./NotebookSection";
 
 import styles from "./PreferencesPanel.module.css";
@@ -14,18 +16,23 @@ type NotebookPreferences = {
   preferredCinemaName: string | null;
   preferredLocation: string;
   preferredLanguage: string;
+  mutedGenres: string[];
 };
 
 type CinemaSearchResponse = { cinemas: Cinema[] };
+
+const GENRE_CHOICES = 40;
 
 export function PreferencesPanel({ isSignedIn }: { isSignedIn: boolean }) {
   const [config, setConfig] = useState<NotebookPreferences | null>(null);
   const [location, setLocation] = useState("");
   const [cinemaId, setCinemaId] = useState("");
   const [language, setLanguage] = useState(DEFAULT_PREFERRED_LANGUAGE);
+  const [mutedGenres, setMutedGenres] = useState<string[]>([]);
   const [cinemas, setCinemas] = useState<Cinema[]>([]);
   const [status, setStatus] = useState("");
   const query = useDebouncedValue(location.trim(), 250);
+  const genres = useGenres(GENRE_CHOICES);
 
   useEffect(() => {
     if (!isSignedIn) {
@@ -44,6 +51,7 @@ export function PreferencesPanel({ isSignedIn }: { isSignedIn: boolean }) {
         setLocation(response.preferredLocation);
         setCinemaId(response.preferredCinemaId ?? "");
         setLanguage(response.preferredLanguage);
+        setMutedGenres(response.mutedGenres);
 
         return response;
       })
@@ -86,6 +94,12 @@ export function PreferencesPanel({ isSignedIn }: { isSignedIn: boolean }) {
     };
   }, [isSignedIn, query]);
 
+  const genreChoices = useMemo(() => {
+    const known = new Set(genres.map((genre) => genre.toLowerCase()));
+
+    return [...genres, ...mutedGenres.filter((genre) => !known.has(genre))];
+  }, [genres, mutedGenres]);
+
   const selectedCinema = useMemo(() => {
     const found = cinemas.find((cinema) => cinema.id === cinemaId);
 
@@ -107,6 +121,16 @@ export function PreferencesPanel({ isSignedIn }: { isSignedIn: boolean }) {
     return null;
   }
 
+  function toggleGenre(genre: string) {
+    const value = genre.trim().toLowerCase();
+
+    setMutedGenres((current) =>
+      current.includes(value)
+        ? current.filter((muted) => muted !== value)
+        : [...current, value].slice(0, MUTED_GENRE_LIMIT),
+    );
+  }
+
   async function save(nextCinemaId = cinemaId, nextLocation = location) {
     if (Boolean(nextCinemaId) !== Boolean(nextLocation.trim())) {
       setStatus("Choose both a location and a cinema, or leave both blank.");
@@ -123,16 +147,18 @@ export function PreferencesPanel({ isSignedIn }: { isSignedIn: boolean }) {
           preferredCinemaId: nextCinemaId || null,
           preferredLocation: nextLocation.trim(),
           preferredLanguage: language,
+          mutedGenres,
         }),
       );
 
       setConfig(response);
       setLocation(response.preferredLocation);
       setCinemaId(response.preferredCinemaId ?? "");
+      setMutedGenres(response.mutedGenres);
       setStatus(
         response.preferredCinemaId
           ? "Preferences saved. Cinema notes are now limited to this branch."
-          : "Language preference saved. Cinema notes remain switched off.",
+          : "Preferences saved. Cinema notes remain switched off.",
       );
     } catch {
       setStatus("Those preferences did not take. Try again.");
@@ -172,6 +198,30 @@ export function PreferencesPanel({ isSignedIn }: { isSignedIn: boolean }) {
             too.
           </small>
         </label>
+
+        <fieldset className={styles.genreGroup}>
+          <legend>Genres you never want</legend>
+          <div className={styles.genres}>
+            {genreChoices.map((genre) => {
+              const muted = isMutedGenre(genre, mutedGenres);
+
+              return (
+                <Chip
+                  key={genre}
+                  selected={muted}
+                  pressed={muted}
+                  onClick={() => toggleGenre(genre)}
+                >
+                  {genre}
+                </Chip>
+              );
+            })}
+          </div>
+          <small>
+            Muted genres are dropped from the featured title, your shelves and anything the Usher
+            picks. Up to {MUTED_GENRE_LIMIT}.
+          </small>
+        </fieldset>
 
         <label className={styles.field}>
           <span>Location</span>

@@ -621,6 +621,7 @@ export type ViewerPreferences = {
   subtitles: string;
   novelty: string;
   preferredLanguage: string;
+  mutedGenres: string[];
 };
 
 export const NO_PREFERENCES: ViewerPreferences = {
@@ -634,6 +635,7 @@ export const NO_PREFERENCES: ViewerPreferences = {
   subtitles: "",
   novelty: "",
   preferredLanguage: "en",
+  mutedGenres: [],
 };
 
 export async function readViewerPreferences(
@@ -667,6 +669,7 @@ export async function readViewerPreferences(
       subtitles: single("subtitles"),
       novelty: single("novelty"),
       preferredLanguage: notebook.preferredLanguage,
+      mutedGenres: notebook.mutedGenres,
     };
   } catch (error) {
     logError("usher_preferences_failed", error);

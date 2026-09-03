@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 
+import { mutedGenreList } from "../../src/domain/genres.ts";
 import { preferredLanguage } from "../../src/domain/languages.ts";
 import { isBeliefScope } from "../../src/domain/notebook.ts";
 import { requireAuthentication, type AuthVariables } from "../auth/session.ts";
@@ -126,6 +127,7 @@ notebookRoutes.post("/preferences", async (context) => {
     preferredCinemaId: requestedCinemaId || null,
     preferredLocation: requestedLocation || null,
     preferredLanguage: preferredLanguage(body?.preferredLanguage),
+    mutedGenres: mutedGenreList(body?.mutedGenres),
   });
 
   return jsonResponse(await readNotebookPreferences(context.env.DB, user.id));
