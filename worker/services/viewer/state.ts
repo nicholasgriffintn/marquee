@@ -78,7 +78,9 @@ export function eligibilityFor(state: ViewerState, options: EligibilityOptions =
         ...(options.exclude ?? []),
       ]),
     ],
-    excludeGenres: [...new Set(options.excludeGenres ?? [])],
+    excludeGenres: [
+      ...new Set([...state.preferences.mutedGenres, ...(options.excludeGenres ?? [])]),
+    ],
     certifications: [...new Set(options.certifications ?? [])],
     languages: [state.preferences.preferredLanguage],
     ...(options.maxRuntime ? { maxRuntime: options.maxRuntime } : {}),

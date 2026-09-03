@@ -82,6 +82,7 @@ export function TonightPage({
   onOpen,
   onPin,
   onPick,
+  onRefuseFeatured,
   onRejectPick,
   onStartOrder,
   onOrder,
@@ -121,6 +122,7 @@ export function TonightPage({
   onOpen: (item: MediaTitle) => void;
   onPin: () => void;
   onPick: () => void;
+  onRefuseFeatured: (item: MediaTitle) => void;
   onRejectPick: (scope?: "never") => void;
   onStartOrder: () => void;
   onOrder: (order: TonightOrder, guestIds: string[]) => void;
@@ -253,6 +255,9 @@ export function TonightPage({
                         onClick={() => onOpen(readyFeatured)}
                       >
                         See where to watch
+                      </HeroAction>
+                      <HeroAction variant="quiet" onClick={() => onRefuseFeatured(readyFeatured)}>
+                        Never suggest this again
                       </HeroAction>
                     </HeroActions>
                   </>

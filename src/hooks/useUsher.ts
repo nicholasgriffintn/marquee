@@ -3,8 +3,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MediaTitle } from "../domain/catalog";
 import type { Guest } from "../domain/notebook";
 import type { TonightOrder, UsherMoment, UsherSurface } from "../domain/usher";
-import { journeyFor, startJourney } from "../lib/journey";
+import { startJourney } from "../lib/journey";
 import { jsonMutation, mutateJson, queryJson, queryJsonFresh } from "../lib/query-client";
+import { recordRefusal } from "../lib/refusals";
 
 type StateResponse = { status: string; answered: string[]; awayDays?: number };
 
@@ -297,33 +298,16 @@ export function useUsher(viewerId: string) {
     [isSignedIn],
   );
 
-  const remember = useCallback(
-    async (titleId: string, source: string, context: Record<string, unknown>) => {
-      const journey = journeyFor(titleId);
-
-      await mutateJson(
-        "/api/usher/reject",
-        jsonMutation("POST", {
-          titleId,
-          source,
-          ...(journey ? { journey: journey.token, rank: journey.rank } : {}),
-          ...context,
-        }),
-      ).catch(() => undefined);
-    },
-    [],
-  );
-
   const rejectPick = useCallback(
     async (providerIds: string[], scope?: "never") => {
       if (pick.item) {
         rejected.current = [...rejected.current, pick.item.id].slice(-REJECTED_MEMORY);
-        void remember(pick.item.id, "pick", { providerIds, ...(scope ? { scope } : {}) });
+        void recordRefusal(pick.item.id, "pick", { providerIds, ...(scope ? { scope } : {}) });
       }
 
       await askForPick(providerIds);
     },
-    [askForPick, pick.item, remember],
+    [askForPick, pick.item],
   );
 
   const placeOrder = useCallback(
@@ -413,12 +397,12 @@ export function useUsher(viewerId: string) {
       );
 
       for (const entry of shown) {
-        void remember(entry.item.id, "order", { providerIds, order: brief });
+        void recordRefusal(entry.item.id, "order", { providerIds, order: brief });
       }
 
       await placeOrder(brief, providerIds, order.guestIds);
     },
-    [order.backups, order.guestIds, order.order, order.pick, placeOrder, remember],
+    [order.backups, order.guestIds, order.order, order.pick, placeOrder],
   );
 
   const editOrder = useCallback(() => {

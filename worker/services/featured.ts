@@ -128,21 +128,24 @@ export async function getFeaturedTitle(
     providerIds: string[];
     origin: ViewerOrigin | null;
     now?: Date;
+    refresh?: boolean;
     defer?: (task: Promise<unknown>) => void;
   },
 ) {
-  const { viewerId, providerIds, origin, now = new Date(), defer } = options;
+  const { viewerId, providerIds, origin, now = new Date(), refresh = false, defer } = options;
   const language = await readPreferredLanguage(env.DB, viewerId ?? "").catch((error: unknown) => {
     logError("featured_language_read_failed", error);
 
     return DEFAULT_PREFERRED_LANGUAGE;
   });
   const cacheKey = featuredCacheKey(viewerId, providerIds, language, dayKey(now));
-  const cached = await readCachedValue<FeaturedTitle>(cacheKey).catch((error: unknown) => {
-    logError("featured_cache_read_failed", error);
+  const cached = refresh
+    ? null
+    : await readCachedValue<FeaturedTitle>(cacheKey).catch((error: unknown) => {
+        logError("featured_cache_read_failed", error);
 
-    return null;
-  });
+        return null;
+      });
 
   if (cached) {
     return cached;
