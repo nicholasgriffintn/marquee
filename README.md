@@ -122,21 +122,6 @@ where there is neither.
 Odeon and Curzon publish nothing readable — both sit behind a bot challenge a Worker does not get
 through. They are absent rather than approximated.
 
-## Adults only
-
-Anything the catalogue holds under an adults-only certificate — 18, NC-17, X, TV-MA and their
-equivalents abroad — stays off the shelves until you are signed in and have said in the notebook
-that you are 18 or over. That covers the front of house, search and browse, the Usher's picks, the
-rails, the diary feeds and the API. A 15 or an R still shows to everyone; the family gate on the
-Usher's tonight order is the stricter list, and it is separate.
-
-The revival house keeps the same rule for prints matched to an adult-certified title, and adds a
-second one. Some of the vault is racist propaganda, atrocity footage and colonial-era material held
-for historical study, and those prints carry a content notice. They are not shown, and their reels
-are not served, unless you have also ticked that you want such things put in front of you. Both
-switches live on the preferences page of the notebook, and the second one only opens once the first
-is set.
-
 ## The revival house
 
 There is a small screen at the back where the ticket is nothing, because the prints are out of
