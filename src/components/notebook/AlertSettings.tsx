@@ -29,6 +29,10 @@ const KIND_COPY: Record<string, { label: string; hint: string }> = {
     label: "Someone you follow has something new",
     hint: "Drawn from the names in your notebook.",
   },
+  trailer: {
+    label: "Something on your shelf has a new trailer",
+    hint: "Trailers and teasers only, never clips.",
+  },
 };
 
 const CONFIRM_COPY: Record<string, string> = {

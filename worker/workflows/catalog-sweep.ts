@@ -103,6 +103,12 @@ export class CatalogSweep extends WorkflowEntrypoint<WorkerBindings, CatalogSwee
       return true;
     });
 
+    await step.do("sync trailers", { retries: RETRIES }, async () => {
+      await this.env.INGESTION_QUEUE.send({ type: "sync-trailers" });
+
+      return true;
+    });
+
     await step.do("sync awards", { retries: RETRIES }, () => withDatabase(this.env, syncAwards));
 
     await step.do("sync visual format", { retries: RETRIES }, async () =>

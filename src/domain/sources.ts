@@ -7,6 +7,7 @@ export type UpstreamSourceId =
   | "fribb"
   | "tvmaze"
   | "wikimedia"
+  | "kinocheck"
   | "wikipedia"
   | "wikidata"
   | "commons"
@@ -156,6 +157,18 @@ export const UPSTREAM_SOURCES: Record<UpstreamSourceId, UpstreamSourceConfig> = 
     window: "day",
     callLimit: 40_000,
     enforced: false,
+  }),
+  kinocheck: source({
+    id: "kinocheck",
+    label: "KinoCheck",
+    kind: "metadata",
+    powers: "The latest trailers and how many people have watched them",
+    credential: null,
+    optional: true,
+    window: "day",
+    callLimit: 900,
+    enforced: true,
+    rateLimited: { baseMinutes: 60, capMinutes: 60 * 12 },
   }),
   wikipedia: source({
     id: "wikipedia",

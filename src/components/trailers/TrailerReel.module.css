@@ -1,0 +1,101 @@
+.track {
+  grid-auto-columns: minmax(200px, 16vw);
+}
+
+.item {
+  background: none;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: 0;
+  text-align: left;
+}
+
+.still {
+  aspect-ratio: 16 / 9;
+  background: var(--panel-tile);
+  display: block;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  overflow: hidden;
+  position: relative;
+  transition: outline-color 0.18s;
+}
+
+.still img {
+  display: block;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.72;
+  transition: opacity 0.2s ease;
+  width: 100%;
+}
+
+.item:hover .still img,
+.active .still img {
+  opacity: 1;
+}
+
+.active .still {
+  outline-color: var(--acid);
+}
+
+.now {
+  background: var(--acid);
+  bottom: var(--space-2);
+  color: var(--ink);
+  font: var(--weight-bold) var(--type-label-sm) var(--mono);
+  left: var(--space-2);
+  letter-spacing: 0.08em;
+  padding: 4px 7px;
+  position: absolute;
+  text-transform: uppercase;
+}
+
+.title {
+  color: var(--white);
+  font-size: var(--type-body);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-snug);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.active .title {
+  color: var(--acid);
+}
+
+.facts {
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  font: var(--type-label) var(--mono);
+  gap: var(--space-3);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.facts b {
+  font-weight: var(--weight-bold);
+}
+
+.facts em {
+  font-style: normal;
+}
+
+@media (max-width: 640px) {
+  .track {
+    grid-auto-columns: minmax(180px, 60vw);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .still,
+  .still img {
+    transition: none;
+  }
+}

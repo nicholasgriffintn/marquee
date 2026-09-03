@@ -4,6 +4,7 @@ TRAKT_CLIENT_ID=your-trakt-client-id
 TRAKT_CLIENT_SECRET=your-trakt-client-secret
 EUROPEANA_API_KEY=your-europeana-api-key
 MAL_CLIENT_ID=
+KINOCHECK_API_KEY=
 
 CLOUDFLARE_ACCOUNT_ID=your-cloudflare-account-id
 CLOUDFLARE_API_TOKEN=your-cloudflare-analytics-token

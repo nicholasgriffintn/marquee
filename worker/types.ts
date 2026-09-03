@@ -35,6 +35,7 @@ export type WorkerBindings = DatabaseBinding & {
   TMDB_API_TOKEN?: string;
   EUROPEANA_API_KEY?: string;
   OMDB_API_KEY?: string;
+  KINOCHECK_API_KEY?: string;
   AI: Ai;
   VECTORS: Vectorize;
   IMAGES?: ImagesBinding;
@@ -120,6 +121,7 @@ export type IngestionJob =
   | { type: "push-trakt-shelf"; viewerId: string; origin: string }
   | { type: "sync-schedule" }
   | { type: "sync-buzz" }
+  | { type: "sync-trailers" }
   | { type: "sync-title-identifiers" }
   | { type: "sync-cinemas"; source: string }
   | { type: "sync-cinema-screenings"; source: string; siteId: string }

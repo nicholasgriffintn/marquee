@@ -37,6 +37,7 @@ const QUEUED_JOBS: Partial<Record<AdminAction, IngestionJob>> = {
   "catalog-head": { type: "sync-catalog" },
   schedule: { type: "sync-schedule" },
   buzz: { type: "sync-buzz" },
+  trailers: { type: "sync-trailers" },
   identifiers: { type: "sync-title-identifiers" },
   providers: { type: "sync-providers" },
   sections: { type: "build-sections" },

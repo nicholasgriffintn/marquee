@@ -1,13 +1,13 @@
 import { useState } from "react";
 
-import type { MediaTitle } from "../domain/catalog";
+import type { MediaTitle, TitleVideo } from "../domain/catalog";
 import { classNames } from "../lib/class-names";
 import { artwork } from "../lib/media";
 import { ExternalLinkIcon, PlayIcon } from "../ui";
 
 import styles from "./TrailerBlock.module.css";
 
-type Video = { key: string; name: string; type: string };
+type Video = Pick<TitleVideo, "key" | "name" | "type">;
 
 const YOUTUBE_ID_PATTERN = /^[\w-]{6,15}$/;
 

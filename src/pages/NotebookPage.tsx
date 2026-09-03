@@ -23,7 +23,7 @@ import type { Provider, ProvidersResponse } from "../domain/catalog";
 import { NOTEBOOK_DIVIDERS, type Belief, type Guest } from "../domain/notebook";
 import { useNotebookDivider } from "../hooks/useNotebookDivider";
 import { jsonMutation, mutateJson, queryJson } from "../lib/query-client";
-import { Eyebrow, Heading, Page, Text } from "../ui";
+import { Heading, Page, Text } from "../ui";
 
 import styles from "./NotebookPage.module.css";
 
@@ -142,9 +142,6 @@ export function NotebookPage({
         <div className={styles.head}>
           <UsherMark face="idle" crop="head" className={styles.mark} />
           <div>
-            <Eyebrow tone="accent" tracking="wide" className={styles.eyebrow}>
-              The Usher&apos;s notebook
-            </Eyebrow>
             <Heading level={1} size="heading" family="serif" className={styles.title}>
               I only keep one of these per ticket.
             </Heading>
@@ -163,9 +160,6 @@ export function NotebookPage({
       <div className={styles.head}>
         <UsherMark face="thinking" crop="head" className={styles.mark} />
         <div>
-          <Eyebrow tone="accent" tracking="wide" className={styles.eyebrow}>
-            The Usher&apos;s notebook
-          </Eyebrow>
           <Heading level={1} size="heading" family="serif" className={styles.title}>
             What I have worked out about you.
           </Heading>

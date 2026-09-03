@@ -27,6 +27,7 @@ import {
 } from "../services/revival.ts";
 import { syncSchedule } from "../services/schedule.ts";
 import { buildSections } from "../services/sections.ts";
+import { syncTrailers } from "../services/trailers.ts";
 import { exportTraktShelf, importTraktHistory } from "../services/trakt.ts";
 import type { Bindings, IngestionJob } from "../types.ts";
 import { importAnimeIds } from "./anime-ids.ts";
@@ -230,6 +231,12 @@ export async function executeIngestionJob(env: Bindings, job: IngestionJob) {
 
     case "sync-schedule": {
       await syncSchedule(env);
+
+      return;
+    }
+
+    case "sync-trailers": {
+      await syncTrailers(env);
 
       return;
     }

@@ -50,6 +50,36 @@ export function formatTime(
   return parseDate(value)?.toLocaleTimeString(undefined, options) ?? fallback;
 }
 
+const DAY_MS = 86_400_000;
+
+export function formatDaysAgo(value: string | null | undefined, fallback = "") {
+  const parsed = parseDate(value);
+
+  if (!parsed) {
+    return fallback;
+  }
+
+  const days = Math.floor((Date.now() - parsed.getTime()) / DAY_MS);
+
+  if (days <= 0) {
+    return "Today";
+  }
+
+  if (days === 1) {
+    return "Yesterday";
+  }
+
+  if (days < 14) {
+    return `${days} days ago`;
+  }
+
+  if (days < 60) {
+    return `${Math.floor(days / 7)} weeks ago`;
+  }
+
+  return formatDate(value, { day: "numeric", month: "short" }, fallback);
+}
+
 const SLASH_DATE = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2}|\d{4})$/u;
 
 function localeDayFirst() {
