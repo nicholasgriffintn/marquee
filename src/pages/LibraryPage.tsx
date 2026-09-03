@@ -8,6 +8,7 @@ import { SearchField } from "../components/SearchField";
 import { UsherCard } from "../components/usher/UsherCard";
 import { UsherMark } from "../components/usher/UsherMark";
 import type { MediaTitle } from "../domain/catalog";
+import { ENTRY_STATUS_LABELS } from "../domain/entries";
 import { episodeLabel } from "../domain/seasons";
 import { isShelfSort, type ShelfSort } from "../domain/shelf";
 import type { UsherMoment } from "../domain/usher";
@@ -37,13 +38,6 @@ const SORTS: { value: ShelfSort; label: string }[] = [
   { value: "genre", label: "Genre" },
 ];
 
-const STATUS_LABELS: Record<EntryStatus, string> = {
-  watchlist: "On my watchlist",
-  watching: "Watching",
-  watched: "Watched",
-  dropped: "Dropped",
-};
-
 const STATUS_ORDER: EntryStatus[] = ["watching", "watchlist", "watched", "dropped"];
 
 function sinceLabel(entry: ViewingEntry) {
@@ -64,7 +58,7 @@ function groupFor(sort: ShelfSort, item: MediaTitle, entry: ViewingEntry) {
   }
 
   if (sort === "status") {
-    return STATUS_LABELS[entry.status];
+    return ENTRY_STATUS_LABELS[entry.status];
   }
 
   return "";
@@ -83,13 +77,13 @@ function sortGroups(sort: ShelfSort, names: string[]) {
     return names.toSorted(
       (left, right) =>
         STATUS_ORDER.indexOf(
-          (Object.keys(STATUS_LABELS) as EntryStatus[]).find(
-            (key) => STATUS_LABELS[key] === left,
+          (Object.keys(ENTRY_STATUS_LABELS) as EntryStatus[]).find(
+            (key) => ENTRY_STATUS_LABELS[key] === left,
           ) ?? "watchlist",
         ) -
         STATUS_ORDER.indexOf(
-          (Object.keys(STATUS_LABELS) as EntryStatus[]).find(
-            (key) => STATUS_LABELS[key] === right,
+          (Object.keys(ENTRY_STATUS_LABELS) as EntryStatus[]).find(
+            (key) => ENTRY_STATUS_LABELS[key] === right,
           ) ?? "watchlist",
         ),
     );
@@ -287,7 +281,7 @@ export function LibraryPage({
                 pressed={statusFilter === status}
                 onClick={() => update({ status: statusFilter === status ? "" : status })}
               >
-                {STATUS_LABELS[status]}
+                {ENTRY_STATUS_LABELS[status]}
               </Chip>
             ))}
           </Facet>
@@ -331,7 +325,7 @@ export function LibraryPage({
                   <Poster item={item} className={styles.itemPoster} />
                   <strong>{item.title}</strong>
                   <small className={styles.itemMeta}>
-                    {STATUS_LABELS[entry.status]}
+                    {ENTRY_STATUS_LABELS[entry.status]}
                     {entry.rating ? (
                       <span className={styles.itemRating} aria-label={`${entry.rating} out of 5`}>
                         <span aria-hidden="true">·</span>

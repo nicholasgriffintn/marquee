@@ -15,6 +15,8 @@ const DEMAND_SOURCES = [
    CROSS JOIN LATERAL jsonb_array_elements_text(p.title_ids::jsonb) AS entry(value)`,
   `SELECT title_id, 1 AS demand FROM title_insights`,
   `SELECT title_id, 1 AS demand FROM title_schedule WHERE title_id IS NOT NULL`,
+  `SELECT id AS title_id, 1 AS demand FROM catalog_titles
+   WHERE release_date > CURRENT_DATE AND release_date <= (CURRENT_DATE + INTERVAL '180 day')`,
 ];
 
 const MAX_AGE_EXPRESSION = `CAST(CASE WHEN w.demand = 1 THEN '-${DEMAND_MAX_AGE_DAYS} days' ELSE '-${TAIL_MAX_AGE_DAYS} days' END AS INTERVAL)`;

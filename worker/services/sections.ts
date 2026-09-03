@@ -6,6 +6,7 @@ import { logError, logEvent } from "../lib/logging.ts";
 import { titleCase } from "../lib/text.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { ACADEMY_RATIO, BLACK_AND_WHITE } from "../lib/visual-format.ts";
+import { readRecentTrailerTitleIds } from "../repositories/trailers.ts";
 import type { Bindings } from "../types.ts";
 
 const POOL_SIZE = 40;
@@ -17,6 +18,7 @@ const ROTATING_GENRES = 3;
 const ROTATING_MOODS = 2;
 const ROTATING_STUDIOS = 2;
 const SERVICE_ROWS = 10;
+const TRAILER_DAYS = 21;
 
 const JUNK_KEYWORDS = new Set(["duringcreditsstinger", "aftercreditsstinger", "woman director"]);
 
@@ -92,6 +94,12 @@ async function scheduled(env: Bindings, used: Set<string>) {
     .map((row) => row.id)
     .filter((id) => isKnownTitle(id) && !used.has(id))
     .slice(0, POOL_SIZE);
+}
+
+async function freshTrailers(env: Bindings, used: Set<string>) {
+  const ids = await readRecentTrailerTitleIds(env.DB, TRAILER_DAYS, OVERFETCH);
+
+  return ids.filter((id) => isKnownTitle(id) && !used.has(id)).slice(0, POOL_SIZE);
 }
 
 async function anniversaries(env: Bindings, used: Set<string>) {
@@ -236,6 +244,13 @@ export async function buildSections(env: Bindings) {
     title: "On the box this week",
     description: "Episodes landing over the next seven days",
     titleIds: await scheduled(env, used),
+  });
+
+  add({
+    id: "trailers",
+    title: "New trailers",
+    description: "Trailers and teasers that landed in the last three weeks, newest first",
+    titleIds: await freshTrailers(env, used),
   });
 
   add({

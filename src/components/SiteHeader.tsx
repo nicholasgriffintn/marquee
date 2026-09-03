@@ -12,6 +12,7 @@ import styles from "./SiteHeader.module.css";
 const NAV: { to: string; label: string; private: boolean; admin?: boolean }[] = [
   { to: "/", label: "Tonight", private: false },
   { to: "/listings", label: "Listings", private: false },
+  { to: "/trailers", label: "Trailers", private: false },
   { to: "/revival", label: "Revival house", private: false },
   { to: "/shelf", label: "My shelf", private: true },
   { to: "/this-week", label: "This week", private: true },

@@ -2,6 +2,7 @@ import { Hono } from "hono";
 
 import { NO_AWARDS } from "../../src/domain/awards.ts";
 import { NO_RAILS } from "../../src/domain/rails.ts";
+import { isTrailerSort, type TrailerSort } from "../../src/domain/trailers.ts";
 import { requireAuthentication, sessionPrincipal, type AuthVariables } from "../auth/session.ts";
 import { refreshTitleAvailability } from "../jobs/availability.ts";
 import { edgeCache } from "../lib/cache.ts";
@@ -54,9 +55,12 @@ import { getFeaturedTitle } from "../services/featured.ts";
 import { deliverRails } from "../services/rail-delivery.ts";
 import { getSeason, getSeasonIndex } from "../services/seasons.ts";
 import { walkBetweenTitles } from "../services/title-path.ts";
+import { getLatestTrailers } from "../services/trailers.ts";
 import type { Bindings } from "../types.ts";
 
 const TONIGHT_DEFAULT_LIMIT = 12;
+const TRAILERS_DEFAULT_LIMIT = 24;
+const TRAILERS_LIMIT_MAX = 60;
 const QUERY_LIMIT = 120;
 const PROVIDER_LIMIT = 500;
 const FACET_LIMIT = 6;
@@ -258,6 +262,23 @@ catalogRoutes.get("/tonight", async (context) => {
     logError("tonight_read_failed", error, { area: "schedule" });
 
     return context.json({ episodes: [], fetchedAt: "" });
+  }
+});
+
+catalogRoutes.get("/trailers", edgeCache(600), async (context) => {
+  const requested = queryText(context, "sort", 16);
+  const sort: TrailerSort = isTrailerSort(requested) ? requested : "latest";
+  const limit = queryInteger(context, "limit", TRAILERS_DEFAULT_LIMIT, 1, TRAILERS_LIMIT_MAX);
+
+  try {
+    context.header("cache-control", "public, max-age=600");
+
+    return context.json({ sort, trailers: await getLatestTrailers(context.env, sort, limit) });
+  } catch (error) {
+    logError("trailers_read_failed", error, { area: "trailers" });
+    context.header("cache-control", "no-store");
+
+    return context.json({ sort, trailers: [] });
   }
 });
 

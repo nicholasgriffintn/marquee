@@ -16,6 +16,7 @@ const STATIC_PATHS = [
   { path: "/", priority: "1.0", changefreq: "hourly" },
   { path: "/listings", priority: "0.9", changefreq: "hourly" },
   { path: "/revival", priority: "0.8", changefreq: "daily" },
+  { path: "/trailers", priority: "0.8", changefreq: "hourly" },
   { path: "/directory", priority: "0.5", changefreq: "weekly" },
   { path: "/directory?tab=collections", priority: "0.5", changefreq: "weekly" },
   { path: "/sources", priority: "0.3", changefreq: "monthly" },

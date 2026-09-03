@@ -1,6 +1,6 @@
 import type { Bindings } from "../../types.ts";
 
-export const ALERT_KINDS = ["arrival", "season", "cinema", "person"] as const;
+export const ALERT_KINDS = ["arrival", "season", "cinema", "person", "trailer"] as const;
 
 export type AlertKind = (typeof ALERT_KINDS)[number];
 
@@ -31,4 +31,5 @@ export const KIND_LABELS: Record<AlertKind, string> = {
   season: "back for another run",
   cinema: "on a real screen",
   person: "someone you follow",
+  trailer: "a new trailer",
 };

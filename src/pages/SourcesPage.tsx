@@ -41,6 +41,11 @@ const CREDITS: { name: string; href: string; note: string; logo?: string }[] = [
     note: "The map between anime databases",
   },
   {
+    name: "KinoCheck",
+    href: "https://www.kinocheck.com",
+    note: "The latest trailers and how many people have watched them",
+  },
+  {
     name: "Wikimedia",
     href: "https://wikimediafoundation.org",
     note: "Pageview trends behind Trending",

@@ -15,6 +15,7 @@ export const ADMIN_ACTIONS = [
   "discover",
   "schedule",
   "buzz",
+  "trailers",
   "identifiers",
   "awards",
   "visual-format",

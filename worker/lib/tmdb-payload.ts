@@ -5,6 +5,7 @@ import type {
   ProviderAvailability,
   TitleCredit,
   TitleCredits,
+  TitleVideo,
 } from "../../src/domain/catalog.ts";
 import {
   findRegistryProviderForOffer,
@@ -174,16 +175,33 @@ function parseVideos(details: Record<string, unknown>) {
   const ordered = [...videos].sort((left, right) => {
     const rank = (video: Record<string, unknown>) =>
       VIDEO_TYPES.indexOf(stringAt(video, "type") ?? "") + (video.official === true ? 0 : 0.5);
+    const byRank = rank(left) - rank(right);
 
-    return rank(left) - rank(right);
+    return byRank === 0 ? publishedAt(right) - publishedAt(left) : byRank;
   });
 
-  return ordered.slice(0, VIDEO_LIMIT).flatMap((video) => {
+  return ordered.slice(0, VIDEO_LIMIT).flatMap((video): TitleVideo[] => {
     const key = stringAt(video, "key");
     const type = stringAt(video, "type");
+    const published = stringAt(video, "published_at");
 
-    return key && type ? [{ key, name: (stringAt(video, "name") ?? type).slice(0, 80), type }] : [];
+    return key && type
+      ? [
+          {
+            key,
+            name: (stringAt(video, "name") ?? type).slice(0, 80),
+            type,
+            publishedAt: published && publishedAt(video) > 0 ? published : null,
+          },
+        ]
+      : [];
   });
+}
+
+function publishedAt(video: Record<string, unknown>) {
+  const parsed = Date.parse(stringAt(video, "published_at") ?? "");
+
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function parseTrailer(details: Record<string, unknown>) {

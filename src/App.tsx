@@ -74,6 +74,9 @@ const ScreeningPage = lazy(() =>
   import("./pages/ScreeningPage").then((m) => ({ default: m.ScreeningPage })),
 );
 const AdminPage = lazy(() => import("./pages/AdminPage").then((m) => ({ default: m.AdminPage })));
+const TrailersPage = lazy(() =>
+  import("./pages/TrailersPage").then((m) => ({ default: m.TrailersPage })),
+);
 const RevivalPage = lazy(() =>
   import("./pages/RevivalPage").then((m) => ({ default: m.RevivalPage })),
 );
@@ -562,6 +565,22 @@ export function App() {
                         onEdit: usher.editOrder,
                       }}
                       onOpen={openTitle}
+                    />
+                  </Suspense>
+                }
+              />
+
+              <Route
+                path="/trailers"
+                element={
+                  <Suspense fallback={<RouteFallback />}>
+                    <TrailersPage
+                      isReady={isViewerReady}
+                      isSignedIn={isSignedIn}
+                      entryStates={profile.entryStates}
+                      onLoadEntry={profile.loadEntry}
+                      onOpen={openTitle}
+                      onSave={(item) => void saveTitle(item)}
                     />
                   </Suspense>
                 }

@@ -9,6 +9,7 @@ const ROUTE_TITLES: Record<string, string> = {
   "/this-week": "This week · Marquee",
   "/notebook": "The notebook · Marquee",
   "/revival": "The revival house · Marquee",
+  "/trailers": "New trailers · Marquee",
   "/sources": "Where it comes from · Marquee",
   "/directory": "The index · Marquee",
   "/admin": "Admin · Marquee",

@@ -78,6 +78,7 @@ export const ACTION_GROUPS: {
       { id: "index-rebuild", label: "Rebuild search index" },
       { id: "schedule", label: "Refresh air dates" },
       { id: "buzz", label: "Refresh trending" },
+      { id: "trailers", label: "Pull latest trailers" },
       { id: "awards", label: "Read awards" },
       { id: "visual-format", label: "Read colour and ratio" },
       { id: "adaptations", label: "Link source works" },

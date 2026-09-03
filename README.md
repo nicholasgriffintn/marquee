@@ -202,14 +202,15 @@ token in the clear.
 | `OMDB_API_KEY`                 | Ratings, awards, box office, episodes, search      |
 | `TRAKT_CLIENT_ID` / `_SECRET`  | Importing a viewer's history                       |
 | `EUROPEANA_API_KEY`            | British and European prints for the revival house  |
+| `KINOCHECK_API_KEY`            | A higher daily limit on the latest trailers        |
 | `CLOUDFLARE_ACCOUNT_ID`        | AI Gateway and Analytics Engine account            |
 | `CLOUDFLARE_API_TOKEN`         | Analytics Engine queries                           |
 | `AI_GATEWAY_TOKEN`             | AI Gateway requests; grant only AI Gateway Run     |
 | `TOKEN_ENCRYPTION_KEY`         | Encrypting linked-account tokens at rest           |
 
 TMDB is the one you cannot really run without. Air dates come from TVmaze, the trending rail from
-Wikipedia pageviews, and the revival house's UK term checks from Wikidata; none of those needs a
-key. A [free Europeana key](https://pro.europeana.eu/page/get-api) is what turns on the British and
+Wikipedia pageviews, the latest trailers from KinoCheck, and the revival house's UK term checks
+from Wikidata; none of those needs a key. A [free Europeana key](https://pro.europeana.eu/page/get-api) is what turns on the British and
 European side of the revival house — without it the other two sources still run.
 
 A name only reaches `env` if it is listed under `secrets.required` in `wrangler.json`. Defining that

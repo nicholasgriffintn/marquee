@@ -231,7 +231,7 @@ export type MediaTitle = {
   productionCountries?: string[];
   spokenLanguages?: string[];
   trailerKey?: string | null;
-  videos?: { key: string; name: string; type: string }[];
+  videos?: TitleVideo[];
   pending?: boolean;
   originalLanguage?: string | null;
   tagline?: string | null;
@@ -261,6 +261,15 @@ export type MediaTitle = {
   };
 
   externalIds?: ExternalIds;
+};
+
+export type TitleVideo = {
+  key: string;
+  name: string;
+  type: string;
+  publishedAt?: string | null;
+  views?: number | null;
+  source?: string;
 };
 
 export type SectionAudience = {

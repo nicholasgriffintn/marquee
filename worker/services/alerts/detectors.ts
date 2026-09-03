@@ -12,6 +12,8 @@ import type { AlertCandidate, Detector } from "./types.ts";
 const SEASON_HORIZON_DAYS = 45;
 const CINEMA_HORIZON_DAYS = 7;
 const PERSON_WINDOW_DAYS = 45;
+const TRAILER_PUBLISHED_DAYS = 14;
+const TRAILER_SEEN_DAYS = 3;
 
 function pathFor(titleId: string, title: string) {
   const [mediaType, tmdbId] = titleId.split(":");
@@ -253,7 +255,61 @@ const people: Detector = {
   },
 };
 
-export const DETECTORS: Detector[] = [seasons, arrivals, cinema, people];
+type TrailerRow = {
+  viewerId: string;
+  titleId: string;
+  title: string;
+  videoKey: string;
+  name: string;
+  type: string;
+  publishedAt: string;
+};
+
+const trailers: Detector = {
+  kind: "trailer",
+  priority: 1,
+  async find(env, _options) {
+    try {
+      const rows = await env.DB.query<TrailerRow>(
+        `SELECT v.viewer_id AS "viewerId", c.title_id AS "titleId", t.title,
+                c.video_key AS "videoKey", c.name, c.type, c.published_at AS "publishedAt"
+           FROM catalog_title_videos AS c
+           JOIN viewing_entries AS v ON v.title_id = c.title_id
+           JOIN catalog_titles AS t ON t.id = c.title_id
+          WHERE c.type IN ('Trailer', 'Teaser')
+            AND c.published_at >= (CURRENT_TIMESTAMP - CAST($1 AS INTERVAL))
+            AND c.first_seen_at >= (CURRENT_TIMESTAMP - CAST($2 AS INTERVAL))
+            AND v.status IN ('watchlist', 'watching')
+          ORDER BY c.published_at DESC
+          LIMIT 400`,
+        [`${TRAILER_PUBLISHED_DAYS} days`, `${TRAILER_SEEN_DAYS} days`],
+      );
+
+      return rows.rows.map((row): AlertCandidate => {
+        const when = new Date(row.publishedAt);
+        const day = Number.isNaN(when.getTime())
+          ? "this week"
+          : when.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+
+        return {
+          kind: "trailer",
+          viewerId: row.viewerId,
+          key: `${row.titleId}:${row.videoKey}`,
+          titleId: row.titleId,
+          headline: `${row.title} has a new ${row.type.toLowerCase()}`,
+          detail: `${row.name}, out ${day}.`,
+          path: pathFor(row.titleId, row.title),
+        };
+      });
+    } catch (error) {
+      logError("trailer_detector_failed", error);
+
+      return [];
+    }
+  },
+};
+
+export const DETECTORS: Detector[] = [seasons, arrivals, cinema, people, trailers];
 
 export function detectorsFor(kinds: string[]) {
   return kinds.length ? DETECTORS.filter((detector) => kinds.includes(detector.kind)) : DETECTORS;

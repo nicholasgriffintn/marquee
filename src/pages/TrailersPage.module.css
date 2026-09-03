@@ -1,0 +1,44 @@
+.sorts {
+  border: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  min-width: 0;
+  padding: 0;
+}
+
+.legend {
+  padding: 0;
+  position: absolute;
+}
+
+.screenSlot {
+  scroll-margin-top: 92px;
+}
+
+.skeletonScreen {
+  aspect-ratio: 16 / 9;
+  display: block;
+  width: 100%;
+}
+
+.skeletonBill {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4) 0 var(--space-7);
+}
+
+.skeletonReel {
+  display: grid;
+  gap: 13px;
+  grid-auto-columns: minmax(200px, 16vw);
+  grid-auto-flow: column;
+  overflow: hidden;
+}
+
+.skeletonItem {
+  aspect-ratio: 16 / 9;
+  display: block;
+  width: 100%;
+}
