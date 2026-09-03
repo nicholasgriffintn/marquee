@@ -1,3 +1,4 @@
+import type { ViewerAccess } from "../../src/domain/access.ts";
 import { getTvmazeSchedule, type ScheduledEpisode } from "../clients/tvmaze.ts";
 import { hoursFrom, startOfHour, utcDay } from "../lib/dates.ts";
 import { logError, logEvent } from "../lib/logging.ts";
@@ -153,6 +154,7 @@ export async function readTonight(
   env: Bindings,
   viewerId: string | null,
   limit: number,
+  access: ViewerAccess,
   hours = 36,
 ) {
   const window = `+${hours} hours`;
@@ -175,6 +177,7 @@ export async function readTonight(
   const titles = await readSummaryItems(
     env.DB,
     rows.flatMap((row) => (row.titleId ? [row.titleId] : [])),
+    access,
     limit,
   );
   const byId = new Map(titles.map((title) => [title.id, title]));

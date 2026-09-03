@@ -1,3 +1,4 @@
+import type { ContentGate } from "./access";
 import { slugify } from "./slug";
 
 export type RevivalSource = "archive" | "loc" | "europeana" | "wikidata";
@@ -69,6 +70,7 @@ export type RevivalWork = {
   height: number | null;
   condition: PrintCondition;
   contentNotice: string | null;
+  gate: ContentGate | null;
   tags: RevivalTag[];
 };
 

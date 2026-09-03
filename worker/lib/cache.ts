@@ -1,16 +1,22 @@
 import type { MiddlewareHandler } from "hono";
 
+import { accessTier } from "../../src/domain/access.ts";
+import { viewerAccess } from "../services/viewer/access.ts";
 import type { Bindings } from "../types.ts";
 import { logError, logRejection } from "./logging.ts";
 
 const edgeCaches = caches as unknown as { default: Cache };
 
-const CACHE_VERSION = "3";
+const CACHE_VERSION = "4";
 
-function versionedKey(url: string) {
+function versionedKey(url: string, tier = "") {
   const key = new URL(url);
 
   key.searchParams.set("cache-version", CACHE_VERSION);
+
+  if (tier) {
+    key.searchParams.set("access", tier);
+  }
 
   return new Request(key, { method: "GET" });
 }
@@ -91,20 +97,30 @@ export async function withKvCache<T>(
   return value;
 }
 
-export function edgeCache(seconds: number): MiddlewareHandler<{ Bindings: Bindings }> {
+export function edgeCache(
+  seconds: number,
+  options: { byAccess?: boolean } = {},
+): MiddlewareHandler<{ Bindings: Bindings }> {
   return async (context, next) => {
     if (context.req.method !== "GET") {
       return next();
     }
 
+    const tier = options.byAccess
+      ? accessTier(await viewerAccess(context.env, context.req.raw))
+      : "";
     const cache = edgeCaches.default;
-    const cacheKey = versionedKey(context.req.url);
+    const cacheKey = versionedKey(context.req.url, tier);
     const hit = await cache.match(cacheKey);
 
     if (hit) {
       const response = new Response(hit.body, hit);
 
       response.headers.set("x-marquee-cache", "hit");
+
+      if (tier) {
+        response.headers.set("cache-control", `private, max-age=${seconds}`);
+      }
 
       return response;
     }
@@ -134,6 +150,10 @@ export function edgeCache(seconds: number): MiddlewareHandler<{ Bindings: Bindin
     context.executionCtx.waitUntil(
       logRejection(cache.put(cacheKey, stored), "edge_cache_put_failed", { cacheKey }),
     );
+
+    if (tier) {
+      response.headers.set("cache-control", `private, max-age=${seconds}`);
+    }
 
     return response;
   };

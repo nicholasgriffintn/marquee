@@ -1,3 +1,4 @@
+import type { ViewerAccess } from "../../src/domain/access.ts";
 import type { MediaTitle, SourceWork } from "../../src/domain/catalog.ts";
 import {
   fetchSourceLinks,
@@ -104,6 +105,7 @@ export async function syncAdaptations(env: Bindings) {
 export async function getTitleAdaptations(
   db: Database,
   titleId: string,
+  access: ViewerAccess,
 ): Promise<TitleAdaptations> {
   if (!isKnownTitle(titleId)) {
     return NOTHING;
@@ -123,6 +125,6 @@ export async function getTitleAdaptations(
 
   return {
     source: toSourceWork(work),
-    items: await readItems(db, titleIds, STRIP_LIMIT),
+    items: await readItems(db, titleIds, access, STRIP_LIMIT),
   };
 }

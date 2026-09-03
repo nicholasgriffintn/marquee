@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { canonicalOrigin } from "../lib/security.ts";
 import { feedViewerFor } from "../repositories/feeds.ts";
 import { buildAlertFeed, buildDiaryCalendar } from "../services/feeds.ts";
+import { readViewerAccess } from "../services/viewer/access.ts";
 import type { Bindings } from "../types.ts";
 
 export const feedRoutes = new Hono<{ Bindings: Bindings }>();
@@ -36,7 +37,8 @@ feedRoutes.on(METHODS, "/:token/diary.ics", async (context) => {
   }
 
   const origin = canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN);
-  const calendar = await buildDiaryCalendar(context.env, viewerId, origin);
+  const access = await readViewerAccess(context.env.DB, viewerId);
+  const calendar = await buildDiaryCalendar(context.env, viewerId, origin, access);
 
   return served(calendar, "text/calendar; charset=UTF-8");
 });
@@ -50,11 +52,13 @@ feedRoutes.on(METHODS, "/:token/alerts.atom", async (context) => {
   }
 
   const origin = canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN);
+  const access = await readViewerAccess(context.env.DB, viewerId);
   const feed = await buildAlertFeed(
     context.env,
     viewerId,
     origin,
     `${origin}/feeds/${token}/alerts.atom`,
+    access,
   );
 
   return served(feed, "application/atom+xml; charset=UTF-8");

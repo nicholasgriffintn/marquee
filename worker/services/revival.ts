@@ -1,3 +1,4 @@
+import { admitted, requirementFor, type ViewerAccess } from "../../src/domain/access.ts";
 import { assertsPublicDomain, RUNTIME_BANDS, toCard, toPrint } from "../../src/domain/revival.ts";
 import type { RevivalStatus, RevivalWork } from "../../src/domain/revival.ts";
 import {
@@ -587,12 +588,12 @@ async function planShelves(db: Database): Promise<ShelfPlan[]> {
   ];
 }
 
-async function readShelves(db: Database) {
+async function readShelves(db: Database, access: ViewerAccess) {
   const plans = await planShelves(db);
   const filled = await Promise.all(
     plans.map(async (plan) => ({
       plan,
-      works: await readShelfPage(db, plan.selector, RAIL_LENGTH),
+      works: admitted(await readShelfPage(db, plan.selector, RAIL_LENGTH), access),
     })),
   );
 
@@ -687,9 +688,7 @@ export async function drawBill(db: Database, day: string) {
       chosen =
         batch.find(
           (work) =>
-            !taken.has(work.id) &&
-            !work.contentNotice &&
-            (loose || !entry.prefer || entry.prefer(work)),
+            !taken.has(work.id) && !work.gate && (loose || !entry.prefer || entry.prefer(work)),
         ) ?? null;
     }
 
@@ -709,25 +708,36 @@ export async function getBill(db: Database) {
   return { bill: await drawBill(db, day), billDate: day, fetchedAt: new Date().toISOString() };
 }
 
-export async function getShelves(db: Database) {
-  return { shelves: await readShelves(db), fetchedAt: new Date().toISOString() };
+export async function getShelves(db: Database, access: ViewerAccess) {
+  return { shelves: await readShelves(db, access), fetchedAt: new Date().toISOString() };
 }
 
-export async function getResumeShelf(db: Database, viewerId: string) {
+export async function getResumeShelf(db: Database, viewerId: string, access: ViewerAccess) {
   const progress = await readViewerProgress(db, viewerId);
   const works = await readWorksByIds(
     db,
     progress.map((entry) => entry.id),
   );
 
-  return { works: works.map(toCard) };
+  return { works: admitted(works, access).map(toCard) };
 }
 
-export async function getScreening(env: Bindings, id: string, viewerId: string | null) {
+export async function getScreening(
+  env: Bindings,
+  id: string,
+  viewerId: string | null,
+  access: ViewerAccess,
+) {
   const work = await readWork(env.DB, id);
 
   if (!work) {
     return null;
+  }
+
+  const requires = requirementFor(access, work.gate);
+
+  if (requires) {
+    return { requires };
   }
 
   const [progress, alsoShowing, prints] = await Promise.all([
@@ -738,5 +748,10 @@ export async function getScreening(env: Bindings, id: string, viewerId: string |
     work.groupId ? readGroupPrints(env.DB, work.groupId, work.id) : Promise.resolve([]),
   ]);
 
-  return { work, ...progress, alsoShowing, prints: prints.map(toPrint) };
+  return {
+    work,
+    ...progress,
+    alsoShowing: admitted(alsoShowing, access),
+    prints: admitted(prints, access).map(toPrint),
+  };
 }

@@ -50,15 +50,15 @@ export function useResumeShelf(isReady: boolean) {
 }
 
 export function useScreening(workId: string | undefined) {
-  const { data, error, isLoading } = useResource<RevivalScreening>(
+  const { data, error, status, isLoading } = useResource<RevivalScreening>(
     workId ? `/api/revival/${encodeURIComponent(workId)}` : null,
-    { errorMessage: "Nothing showing under that name" },
   );
 
   return {
     screening: data,
     isLoading,
-    error,
+    error: status === 403 ? error : error && "Nothing showing under that name",
+    isGated: status === 403,
   };
 }
 

@@ -1,16 +1,19 @@
+import type { ViewerAccess } from "../../src/domain/access.ts";
+import { accessFor, accessTier } from "../../src/domain/access.ts";
 import type { CatalogSection, FeaturedSource, MediaTitle } from "../../src/domain/catalog.ts";
 import type { ViewerOrigin } from "../../src/domain/cinema.ts";
 import { DEFAULT_PREFERRED_LANGUAGE } from "../../src/domain/languages.ts";
 import { readCachedValue, writeCachedValue } from "../lib/cache.ts";
 import { logError, logRejection } from "../lib/logging.ts";
 import { readSectionFronts, readSummaryItems } from "../repositories/catalog-reader.ts";
-import { readPreferredLanguage } from "../repositories/notebook-preferences.ts";
+import { readNotebookPreferences } from "../repositories/notebook-preferences.ts";
 import type { Bindings } from "../types.ts";
 import { readTrendingBuzz } from "./buzz.ts";
 import { chooseFeatured, type FeaturedCandidate } from "./featured-selection.ts";
 import { getPersonalRails } from "./personal-rails.ts";
 import { readLatestRails } from "./rail-generation.ts";
 import type { StoredRail } from "./rail-identity.ts";
+import { accessOf } from "./viewer/access.ts";
 import { eligibilityGate, type Eligibility } from "./viewer/eligibility.ts";
 import { eligibilityFor, readViewerState, type ViewerState } from "./viewer/state.ts";
 
@@ -77,9 +80,10 @@ function featuredCacheKey(
   viewerId: string | null,
   providerIds: string[],
   preferredLanguage: string,
+  tier: string,
   day: string,
 ) {
-  return `featured:${day}:${viewerId ?? "front-of-house"}:${preferredLanguage}:${providerIds.toSorted().join(",")}`;
+  return `featured:${day}:${viewerId ?? "front-of-house"}:${preferredLanguage}:${tier}:${providerIds.toSorted().join(",")}`;
 }
 
 function frontIds(rails: StoredRail[]) {
@@ -99,24 +103,26 @@ function frontIds(rails: StoredRail[]) {
 }
 
 async function personalItems(env: Bindings, viewer: ViewerState, origin: ViewerOrigin | null) {
+  const access = accessOf(viewer);
   const [stored, personal] = await Promise.all([
     readLatestRails(env.DB, viewer.viewerId),
-    getPersonalRails(env, viewer.viewerId, origin),
+    getPersonalRails(env, viewer.viewerId, origin, access),
   ]);
   const storedIds = frontIds(stored);
-  const storedItems = await readSummaryItems(env.DB, storedIds, storedIds.length);
+  const storedItems = await readSummaryItems(env.DB, storedIds, access, storedIds.length);
   const byId = new Map(storedItems.map((item) => [item.id, item]));
   const curated = storedIds.flatMap((id) => byId.get(id) ?? []);
 
   return [...curated, ...sectionFronts(personal)];
 }
 
-async function trendingItems(env: Bindings) {
+async function trendingItems(env: Bindings, access: ViewerAccess) {
   const ranked = await readTrendingBuzz(env, ITEMS_PER_SOURCE * 2);
 
   return readSummaryItems(
     env.DB,
     ranked.map((entry) => entry.titleId),
+    access,
     ranked.length,
   );
 }
@@ -133,12 +139,21 @@ export async function getFeaturedTitle(
   },
 ) {
   const { viewerId, providerIds, origin, now = new Date(), refresh = false, defer } = options;
-  const language = await readPreferredLanguage(env.DB, viewerId ?? "").catch((error: unknown) => {
-    logError("featured_language_read_failed", error);
+  const notebook = viewerId
+    ? await readNotebookPreferences(env.DB, viewerId).catch((error: unknown) => {
+        logError("featured_preferences_read_failed", error);
 
-    return DEFAULT_PREFERRED_LANGUAGE;
-  });
-  const cacheKey = featuredCacheKey(viewerId, providerIds, language, dayKey(now));
+        return null;
+      })
+    : null;
+  const language = notebook?.preferredLanguage ?? DEFAULT_PREFERRED_LANGUAGE;
+  const cacheKey = featuredCacheKey(
+    viewerId,
+    providerIds,
+    language,
+    accessTier(accessFor(Boolean(viewerId), notebook)),
+    dayKey(now),
+  );
   const cached = refresh
     ? null
     : await readCachedValue<FeaturedTitle>(cacheKey).catch((error: unknown) => {
@@ -152,10 +167,11 @@ export async function getFeaturedTitle(
   }
 
   const viewer = await readViewerState(env, viewerId ?? "", { providerIds });
+  const access = accessOf(viewer);
 
   const [catalogue, trending, personal] = await Promise.all([
-    readSectionFronts(env.DB, viewer.providerIds, ITEMS_PER_SECTION),
-    trendingItems(env).catch(() => []),
+    readSectionFronts(env.DB, viewer.providerIds, ITEMS_PER_SECTION, access),
+    trendingItems(env, access).catch(() => []),
     viewerId ? personalItems(env, viewer, origin) : Promise.resolve([]),
   ]);
   const candidates = candidatePool(

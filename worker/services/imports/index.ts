@@ -22,6 +22,7 @@ import { projectViewingTitle } from "../../repositories/viewing-events.ts";
 import type { Bindings } from "../../types.ts";
 import { getCatalogueItems } from "../catalog.ts";
 import { syncSeriesEntry } from "../seasons.ts";
+import { readViewerAccess } from "../viewer/access.ts";
 import { reprojectRemovedImport } from "./commit.ts";
 import { parseImportedActivity, parseImportRunInput } from "./validation.ts";
 
@@ -75,7 +76,12 @@ export async function getViewerImport(env: Bindings, viewerId: string, runId: st
       ]),
     ),
   ];
-  const catalogue = await getCatalogueItems(env.DB, titleIds, titleIds.length);
+  const catalogue = await getCatalogueItems(
+    env.DB,
+    titleIds,
+    await readViewerAccess(env.DB, viewerId),
+    titleIds.length,
+  );
 
   return {
     run,

@@ -1,3 +1,4 @@
+import { accessFor } from "../../src/domain/access.ts";
 import type { MediaTitle } from "../../src/domain/catalog.ts";
 import { titleHasPreferredAudioLanguage } from "../../src/domain/languages.ts";
 import { candidatesFrom, type DecisionCandidate } from "../lib/decisions.ts";
@@ -185,7 +186,7 @@ export async function buildDigest(env: Bindings, viewerId: string) {
       },
     ),
     trendingForViewer(env, digestEligibility),
-    readTonight(env, viewerId, DIGEST_EPISODES, 168),
+    readTonight(env, viewerId, DIGEST_EPISODES, accessFor(true, viewer.preferences), 168),
     weekNumbers(env, viewerId),
     leadForViewer(env, viewerId, viewer.providerIds),
   ]);
@@ -255,11 +256,11 @@ export async function readDigest(env: Bindings, viewerId: string) {
 
   const digest = JSON.parse(row.payload) as Digest;
   const items = (
-    await readRanked(env.DB, [
-      ...(digest.lead ? [digest.lead.titleId] : []),
-      ...digest.fresh,
-      ...digest.trending,
-    ])
+    await readRanked(
+      env.DB,
+      [...(digest.lead ? [digest.lead.titleId] : []), ...digest.fresh, ...digest.trending],
+      accessFor(true, preferences),
+    )
   ).filter((item) =>
     titleHasPreferredAudioLanguage(item, [preferences.preferredLanguage], providerIds ?? []),
   );

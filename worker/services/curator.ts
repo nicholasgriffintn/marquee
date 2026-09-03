@@ -18,6 +18,7 @@ import type { Bindings } from "../types.ts";
 import { beginDecision, type Decision } from "./decisions.ts";
 import { explainCandidate, retrieveCandidates, type Candidate } from "./retrieval/index.ts";
 import { preferenceSummary } from "./usher.ts";
+import { accessOf } from "./viewer/access.ts";
 import type { Eligibility } from "./viewer/eligibility.ts";
 import { eligibilityFor, readViewerState, type ViewerState } from "./viewer/state.ts";
 
@@ -330,7 +331,7 @@ export async function* curateStream(
       options.signal,
     );
     decision.select(result.titleIds);
-    items = await readItems(env.DB, result.titleIds);
+    items = await readItems(env.DB, result.titleIds, accessOf(viewer));
   } catch (error) {
     await decision.settle("failed");
 

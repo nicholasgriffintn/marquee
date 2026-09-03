@@ -1,3 +1,4 @@
+import { FULL_ACCESS } from "../../src/domain/access.ts";
 import type { MediaTitle } from "../../src/domain/catalog.ts";
 import { hashString } from "../../src/lib/string.ts";
 import { runAiObject } from "../ai/run.ts";
@@ -80,7 +81,7 @@ async function pairCandidates(env: Bindings, title: MediaTitle) {
   const neighbours = await similarTo(env, title.id, PAIR_CANDIDATES + 1);
 
   if (neighbours.length) {
-    const ranked = (await readRanked(env.DB, neighbours)).slice(0, PAIR_CANDIDATES);
+    const ranked = (await readRanked(env.DB, neighbours, FULL_ACCESS)).slice(0, PAIR_CANDIDATES);
 
     if (ranked.length >= 2) {
       return { candidates: ranked, origin: "vector" };
@@ -214,7 +215,7 @@ async function generateInsight(
   titleId: string,
   viewerId: string,
 ): Promise<TitleInsight | null> {
-  const [title] = await readItems(env.DB, [titleId]);
+  const [title] = await readItems(env.DB, [titleId], FULL_ACCESS);
 
   if (!title) {
     return null;

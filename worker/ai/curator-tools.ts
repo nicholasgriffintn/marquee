@@ -10,6 +10,7 @@ import {
   retrieveSimilar,
   type Candidate,
 } from "../services/retrieval/index.ts";
+import { accessOf } from "../services/viewer/access.ts";
 import type { Eligibility } from "../services/viewer/eligibility.ts";
 import type { ViewerState } from "../services/viewer/state.ts";
 import type { Bindings } from "../types.ts";
@@ -223,6 +224,7 @@ async function executeCuratorToolUncached(
     const titles = await readItems(
       env.DB,
       entries.map((entry) => entry.titleId),
+      accessOf(viewer),
       entries.length,
     );
     const byId = new Map(titles.map((title) => [title.id, title]));
@@ -268,7 +270,7 @@ async function executeCuratorToolUncached(
     const titleIds = Array.isArray(argumentsValue.titleIds)
       ? argumentsValue.titleIds.filter(isKnownTitle).slice(0, 10)
       : [];
-    const items = await readItems(env.DB, titleIds);
+    const items = await readItems(env.DB, titleIds, accessOf(viewer));
 
     for (const item of items) {
       availableIds.add(item.id);

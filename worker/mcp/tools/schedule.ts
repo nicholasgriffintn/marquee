@@ -37,8 +37,8 @@ export const scheduleTools: readonly McpTool[] = [
       },
       required: ["episodes"],
     },
-    async run({ env, user, origin }) {
-      const tonight = await getTonight(env, user.id, origin, TONIGHT_EPISODES);
+    async run({ env, user, origin, access }) {
+      const tonight = await getTonight(env, user.id, origin, TONIGHT_EPISODES, access);
 
       return answer({
         episodes: tonight.episodes.map((episode) => ({
@@ -96,11 +96,11 @@ export const scheduleTools: readonly McpTool[] = [
       },
       required: ["days", "entries"],
     },
-    async run({ env, user }, input) {
+    async run({ env, user, access }, input) {
       const days =
         typeof input.days === "number" ? clamp(Math.round(input.days), 1, MAX_DAYS) : DEFAULT_DAYS;
 
-      return answer({ days, entries: await readWeekAhead(env, user.id, days) });
+      return answer({ days, entries: await readWeekAhead(env, user.id, access, days) });
     },
   },
 ];

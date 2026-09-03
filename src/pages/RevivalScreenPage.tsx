@@ -36,12 +36,35 @@ import styles from "./RevivalScreenPage.module.css";
 
 export function RevivalScreenPage({ isSignedIn }: { isSignedIn: boolean }) {
   const { workId } = useParams();
-  const { screening, isLoading, error } = useScreening(workId);
+  const { screening, isLoading, error, isGated } = useScreening(workId);
 
   if (isLoading) {
     return (
       <Page>
         <Skeleton shape="art" />
+      </Page>
+    );
+  }
+
+  if (!screening && isGated) {
+    const returnTo = encodeURIComponent(`/revival/${workId ?? ""}`);
+
+    return (
+      <Page>
+        <EmptyState
+          mark={<UsherMark face="unimpressed" crop="head" className={styles.mark} />}
+          heading="Behind the curtain."
+          description={error}
+          actions={
+            <ButtonLink
+              to={isSignedIn ? "/notebook#preferences" : `/sign-in?returnTo=${returnTo}`}
+              variant="primary"
+              size="lg"
+            >
+              {isSignedIn ? "Open the notebook" : "Come to the box office"}
+            </ButtonLink>
+          }
+        />
       </Page>
     );
   }

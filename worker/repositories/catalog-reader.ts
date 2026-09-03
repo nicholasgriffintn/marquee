@@ -1,4 +1,9 @@
+import { FULL_ACCESS, type ViewerAccess } from "../../src/domain/access.ts";
 import type { CatalogResponse, CatalogSection, MediaTitle } from "../../src/domain/catalog.ts";
+import {
+  ADULTS_ONLY_CERTIFICATIONS,
+  barredCertifications,
+} from "../../src/domain/certification.ts";
 import {
   CATALOG_TITLE_COLUMNS,
   type CatalogTitleRow,
@@ -11,7 +16,12 @@ import { clamp } from "../lib/numbers.ts";
 import { isKnownTitle } from "../lib/validation.ts";
 import { READ_CHUNK } from "./catalog-array-utils.ts";
 import { hydrateTitleRows, summariseTitleRows } from "./catalog-arrays.ts";
-import { availabilityCondition, searchTitlesFirstRows } from "./catalog-search.ts";
+import {
+  availabilityCondition,
+  certificationBar,
+  certifiedWithin,
+  searchTitlesFirstRows,
+} from "./catalog-search.ts";
 
 type SectionRow = {
   id: string;
@@ -79,7 +89,35 @@ export async function readRawItems(db: Database, ids: string[]) {
   return new Map(hydrated.map((title) => [title.id, title]));
 }
 
-export async function readItems(db: Database, ids: string[], limit = 30) {
+function idsWithin(ids: string[], access: ViewerAccess) {
+  const bindings: DatabaseValue[] = [...ids];
+  const conditions = [
+    `id IN (${ids.map((_, position) => `$${position + 1}`).join(",")})`,
+    ...certificationBar("catalog_titles", bindings, barredCertifications(access)),
+  ];
+
+  return { where: conditions.join(" AND "), bindings };
+}
+
+export async function readGatedIds(db: Database, ids: string[]) {
+  const uniqueIds = [...new Set(ids.filter(isKnownTitle))].slice(0, 400);
+
+  if (uniqueIds.length === 0) {
+    return [];
+  }
+
+  const bindings: DatabaseValue[] = [JSON.stringify(uniqueIds)];
+  const rows = await db.query<{ id: string }>(
+    `SELECT id FROM catalog_titles
+      WHERE id IN (SELECT value FROM jsonb_array_elements_text(CAST($1 AS jsonb)) AS entries(value))
+        AND ${certifiedWithin("catalog_titles", bindings, ADULTS_ONLY_CERTIFICATIONS)}`,
+    bindings,
+  );
+
+  return rows.rows.map((row) => row.id);
+}
+
+export async function readItems(db: Database, ids: string[], access: ViewerAccess, limit = 30) {
   const uniqueIds = [...new Set(ids.filter(isKnownTitle))].slice(0, Math.min(limit, 400));
 
   if (uniqueIds.length === 0) {
@@ -89,12 +127,11 @@ export async function readItems(db: Database, ids: string[], limit = 30) {
   const rows: CatalogTitleRow[] = [];
 
   for (let index = 0; index < uniqueIds.length; index += READ_CHUNK) {
-    const wave = uniqueIds.slice(index, index + READ_CHUNK);
+    const { where, bindings } = idsWithin(uniqueIds.slice(index, index + READ_CHUNK), access);
     // oxlint-disable-next-line no-await-in-loop
     const result = await db.query<CatalogTitleRow>(
-      `SELECT ${CATALOG_TITLE_COLUMNS}
-         FROM catalog_titles WHERE id IN (${wave.map((_, position) => `$${position + 1}`).join(",")})`,
-      [...wave],
+      `SELECT ${CATALOG_TITLE_COLUMNS} FROM catalog_titles WHERE ${where}`,
+      bindings,
     );
 
     rows.push(...result.rows);
@@ -109,17 +146,22 @@ export async function readItems(db: Database, ids: string[], limit = 30) {
   });
 }
 
-export async function readSummaryItems(db: Database, ids: string[], limit = 30) {
+export async function readSummaryItems(
+  db: Database,
+  ids: string[],
+  access: ViewerAccess,
+  limit = 30,
+) {
   const uniqueIds = [...new Set(ids.filter(isKnownTitle))].slice(0, Math.min(limit, 400));
 
   if (uniqueIds.length === 0) {
     return [];
   }
 
+  const { where, bindings } = idsWithin(uniqueIds, access);
   const result = await db.query<CatalogTitleRow>(
-    `SELECT ${CATALOG_TITLE_COLUMNS}
-       FROM catalog_titles WHERE id IN (${uniqueIds.map((_, position) => `$${position + 1}`).join(",")})`,
-    [...uniqueIds],
+    `SELECT ${CATALOG_TITLE_COLUMNS} FROM catalog_titles WHERE ${where}`,
+    bindings,
   );
   const byId = new Map(
     (await summariseTitleRows(db, result.rows)).map((title) => [title.id, title] as const),
@@ -128,7 +170,7 @@ export async function readSummaryItems(db: Database, ids: string[], limit = 30) 
   return uniqueIds.flatMap((id) => byId.get(id) ?? []);
 }
 
-export async function readTitlesByMalId(db: Database, malIds: number[]) {
+export async function readTitlesByMalId(db: Database, malIds: number[], access: ViewerAccess) {
   const unique = [...new Set(malIds.filter((id) => Number.isInteger(id) && id > 0))].slice(0, 40);
   const found = new Map<number, MediaTitle>();
 
@@ -136,11 +178,16 @@ export async function readTitlesByMalId(db: Database, malIds: number[]) {
     return found;
   }
 
+  const bindings: DatabaseValue[] = [...unique];
+  const conditions = [
+    `mal_id IN (${unique.map((_, index) => `$${index + 1}`).join(",")})`,
+    ...certificationBar("catalog_titles", bindings, barredCertifications(access)),
+  ];
   const result = await db.query<CatalogTitleRow & { malId: number }>(
     `SELECT ${CATALOG_TITLE_COLUMNS}, mal_id AS "malId"
        FROM catalog_titles
-       WHERE mal_id IN (${unique.map((_, index) => `$${index + 1}`).join(",")})`,
-    [...unique],
+       WHERE ${conditions.join(" AND ")}`,
+    bindings,
   );
 
   const hydrated = await summariseTitleRows(db, result.rows);
@@ -201,16 +248,24 @@ async function sectionShortlist(
   };
 }
 
-async function readShortlistedTitles(db: Database, shortlist: { ids: string[] }[]) {
+async function readShortlistedTitles(
+  db: Database,
+  shortlist: { ids: string[] }[],
+  access: ViewerAccess,
+) {
   const wanted = shortlist.flatMap((section) => section.ids);
-  const titles = await readItems(db, wanted, wanted.length);
+  const titles = await readItems(db, wanted, access, wanted.length);
 
   return new Map(titles.map((title) => [title.id, title]));
 }
 
-async function readShortlistedSummaries(db: Database, shortlist: { ids: string[] }[]) {
+async function readShortlistedSummaries(
+  db: Database,
+  shortlist: { ids: string[] }[],
+  access: ViewerAccess,
+) {
   const wanted = shortlist.flatMap((section) => section.ids);
-  const titles = await readSummaryItems(db, wanted, wanted.length);
+  const titles = await readSummaryItems(db, wanted, access, wanted.length);
 
   return new Map(titles.map((title) => [title.id, title]));
 }
@@ -227,6 +282,7 @@ export async function readSectionFronts(
   db: Database,
   providerIds: string[],
   perSection: number,
+  access: ViewerAccess,
 ): Promise<CatalogSection[]> {
   const shortlist = await sectionShortlist(db, providerIds);
 
@@ -238,7 +294,7 @@ export async function readSectionFronts(
     row,
     ids: ids.slice(0, perSection),
   }));
-  const titlesById = await readShortlistedSummaries(db, fronts);
+  const titlesById = await readShortlistedSummaries(db, fronts, access);
 
   return fronts.map(({ row, ids }) => ({
     id: row.id,
@@ -248,9 +304,14 @@ export async function readSectionFronts(
   }));
 }
 
-export async function readCatalog(db: Database, query: string, providerIds: string[]) {
+export async function readCatalog(
+  db: Database,
+  query: string,
+  providerIds: string[],
+  access: ViewerAccess,
+) {
   if (query) {
-    return readSearchResults(db, query, providerIds);
+    return readSearchResults(db, query, providerIds, access);
   }
 
   const shortlist = await sectionShortlist(db, providerIds);
@@ -259,7 +320,7 @@ export async function readCatalog(db: Database, query: string, providerIds: stri
     return null;
   }
 
-  const titlesById = await readShortlistedTitles(db, shortlist.sections);
+  const titlesById = await readShortlistedTitles(db, shortlist.sections, access);
   const sections: CatalogSection[] = shortlist.sections
     .map(({ row, ids }) => {
       const items = sectionItems(ids, titlesById);
@@ -292,7 +353,7 @@ export async function readCatalog(db: Database, query: string, providerIds: stri
 }
 
 export async function readAvailability(db: Database, titleId: string) {
-  const [title] = await readItems(db, [titleId]);
+  const [title] = await readItems(db, [titleId], FULL_ACCESS);
 
   if (!title) {
     return null;
@@ -306,11 +367,17 @@ export async function readAvailability(db: Database, titleId: string) {
   return { providers: title.providers, checked: Boolean(row?.enrichedAt) };
 }
 
-async function readSearchResults(db: Database, query: string, providerIds: string[]) {
+async function readSearchResults(
+  db: Database,
+  query: string,
+  providerIds: string[],
+  access: ViewerAccess,
+) {
   const rows = await searchTitlesFirstRows(db, {
     query,
     providerIds,
     availability: "confirmed-or-unknown",
+    certifications: barredCertifications(access),
     limit: 30,
   });
   const items = await summariseTitleRows(db, rows);

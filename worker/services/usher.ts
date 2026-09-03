@@ -622,6 +622,8 @@ export type ViewerPreferences = {
   novelty: string;
   preferredLanguage: string;
   mutedGenres: string[];
+  adultConfirmed: boolean;
+  offensiveContentApproved: boolean;
 };
 
 export const NO_PREFERENCES: ViewerPreferences = {
@@ -636,6 +638,8 @@ export const NO_PREFERENCES: ViewerPreferences = {
   novelty: "",
   preferredLanguage: "en",
   mutedGenres: [],
+  adultConfirmed: false,
+  offensiveContentApproved: false,
 };
 
 export async function readViewerPreferences(
@@ -670,6 +674,8 @@ export async function readViewerPreferences(
       novelty: single("novelty"),
       preferredLanguage: notebook.preferredLanguage,
       mutedGenres: notebook.mutedGenres,
+      adultConfirmed: notebook.adultConfirmed,
+      offensiveContentApproved: notebook.offensiveContentApproved,
     };
   } catch (error) {
     logError("usher_preferences_failed", error);

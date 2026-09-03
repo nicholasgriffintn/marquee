@@ -17,6 +17,7 @@ import { readItems } from "../repositories/catalog-reader.ts";
 import { pinShelf, readPinnedShelves, unpinShelf } from "../repositories/shelves.ts";
 import { readDigest } from "../services/digest.ts";
 import { getTitleInsight } from "../services/title-insight.ts";
+import { viewerAccess } from "../services/viewer/access.ts";
 import type { Bindings } from "../types.ts";
 import { viewerHour } from "./usher.ts";
 
@@ -145,6 +146,7 @@ curatorRoutes.get("/insight/:titleId", async (context) => {
     const paired = await readItems(
       context.env.DB,
       insight.pairs.map((pair) => pair.titleId),
+      await viewerAccess(context.env, context.req.raw),
     );
     const byId = new Map(paired.map((item) => [item.id, item]));
     const pairs = insight.pairs.flatMap((pair) => {
@@ -186,6 +188,7 @@ curatorRoutes.get("/pinned", async (context) => {
     const titles = await readItems(
       context.env.DB,
       shelves.flatMap((shelf) => shelf.titleIds),
+      await viewerAccess(context.env, context.req.raw),
       60,
     );
     const byId = new Map(titles.map((title) => [title.id, title]));

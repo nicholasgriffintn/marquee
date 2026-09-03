@@ -17,6 +17,8 @@ type NotebookPreferences = {
   preferredLocation: string;
   preferredLanguage: string;
   mutedGenres: string[];
+  adultConfirmed: boolean;
+  offensiveContentApproved: boolean;
 };
 
 type CinemaSearchResponse = { cinemas: Cinema[] };
@@ -29,6 +31,8 @@ export function PreferencesPanel({ isSignedIn }: { isSignedIn: boolean }) {
   const [cinemaId, setCinemaId] = useState("");
   const [language, setLanguage] = useState(DEFAULT_PREFERRED_LANGUAGE);
   const [mutedGenres, setMutedGenres] = useState<string[]>([]);
+  const [adultConfirmed, setAdultConfirmed] = useState(false);
+  const [offensiveContentApproved, setOffensiveContentApproved] = useState(false);
   const [cinemas, setCinemas] = useState<Cinema[]>([]);
   const [status, setStatus] = useState("");
   const query = useDebouncedValue(location.trim(), 250);
@@ -52,6 +56,8 @@ export function PreferencesPanel({ isSignedIn }: { isSignedIn: boolean }) {
         setCinemaId(response.preferredCinemaId ?? "");
         setLanguage(response.preferredLanguage);
         setMutedGenres(response.mutedGenres);
+        setAdultConfirmed(response.adultConfirmed);
+        setOffensiveContentApproved(response.offensiveContentApproved);
 
         return response;
       })
@@ -148,6 +154,8 @@ export function PreferencesPanel({ isSignedIn }: { isSignedIn: boolean }) {
           preferredLocation: nextLocation.trim(),
           preferredLanguage: language,
           mutedGenres,
+          adultConfirmed,
+          offensiveContentApproved: adultConfirmed && offensiveContentApproved,
         }),
       );
 
@@ -155,6 +163,8 @@ export function PreferencesPanel({ isSignedIn }: { isSignedIn: boolean }) {
       setLocation(response.preferredLocation);
       setCinemaId(response.preferredCinemaId ?? "");
       setMutedGenres(response.mutedGenres);
+      setAdultConfirmed(response.adultConfirmed);
+      setOffensiveContentApproved(response.offensiveContentApproved);
       setStatus(
         response.preferredCinemaId
           ? "Preferences saved. Cinema notes are now limited to this branch."
@@ -221,6 +231,53 @@ export function PreferencesPanel({ isSignedIn }: { isSignedIn: boolean }) {
             Muted genres are dropped from the featured title, your shelves and anything the Usher
             picks. Up to {MUTED_GENRE_LIMIT}.
           </small>
+        </fieldset>
+
+        <fieldset className={styles.genreGroup}>
+          <legend>What you are old enough for</legend>
+          <ul className={styles.consent}>
+            <li>
+              <label>
+                <input
+                  type="checkbox"
+                  aria-label="I am 18 or over"
+                  checked={adultConfirmed}
+                  onChange={(event) => {
+                    setAdultConfirmed(event.target.checked);
+
+                    if (!event.target.checked) {
+                      setOffensiveContentApproved(false);
+                    }
+                  }}
+                />
+                <span>
+                  <strong>I am 18 or over</strong>
+                  <small>
+                    Titles certified for adults only stay off the shelves, out of the Usher&apos;s
+                    hands and away from the revival house until you say so.
+                  </small>
+                </span>
+              </label>
+            </li>
+            <li>
+              <label>
+                <input
+                  type="checkbox"
+                  aria-label="Show me prints that carry a content notice"
+                  checked={adultConfirmed && offensiveContentApproved}
+                  disabled={!adultConfirmed}
+                  onChange={(event) => setOffensiveContentApproved(event.target.checked)}
+                />
+                <span>
+                  <strong>Show me prints that carry a content notice</strong>
+                  <small>
+                    Some of the revival house is racist propaganda, atrocity footage and the like,
+                    kept for historical study. It stays behind the curtain unless you ask for it.
+                  </small>
+                </span>
+              </label>
+            </li>
+          </ul>
         </fieldset>
 
         <label className={styles.field}>

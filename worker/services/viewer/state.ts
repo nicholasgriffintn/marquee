@@ -1,3 +1,5 @@
+import { accessFor } from "../../../src/domain/access.ts";
+import { barredCertifications } from "../../../src/domain/certification.ts";
 import { validProviderIds } from "../../lib/validation.ts";
 import { readRefusals } from "../../repositories/signals.ts";
 import { readViewerEntries } from "../../repositories/viewer-context.ts";
@@ -81,7 +83,12 @@ export function eligibilityFor(state: ViewerState, options: EligibilityOptions =
     excludeGenres: [
       ...new Set([...state.preferences.mutedGenres, ...(options.excludeGenres ?? [])]),
     ],
-    certifications: [...new Set(options.certifications ?? [])],
+    certifications: [
+      ...new Set([
+        ...barredCertifications(accessFor(Boolean(state.viewerId), state.preferences)),
+        ...(options.certifications ?? []),
+      ]),
+    ],
     languages: [state.preferences.preferredLanguage],
     ...(options.maxRuntime ? { maxRuntime: options.maxRuntime } : {}),
     ...(options.mediaType ? { mediaType: options.mediaType } : {}),

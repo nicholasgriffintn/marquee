@@ -185,7 +185,7 @@ export function NotebookPage({
             id="preferences"
             hidden={current !== "preferences"}
             title={NOTEBOOK_DIVIDERS[0].label}
-            lede="Set the audio language I should look for and, if you want cinema notes, the one branch that counts as yours."
+            lede="Set the audio language I should look for, tell me what you are old enough to see, and, if you want cinema notes, the one branch that counts as yours."
           >
             <ErrorBoundary label="These preferences">
               <PreferencesPanel isSignedIn={isSignedIn} />

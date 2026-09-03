@@ -13,6 +13,7 @@ type ResourceOptions = {
 type Resource<T> = {
   data: T | null;
   error: string;
+  status: number | null;
   isLoading: boolean;
   isRefreshing: boolean;
   reload: () => void;
@@ -38,6 +39,7 @@ export function useResource<T>(path: string | null, options: ResourceOptions = {
     error: error
       ? errorMessage || (error instanceof QueryError ? error.message : "Request failed")
       : "",
+    status: error instanceof QueryError ? error.status : null,
     isLoading: active && isPending,
     isRefreshing: active && isFetching,
     reload,

@@ -1,3 +1,4 @@
+import { FULL_ACCESS } from "../../src/domain/access.ts";
 import type { MediaTitle } from "../../src/domain/catalog.ts";
 import { cachedWorkersAiOptions } from "../ai/workers-ai.ts";
 import { withDeadline } from "../lib/deadline.ts";
@@ -168,7 +169,7 @@ export async function embedTitles(
   titleIds: string[],
   options: { force?: boolean } = {},
 ) {
-  const titles = await readItems(env.DB, titleIds, titleIds.length);
+  const titles = await readItems(env.DB, titleIds, FULL_ACCESS, titleIds.length);
 
   if (titles.length === 0) {
     return 0;
@@ -303,7 +304,7 @@ export async function reindexVectorMetadata(env: Bindings, after: string) {
     return null;
   }
 
-  const titles = await readItems(env.DB, titleIds, titleIds.length);
+  const titles = await readItems(env.DB, titleIds, FULL_ACCESS, titleIds.length);
   const stored = await readVectors(env, titleIds, null);
   const pending = titles.flatMap((title) => {
     const values = stored.get(title.id);

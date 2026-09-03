@@ -1,4 +1,6 @@
+import { accessTier, type ViewerAccess } from "../../src/domain/access.ts";
 import type { MediaTitle, ProvidersResponse, TitleBuzz } from "../../src/domain/catalog.ts";
+import { barredCertifications } from "../../src/domain/certification.ts";
 import { getProviderLedger } from "../jobs/provider-ledger.ts";
 import { withKvCache, writeKvValue } from "../lib/cache.ts";
 import { sha256Hex } from "../lib/hash.ts";
@@ -10,6 +12,7 @@ import {
 import {
   readAvailability,
   readCatalog,
+  readGatedIds,
   readItems,
   readTitlesByMalId,
 } from "../repositories/catalog-reader.ts";
@@ -57,8 +60,8 @@ async function withBuzz<Item extends MediaTitle>(db: Database, items: Item[]) {
   );
 }
 
-export async function getCatalogue(env: Bindings, providerIds: string[]) {
-  const catalogue = await readCatalog(env.DB, "", providerIds);
+export async function getCatalogue(env: Bindings, providerIds: string[], access: ViewerAccess) {
+  const catalogue = await readCatalog(env.DB, "", providerIds, access);
 
   if (!catalogue) {
     return catalogue;
@@ -79,24 +82,30 @@ export async function getCatalogue(env: Bindings, providerIds: string[]) {
   };
 }
 
-async function searchCacheKey(mode: string, query: string, providerIds: string[]) {
+async function searchCacheKey(
+  mode: string,
+  query: string,
+  providerIds: string[],
+  access: ViewerAccess,
+) {
   const normalised = query.trim().toLowerCase().replaceAll(/\s+/gu, " ");
   const providers = await sha256Hex(providerIds.toSorted().join(","), 8);
 
-  return `search:${mode}:${providers}:${normalised}`;
+  return `search:${mode}:${providers}:${accessTier(access)}:${normalised}`;
 }
 
 export async function searchCatalogue(
   env: Bindings,
   query: string,
   providerIds: string[],
+  access: ViewerAccess,
   defer?: (task: Promise<unknown>) => void,
 ) {
   const items = await withKvCache(
     env,
-    await searchCacheKey("keyword", query, providerIds),
+    await searchCacheKey("keyword", query, providerIds, access),
     SEARCH_CACHE_SECONDS,
-    async () => (await readCatalog(env.DB, query, providerIds))?.sections[0]?.items ?? [],
+    async () => (await readCatalog(env.DB, query, providerIds, access))?.sections[0]?.items ?? [],
   );
   let pending: MediaTitle[] = [];
 
@@ -114,16 +123,22 @@ export async function searchCatalogue(
   };
 }
 
-export async function searchCatalogueHybrid(env: Bindings, query: string, providerIds: string[]) {
+export async function searchCatalogueHybrid(
+  env: Bindings,
+  query: string,
+  providerIds: string[],
+  access: ViewerAccess,
+) {
   const items = await withKvCache(
     env,
-    await searchCacheKey("hybrid", query, providerIds),
+    await searchCacheKey("hybrid", query, providerIds, access),
     SEARCH_CACHE_SECONDS,
     () =>
       retrieveTitles(env, {
         text: query,
         providerIds,
         availability: "confirmed-or-unknown",
+        certifications: barredCertifications(access),
         limit: HYBRID_SEARCH_LIMIT,
       }),
   );
@@ -136,15 +151,26 @@ export async function searchCatalogueHybrid(env: Bindings, query: string, provid
   };
 }
 
-export async function getCatalogueItems(db: Database, ids: string[], limit = 30) {
+export async function getCatalogueItems(
+  db: Database,
+  ids: string[],
+  access: ViewerAccess,
+  limit = 30,
+) {
+  const items = await withBuzz(db, await readItems(db, ids, access, limit));
+  const found = new Set(items.map((item) => item.id));
+  const missing = ids.filter((id) => !found.has(id));
+  const gated = access.adult || missing.length === 0 ? [] : await readGatedIds(db, missing);
+
   return {
-    items: await withBuzz(db, await readItems(db, ids, limit)),
+    items,
+    gated,
     source: "Marquee catalogue",
     fetchedAt: new Date().toISOString(),
   };
 }
 
-export async function getAnimeWatchOrder(db: Database, titleId: string) {
+export async function getAnimeWatchOrder(db: Database, titleId: string, access: ViewerAccess) {
   const relations = (await readAnimeRelationMap(db, [titleId])).get(titleId) ?? [];
 
   if (relations.length === 0) {
@@ -158,6 +184,7 @@ export async function getAnimeWatchOrder(db: Database, titleId: string) {
   const found = await readTitlesByMalId(
     db,
     relations.map((relation) => relation.malId),
+    access,
   );
   const related = relations.flatMap((relation) => {
     const item = found.get(relation.malId);
@@ -180,7 +207,7 @@ export async function getAnimeWatchOrder(db: Database, titleId: string) {
   };
 }
 
-export async function getAnimeRecommendations(db: Database, titleId: string) {
+export async function getAnimeRecommendations(db: Database, titleId: string, access: ViewerAccess) {
   const malIds = (await readAnimeRecommendationMap(db, [titleId])).get(titleId) ?? [];
 
   if (malIds.length === 0) {
@@ -191,7 +218,7 @@ export async function getAnimeRecommendations(db: Database, titleId: string) {
     };
   }
 
-  const found = await readTitlesByMalId(db, malIds);
+  const found = await readTitlesByMalId(db, malIds, access);
   const items = malIds.flatMap((malId) => {
     const item = found.get(malId);
 
@@ -265,13 +292,19 @@ export type BrowseQuery = {
 const PAGE_SIZE = 24;
 const BROWSE_MIN_VOTES = 20;
 
-async function browseByPopularityOrScore(env: Bindings, browse: BrowseQuery, minVotes: number) {
+async function browseByPopularityOrScore(
+  env: Bindings,
+  browse: BrowseQuery,
+  minVotes: number,
+  access: ViewerAccess,
+) {
   const search = {
     mediaType: browse.mediaType,
     genres: browse.genres,
     keywords: browse.keywords,
     places: browse.places,
     providerIds: browse.providerIds,
+    certifications: barredCertifications(access),
     query: browse.query,
     sort: browse.query && browse.sort === "popularity" ? undefined : browse.sort,
     minVotes,
@@ -314,7 +347,7 @@ async function pendingForBrowse(
   }
 }
 
-export async function browseCatalogue(env: Bindings, browse: BrowseQuery) {
+export async function browseCatalogue(env: Bindings, browse: BrowseQuery, access: ViewerAccess) {
   const minVotes = browse.sort === "recent" ? 0 : BROWSE_MIN_VOTES;
   const items =
     !browse.query && browse.sort === "trending"
@@ -326,12 +359,13 @@ export async function browseCatalogue(env: Bindings, browse: BrowseQuery) {
             keywords: browse.keywords,
             places: browse.places,
             providerIds: browse.providerIds,
+            certifications: barredCertifications(access),
             minVotes,
           },
           PAGE_SIZE + 1,
           browse.page * PAGE_SIZE,
         )
-      : await browseByPopularityOrScore(env, browse, minVotes);
+      : await browseByPopularityOrScore(env, browse, minVotes, access);
 
   const hasMore = items.length > PAGE_SIZE;
   const found = await withBuzz(env.DB, items.slice(0, PAGE_SIZE));
@@ -392,9 +426,10 @@ export async function getTonight(
   viewerId: string | null,
   origin: string,
   limit: number,
+  access: ViewerAccess,
 ) {
   const [scheduled, calendar] = await Promise.all([
-    readTonight(env, viewerId, limit),
+    readTonight(env, viewerId, limit, access),
     viewerId ? traktUpcoming(env, viewerId, origin, TONIGHT_TRAKT_TIMEOUT_MS) : [],
   ]);
 
@@ -427,6 +462,7 @@ export async function getTonight(
   const hydrated = await readRanked(
     env.DB,
     merged.flatMap((episode) => (episode.titleId && !episode.item ? [episode.titleId] : [])),
+    access,
   );
   const byId = new Map(hydrated.map((item) => [item.id, item]));
 
@@ -440,11 +476,12 @@ export async function getTonight(
   };
 }
 
-async function buildTrending(env: Bindings) {
+async function buildTrending(env: Bindings, access: ViewerAccess) {
   const ranked = await readTrendingBuzz(env);
   const items = await readRanked(
     env.DB,
     ranked.map((entry) => entry.titleId),
+    access,
   );
   const byId = new Map(ranked.map((entry) => [entry.titleId, entry.buzz]));
 
@@ -459,8 +496,10 @@ async function buildTrending(env: Bindings) {
   };
 }
 
-export function getTrending(env: Bindings) {
-  return withKvCache(env, "catalog-trending", TRENDING_CACHE_SECONDS, () => buildTrending(env));
+export function getTrending(env: Bindings, access: ViewerAccess) {
+  return withKvCache(env, `catalog-trending:${accessTier(access)}`, TRENDING_CACHE_SECONDS, () =>
+    buildTrending(env, access),
+  );
 }
 
 export function getFilmingPlaces(env: Bindings, limit: number) {

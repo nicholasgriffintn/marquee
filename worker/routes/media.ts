@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 
+import { NO_ACCESS } from "../../src/domain/access.ts";
 import { UPSTREAM_AGENT } from "../clients/fetch.ts";
 import { logError } from "../lib/logging.ts";
 import { isKnownTitle } from "../lib/validation.ts";
@@ -92,7 +93,7 @@ mediaRoutes.get("/og/:titleId", async (context) => {
     return context.json({ error: "Not found" }, 404);
   }
 
-  const [title] = await readItems(context.env.DB, [titleId]);
+  const [title] = await readItems(context.env.DB, [titleId], NO_ACCESS);
   const source = title?.backdropUrl ?? title?.posterUrl;
 
   if (!source) {

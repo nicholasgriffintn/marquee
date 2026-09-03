@@ -1,3 +1,4 @@
+import { accessTier, type ViewerAccess } from "../../src/domain/access.ts";
 import type { ViewerOrigin } from "../../src/domain/cinema.ts";
 import {
   titleHasPreferredAudioLanguage,
@@ -32,6 +33,7 @@ async function peopleRails(
   viewerId: string,
   preferredLanguage: string,
   providerIds: string[],
+  access: ViewerAccess,
 ): Promise<DeliveredRail[]> {
   const names = (await readFollowedPeople(env.DB, viewerId)).slice(0, PEOPLE_RAILS);
 
@@ -43,7 +45,7 @@ async function peopleRails(
     names.map(async (name) => {
       const person = await readPerson(env.DB, name);
       const ids = person ? await readPersonTitleIds(env.DB, person.personId, RAIL_SIZE * 2) : [];
-      const items = (await readSummaryItems(env.DB, ids, RAIL_SIZE * 2))
+      const items = (await readSummaryItems(env.DB, ids, access, RAIL_SIZE * 2))
         .filter((item) => titleHasPreferredAudioLanguage(item, [preferredLanguage], providerIds))
         .slice(0, RAIL_SIZE);
       const label = titleCase(name);
@@ -72,6 +74,7 @@ async function cinemaRail(
     language: string;
     required: boolean;
   },
+  access: ViewerAccess,
 ): Promise<DeliveredRail | null> {
   if (preference.required && (!preference.cinemaId || !preference.location)) {
     return null;
@@ -96,6 +99,7 @@ async function cinemaRail(
     await readSummaryItems(
       env.DB,
       showing.map((row) => row.titleId),
+      access,
       RAIL_SIZE * 2,
     )
   )
@@ -129,18 +133,20 @@ function personalCacheKey(
   viewerId: string | null,
   origin: ViewerOrigin | null,
   providerIds: string[],
+  access: ViewerAccess,
 ) {
   const place = origin
     ? `${origin.latitude.toFixed(ORIGIN_PRECISION)},${origin.longitude.toFixed(ORIGIN_PRECISION)}`
     : "";
 
-  return `personal-rails:${viewerId ?? "front-of-house"}:${place}:${providerIds.toSorted().join(",")}`;
+  return `personal-rails:${viewerId ?? "front-of-house"}:${place}:${accessTier(access)}:${providerIds.toSorted().join(",")}`;
 }
 
 export async function getPersonalRails(
   env: Bindings,
   viewerId: string | null,
   origin: ViewerOrigin | null,
+  access: ViewerAccess,
 ): Promise<DeliveredRail[]> {
   try {
     const [preferences, providerIds] = viewerId
@@ -153,18 +159,25 @@ export async function getPersonalRails(
 
     return await withKvCache(
       env,
-      personalCacheKey(viewerId, origin, providerIds ?? []),
+      personalCacheKey(viewerId, origin, providerIds ?? [], access),
       PERSONAL_CACHE_SECONDS,
       async () => {
         const [people, cinema] = await Promise.all([
-          viewerId ? peopleRails(env, viewerId, language, providerIds ?? []) : Promise.resolve([]),
-          cinemaRail(env, origin, {
-            cinemaId: preferences?.preferredCinemaId ?? null,
-            cinemaName: preferences?.preferredCinemaName ?? null,
-            location: preferences?.preferredLocation ?? "",
-            language,
-            required: Boolean(viewerId),
-          }),
+          viewerId
+            ? peopleRails(env, viewerId, language, providerIds ?? [], access)
+            : Promise.resolve([]),
+          cinemaRail(
+            env,
+            origin,
+            {
+              cinemaId: preferences?.preferredCinemaId ?? null,
+              cinemaName: preferences?.preferredCinemaName ?? null,
+              location: preferences?.preferredLocation ?? "",
+              language,
+              required: Boolean(viewerId),
+            },
+            access,
+          ),
         ]);
 
         return [...people, cinema].filter((rail): rail is DeliveredRail => rail !== null);
