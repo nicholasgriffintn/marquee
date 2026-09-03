@@ -1,5 +1,6 @@
 import { logError } from "../lib/logging.ts";
 import { clamp } from "../lib/numbers.ts";
+import { retryTransient } from "../lib/retry.ts";
 import { estimateTableRows } from "./table-stats.ts";
 
 export type PersonRecord = { personId: number; name: string; titles: number };
@@ -128,6 +129,7 @@ export async function readCreditSeasons(db: Database, titleId: string) {
 
 const TITLES_CHUNK = 5_000;
 const RECOUNT_CHUNK = 200;
+const RECOUNT_ATTEMPTS = 3;
 
 export async function recountPersonTitles(db: Database, personIds: number[]) {
   const ordered = [...new Set(personIds)]
@@ -143,19 +145,23 @@ export async function recountPersonTitles(db: Database, personIds: number[]) {
     const placeholders = chunk.map((_unused, position) => `$${position + 1}`).join(",");
 
     // oxlint-disable-next-line no-await-in-loop
-    await db.execute(
-      `UPDATE catalog_people AS p
-          SET titles = counted.titles
-         FROM (
-           SELECT person_id, count(DISTINCT title_id) AS titles
-             FROM catalog_credits
-            WHERE person_id IN (${placeholders})
-            GROUP BY person_id
-            ORDER BY person_id
-         ) AS counted
-        WHERE p.person_id = counted.person_id
-          AND p.titles IS DISTINCT FROM counted.titles`,
-      chunk,
+    await retryTransient(
+      () =>
+        db.execute(
+          `UPDATE catalog_people AS p
+              SET titles = counted.titles
+             FROM (
+               SELECT person_id, count(DISTINCT title_id) AS titles
+                 FROM catalog_credits
+                WHERE person_id IN (${placeholders})
+                GROUP BY person_id
+                ORDER BY person_id
+             ) AS counted
+            WHERE p.person_id = counted.person_id
+              AND p.titles IS DISTINCT FROM counted.titles`,
+          chunk,
+        ),
+      RECOUNT_ATTEMPTS,
     );
   }
 

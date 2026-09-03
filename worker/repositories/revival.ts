@@ -584,26 +584,22 @@ export async function storeGroups(
     return 0;
   }
 
-  const written = await db.transaction(async (transaction) => {
-    let changes = 0;
+  const result = await db.execute(
+    `UPDATE revival_works AS w
+       SET group_id = assigned.group_id, group_primary = assigned.group_primary
+       FROM (VALUES ${assignments
+         .map(
+           (_entry, row) =>
+             `($${row * 3 + 1}::text, $${row * 3 + 2}::text, $${row * 3 + 3}::integer)`,
+         )
+         .join(", ")}) AS assigned(id, group_id, group_primary)
+       WHERE w.id = assigned.id
+         AND (w.group_id IS DISTINCT FROM assigned.group_id
+              OR w.group_primary IS DISTINCT FROM assigned.group_primary)`,
+    assignments.flatMap((entry) => [entry.id, entry.groupId, entry.primary ? 1 : 0]),
+  );
 
-    for (const entry of assignments) {
-      // oxlint-disable-next-line no-await-in-loop
-      const result = await transaction.execute(
-        `UPDATE revival_works
-           SET group_id = $1, group_primary = $2
-           WHERE id = $3
-             AND (group_id IS DISTINCT FROM $4 OR group_primary IS DISTINCT FROM $5)`,
-        [entry.groupId, entry.primary ? 1 : 0, entry.id, entry.groupId, entry.primary ? 1 : 0],
-      );
-
-      changes += result.rowCount;
-    }
-
-    return changes;
-  });
-
-  return written;
+  return result.rowCount;
 }
 
 export async function readGroupPrints(db: Database, groupId: string, excludeId: string) {
