@@ -65,7 +65,6 @@ export class PostgresDatabase extends PostgresQueries implements Database {
       connectionString,
       max: POOL_SIZE,
       connectionTimeoutMillis: CONNECTION_TIMEOUT_MS,
-      statement_timeout: statementTimeoutMs,
       query_timeout: statementTimeoutMs + QUERY_TIMEOUT_HEADROOM_MS,
     });
 
