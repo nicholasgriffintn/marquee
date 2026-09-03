@@ -1,3 +1,4 @@
+import type { ViewerAccess } from "../../src/domain/access.ts";
 import {
   DEFAULT_RADIUS_KM,
   MAX_RADIUS_KM,
@@ -75,6 +76,7 @@ export async function getLocalShowings(
   env: Bindings,
   origin: ViewerOrigin | null,
   radiusKm: number,
+  access: ViewerAccess,
   limit = 24,
 ) {
   if (!origin) {
@@ -91,6 +93,7 @@ export async function getLocalShowings(
   const items = await readRanked(
     env.DB,
     showings.map((showing) => showing.titleId),
+    access,
   );
   const order = new Map(showings.map((showing, index) => [showing.titleId, index]));
 

@@ -1,4 +1,5 @@
 import type { MediaTitle } from "../../../src/domain/catalog.ts";
+import { hasCertification } from "../../../src/domain/certification.ts";
 import { titleHasPreferredAudioLanguage } from "../../../src/domain/languages.ts";
 import { includesProvider } from "../../lib/providers.ts";
 
@@ -39,10 +40,6 @@ export function meetsAvailability(
   return state === "confirmed" || (state === "unknown" && availability === "confirmed-or-unknown");
 }
 
-function matchesCertification(certification: string, barred: string[]) {
-  return barred.some((value) => certification === value || certification.endsWith(` ${value}`));
-}
-
 export function eligibilityGate(eligibility: Eligibility) {
   const excluded = new Set(eligibility.excludeIds);
   const banned = new Set(eligibility.excludeGenres.map((genre) => genre.toLowerCase()));
@@ -70,8 +67,7 @@ export function eligibilityGate(eligibility: Eligibility) {
 
     if (
       eligibility.certifications.length &&
-      title.certification &&
-      matchesCertification(title.certification, eligibility.certifications)
+      hasCertification(title.certification, eligibility.certifications)
     ) {
       return false;
     }

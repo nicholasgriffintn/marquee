@@ -1,8 +1,12 @@
 import { Hono } from "hono";
 
+import { NO_ACCESS } from "../../src/domain/access.ts";
 import { titleSlug } from "../../src/domain/catalog.ts";
+import { barredCertifications } from "../../src/domain/certification.ts";
 import { edgeCache, withKvCache } from "../lib/cache.ts";
+import { contentNoticeFor, revivalGateFor } from "../lib/revival-notice.ts";
 import { canonicalOrigin } from "../lib/security.ts";
+import { certificationBar } from "../repositories/catalog-search.ts";
 import type { Bindings } from "../types.ts";
 
 export const sitemapRoutes = new Hono<{ Bindings: Bindings }>();
@@ -183,10 +187,27 @@ sitemapRoutes.get("/sitemap/revival.xml", sitemapCache, async (context) => {
   const { rows: results } = await context.env.DB.query<{
     id: string;
     title: string;
-  }>(`SELECT id, title FROM revival_works WHERE status = 'approved' LIMIT $1`, [PAGE_SIZE]);
+    synopsis: string;
+    contentNotice: string | null;
+    certification: string | null;
+  }>(
+    `SELECT w.id, w.title, w.synopsis, w.content_notice AS "contentNotice", t.certification
+       FROM revival_works AS w
+       LEFT JOIN catalog_titles AS t ON t.id = w.title_id
+      WHERE w.status = 'approved'
+      LIMIT $1`,
+    [PAGE_SIZE],
+  );
+  const open = results.filter(
+    (row) =>
+      revivalGateFor({
+        contentNotice: row.contentNotice ?? contentNoticeFor(row.title, row.synopsis),
+        certification: row.certification,
+      }) === null,
+  );
 
   return urlset(
-    results.map(
+    open.map(
       (row) =>
         `<url><loc>${escapeXml(`${origin}/revival/${encodeURIComponent(row.id)}`)}</loc>` +
         "<changefreq>monthly</changefreq></url>",
@@ -195,12 +216,15 @@ sitemapRoutes.get("/sitemap/revival.xml", sitemapCache, async (context) => {
 });
 
 async function renderTitlesPage(env: Bindings, origin: string, page: number) {
+  const bindings: DatabaseValue[] = [PAGE_SIZE, (page - 1) * PAGE_SIZE];
+  const open = certificationBar("catalog_titles", bindings, barredCertifications(NO_ACCESS));
   const { rows: results } = await env.DB.query<TitleRow>(
     `SELECT media_type, tmdb_id, title, updated_at
        FROM catalog_titles
+      WHERE ${open.join(" AND ") || "TRUE"}
       ORDER BY popularity DESC, id
       LIMIT $1 OFFSET $2`,
-    [PAGE_SIZE, (page - 1) * PAGE_SIZE],
+    bindings,
   );
 
   if (results.length === 0) {

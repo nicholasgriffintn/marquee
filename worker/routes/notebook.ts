@@ -50,6 +50,7 @@ import { readViewerEntries } from "../repositories/viewer-context.ts";
 import { ALERT_KINDS, isAlertKind } from "../services/alerts/types.ts";
 import { refreshBeliefs } from "../services/beliefs.ts";
 import { buildTasteMap } from "../services/taste-map.ts";
+import { viewerAccess } from "../services/viewer/access.ts";
 import type { Bindings } from "../types.ts";
 
 export const notebookRoutes = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
@@ -128,6 +129,8 @@ notebookRoutes.post("/preferences", async (context) => {
     preferredLocation: requestedLocation || null,
     preferredLanguage: preferredLanguage(body?.preferredLanguage),
     mutedGenres: mutedGenreList(body?.mutedGenres),
+    adultConfirmed: body?.adultConfirmed === true,
+    offensiveContentApproved: body?.offensiveContentApproved === true,
   });
 
   return jsonResponse(await readNotebookPreferences(context.env.DB, user.id));
@@ -275,7 +278,11 @@ notebookRoutes.get("/map", async (context) => {
       context.env.defer(logRejection(task, "taste_map_task_failed"));
     };
 
-    return jsonResponse(await buildTasteMap(context.env, user.id, { schedule }));
+    return jsonResponse(
+      await buildTasteMap(context.env, user.id, await viewerAccess(context.env, context.req.raw), {
+        schedule,
+      }),
+    );
   } catch (error) {
     logError("taste_map_route_failed", error);
 

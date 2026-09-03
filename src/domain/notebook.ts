@@ -265,7 +265,7 @@ export const NOTEBOOK_DIVIDERS: NotebookDivider[] = [
   {
     id: "preferences",
     label: "Your preferences",
-    aside: "language, location and your cinema",
+    aside: "language, your age, location and your cinema",
   },
   {
     id: "notes",

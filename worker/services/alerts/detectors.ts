@@ -1,3 +1,4 @@
+import { FULL_ACCESS } from "../../../src/domain/access.ts";
 import { titlePath } from "../../../src/domain/catalog.ts";
 import { titleHasPreferredAudioLanguage } from "../../../src/domain/languages.ts";
 import {
@@ -35,7 +36,7 @@ const arrivals: Detector = {
 
     const titleIds = [...new Set(found.map((arrival) => arrival.titleId))];
     const [titles, byTitle] = await Promise.all([
-      readItems(env.DB, titleIds),
+      readItems(env.DB, titleIds, FULL_ACCESS),
       waitingViewers(env.DB, titleIds),
     ]);
     const byId = new Map(titles.map((title) => [title.id, title]));

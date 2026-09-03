@@ -1,3 +1,4 @@
+import type { ViewerAccess } from "../../src/domain/access.ts";
 import type { MediaTitle } from "../../src/domain/catalog.ts";
 import { logError } from "../lib/logging.ts";
 import { clamp } from "../lib/numbers.ts";
@@ -32,6 +33,7 @@ export async function walkBetweenTitles(
   env: Bindings,
   fromId: string,
   toId: string,
+  access: ViewerAccess,
   maxHops = 6,
 ): Promise<TitlePath> {
   if (fromId === toId) {
@@ -69,7 +71,7 @@ export async function walkBetweenTitles(
 
       // oxlint-disable-next-line no-await-in-loop
       const [known, candidates] = await Promise.all([
-        readItems(env.DB, shortlist, shortlist.length),
+        readItems(env.DB, shortlist, access, shortlist.length),
         readVectors(env, shortlist),
       ]);
       const closer = shortlist.filter((id) => {
@@ -98,7 +100,7 @@ export async function walkBetweenTitles(
 
     const ordered = [fromId, ...chosen, toId];
     const [titles, vectors] = await Promise.all([
-      readItems(env.DB, ordered, ordered.length),
+      readItems(env.DB, ordered, access, ordered.length),
       readVectors(env, ordered),
     ]);
     const byId = new Map(titles.map((item): [string, MediaTitle] => [item.id, item]));

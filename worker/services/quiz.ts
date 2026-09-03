@@ -1,3 +1,4 @@
+import { NO_ACCESS } from "../../src/domain/access.ts";
 import type { MediaTitle } from "../../src/domain/catalog.ts";
 import type { GameKind, GameOption, GameQuestion } from "../../src/domain/screening.ts";
 import { withDatabase } from "../database/runtime.ts";
@@ -56,16 +57,20 @@ async function loadPool(runtime: Bindings): Promise<Pool> {
   const today = new Date().toISOString().slice(0, 10);
   const pages = await Promise.all(
     POOL_PAGES.map((page) =>
-      browseCatalogue(runtime, {
-        mediaType: "movie",
-        genres: [],
-        keywords: [],
-        places: [],
-        providerIds: [],
-        query: "",
-        sort: "popularity",
-        page,
-      }),
+      browseCatalogue(
+        runtime,
+        {
+          mediaType: "movie",
+          genres: [],
+          keywords: [],
+          places: [],
+          providerIds: [],
+          query: "",
+          sort: "popularity",
+          page,
+        },
+        NO_ACCESS,
+      ),
     ),
   );
   const seen = new Set<string>();

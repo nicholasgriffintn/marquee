@@ -1,3 +1,4 @@
+import type { ContentGate } from "../../src/domain/access.ts";
 import {
   printCondition,
   reelPath,
@@ -10,7 +11,7 @@ import {
   type RevivalTagKind,
   type RevivalWork,
 } from "../../src/domain/revival.ts";
-import { contentNoticeFor } from "../lib/revival-notice.ts";
+import { contentNoticeFor, revivalGateFor } from "../lib/revival-notice.ts";
 
 export type RevivalCandidate = {
   sourceId: string;
@@ -67,6 +68,7 @@ type WorkRow = {
   popularity: number | null;
   downloads: number | null;
   groupId: string | null;
+  catalogueCertification: string | null;
   posterKey: string | null;
   catalogueBackdrop: string | null;
   cataloguePoster: string | null;
@@ -82,6 +84,7 @@ const WORK_COLUMNS = `w.id, w.source, w.source_url AS "sourceUrl", w.title, w.ye
    w.mirror_state AS "mirrorState", w.plays, w.content_notice AS "contentNotice",
    w.popularity, w.downloads, w.group_id AS "groupId",
    w.stream_bytes AS "streamBytes", w.width, w.height,
+   t.certification AS "catalogueCertification",
    t.poster_key AS "posterKey",
    t.backdrop_url AS "catalogueBackdrop",
    t.poster_url AS "cataloguePoster"`;
@@ -130,6 +133,8 @@ function artFor(row: WorkRow) {
 }
 
 function toWork(row: WorkRow): RevivalWork {
+  const contentNotice = row.contentNotice ?? contentNoticeFor(row.title, row.synopsis);
+
   return {
     id: row.id,
     source: row.source as RevivalSource,
@@ -162,7 +167,8 @@ function toWork(row: WorkRow): RevivalWork {
     streamBytes: row.streamBytes,
     height: row.height,
     condition: printCondition(row.streamBytes, row.runtimeSeconds, row.height),
-    contentNotice: row.contentNotice ?? contentNoticeFor(row.title, row.synopsis),
+    contentNotice,
+    gate: revivalGateFor({ contentNotice, certification: row.catalogueCertification }),
     tags: [],
   };
 }
@@ -721,27 +727,56 @@ export type ReelTarget = {
   streamType: string;
   mirrorKey: string | null;
   mirrorState: RevivalMirrorState;
+  gate: ContentGate | null;
 };
 
-export async function readReelTarget(db: Database, id: string) {
-  const row = await db.first<ReelTarget>(
-    `SELECT id, stream_url AS "streamUrl", stream_type AS "streamType",
-              mirror_key AS "mirrorKey", mirror_state AS "mirrorState"
-       FROM revival_works
-       WHERE id = $1 AND status = 'approved' AND uk_clear = 1`,
+type GateRow = {
+  title: string;
+  synopsis: string;
+  contentNotice: string | null;
+  catalogueCertification: string | null;
+};
+
+const GATE_COLUMNS = `w.title, w.synopsis, w.content_notice AS "contentNotice",
+   t.certification AS "catalogueCertification"`;
+
+function gateOf(row: GateRow) {
+  return revivalGateFor({
+    contentNotice: row.contentNotice ?? contentNoticeFor(row.title, row.synopsis),
+    certification: row.catalogueCertification,
+  });
+}
+
+export async function readReelTarget(db: Database, id: string): Promise<ReelTarget | null> {
+  const row = await db.first<Omit<ReelTarget, "gate"> & GateRow>(
+    `SELECT w.id, w.stream_url AS "streamUrl", w.stream_type AS "streamType",
+            w.mirror_key AS "mirrorKey", w.mirror_state AS "mirrorState", ${GATE_COLUMNS}
+       ${WORK_FROM}
+       WHERE w.id = $1 AND w.status = 'approved' AND w.uk_clear = 1`,
     [id],
   );
 
-  return row ?? null;
+  return row
+    ? {
+        id: row.id,
+        streamUrl: row.streamUrl,
+        streamType: row.streamType,
+        mirrorKey: row.mirrorKey,
+        mirrorState: row.mirrorState,
+        gate: gateOf(row),
+      }
+    : null;
 }
 
 export async function readStillSource(db: Database, id: string) {
-  const row = await db.first<{ stillUrl: string | null }>(
-    `SELECT still_url AS "stillUrl" FROM revival_works WHERE id = $1 AND status = 'approved'`,
+  const row = await db.first<{ stillUrl: string | null } & GateRow>(
+    `SELECT w.still_url AS "stillUrl", ${GATE_COLUMNS}
+       ${WORK_FROM}
+       WHERE w.id = $1 AND w.status = 'approved'`,
     [id],
   );
 
-  return row?.stillUrl ?? null;
+  return row?.stillUrl ? { stillUrl: row.stillUrl, gate: gateOf(row) } : null;
 }
 
 export async function selectArchiveForRecheck(db: Database, limit = 60, staleDays = 30) {

@@ -1,3 +1,4 @@
+import { FULL_ACCESS } from "../../src/domain/access.ts";
 import type { MediaTitle } from "../../src/domain/catalog.ts";
 import { getAniListDetails } from "../clients/anilist.ts";
 import { getMalAnimeDetails } from "../clients/myanimelist.ts";
@@ -363,7 +364,7 @@ export async function enrichRatings(env: Bindings, titleId: string) {
     return;
   }
 
-  const [title] = await readItems(env.DB, [titleId]);
+  const [title] = await readItems(env.DB, [titleId], FULL_ACCESS);
 
   if (!title) {
     await storeEnrichmentMiss(env, titleId, "omdb", "no-title-row");
@@ -411,7 +412,7 @@ export async function enrichRatings(env: Bindings, titleId: string) {
 }
 
 export async function enrichAnime(env: Bindings, titleId: string) {
-  const [title] = await readItems(env.DB, [titleId]);
+  const [title] = await readItems(env.DB, [titleId], FULL_ACCESS);
   const malId = title?.externalIds?.malId ?? null;
 
   if (!malId) {
@@ -518,7 +519,7 @@ export async function enrichAnime(env: Bindings, titleId: string) {
 }
 
 export async function enrichAniListMedia(env: Bindings, titleId: string) {
-  const [title] = await readItems(env.DB, [titleId]);
+  const [title] = await readItems(env.DB, [titleId], FULL_ACCESS);
   const anilistId = title?.externalIds?.anilistId ?? null;
 
   if (!anilistId) {

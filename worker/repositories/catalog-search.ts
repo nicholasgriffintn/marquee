@@ -1,4 +1,6 @@
+import type { ViewerAccess } from "../../src/domain/access.ts";
 import type { MediaTitle } from "../../src/domain/catalog.ts";
+import { barredCertifications } from "../../src/domain/certification.ts";
 import { searchTokens } from "../../src/domain/search-query.ts";
 import { buzzScoreSql, MIN_TRENDING_VIEWS } from "../lib/buzz.ts";
 import {
@@ -111,6 +113,37 @@ function placeCondition(parameters: string[]) {
        )`;
 }
 
+const CERTIFICATION_LIMIT = 60;
+
+function certifiedAs(alias: string, parameter: string) {
+  return `EXISTS (
+         SELECT 1 FROM jsonb_array_elements_text(CAST(${parameter} AS jsonb)) AS rated(value)
+         WHERE ${alias}.certification = rated.value OR ${alias}.certification LIKE '% ' || rated.value
+       )`;
+}
+
+export function certificationBar(
+  alias: string,
+  bindings: DatabaseValue[],
+  certifications: readonly string[],
+) {
+  const barred = certifications.filter(Boolean).slice(0, CERTIFICATION_LIMIT);
+
+  return barred.length
+    ? [`NOT ${certifiedAs(alias, `$${bindings.push(JSON.stringify(barred))}`)}`]
+    : [];
+}
+
+export function certifiedWithin(
+  alias: string,
+  bindings: DatabaseValue[],
+  certifications: readonly string[],
+) {
+  const wanted = certifications.filter(Boolean).slice(0, CERTIFICATION_LIMIT);
+
+  return certifiedAs(alias, `$${bindings.push(JSON.stringify(wanted))}`);
+}
+
 function eligibilityClause(search: CatalogueSearch, bindings: DatabaseValue[]): Eligibility {
   const conditions: string[] = [];
   const genres = lowered(search.genres, 10);
@@ -200,16 +233,7 @@ function eligibilityClause(search: CatalogueSearch, bindings: DatabaseValue[]): 
     );
   }
 
-  const certifications = (search.certifications ?? []).filter(Boolean).slice(0, 60);
-
-  if (certifications.length) {
-    conditions.push(
-      `NOT EXISTS (
-         SELECT 1 FROM jsonb_array_elements_text(CAST($${bindings.push(JSON.stringify(certifications))} AS jsonb)) AS rated(value)
-         WHERE t.certification = rated.value OR t.certification LIKE '% ' || rated.value
-       )`,
-    );
-  }
+  conditions.push(...certificationBar("t", bindings, search.certifications ?? []));
 
   if (Number.isFinite(search.releasedAfter)) {
     conditions.push(
@@ -379,6 +403,7 @@ export type BrowseTrendingFilter = {
   places: string[];
   providerIds: string[];
   availability?: AvailabilityRule;
+  certifications?: string[];
   minVotes: number;
 };
 
@@ -458,18 +483,23 @@ export async function browseTrending(
   return [...(await hydrate(db, page)), ...rest];
 }
 
-export async function readRanked(db: Database, ids: string[]) {
+export async function readRanked(db: Database, ids: string[], access: ViewerAccess) {
   const uniqueIds = [...new Set(ids.filter(isKnownTitle))].slice(0, 100);
 
   if (uniqueIds.length === 0) {
     return [];
   }
 
+  const bindings: DatabaseValue[] = [JSON.stringify(uniqueIds)];
+  const conditions = [
+    "id IN (SELECT value FROM jsonb_array_elements_text(CAST($1 AS jsonb)) AS entries(value))",
+    ...certificationBar("catalog_titles", bindings, barredCertifications(access)),
+  ];
   const rows = await db.query<CatalogTitleRow>(
     `SELECT ${CATALOG_TITLE_COLUMNS}
        FROM catalog_titles
-       WHERE id IN (SELECT value FROM jsonb_array_elements_text(CAST($1 AS jsonb)) AS entries(value))`,
-    [JSON.stringify(uniqueIds)],
+       WHERE ${conditions.join(" AND ")}`,
+    bindings,
   );
   const byId = new Map((await hydrate(db, rows.rows)).map((title) => [title.id, title]));
 

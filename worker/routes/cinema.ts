@@ -11,6 +11,7 @@ import {
   getTitleShowings,
   rememberInterest,
 } from "../services/cinema.ts";
+import { viewerAccess } from "../services/viewer/access.ts";
 import type { Bindings } from "../types.ts";
 
 export const cinemaRoutes = new Hono<{ Bindings: Bindings; Variables: AuthVariables }>();
@@ -47,7 +48,14 @@ cinemaRoutes.get("/showing", async (context) => {
       }),
     );
 
-    return context.json(await getLocalShowings(context.env, origin, radiusKm));
+    return context.json(
+      await getLocalShowings(
+        context.env,
+        origin,
+        radiusKm,
+        await viewerAccess(context.env, context.req.raw),
+      ),
+    );
   } catch (error) {
     logError("cinema_showing_failed", error, { area: "cinema" });
 

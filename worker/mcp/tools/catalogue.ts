@@ -1,3 +1,4 @@
+import { barredCertifications } from "../../../src/domain/certification.ts";
 import { isKnownTitle } from "../../lib/validation.ts";
 import { readItems } from "../../repositories/catalog-reader.ts";
 import { retrieveSimilar, retrieveTitles } from "../../services/retrieval/index.ts";
@@ -37,7 +38,7 @@ export const catalogueTools: readonly McpTool[] = [
       required: ["query"],
     },
     outputSchema: titleResultsSchema(),
-    async run({ env, user }, input) {
+    async run({ env, user, access }, input) {
       const { success } = await env.SEARCH_MEMBER_RATE_LIMITER.limit({ key: user.id });
 
       if (!success) {
@@ -46,6 +47,7 @@ export const catalogueTools: readonly McpTool[] = [
 
       const results = await retrieveTitles(env, {
         text: typeof input.query === "string" ? input.query.slice(0, MAX_QUERY_LENGTH) : "",
+        certifications: barredCertifications(access),
         mediaType:
           input.mediaType === "movie" || input.mediaType === "tv" ? input.mediaType : undefined,
         genres: Array.isArray(input.genres)
@@ -75,13 +77,14 @@ export const catalogueTools: readonly McpTool[] = [
       required: ["titleId"],
     },
     outputSchema: titleResultsSchema(),
-    async run({ env }, input) {
+    async run({ env, access }, input) {
       if (!isKnownTitle(input.titleId)) {
         return refuse("titleId must look like movie:550");
       }
 
       const similar = await retrieveSimilar(env, input.titleId, {
         limit: boundedLimit(input.limit),
+        certifications: barredCertifications(access),
       });
 
       return answer({ results: summarise(similar.map((candidate) => candidate.title)) });
@@ -110,12 +113,12 @@ export const catalogueTools: readonly McpTool[] = [
       },
       required: TITLE_SUMMARY_SCHEMA.required,
     },
-    async run({ env, user }, input) {
+    async run({ env, user, access }, input) {
       if (!isKnownTitle(input.titleId)) {
         return refuse("titleId must look like movie:550");
       }
 
-      const [title] = await readItems(env.DB, [input.titleId]);
+      const [title] = await readItems(env.DB, [input.titleId], access);
 
       if (!title) {
         return refuse("Unknown title");

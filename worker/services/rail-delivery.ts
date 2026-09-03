@@ -1,3 +1,4 @@
+import type { ViewerAccess } from "../../src/domain/access.ts";
 import type { ViewerOrigin } from "../../src/domain/cinema.ts";
 import type { DeliveredRail, RailsDelivery, RailStatus } from "../../src/domain/rails.ts";
 import { logError } from "../lib/logging.ts";
@@ -14,6 +15,7 @@ export type DeliveryRequest = {
   viewerId: string | null;
   origin: ViewerOrigin | null;
   generate: boolean;
+  access: ViewerAccess;
 };
 
 type CuratedDelivery = {
@@ -34,6 +36,7 @@ async function curatedDelivery(
   env: Bindings,
   viewerId: string,
   generate: boolean,
+  access: ViewerAccess,
 ): Promise<CuratedDelivery> {
   try {
     const [revision, preferences, providerIds] = await Promise.all([
@@ -49,6 +52,7 @@ async function curatedDelivery(
           record.generationId,
           preferences.preferredLanguage,
           providerIds ?? [],
+          access,
         )
       : [];
 
@@ -77,10 +81,10 @@ export async function deliverRails(
   env: Bindings,
   request: DeliveryRequest,
 ): Promise<RailsDelivery> {
-  const { viewerId, origin, generate } = request;
+  const { viewerId, origin, generate, access } = request;
   const [curated, personal] = await Promise.all([
-    viewerId ? curatedDelivery(env, viewerId, generate) : NO_CURATED,
-    getPersonalRails(env, viewerId, origin),
+    viewerId ? curatedDelivery(env, viewerId, generate, access) : NO_CURATED,
+    getPersonalRails(env, viewerId, origin, access),
   ]);
 
   return {

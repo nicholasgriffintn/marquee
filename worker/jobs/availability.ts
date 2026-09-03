@@ -1,3 +1,4 @@
+import { FULL_ACCESS } from "../../src/domain/access.ts";
 import { getJustwatchAvailability } from "../clients/justwatch.ts";
 import { logEvent } from "../lib/logging.ts";
 import { enqueue } from "../lib/queue.ts";
@@ -103,7 +104,7 @@ export async function enrichTitleAvailability(env: Bindings, titleId: string, bu
     return;
   }
 
-  const [title] = await readItems(env.DB, [titleId]);
+  const [title] = await readItems(env.DB, [titleId], FULL_ACCESS);
 
   if (!title) {
     logEvent("availability_title_unreadable", { titleId });

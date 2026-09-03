@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 
+import { accessTier, admitted, REQUIREMENT_MESSAGES } from "../../src/domain/access.ts";
 import { toCard } from "../../src/domain/revival.ts";
 import { sessionPrincipal } from "../auth/session.ts";
 import { edgeCache } from "../lib/cache.ts";
@@ -24,6 +25,7 @@ import {
   getShelves,
   shelfSelector,
 } from "../services/revival.ts";
+import { viewerAccess } from "../services/viewer/access.ts";
 import type { Bindings } from "../types.ts";
 
 export const revivalRoutes = new Hono<{ Bindings: Bindings }>();
@@ -48,9 +50,11 @@ revivalRoutes.get("/bill", edgeCache(300), async (context) => {
   }
 });
 
-revivalRoutes.get("/shelves", edgeCache(300), async (context) => {
+revivalRoutes.get("/shelves", edgeCache(300, { byAccess: true }), async (context) => {
   try {
-    return context.json(await getShelves(context.env.DB));
+    const access = await viewerAccess(context.env, context.req.raw);
+
+    return context.json(await getShelves(context.env.DB, access));
   } catch (error) {
     logError("revival_shelves_failed", error, { area: "revival" });
 
@@ -68,7 +72,9 @@ revivalRoutes.get("/resume", async (context) => {
   }
 
   try {
-    return context.json(await getResumeShelf(context.env.DB, principal.user.id));
+    const access = await viewerAccess(context.env, context.req.raw);
+
+    return context.json(await getResumeShelf(context.env.DB, principal.user.id, access));
   } catch (error) {
     logError("revival_resume_failed", error, { area: "revival" });
 
@@ -84,7 +90,12 @@ revivalRoutes.get("/search", async (context) => {
   }
 
   try {
-    context.header("cache-control", "public, max-age=300");
+    const access = await viewerAccess(context.env, context.req.raw);
+
+    context.header(
+      "cache-control",
+      accessTier(access) ? "private, max-age=300" : "public, max-age=300",
+    );
 
     const page = pageParam(context.req.query("page"));
     const [found, total] = await Promise.all([
@@ -93,7 +104,7 @@ revivalRoutes.get("/search", async (context) => {
     ]);
 
     return context.json({
-      works: found.map(toCard),
+      works: admitted(found, access).map(toCard),
       query,
       page,
       pageSize: PAGE_SIZE,
@@ -115,17 +126,18 @@ function pageParam(raw: string | undefined) {
 
 const PAGE_SIZE = 60;
 
-revivalRoutes.get("/browse", edgeCache(300), async (context) => {
+revivalRoutes.get("/browse", edgeCache(300, { byAccess: true }), async (context) => {
   const page = pageParam(context.req.query("page"));
 
   try {
-    const [works, total] = await Promise.all([
+    const [works, total, access] = await Promise.all([
       readVaultPage(context.env.DB, PAGE_SIZE, (page - 1) * PAGE_SIZE),
       countApproved(context.env.DB),
+      viewerAccess(context.env, context.req.raw),
     ]);
 
     return context.json({
-      works: works.map(toCard),
+      works: admitted(works, access).map(toCard),
       page,
       pageSize: PAGE_SIZE,
       total,
@@ -138,7 +150,7 @@ revivalRoutes.get("/browse", edgeCache(300), async (context) => {
   }
 });
 
-revivalRoutes.get("/shelf/:id", edgeCache(300), async (context) => {
+revivalRoutes.get("/shelf/:id", edgeCache(300, { byAccess: true }), async (context) => {
   const id = context.req.param("id");
   const selector = shelfSelector(id);
   const page = pageParam(context.req.query("page"));
@@ -148,14 +160,15 @@ revivalRoutes.get("/shelf/:id", edgeCache(300), async (context) => {
   }
 
   try {
-    const [works, total] = await Promise.all([
+    const [works, total, access] = await Promise.all([
       readShelfPage(context.env.DB, selector, PAGE_SIZE, (page - 1) * PAGE_SIZE),
       countShelf(context.env.DB, selector),
+      viewerAccess(context.env, context.req.raw),
     ]);
 
     return context.json({
       id,
-      works: works.map(toCard),
+      works: admitted(works, access).map(toCard),
       page,
       pageSize: PAGE_SIZE,
       total,
@@ -168,23 +181,32 @@ revivalRoutes.get("/shelf/:id", edgeCache(300), async (context) => {
   }
 });
 
-revivalRoutes.get("/titles/:mediaType/:tmdbId", edgeCache(900), async (context) => {
-  const titleId = `${context.req.param("mediaType")}:${context.req.param("tmdbId")}`;
+revivalRoutes.get(
+  "/titles/:mediaType/:tmdbId",
+  edgeCache(900, { byAccess: true }),
+  async (context) => {
+    const titleId = `${context.req.param("mediaType")}:${context.req.param("tmdbId")}`;
 
-  if (!isKnownTitle(titleId)) {
-    return context.json({ works: [] });
-  }
+    if (!isKnownTitle(titleId)) {
+      return context.json({ works: [] });
+    }
 
-  try {
-    context.header("cache-control", "public, max-age=900");
+    try {
+      context.header("cache-control", "public, max-age=900");
 
-    return context.json({ works: await readWorksForTitle(context.env.DB, titleId) });
-  } catch (error) {
-    logError("revival_title_failed", error, { area: "revival", titleId });
+      const [works, access] = await Promise.all([
+        readWorksForTitle(context.env.DB, titleId),
+        viewerAccess(context.env, context.req.raw),
+      ]);
 
-    return context.json({ works: [] });
-  }
-});
+      return context.json({ works: admitted(works, access) });
+    } catch (error) {
+      logError("revival_title_failed", error, { area: "revival", titleId });
+
+      return context.json({ works: [] });
+    }
+  },
+);
 
 revivalRoutes.get("/:workId", async (context) => {
   const workId = context.req.param("workId");
@@ -193,16 +215,27 @@ revivalRoutes.get("/:workId", async (context) => {
     return context.json({ error: "Nothing showing under that name" }, 404);
   }
 
-  const principal = await sessionPrincipal(context.env, context.req.raw);
+  const [principal, access] = await Promise.all([
+    sessionPrincipal(context.env, context.req.raw),
+    viewerAccess(context.env, context.req.raw),
+  ]);
 
   try {
     context.header("cache-control", "no-store");
 
-    const screening = await getScreening(context.env, workId, principal?.user.id ?? null);
+    const screening = await getScreening(context.env, workId, principal?.user.id ?? null, access);
 
-    return screening
-      ? context.json(screening)
-      : context.json({ error: "Nothing showing under that name" }, 404);
+    if (!screening) {
+      return context.json({ error: "Nothing showing under that name" }, 404);
+    }
+
+    const requires = "requires" in screening ? screening.requires : null;
+
+    if (requires) {
+      return context.json({ error: REQUIREMENT_MESSAGES[requires], requires }, 403);
+    }
+
+    return context.json(screening);
   } catch (error) {
     logError("revival_screening_failed", error, { area: "revival", workId });
 

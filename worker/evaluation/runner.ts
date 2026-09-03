@@ -1,3 +1,4 @@
+import { FULL_ACCESS } from "../../src/domain/access.ts";
 import {
   tallyOf,
   type EvaluationReport,
@@ -60,8 +61,8 @@ async function runGoldenQuery(
 
   const results =
     fixture.mode === "hybrid"
-      ? await searchCatalogueHybrid(env, fixture.query, [])
-      : await searchCatalogue(env, fixture.query, []);
+      ? await searchCatalogueHybrid(env, fixture.query, [], FULL_ACCESS)
+      : await searchCatalogue(env, fixture.query, [], FULL_ACCESS);
   const items = results.items.slice(0, RESULT_LIMIT);
   const ranks = fixture.expect.map((titleId) => ({ titleId, rank: rankOf(items, titleId) }));
   const intruders = (fixture.absent ?? []).filter((titleId) => rankOf(items, titleId) !== null);
@@ -106,7 +107,7 @@ function meanReciprocalRank(relevance: RelevanceResult[]) {
 export async function runEvaluation(env: Bindings): Promise<EvaluationReport> {
   const expected = [...new Set(GOLDEN_QUERIES.flatMap((fixture) => fixture.expect))];
   const known = new Set(
-    (await readItems(env.DB, expected, expected.length)).map((item) => item.id),
+    (await readItems(env.DB, expected, FULL_ACCESS, expected.length)).map((item) => item.id),
   );
   const relevance: RelevanceResult[] = [];
 

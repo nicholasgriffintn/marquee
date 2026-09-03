@@ -56,6 +56,7 @@ import { deliverRails } from "../services/rail-delivery.ts";
 import { getSeason, getSeasonIndex } from "../services/seasons.ts";
 import { walkBetweenTitles } from "../services/title-path.ts";
 import { getLatestTrailers } from "../services/trailers.ts";
+import { viewerAccess } from "../services/viewer/access.ts";
 import type { Bindings } from "../types.ts";
 
 const TONIGHT_DEFAULT_LIMIT = 12;
@@ -80,11 +81,12 @@ export const catalogRoutes = new Hono<{
   Variables: AuthVariables;
 }>();
 
-catalogRoutes.get("/", edgeCache(900), async (context) => {
+catalogRoutes.get("/", edgeCache(900, { byAccess: true }), async (context) => {
   const providerIds = validProviderIds(queryList(context, "providers", PROVIDER_LIMIT));
 
   try {
-    const catalogue = await getCatalogue(context.env, providerIds);
+    const access = await viewerAccess(context.env, context.req.raw);
+    const catalogue = await getCatalogue(context.env, providerIds, access);
 
     if (!catalogue) {
       return context.json({ error: "Catalogue not found" }, 404);
@@ -112,6 +114,7 @@ catalogRoutes.get("/rails", requireAuthentication, async (context) => {
       viewerId: user.id,
       origin: edgeOrigin(context.req.raw),
       generate: context.req.query("generate") === "1",
+      access: await viewerAccess(context.env, context.req.raw),
     });
     const rails = await Promise.all(
       delivery.rails.map((rail) =>
@@ -182,15 +185,18 @@ catalogRoutes.get("/search", async (context) => {
     });
   }
 
-  const principal = await sessionPrincipal(context.env, context.req.raw);
+  const [principal, access] = await Promise.all([
+    sessionPrincipal(context.env, context.req.raw),
+    viewerAccess(context.env, context.req.raw),
+  ]);
 
   try {
     context.header("cache-control", "no-store");
 
     const startedAt = Date.now();
     const results = hybrid
-      ? await searchCatalogueHybrid(context.env, query, providerIds)
-      : await searchCatalogue(context.env, query, providerIds, (task) =>
+      ? await searchCatalogueHybrid(context.env, query, providerIds, access)
+      : await searchCatalogue(context.env, query, providerIds, access, (task) =>
           context.executionCtx.waitUntil(task),
         );
     const journey = await mintJourney(context.env, {
@@ -246,7 +252,10 @@ catalogRoutes.get("/genres", edgeCache(3_600), async (context) => {
 });
 
 catalogRoutes.get("/tonight", async (context) => {
-  const principal = await sessionPrincipal(context.env, context.req.raw);
+  const [principal, access] = await Promise.all([
+    sessionPrincipal(context.env, context.req.raw),
+    viewerAccess(context.env, context.req.raw),
+  ]);
   const limit = queryInteger(context, "limit", TONIGHT_DEFAULT_LIMIT, 1, 40);
 
   try {
@@ -258,6 +267,7 @@ catalogRoutes.get("/tonight", async (context) => {
         principal?.user.id ?? null,
         canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN),
         limit,
+        access,
       ),
     );
   } catch (error) {
@@ -267,7 +277,7 @@ catalogRoutes.get("/tonight", async (context) => {
   }
 });
 
-catalogRoutes.get("/trailers", edgeCache(600), async (context) => {
+catalogRoutes.get("/trailers", edgeCache(600, { byAccess: true }), async (context) => {
   const requested = queryText(context, "sort", 16);
   const sort: TrailerSort = isTrailerSort(requested) ? requested : "latest";
   const limit = queryInteger(context, "limit", TRAILERS_DEFAULT_LIMIT, 1, TRAILERS_LIMIT_MAX);
@@ -275,7 +285,12 @@ catalogRoutes.get("/trailers", edgeCache(600), async (context) => {
   try {
     context.header("cache-control", "public, max-age=600");
 
-    return context.json({ sort, trailers: await getLatestTrailers(context.env, sort, limit) });
+    const access = await viewerAccess(context.env, context.req.raw);
+
+    return context.json({
+      sort,
+      trailers: await getLatestTrailers(context.env, sort, limit, access),
+    });
   } catch (error) {
     logError("trailers_read_failed", error, { area: "trailers" });
     context.header("cache-control", "no-store");
@@ -284,9 +299,11 @@ catalogRoutes.get("/trailers", edgeCache(600), async (context) => {
   }
 });
 
-catalogRoutes.get("/trending", edgeCache(1_800), async (context) => {
+catalogRoutes.get("/trending", edgeCache(1_800, { byAccess: true }), async (context) => {
   try {
-    return context.json(await getTrending(context.env));
+    const access = await viewerAccess(context.env, context.req.raw);
+
+    return context.json(await getTrending(context.env, access));
   } catch (error) {
     logError("trending_read_failed", error, { area: "buzz" });
     context.header("cache-control", "no-store");
@@ -325,28 +342,34 @@ catalogRoutes.get("/keywords", edgeCache(3_600), async (context) => {
   }
 });
 
-catalogRoutes.get("/browse", edgeCache(120), async (context) => {
+catalogRoutes.get("/browse", edgeCache(120, { byAccess: true }), async (context) => {
   const mediaTypeParam = context.req.query("mediaType");
   const sortParam = context.req.query("sort");
 
   try {
     context.header("cache-control", "public, max-age=120");
 
+    const access = await viewerAccess(context.env, context.req.raw);
+
     return context.json(
-      await browseCatalogue(context.env, {
-        mediaType:
-          mediaTypeParam === "movie" || mediaTypeParam === "tv" ? mediaTypeParam : undefined,
-        genres: queryList(context, "genres", FACET_LIMIT),
-        keywords: queryList(context, "keywords", FACET_LIMIT),
-        places: queryList(context, "places", FACET_LIMIT),
-        providerIds: validProviderIds(queryList(context, "providers", PROVIDER_LIMIT)),
-        query: queryText(context, "query", QUERY_LIMIT),
-        sort:
-          sortParam === "score" || sortParam === "recent" || sortParam === "trending"
-            ? sortParam
-            : "popularity",
-        page: queryInteger(context, "page", 0, 0, MAX_BROWSE_PAGE),
-      }),
+      await browseCatalogue(
+        context.env,
+        {
+          mediaType:
+            mediaTypeParam === "movie" || mediaTypeParam === "tv" ? mediaTypeParam : undefined,
+          genres: queryList(context, "genres", FACET_LIMIT),
+          keywords: queryList(context, "keywords", FACET_LIMIT),
+          places: queryList(context, "places", FACET_LIMIT),
+          providerIds: validProviderIds(queryList(context, "providers", PROVIDER_LIMIT)),
+          query: queryText(context, "query", QUERY_LIMIT),
+          sort:
+            sortParam === "score" || sortParam === "recent" || sortParam === "trending"
+              ? sortParam
+              : "popularity",
+          page: queryInteger(context, "page", 0, 0, MAX_BROWSE_PAGE),
+        },
+        access,
+      ),
     );
   } catch (error) {
     logError("browse_failed", error, { area: "browse" });
@@ -355,13 +378,15 @@ catalogRoutes.get("/browse", edgeCache(120), async (context) => {
   }
 });
 
-catalogRoutes.get("/items", edgeCache(900), async (context) => {
+catalogRoutes.get("/items", edgeCache(900, { byAccess: true }), async (context) => {
   const ids = queryList(context, "ids", ITEMS_LIMIT);
 
   try {
     context.header("cache-control", "public, max-age=900");
 
-    return context.json(await getCatalogueItems(context.env.DB, ids));
+    const access = await viewerAccess(context.env, context.req.raw);
+
+    return context.json(await getCatalogueItems(context.env.DB, ids, access));
   } catch (error) {
     logError("catalogue_read_failed", error, { area: "items" });
 
@@ -440,15 +465,16 @@ catalogRoutes.get("/people/:id", async (context) => {
     }
 
     const principal = await sessionPrincipal(context.env, context.req.raw);
-    const [ids, shelf, awards] = await Promise.all([
+    const [ids, shelf, awards, access] = await Promise.all([
       readPersonTitleIds(context.env.DB, person.personId, PERSON_LIMIT + 1, page * PERSON_LIMIT),
       principal?.user
         ? readPersonShelf(context.env.DB, principal.user.id, person.personId)
         : Promise.resolve({ shelved: 0, watched: 0 }),
       readPersonAwards(context.env.DB, person.personId),
+      viewerAccess(context.env, context.req.raw),
     ]);
     const hasMore = ids.length > PERSON_LIMIT;
-    const items = await readItems(context.env.DB, ids.slice(0, PERSON_LIMIT), PERSON_LIMIT);
+    const items = await readItems(context.env.DB, ids.slice(0, PERSON_LIMIT), access, PERSON_LIMIT);
 
     return context.json({ person, items, shelf, awards, page, hasMore });
   } catch (error) {
@@ -458,7 +484,7 @@ catalogRoutes.get("/people/:id", async (context) => {
   }
 });
 
-catalogRoutes.get("/collections/:id", edgeCache(3_600), async (context) => {
+catalogRoutes.get("/collections/:id", edgeCache(3_600, { byAccess: true }), async (context) => {
   const collectionId = pathInteger(context, "id", 1, MAX_TMDB_ID);
 
   if (collectionId === null) {
@@ -475,7 +501,12 @@ catalogRoutes.get("/collections/:id", edgeCache(3_600), async (context) => {
       page * COLLECTION_LIMIT,
     );
     const hasMore = ids.length > COLLECTION_LIMIT;
-    const items = await readItems(context.env.DB, ids.slice(0, COLLECTION_LIMIT), COLLECTION_LIMIT);
+    const items = await readItems(
+      context.env.DB,
+      ids.slice(0, COLLECTION_LIMIT),
+      await viewerAccess(context.env, context.req.raw),
+      COLLECTION_LIMIT,
+    );
 
     context.header("cache-control", "public, max-age=3600");
 
@@ -572,24 +603,30 @@ catalogRoutes.get("/titles/:titleId/credits", edgeCache(3_600), async (context) 
   }
 });
 
-catalogRoutes.get("/titles/:titleId/path", edgeCache(3_600), async (context) => {
-  const fromId = context.req.param("titleId");
-  const toId = queryText(context, "to", TITLE_ID_LIMIT);
+catalogRoutes.get(
+  "/titles/:titleId/path",
+  edgeCache(3_600, { byAccess: true }),
+  async (context) => {
+    const fromId = context.req.param("titleId");
+    const toId = queryText(context, "to", TITLE_ID_LIMIT);
 
-  if (!isKnownTitle(fromId) || !isKnownTitle(toId)) {
-    return context.json({ error: "Unknown title" }, 404);
-  }
+    if (!isKnownTitle(fromId) || !isKnownTitle(toId)) {
+      return context.json({ error: "Unknown title" }, 404);
+    }
 
-  try {
-    context.header("cache-control", "public, max-age=3600");
+    try {
+      context.header("cache-control", "public, max-age=3600");
 
-    return context.json(await walkBetweenTitles(context.env, fromId, toId, PATH_HOPS));
-  } catch (error) {
-    logError("catalogue_read_failed", error, { area: "path" });
+      const access = await viewerAccess(context.env, context.req.raw);
 
-    return context.json({ error: "I cannot get from one to the other just now" }, 500);
-  }
-});
+      return context.json(await walkBetweenTitles(context.env, fromId, toId, access, PATH_HOPS));
+    } catch (error) {
+      logError("catalogue_read_failed", error, { area: "path" });
+
+      return context.json({ error: "I cannot get from one to the other just now" }, 500);
+    }
+  },
+);
 
 catalogRoutes.get("/titles/:titleId/awards", edgeCache(3_600), async (context) => {
   const titleId = context.req.param("titleId");
@@ -621,41 +658,59 @@ catalogRoutes.get("/titles/:titleId/places", edgeCache(3_600), async (context) =
   }
 });
 
-catalogRoutes.get("/titles/:titleId/watch-order", edgeCache(3_600), async (context) => {
-  const titleId = context.req.param("titleId");
+catalogRoutes.get(
+  "/titles/:titleId/watch-order",
+  edgeCache(3_600, { byAccess: true }),
+  async (context) => {
+    const titleId = context.req.param("titleId");
 
-  try {
-    return context.json(await getAnimeWatchOrder(context.env.DB, titleId));
-  } catch (error) {
-    logError("watch_order_read_failed", error, { area: "anime" });
+    try {
+      const access = await viewerAccess(context.env, context.req.raw);
 
-    return context.json({ related: [] });
-  }
-});
+      return context.json(await getAnimeWatchOrder(context.env.DB, titleId, access));
+    } catch (error) {
+      logError("watch_order_read_failed", error, { area: "anime" });
 
-catalogRoutes.get("/titles/:titleId/anime-recommendations", edgeCache(3_600), async (context) => {
-  const titleId = context.req.param("titleId");
+      return context.json({ related: [] });
+    }
+  },
+);
 
-  try {
-    return context.json(await getAnimeRecommendations(context.env.DB, titleId));
-  } catch (error) {
-    logError("anime_recommendations_read_failed", error, { area: "anime" });
+catalogRoutes.get(
+  "/titles/:titleId/anime-recommendations",
+  edgeCache(3_600, { byAccess: true }),
+  async (context) => {
+    const titleId = context.req.param("titleId");
 
-    return context.json({ items: [] });
-  }
-});
+    try {
+      const access = await viewerAccess(context.env, context.req.raw);
 
-catalogRoutes.get("/titles/:titleId/adaptations", edgeCache(3_600), async (context) => {
-  const titleId = context.req.param("titleId");
+      return context.json(await getAnimeRecommendations(context.env.DB, titleId, access));
+    } catch (error) {
+      logError("anime_recommendations_read_failed", error, { area: "anime" });
 
-  try {
-    return context.json(await getTitleAdaptations(context.env.DB, titleId));
-  } catch (error) {
-    logError("adaptations_read_failed", error, { area: "adaptations" });
+      return context.json({ items: [] });
+    }
+  },
+);
 
-    return context.json({ source: null, items: [] });
-  }
-});
+catalogRoutes.get(
+  "/titles/:titleId/adaptations",
+  edgeCache(3_600, { byAccess: true }),
+  async (context) => {
+    const titleId = context.req.param("titleId");
+
+    try {
+      const access = await viewerAccess(context.env, context.req.raw);
+
+      return context.json(await getTitleAdaptations(context.env.DB, titleId, access));
+    } catch (error) {
+      logError("adaptations_read_failed", error, { area: "adaptations" });
+
+      return context.json({ source: null, items: [] });
+    }
+  },
+);
 
 catalogRoutes.get("/tv/:tmdbId/seasons", edgeCache(3_600), async (context) => {
   const tmdbId = pathInteger(context, "tmdbId", 1, MAX_TMDB_ID);

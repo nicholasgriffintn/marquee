@@ -52,3 +52,50 @@ export const ADULT_CERTIFICATIONS = [
   "청소년 관람불가",
   "청소년관람불가",
 ];
+
+export const ADULTS_ONLY_CERTIFICATIONS = [
+  "+18",
+  "17+",
+  "18",
+  "18 anos",
+  "18+",
+  "18A",
+  "18TC",
+  "19",
+  "19+",
+  "21",
+  "21+",
+  "III",
+  "K18",
+  "M18",
+  "NC-17",
+  "R 18+",
+  "R - 17+",
+  "R+ - Mild Nudity",
+  "R-18",
+  "R18+",
+  "R21",
+  "SAM 18",
+  "TV-MA",
+  "VM18",
+  "X",
+  "น 18+",
+  "청소년 관람불가",
+  "청소년관람불가",
+];
+
+export function hasCertification(certification: string | null, list: readonly string[]) {
+  if (!certification) {
+    return false;
+  }
+
+  return list.some((value) => certification === value || certification.endsWith(` ${value}`));
+}
+
+export function isAdultsOnly(certification: string | null) {
+  return hasCertification(certification, ADULTS_ONLY_CERTIFICATIONS);
+}
+
+export function barredCertifications(access: { adult: boolean }) {
+  return access.adult ? [] : ADULTS_ONLY_CERTIFICATIONS;
+}

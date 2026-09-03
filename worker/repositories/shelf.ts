@@ -1,4 +1,6 @@
+import type { ViewerAccess } from "../../src/domain/access.ts";
 import type { MediaTitle } from "../../src/domain/catalog.ts";
+import { barredCertifications } from "../../src/domain/certification.ts";
 import type { ShelfSort } from "../../src/domain/shelf.ts";
 import type { EntryStatus, ViewingEntry } from "../../src/types.ts";
 import {
@@ -7,6 +9,7 @@ import {
   withStoredPoster,
 } from "../lib/catalog-payload.ts";
 import { hydrateTitleRows } from "./catalog-arrays.ts";
+import { certificationBar } from "./catalog-search.ts";
 import { furthestEpisodeColumns } from "./viewing-progress.ts";
 
 export type ShelfPageQuery = {
@@ -95,9 +98,19 @@ async function toRows(db: Database, rows: JoinedRow[]): Promise<ShelfRow[]> {
   });
 }
 
-export async function readShelfPage(db: Database, viewerId: string, query: ShelfPageQuery) {
+export async function readShelfPage(
+  db: Database,
+  viewerId: string,
+  query: ShelfPageQuery,
+  access: ViewerAccess,
+) {
   const { where, bindings } = conditions(query);
-  const limitParameter = bindings.length + 2;
+  const shared: DatabaseValue[] = [viewerId, ...bindings];
+  const clause = [
+    `(${where})`,
+    ...certificationBar("t", shared, barredCertifications(access)),
+  ].join(" AND ");
+  const limitParameter = shared.length + 1;
   const offsetParameter = limitParameter + 1;
   const [rows, totals] = await Promise.all([
     db.query<JoinedRow>(
@@ -106,18 +119,18 @@ export async function readShelfPage(db: Database, viewerId: string, query: Shelf
                 ${catalogTitleColumns("t")}
            FROM viewing_entries AS e
            JOIN catalog_titles AS t ON t.id = e.title_id
-          WHERE ${where}
+          WHERE ${clause}
           ORDER BY ${ORDER_BY[query.sort]}
           LIMIT $${limitParameter} OFFSET $${offsetParameter}`,
-      [viewerId, ...bindings, query.pageSize, query.page * query.pageSize],
+      [...shared, query.pageSize, query.page * query.pageSize],
     ),
     db.first<{ matched: number; shelved: number }>(
       `SELECT count(*) AS matched,
                 (SELECT count(*) FROM viewing_entries WHERE viewer_id = $1) AS shelved
            FROM viewing_entries AS e
            JOIN catalog_titles AS t ON t.id = e.title_id
-          WHERE ${where}`,
-      [viewerId, ...bindings],
+          WHERE ${clause}`,
+      [...shared],
     ),
   ]);
 

@@ -1,3 +1,4 @@
+import { NO_ACCESS } from "../../src/domain/access.ts";
 import { collectionPath, titlePath, type MediaTitle } from "../../src/domain/catalog.ts";
 import { revivalPath, runtimeLabel, type RevivalWork } from "../../src/domain/revival.ts";
 import { sentenceList } from "../../src/lib/string.ts";
@@ -184,7 +185,7 @@ async function titleCard(env: Bindings, titleId: string, origin: string): Promis
     return null;
   }
 
-  const [title] = await readItems(env.DB, [titleId]);
+  const [title] = await readItems(env.DB, [titleId], NO_ACCESS);
 
   if (!title) {
     return null;
@@ -256,7 +257,7 @@ async function collectionCard(
     return null;
   }
 
-  const items = await readItems(env.DB, ids, 48);
+  const items = await readItems(env.DB, ids, NO_ACCESS, 48);
   const name = items[0]?.collection?.name ?? "Collection";
   const url = `${origin}${collectionPath(collectionId)}`;
   const plural = items.length === 1 ? "film" : "films";

@@ -1,5 +1,11 @@
 import { Hono } from "hono";
 
+import {
+  admits,
+  type ContentGate,
+  REQUIREMENT_MESSAGES,
+  requirementFor,
+} from "../../src/domain/access.ts";
 import { UPSTREAM_AGENT } from "../clients/fetch.ts";
 import { logError, logRejection } from "../lib/logging.ts";
 import {
@@ -8,11 +14,13 @@ import {
   readStillSource,
   recordPlay,
 } from "../repositories/revival.ts";
+import { viewerAccess } from "../services/viewer/access.ts";
 import type { Bindings } from "../types.ts";
 
 export const reelRoutes = new Hono<{ Bindings: Bindings }>();
 
 const REEL_CACHE = "public, max-age=604800";
+const GATED_REEL_CACHE = "private, max-age=604800";
 const MAX_RANGE_BYTES = 24 * 1_024 * 1_024;
 
 type ParsedRange = { offset: number; length: number };
@@ -68,6 +76,14 @@ function reelHeaders(contentType: string, etag?: string) {
   }
 
   return headers;
+}
+
+function withGate(response: Response, gate: ContentGate | null) {
+  if (gate) {
+    response.headers.set("cache-control", GATED_REEL_CACHE);
+  }
+
+  return response;
 }
 
 async function serveFromMirror(
@@ -149,14 +165,20 @@ reelRoutes.get("/still/:workId", async (context) => {
     return context.json({ error: "Not found" }, 404);
   }
 
-  const source = await readStillSource(context.env.DB, workId);
+  const still = await readStillSource(context.env.DB, workId);
 
-  if (!source) {
+  if (!still) {
     return context.json({ error: "Not found" }, 404);
   }
 
+  if (still.gate && !admits(await viewerAccess(context.env, context.req.raw), still.gate)) {
+    return context.json({ error: "Not found" }, 404);
+  }
+
+  const cacheControl = still.gate ? "private, max-age=2592000" : STILL_CACHE;
+
   try {
-    const upstream = await fetch(source, {
+    const upstream = await fetch(still.stillUrl, {
       redirect: "follow",
       headers: { "user-agent": UPSTREAM_AGENT },
       signal: AbortSignal.timeout(12_000),
@@ -170,7 +192,7 @@ reelRoutes.get("/still/:workId", async (context) => {
     if (!context.env.IMAGES) {
       return new Response(upstream.body, {
         headers: {
-          "cache-control": STILL_CACHE,
+          "cache-control": cacheControl,
           "content-type": upstream.headers.get("content-type") ?? "image/jpeg",
           "x-content-type-options": "nosniff",
         },
@@ -185,7 +207,7 @@ reelRoutes.get("/still/:workId", async (context) => {
 
     return new Response(response.body, {
       headers: {
-        "cache-control": STILL_CACHE,
+        "cache-control": cacheControl,
         "content-type": "image/webp",
         "x-content-type-options": "nosniff",
       },
@@ -210,6 +232,14 @@ reelRoutes.get("/:workId", async (context) => {
     return context.json({ error: "Not found" }, 404);
   }
 
+  const requires = target.gate
+    ? requirementFor(await viewerAccess(context.env, context.req.raw), target.gate)
+    : null;
+
+  if (requires) {
+    return context.json({ error: REQUIREMENT_MESSAGES[requires], requires }, 403);
+  }
+
   const range = context.req.header("range");
 
   if (!range) {
@@ -228,13 +258,15 @@ reelRoutes.get("/:workId", async (context) => {
       );
 
       if (mirrored) {
-        return mirrored;
+        return withGate(mirrored, target.gate);
       }
     }
 
     const proxied = await serveFromSource(target.streamUrl, target.streamType, range);
 
-    return proxied ?? context.json({ error: "The print is missing a reel" }, 502);
+    return proxied
+      ? withGate(proxied, target.gate)
+      : context.json({ error: "The print is missing a reel" }, 502);
   } catch (error) {
     logError("reel_stream_failed", error, { area: "revival", workId });
 

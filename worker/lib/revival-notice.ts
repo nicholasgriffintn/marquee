@@ -1,3 +1,6 @@
+import type { ContentGate } from "../../src/domain/access.ts";
+import { isAdultsOnly } from "../../src/domain/certification.ts";
+
 const RACIST_CONTENT =
   "Contains racist propaganda and depictions. Presented for historical study, not endorsement.";
 
@@ -56,4 +59,15 @@ export function contentNoticeFor(title: string, synopsis = "") {
   }
 
   return SOURCE_WARNING.test(haystack) ? DISTRESSING_CONTENT : null;
+}
+
+export function revivalGateFor(work: {
+  contentNotice: string | null;
+  certification: string | null;
+}): ContentGate | null {
+  if (work.contentNotice) {
+    return "offensive";
+  }
+
+  return isAdultsOnly(work.certification) ? "adult" : null;
 }

@@ -1,3 +1,4 @@
+import type { ViewerAccess } from "../../src/domain/access.ts";
 import type { ApiScope } from "../../src/domain/scopes.ts";
 import { hasScope } from "../../src/domain/scopes.ts";
 import type { MarqueeUser } from "../auth/model.ts";
@@ -8,7 +9,12 @@ import { peopleTools } from "./tools/people.ts";
 import { scheduleTools } from "./tools/schedule.ts";
 import { shelfTools } from "./tools/shelf.ts";
 
-export type ToolContext = { env: Bindings; user: MarqueeUser; origin: string };
+export type ToolContext = {
+  env: Bindings;
+  user: MarqueeUser;
+  origin: string;
+  access: ViewerAccess;
+};
 
 export type ToolOutcome =
   | { ok: true; data: Record<string, unknown> }

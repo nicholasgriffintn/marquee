@@ -18,7 +18,7 @@ import {
 import type { UsherMoment } from "../domain/usher";
 import { classNames } from "../lib/class-names";
 import type { EntryStatus, ViewingEntry } from "../types";
-import { Button, CloseIcon, EmptyState, Skeleton, VisuallyHidden } from "../ui";
+import { Button, ButtonLink, CloseIcon, EmptyState, Skeleton, VisuallyHidden } from "../ui";
 import { DetailPanel } from "./detail/DetailPanel";
 import { UsherCard } from "./usher/UsherCard";
 import { UsherMark } from "./usher/UsherMark";
@@ -113,6 +113,36 @@ function MissingContent({ onRetry }: { onRetry?: () => void }) {
   );
 }
 
+function GatedContent({ isSignedIn }: { isSignedIn: boolean }) {
+  const returnTo = encodeURIComponent(window.location.pathname);
+
+  return (
+    <EmptyState
+      className={styles.missing}
+      mark={<UsherMark face="unimpressed" crop="head" className={styles.mark} />}
+      heading="Adults only."
+      headingId="detail-title"
+      size="title"
+      surface="paper"
+      description={
+        isSignedIn
+          ? "This one carries an adult certificate. Say in your notebook that you are 18 or over and I will open the card."
+          : "This one carries an adult certificate. Sign in, then tell me in your notebook that you are 18 or over."
+      }
+      actions={
+        <ButtonLink
+          to={isSignedIn ? "/notebook#preferences" : `/sign-in?returnTo=${returnTo}`}
+          variant="primary"
+          size="lg"
+          surface="paper"
+        >
+          {isSignedIn ? "Open the notebook" : "Come to the box office"}
+        </ButtonLink>
+      }
+    />
+  );
+}
+
 function LoadingContent() {
   return (
     <div className={styles.loading}>
@@ -130,6 +160,7 @@ export function TitleOverlay({
   titleId,
   title,
   isMissing,
+  isGated,
   isLoading,
   titleError,
   canSave,
@@ -155,6 +186,7 @@ export function TitleOverlay({
   titleId: string;
   title: MediaTitle | null;
   isMissing: boolean;
+  isGated: boolean;
   isLoading: boolean;
   titleError: string;
   canSave: boolean;
@@ -238,12 +270,14 @@ export function TitleOverlay({
   const isPage = layout === "page";
 
   if (!title) {
-    if (!titleError && !isMissing && !isLoading) {
+    if (!titleError && !isMissing && !isGated && !isLoading) {
       return null;
     }
 
     const fallback = titleError ? (
       <MissingContent onRetry={onRetryTitle} />
+    ) : isGated ? (
+      <GatedContent isSignedIn={canSave} />
     ) : isMissing ? (
       <MissingContent />
     ) : (

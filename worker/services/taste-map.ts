@@ -1,3 +1,4 @@
+import type { ViewerAccess } from "../../src/domain/access.ts";
 import type { MediaTitle, MediaType } from "../../src/domain/catalog.ts";
 import { ratingSources } from "../../src/domain/ratings.ts";
 import { readCachedValue, writeCachedValue } from "../lib/cache.ts";
@@ -296,6 +297,7 @@ function shelfSignature(entries: ViewingContext[]) {
 export async function buildTasteMap(
   env: Bindings,
   viewerId: string,
+  access: ViewerAccess,
   options: { schedule?: (task: Promise<unknown>) => void } = {},
 ): Promise<TasteMap> {
   const entries = await readViewerEntries(env.DB, viewerId);
@@ -344,6 +346,7 @@ export async function buildTasteMap(
   const titles = await readItems(
     env.DB,
     found.map((entry) => entry.titleId),
+    access,
     found.length,
   );
   const byTitleId = new Map(titles.map((title) => [title.id, title]));

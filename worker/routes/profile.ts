@@ -18,6 +18,7 @@ import {
   updateProfile,
   updateProviderPreferences,
 } from "../services/profile.ts";
+import { viewerAccess } from "../services/viewer/access.ts";
 import type { Bindings } from "../types.ts";
 import { profileEntryResponse } from "./profile-entry-response.ts";
 
@@ -56,14 +57,19 @@ profileRoutes.get("/shelf", async (context) => {
   const sortParam = context.req.query("sort");
 
   try {
-    const shelf = await getShelf(context.env.DB, user.id, {
-      status: shelfStatus(context.req.query("status")),
-      genre: queryText(context, "genre", GENRE_LIMIT) || null,
-      query: queryText(context, "q", QUERY_LIMIT),
-      sort: isShelfSort(sortParam) ? sortParam : "added",
-      page: queryInteger(context, "page", 0, 0, MAX_SHELF_PAGE),
-      pageSize: SHELF_PAGE_SIZE,
-    });
+    const shelf = await getShelf(
+      context.env.DB,
+      user.id,
+      {
+        status: shelfStatus(context.req.query("status")),
+        genre: queryText(context, "genre", GENRE_LIMIT) || null,
+        query: queryText(context, "q", QUERY_LIMIT),
+        sort: isShelfSort(sortParam) ? sortParam : "added",
+        page: queryInteger(context, "page", 0, 0, MAX_SHELF_PAGE),
+        pageSize: SHELF_PAGE_SIZE,
+      },
+      await viewerAccess(context.env, context.req.raw),
+    );
 
     context.header("cache-control", "private, no-store");
 

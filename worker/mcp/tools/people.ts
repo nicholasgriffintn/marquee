@@ -43,7 +43,7 @@ export const peopleTools: readonly McpTool[] = [
       },
       required: ["person", "results"],
     },
-    async run({ env }, input) {
+    async run({ env, access }, input) {
       const wanted = wantedName(input.name);
       const person = wanted ? await readPerson(env.DB, wanted) : null;
 
@@ -60,7 +60,7 @@ export const peopleTools: readonly McpTool[] = [
       return answer({
         person: person.name,
         credits: person.titles,
-        results: summarise(await readItems(env.DB, ids, limit)),
+        results: summarise(await readItems(env.DB, ids, access, limit)),
       });
     },
   },

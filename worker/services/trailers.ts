@@ -1,3 +1,4 @@
+import { accessTier, type ViewerAccess } from "../../src/domain/access.ts";
 import type { TrailerCard, TrailerSort } from "../../src/domain/trailers.ts";
 import { parseDatabaseDate } from "../../src/lib/dates.ts";
 import {
@@ -113,11 +114,17 @@ export async function syncTrailers(env: Bindings) {
   });
 }
 
-async function buildTrailers(env: Bindings, sort: TrailerSort, limit: number) {
+async function buildTrailers(
+  env: Bindings,
+  sort: TrailerSort,
+  limit: number,
+  access: ViewerAccess,
+) {
   const rows = await readRecentTrailers(env.DB, sort, limit);
   const items = await readItems(
     env.DB,
     rows.map((row) => row.titleId),
+    access,
     limit,
   );
   const byId = new Map(items.map((item) => [item.id, item]));
@@ -141,8 +148,16 @@ async function buildTrailers(env: Bindings, sort: TrailerSort, limit: number) {
   });
 }
 
-export function getLatestTrailers(env: Bindings, sort: TrailerSort, limit: number) {
-  return withKvCache(env, `catalog-trailers-${sort}-${limit}`, TRAILERS_CACHE_SECONDS, () =>
-    buildTrailers(env, sort, limit),
+export function getLatestTrailers(
+  env: Bindings,
+  sort: TrailerSort,
+  limit: number,
+  access: ViewerAccess,
+) {
+  return withKvCache(
+    env,
+    `catalog-trailers-${sort}-${limit}-${accessTier(access)}`,
+    TRAILERS_CACHE_SECONDS,
+    () => buildTrailers(env, sort, limit, access),
   );
 }

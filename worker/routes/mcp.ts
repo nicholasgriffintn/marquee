@@ -23,6 +23,7 @@ import {
   type ToolOutcome,
   toolsWithin,
 } from "../mcp/registry.ts";
+import { readViewerAccess } from "../services/viewer/access.ts";
 import type { Bindings } from "../types.ts";
 
 export const mcpRoutes = new Hono<{ Bindings: Bindings }>();
@@ -128,6 +129,7 @@ mcpRoutes.all("/", async (context) => {
           env: context.env,
           user: identity.user,
           origin: canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN),
+          access: await readViewerAccess(context.env.DB, identity.user.id),
         },
         identity.scopes,
         name,

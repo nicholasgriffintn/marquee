@@ -40,11 +40,12 @@ export const shelfTools: readonly McpTool[] = [
       properties: { entries: { type: "array", items: SHELF_ENTRY_SCHEMA } },
       required: ["entries"],
     },
-    async run({ env, user }) {
+    async run({ env, user, access }) {
       const entries = await readViewerEntries(env.DB, user.id);
       const titles = await readItems(
         env.DB,
         entries.map((entry) => entry.titleId),
+        access,
         SHELF_PAGE,
       );
       const byId = new Map(titles.map((title) => [title.id, title]));
@@ -105,7 +106,7 @@ export const shelfTools: readonly McpTool[] = [
       },
       required: ["applied"],
     },
-    async run({ env, user }, input) {
+    async run({ env, user, access }, input) {
       if (!isKnownTitle(input.titleId)) {
         return refuse("titleId must look like movie:550");
       }
@@ -115,7 +116,7 @@ export const shelfTools: readonly McpTool[] = [
       }
 
       if (input.confirm !== true) {
-        const [title] = await readItems(env.DB, [input.titleId]);
+        const [title] = await readItems(env.DB, [input.titleId], access);
         const existing = await getViewingEntry(env.DB, user.id, input.titleId);
 
         return awaitingApproval({

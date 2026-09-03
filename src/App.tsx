@@ -411,6 +411,7 @@ export function App() {
         onUsherDismiss={(scope) => void usher.dismiss(scope)}
         title={openDetails.title}
         isMissing={openDetails.isMissing}
+        isGated={openDetails.isGated}
         isLoading={openDetails.isLoading}
         titleError={openDetails.error}
         canSave={isSignedIn}

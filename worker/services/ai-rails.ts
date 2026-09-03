@@ -1,3 +1,4 @@
+import type { ViewerAccess } from "../../src/domain/access.ts";
 import type { MediaTitle } from "../../src/domain/catalog.ts";
 import { titleHasPreferredAudioLanguage } from "../../src/domain/languages.ts";
 import type { DeliveredRail } from "../../src/domain/rails.ts";
@@ -593,11 +594,13 @@ export async function hydrateRails(
   generationId: string,
   preferredLanguage: string,
   providerIds: string[],
+  access: ViewerAccess,
 ): Promise<DeliveredRail[]> {
   const titles = (
     await readSummaryItems(
       env.DB,
       rails.flatMap((rail) => rail.titleIds),
+      access,
       RAIL_LIMIT * RAIL_MAX,
     )
   ).filter((title) => titleHasPreferredAudioLanguage(title, [preferredLanguage], providerIds));

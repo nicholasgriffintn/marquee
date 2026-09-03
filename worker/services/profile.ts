@@ -1,3 +1,4 @@
+import type { ViewerAccess } from "../../src/domain/access.ts";
 import type { ShelfResponse } from "../../src/domain/shelf.ts";
 import { isEntryStatus, isKnownTitle, validProviderIds } from "../lib/validation.ts";
 import { deleteProfileDataInTransaction } from "../repositories/profile-removal.ts";
@@ -43,9 +44,10 @@ export async function getShelf(
   db: Database,
   viewerId: string,
   query: ShelfPageQuery,
+  access: ViewerAccess,
 ): Promise<ShelfResponse> {
   const [page, genres, lost] = await Promise.all([
-    readShelfPage(db, viewerId, query),
+    readShelfPage(db, viewerId, query, access),
     query.page === 0 ? readShelfGenres(db, viewerId) : Promise.resolve([]),
     query.page === 0
       ? readLostProperty(db, viewerId, LOST_AFTER_DAYS, LOST_LIMIT)

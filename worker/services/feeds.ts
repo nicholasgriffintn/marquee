@@ -1,3 +1,4 @@
+import type { ViewerAccess } from "../../src/domain/access.ts";
 import { titlePath, type MediaTitle } from "../../src/domain/catalog.ts";
 import { buildAtom, type FeedEntry } from "../lib/atom.ts";
 import { buildCalendar, type CalendarEvent } from "../lib/ical.ts";
@@ -183,7 +184,7 @@ function announcedEvent(episode: UpcomingEpisode, title: MediaTitle, origin: str
   } satisfies CalendarEvent;
 }
 
-async function collectDiary(env: Bindings, viewerId: string) {
+async function collectDiary(env: Bindings, viewerId: string, access: ViewerAccess) {
   const [episodes, releases, announced] = await Promise.all([
     readEpisodes(env, viewerId).catch((error: unknown): EpisodeRow[] => {
       logError("feed_episodes_failed", error, { viewerId });
@@ -231,6 +232,7 @@ async function collectDiary(env: Bindings, viewerId: string) {
       ...releases.map((row) => row.titleId),
       ...announced.map((episode) => episode.titleId),
     ],
+    access,
     EPISODE_LIMIT + RELEASE_LIMIT,
   );
   const byId = new Map(titles.map((title) => [title.id, title]));
@@ -243,8 +245,13 @@ async function collectDiary(env: Bindings, viewerId: string) {
   };
 }
 
-export async function readWeekAhead(env: Bindings, viewerId: string, days = 7) {
-  const { episodes, announced, releases, byId } = await collectDiary(env, viewerId);
+export async function readWeekAhead(
+  env: Bindings,
+  viewerId: string,
+  access: ViewerAccess,
+  days = 7,
+) {
+  const { episodes, announced, releases, byId } = await collectDiary(env, viewerId, access);
   const horizon = new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
   const timed = episodes
     .filter((row) => row.airsAt.slice(0, 10) <= horizon)
@@ -291,9 +298,14 @@ export async function readWeekAhead(env: Bindings, viewerId: string, days = 7) {
   );
 }
 
-export async function buildDiaryCalendar(env: Bindings, viewerId: string, origin: string) {
+export async function buildDiaryCalendar(
+  env: Bindings,
+  viewerId: string,
+  origin: string,
+  access: ViewerAccess,
+) {
   const host = new URL(origin).hostname;
-  const { episodes, announced, releases, byId } = await collectDiary(env, viewerId);
+  const { episodes, announced, releases, byId } = await collectDiary(env, viewerId, access);
   const events = [
     ...episodes.flatMap((row) => {
       const event = episodeEvent(row, byId.get(row.titleId), origin, host);
@@ -383,6 +395,7 @@ export async function buildAlertFeed(
   viewerId: string,
   origin: string,
   selfUrl: string,
+  access: ViewerAccess,
 ) {
   const [alerts, digest] = await Promise.all([
     recentAlerts(env.DB, viewerId),
@@ -395,6 +408,7 @@ export async function buildAlertFeed(
   const titles = await readItems(
     env.DB,
     alerts.flatMap((alert) => (alert.titleId ? [alert.titleId] : [])),
+    access,
     100,
   );
   const entries = [
