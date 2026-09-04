@@ -182,7 +182,7 @@ export async function getFeaturedTitle(
     ],
     eligibilityFor(viewer, {
       availability: "confirmed-or-unknown",
-      exclude: viewer.entries.map((entry) => entry.titleId),
+      exclude: viewer.shelved,
     }),
   );
   const featured = chooseFeatured(candidates, viewerId ?? "front-of-house", now);

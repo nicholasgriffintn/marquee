@@ -2,7 +2,11 @@ import { accessFor } from "../../../src/domain/access.ts";
 import { barredCertifications } from "../../../src/domain/certification.ts";
 import { validProviderIds } from "../../lib/validation.ts";
 import { readRefusals } from "../../repositories/signals.ts";
-import { readViewerEntries } from "../../repositories/viewer-context.ts";
+import {
+  readShelfStatuses,
+  readViewerEntries,
+  type ShelfStatus,
+} from "../../repositories/viewer-context.ts";
 import type { Bindings, ViewingContext } from "../../types.ts";
 import { NO_PREFERENCES, readViewerPreferences, type ViewerPreferences } from "../usher.ts";
 import type { AvailabilityRule, Eligibility } from "./eligibility.ts";
@@ -14,6 +18,7 @@ export type ViewerState = {
   preferences: ViewerPreferences;
   never: string[];
   rejected: string[];
+  shelved: string[];
   finished: string[];
 };
 
@@ -31,11 +36,12 @@ const NO_STATE: Omit<ViewerState, "viewerId" | "providerIds"> = {
   preferences: NO_PREFERENCES,
   never: [],
   rejected: [],
+  shelved: [],
   finished: [],
 };
 
-function finishedIds(entries: ViewingContext[]) {
-  return entries
+export function finishedTitleIds(shelf: ShelfStatus[]) {
+  return shelf
     .filter((entry) => entry.status === "watched" || entry.status === "dropped")
     .map((entry) => entry.titleId);
 }
@@ -51,8 +57,9 @@ export async function readViewerState(
     return { ...NO_STATE, viewerId, providerIds: requested };
   }
 
-  const [entries, preferences, refusals] = await Promise.all([
+  const [entries, shelf, preferences, refusals] = await Promise.all([
     readViewerEntries(env.DB, viewerId),
+    readShelfStatuses(env.DB, viewerId),
     readViewerPreferences(env.DB, viewerId),
     readRefusals(env.DB, viewerId),
   ]);
@@ -64,7 +71,8 @@ export async function readViewerState(
     preferences,
     never: refusals.never,
     rejected: refusals.rejected,
-    finished: finishedIds(entries),
+    shelved: shelf.map((entry) => entry.titleId),
+    finished: finishedTitleIds(shelf),
   };
 }
 

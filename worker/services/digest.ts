@@ -173,9 +173,7 @@ export async function buildDigest(env: Bindings, viewerId: string) {
   const { vector, eligibility, affinity } = await prepareRails(env, viewer);
   const digestEligibility: Eligibility = {
     ...eligibility,
-    excludeIds: [
-      ...new Set([...eligibility.excludeIds, ...viewer.entries.map((entry) => entry.titleId)]),
-    ],
+    excludeIds: [...new Set([...eligibility.excludeIds, ...viewer.shelved])],
   };
   const [fresh, trending, episodes, numbers, lead] = await Promise.all([
     freshForViewer(env, vector, digestEligibility, affinity.genres).catch(
