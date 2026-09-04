@@ -4,27 +4,27 @@
   border-top: 1px solid var(--paper-line);
   color: var(--ink);
   display: flex;
-  gap: var(--space-6);
+  flex-wrap: wrap;
+  gap: var(--space-4) var(--space-6);
   margin-top: auto;
   padding: var(--space-6) var(--gutter);
 }
 
+/* A basis rather than 0 keeps the credits readable instead of collapsing to
+   whatever the navigation columns leave behind. */
 .creditsWrapper {
-  flex: 1;
+  flex: 1 1 340px;
+  min-width: 0;
 }
 
 .legal,
 .browse {
   display: flex;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   flex-wrap: wrap;
   font: var(--type-label-sm) var(--mono);
   gap: var(--space-3);
   text-transform: uppercase;
-}
-
-.browse {
-  max-width: 260px;
 }
 
 .egg {

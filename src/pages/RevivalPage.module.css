@@ -103,6 +103,19 @@
   margin-bottom: var(--space-3);
 }
 
+.noteLink {
+  color: var(--white);
+  text-decoration: underline;
+  text-decoration-color: var(--panel-line);
+  text-underline-offset: 4px;
+}
+
+.noteLink:hover,
+.noteLink:focus-visible {
+  color: var(--acid);
+  text-decoration-color: currentcolor;
+}
+
 @media (max-width: 700px) {
   .billList a,
   .billRow {

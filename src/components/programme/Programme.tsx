@@ -62,11 +62,20 @@ export function ProgrammeMasthead({
   );
 }
 
-export function ProgrammeHeading({ children }: { children: ReactNode }) {
+export function ProgrammeHeading({
+  action,
+  children,
+}: {
+  action?: ReactNode;
+  children: ReactNode;
+}) {
   return (
-    <Heading level={2} size="label" tone="accent" className={styles.heading}>
-      {children}
-    </Heading>
+    <div className={styles.headingRow}>
+      <Heading level={2} size="label" tone="accent" className={styles.heading}>
+        {children}
+      </Heading>
+      {action}
+    </div>
   );
 }
 

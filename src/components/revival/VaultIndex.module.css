@@ -44,5 +44,29 @@
 }
 
 .term {
+  border: 1px solid var(--panel-line);
+  color: inherit;
+  display: grid;
+  gap: 6px;
   margin-top: var(--space-5);
+  padding: var(--space-3) var(--space-4);
+}
+
+.term:hover,
+.term:focus-visible {
+  background: var(--panel-tile);
+  border-color: var(--acid);
+}
+
+.termEyebrow {
+  color: var(--acid);
+  font: var(--type-label) var(--mono);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.termLine {
+  color: var(--white);
+  font-family: var(--serif);
+  font-size: var(--type-compact);
 }

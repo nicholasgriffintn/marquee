@@ -275,7 +275,9 @@ export function RevivalPage({ isReady, isSignedIn }: { isReady: boolean; isSigne
                   day, and we argue about it afterwards.
                 </Text>
                 <Text size="sm" leading="relaxed">
-                  <Link to={REVIVAL_TERM_PATH}>The long version, with worked examples.</Link>
+                  <Link className={styles.noteLink} to={REVIVAL_TERM_PATH}>
+                    The long version, with worked examples
+                  </Link>
                 </Text>
               </div>
             </>

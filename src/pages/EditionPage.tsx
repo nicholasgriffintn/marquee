@@ -73,15 +73,18 @@ export function EditionPage({ onOpen }: { onOpen: (item: MediaTitle) => void }) 
 
           {issue.arrivals.map((entry) => (
             <ErrorBoundary key={entry.provider.id} label={`New on ${entry.provider.name}`}>
-              <div className={styles.rowHead}>
-                <ProgrammeHeading>New on {entry.provider.name}</ProgrammeHeading>
-                <Link
-                  className={styles.rowLink}
-                  to={listingPath(null, { providers: entry.provider.id })}
-                >
-                  Everything on {entry.provider.name}
-                </Link>
-              </div>
+              <ProgrammeHeading
+                action={
+                  <Link
+                    className={styles.rowLink}
+                    to={listingPath(null, { providers: entry.provider.id })}
+                  >
+                    Everything on {entry.provider.name}
+                  </Link>
+                }
+              >
+                New on {entry.provider.name}
+              </ProgrammeHeading>
               <ResultsGrid>
                 {entry.items.map((item) => (
                   <TitleCard key={item.id} item={item} onOpen={onOpen} />

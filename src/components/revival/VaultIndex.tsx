@@ -7,7 +7,7 @@ import {
   type RevivalGroup,
   type RevivalHubs,
 } from "../../domain/revival";
-import { Eyebrow, Heading, Text } from "../../ui";
+import { Eyebrow, Heading } from "../../ui";
 
 import styles from "./VaultIndex.module.css";
 
@@ -73,9 +73,10 @@ export function VaultIndex({
           </div>
         ))}
       </div>
-      <Text size="sm" tone="muted" className={styles.term}>
-        <Link to={REVIVAL_TERM_PATH}>Why a print can be free here and not there.</Link>
-      </Text>
+      <Link className={styles.term} to={REVIVAL_TERM_PATH}>
+        <span className={styles.termEyebrow}>The fine print</span>
+        <span className={styles.termLine}>Why a print can be free here and not there</span>
+      </Link>
     </section>
   );
 }

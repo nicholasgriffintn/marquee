@@ -5,27 +5,20 @@
   padding-top: var(--space-5);
 }
 
-.rowHead {
-  align-items: baseline;
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2) var(--space-4);
-  justify-content: space-between;
-}
-
-.rowHead > :first-child {
-  flex: 1 1 auto;
-}
-
 .rowLink {
   color: var(--muted);
   font: var(--type-label-sm) var(--mono);
   letter-spacing: var(--tracking-label);
+  text-decoration: underline;
+  text-decoration-color: var(--panel-line);
   text-transform: uppercase;
+  text-underline-offset: 4px;
 }
 
-.rowLink:hover {
-  color: var(--white);
+.rowLink:hover,
+.rowLink:focus-visible {
+  color: var(--acid);
+  text-decoration-color: currentcolor;
 }
 
 .issues {

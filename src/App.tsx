@@ -24,6 +24,7 @@ import { usePinned } from "./hooks/usePinned";
 import { useProfile } from "./hooks/useProfile";
 import { useProviderPreferences } from "./hooks/useProviderPreferences";
 import { useRails } from "./hooks/useRails";
+import { useScrollToTop } from "./hooks/useScrollToTop";
 import { useSearch } from "./hooks/useSearch";
 import { useSession } from "./hooks/useSession";
 import { useTitle } from "./hooks/useTitle";
@@ -180,10 +181,7 @@ export function App() {
   const pageLocation = background ?? location;
   const pagePath = pageLocation.pathname;
 
-  useEffect(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
-    // oxlint-disable-next-line exhaustive-effect-dependencies -- rerun on navigation
-  }, [pagePath]);
+  useScrollToTop(`${pagePath}${pageLocation.search}`);
 
   const openTitleId = routedTitleId || (legacyMatch?.params.titleId ?? "");
   const knownTitles = useMemo(
