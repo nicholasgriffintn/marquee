@@ -7,7 +7,6 @@ import type {
   RevivalScreening,
   RevivalShelf,
   RevivalShelvesResponse,
-  RevivalWork,
 } from "../domain/revival";
 import { jsonMutation, mutateJson, queryJson } from "../lib/query-client";
 import { useResource } from "./useResource";
@@ -15,7 +14,6 @@ import { useResource } from "./useResource";
 const NO_BILL: RevivalBillSlot[] = [];
 const NO_SHELVES: RevivalShelf[] = [];
 const NO_CARDS: RevivalCard[] = [];
-const NO_WORKS: RevivalWork[] = [];
 
 export function useVaultTotal(isReady: boolean) {
   const { data } = useResource<{ total: number }>("/api/revival/vault", { enabled: isReady });
@@ -60,14 +58,6 @@ export function useScreening(workId: string | undefined) {
     error: status === 403 ? error : error && "Nothing showing under that name",
     isGated: status === 403,
   };
-}
-
-export function useTitleReels(titleId: string, mediaType: string, tmdbId: number) {
-  const { data } = useResource<{ works: RevivalWork[] }>(
-    titleId ? `/api/revival/titles/${mediaType}/${tmdbId}` : null,
-  );
-
-  return data?.works ?? NO_WORKS;
 }
 
 const SEARCH_DEBOUNCE_MS = 250;

@@ -6,7 +6,6 @@ import { sessionPrincipal } from "../auth/session.ts";
 import { edgeCache } from "../lib/cache.ts";
 import { readJsonObject } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
-import { isKnownTitle } from "../lib/validation.ts";
 import {
   countApproved,
   countSearch,
@@ -14,7 +13,6 @@ import {
   readShelfPage,
   readVaultPage,
   isRevivalId,
-  readWorksForTitle,
   saveProgress,
   searchApproved,
 } from "../repositories/revival.ts";
@@ -180,33 +178,6 @@ revivalRoutes.get("/shelf/:id", edgeCache(300, { byAccess: true }), async (conte
     return context.json({ id, works: [], page, pageSize: PAGE_SIZE, total: 0, hasMore: false });
   }
 });
-
-revivalRoutes.get(
-  "/titles/:mediaType/:tmdbId",
-  edgeCache(900, { byAccess: true }),
-  async (context) => {
-    const titleId = `${context.req.param("mediaType")}:${context.req.param("tmdbId")}`;
-
-    if (!isKnownTitle(titleId)) {
-      return context.json({ works: [] });
-    }
-
-    try {
-      context.header("cache-control", "public, max-age=900");
-
-      const [works, access] = await Promise.all([
-        readWorksForTitle(context.env.DB, titleId),
-        viewerAccess(context.env, context.req.raw),
-      ]);
-
-      return context.json({ works: admitted(works, access) });
-    } catch (error) {
-      logError("revival_title_failed", error, { area: "revival", titleId });
-
-      return context.json({ works: [] });
-    }
-  },
-);
 
 revivalRoutes.get("/:workId", async (context) => {
   const workId = context.req.param("workId");

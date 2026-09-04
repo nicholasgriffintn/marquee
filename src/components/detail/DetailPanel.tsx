@@ -10,7 +10,6 @@ import { useAvailability } from "../../hooks/useAvailability";
 import { useCollection } from "../../hooks/useCollection";
 import { useJourneyOpen } from "../../hooks/useJourneyOpen";
 import { useRecommendations } from "../../hooks/useRecommendations";
-import { useTitleReels } from "../../hooks/useRevival";
 import { useEpisodeEntries, useSeasons } from "../../hooks/useSeasons";
 import { useShowings } from "../../hooks/useShowings";
 import { useTitleInsight } from "../../hooks/useTitleInsight";
@@ -36,7 +35,6 @@ import {
 import { ShowingsBlock } from "../cinema/ShowingsBlock";
 import { ErrorBoundary } from "../ErrorBoundary";
 import { Poster } from "../Poster";
-import { RevivalBlock } from "../revival/RevivalBlock";
 import { SeasonsBlock } from "../seasons";
 import { ShelfForm } from "../ShelfForm";
 import { TrailerBlock } from "../TrailerBlock";
@@ -150,7 +148,7 @@ export function DetailPanel({
   const similar = useRecommendations(item.id, item.recommendationIds, SIMILAR_LIMIT);
   const malSimilar = useAnimeRecommendations(item);
   const showings = useShowings(item, canSave);
-  const reels = useTitleReels(item.id, item.mediaType, item.tmdbId);
+
   const collection = useCollection(item.collection?.id);
   const adaptations = useAdaptations(item.id);
   const spokenIn = languageLabel(item.originalLanguage);
@@ -327,7 +325,6 @@ export function DetailPanel({
               providers={watchProviders}
               fallbackHref={item.watchLink}
               selectedProviderIds={selectedProviderIds}
-              hideIfEmpty={reels.length > 0}
               isRefreshing={isRefreshing}
               onLeave={leaveVia}
             />
@@ -414,9 +411,7 @@ export function DetailPanel({
             currentId={item.id}
             onOpen={onOpen}
           />
-          <ErrorBoundary label="The revival house">
-            <RevivalBlock works={reels} />
-          </ErrorBoundary>
+
           <ErrorBoundary label="Local showings">
             <ShowingsBlock
               listings={showings.listings}

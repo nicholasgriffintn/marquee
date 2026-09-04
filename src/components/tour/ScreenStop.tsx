@@ -1,15 +1,23 @@
 import { bestPrint, RIGHTS_LABELS, runtimeLabel, SOURCE_LABELS } from "../../domain/revival";
 import { useBill, useScreening } from "../../hooks/useRevival";
+import { useRevivalGate } from "../../hooks/useRevivalGate";
 import { Callout, Fact, FactList, Skeleton, TextLink } from "../../ui";
 import { ReelPlayer } from "../revival/ReelPlayer";
+import { RevivalGate } from "../revival/RevivalGate";
 
 import styles from "./ScreenStop.module.css";
 
 export function ScreenStop({ isActive, isSignedIn }: { isActive: boolean; isSignedIn: boolean }) {
-  const { bill, error, isLoading } = useBill(isActive);
+  const gate = useRevivalGate();
+  const isOpen = isActive && gate.accepted;
+  const { bill, error, isLoading } = useBill(isOpen);
   const workId = bestPrint(bill.map((slot) => slot.work))?.id;
-  const screening = useScreening(isActive ? workId : undefined);
+  const screening = useScreening(isOpen ? workId : undefined);
   const work = screening.screening?.work;
+
+  if (!gate.accepted) {
+    return <RevivalGate onAccept={gate.accept} />;
+  }
 
   if (error || screening.error) {
     return <Callout>{error || screening.error}</Callout>;

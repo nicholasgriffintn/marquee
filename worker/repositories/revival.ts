@@ -708,19 +708,6 @@ export async function readWork(db: Database, id: string) {
   return work ?? null;
 }
 
-export async function readWorksForTitle(db: Database, titleId: string) {
-  const rows = await db.query<WorkRow>(
-    `SELECT ${WORK_COLUMNS}
-       ${WORK_FROM}
-       WHERE w.title_id = $1 AND w.status = 'approved'
-       ORDER BY w.mirror_state = 'mirrored' DESC, w.runtime_seconds DESC
-       LIMIT 4`,
-    [titleId],
-  );
-
-  return attachTags(db, rows.rows.map(toWork));
-}
-
 export type ReelTarget = {
   id: string;
   streamUrl: string;

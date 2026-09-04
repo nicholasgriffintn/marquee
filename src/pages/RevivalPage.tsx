@@ -5,6 +5,7 @@ import { ErrorBoundary } from "../components/ErrorBoundary";
 import { Rail, RailEmpty, RailHeading, RailTrack } from "../components/rail/Rail";
 import { ProjectionNote } from "../components/revival/ProjectionNote";
 import { ReelCard } from "../components/revival/ReelCard";
+import { RevivalGate } from "../components/revival/RevivalGate";
 import { SearchField } from "../components/SearchField";
 import { UsherMark } from "../components/usher/UsherMark";
 import { revivalPath, workMeta, type RevivalBillSlot, type RevivalShelf } from "../domain/revival";
@@ -16,6 +17,7 @@ import {
   useVaultSearch,
   useVaultTotal,
 } from "../hooks/useRevival";
+import { useRevivalGate } from "../hooks/useRevivalGate";
 import {
   ButtonLink,
   Callout,
@@ -125,13 +127,27 @@ function ShelvesSkeleton() {
 }
 
 export function RevivalPage({ isReady, isSignedIn }: { isReady: boolean; isSignedIn: boolean }) {
-  const total = useVaultTotal(isReady);
-  const bill = useBill(isReady);
-  const shelves = useShelves(isReady);
-  const resuming = useResumeShelf(isReady && isSignedIn);
+  const gate = useRevivalGate();
+  const isOpen = isReady && gate.accepted;
+  const total = useVaultTotal(isOpen);
+  const bill = useBill(isOpen);
+  const shelves = useShelves(isOpen);
+  const resuming = useResumeShelf(isOpen && isSignedIn);
   const [query, setQuery] = useState("");
-  const search = useVaultSearch(query);
+  const search = useVaultSearch(gate.accepted ? query : "");
   const error = bill.error || shelves.error;
+
+  if (!gate.accepted) {
+    return (
+      <Page>
+        <PageHeader
+          heading="The revival house"
+          description="The small screen at the back. When the building came down, the sign went in a skip and this did not."
+        />
+        <RevivalGate onAccept={gate.accept} />
+      </Page>
+    );
+  }
 
   return (
     <Page>

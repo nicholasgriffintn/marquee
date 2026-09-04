@@ -4,6 +4,7 @@ import { ErrorBoundary } from "../components/ErrorBoundary";
 import { Rail, RailHeading, RailTrack } from "../components/rail/Rail";
 import { ReelCard } from "../components/revival/ReelCard";
 import { ReelPlayer } from "../components/revival/ReelPlayer";
+import { RevivalGate } from "../components/revival/RevivalGate";
 import { UsherMark } from "../components/usher/UsherMark";
 import {
   CONDITION_LABELS,
@@ -18,6 +19,7 @@ import {
   workMeta,
 } from "../domain/revival";
 import { useScreening } from "../hooks/useRevival";
+import { useRevivalGate } from "../hooks/useRevivalGate";
 import {
   ButtonLink,
   Callout,
@@ -36,7 +38,17 @@ import styles from "./RevivalScreenPage.module.css";
 
 export function RevivalScreenPage({ isSignedIn }: { isSignedIn: boolean }) {
   const { workId } = useParams();
-  const { screening, isLoading, error, isGated } = useScreening(workId);
+  const gate = useRevivalGate();
+  const { screening, isLoading, error, isGated } = useScreening(gate.accepted ? workId : undefined);
+
+  if (!gate.accepted) {
+    return (
+      <Page>
+        <PageHeader heading="The revival house" description="The small screen at the back." />
+        <RevivalGate onAccept={gate.accept} />
+      </Page>
+    );
+  }
 
   if (isLoading) {
     return (

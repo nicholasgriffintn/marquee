@@ -8,6 +8,7 @@ import {
 } from "react";
 
 import { focusableElements } from "../../lib/focus";
+import { readStoredFlag, writeStoredFlag } from "../../lib/storage";
 import { Button, Cluster, Heading, Text } from "../../ui";
 import { UsherMark } from "./UsherMark";
 
@@ -38,19 +39,11 @@ const LINES: Record<ExitKind, (label: string) => string> = {
 };
 
 export function shouldWarnOnExit() {
-  try {
-    return window.localStorage.getItem(SKIP_KEY) !== "1";
-  } catch {
-    return true;
-  }
+  return !readStoredFlag(SKIP_KEY);
 }
 
 function rememberSkip() {
-  try {
-    window.localStorage.setItem(SKIP_KEY, "1");
-  } catch {
-    return;
-  }
+  writeStoredFlag(SKIP_KEY);
 }
 
 function hostOf(href: string) {
