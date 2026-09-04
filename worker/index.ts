@@ -164,12 +164,6 @@ app.notFound(async (context) => {
   response.headers.set("referrer-policy", "strict-origin-when-cross-origin");
   response.headers.set("x-content-type-options", "nosniff");
 
-  if ((response.headers.get("content-type") ?? "").includes("text/html")) {
-    response.headers.delete("etag");
-    response.headers.delete("content-length");
-    response.headers.set("cache-control", "public, max-age=0, must-revalidate");
-  }
-
   return response;
 });
 
