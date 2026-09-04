@@ -31,6 +31,7 @@ export type WorkerBindings = DatabaseBinding & {
   GITHUB_CLIENT_SECRET?: string;
   EMAIL?: SendEmail;
   MAIL_FROM?: string;
+  APP_STORE_ID?: string;
   SITE_ORIGIN?: string;
   TMDB_API_TOKEN?: string;
   EUROPEANA_API_KEY?: string;

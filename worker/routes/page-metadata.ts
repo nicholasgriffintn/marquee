@@ -29,6 +29,7 @@ pageMetadataRoutes.get("/", async (context) => {
   }
 
   const card = await cardFor(context.env, url, origin).catch(() => null);
+  const appStoreId = context.env.APP_STORE_ID || null;
 
   context.header("cache-control", "public, max-age=300");
 
@@ -41,8 +42,9 @@ pageMetadataRoutes.get("/", async (context) => {
       image: null,
       ogType: null,
       structuredData: [],
+      appStoreId,
     });
   }
 
-  return context.json(card);
+  return context.json({ ...card, appStoreId });
 });

@@ -13,12 +13,18 @@
   flex: 1;
 }
 
-.legal {
+.legal,
+.browse {
   display: flex;
   flex: 0 0 auto;
+  flex-wrap: wrap;
   font: var(--type-label-sm) var(--mono);
   gap: var(--space-3);
   text-transform: uppercase;
+}
+
+.browse {
+  max-width: 260px;
 }
 
 .egg {

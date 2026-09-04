@@ -15,7 +15,7 @@ const NAV: { to: string; label: string; private: boolean; admin?: boolean }[] = 
   { to: "/trailers", label: "Trailers", private: false },
   { to: "/revival", label: "Revival house", private: false },
   { to: "/shelf", label: "My shelf", private: true },
-  { to: "/this-week", label: "This week", private: true },
+  { to: "/this-week", label: "This week", private: false },
   { to: "/notebook", label: "Notebook", private: true },
   { to: "/admin", label: "Admin", private: true, admin: true },
 ];

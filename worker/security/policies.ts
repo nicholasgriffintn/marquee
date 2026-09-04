@@ -81,6 +81,11 @@ export const POLICIES = {
     member: { limiter: "MEDIA_RATE_LIMITER", message: STEADY_ON },
     bots: "crawlers",
   },
+  card: {
+    anonymous: { limiter: "MEDIA_RATE_LIMITER", message: STEADY_ON },
+    member: { limiter: "MEDIA_RATE_LIMITER", message: STEADY_ON },
+    bots: "open",
+  },
   reel: {
     anonymous: { limiter: "REEL_RATE_LIMITER", message: STEADY_ON },
     member: { limiter: "REEL_RATE_LIMITER", message: STEADY_ON },
@@ -147,6 +152,7 @@ export const RULES: readonly Rule[] = [
   { path: "/mcp", policy: "machine" },
   { path: "/mcp/*", policy: "machine" },
   { path: "/media/reel/*", policy: "reel" },
+  { path: "/media/og/*", policy: "card" },
   { path: "/media/*", policy: "media" },
   { path: "/api/*", methods: WRITE_METHODS, policy: "write" },
   { path: "/api/*", policy: "read" },

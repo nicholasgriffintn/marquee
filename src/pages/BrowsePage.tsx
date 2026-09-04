@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 
+import { BrowseIndex } from "../components/BrowseIndex";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { AdvancedFacets, ClearFilters, Facet, FilterBar } from "../components/filters/FilterBar";
 import { ProviderBadge } from "../components/ProviderBadge";
@@ -10,6 +11,7 @@ import { TitleCard } from "../components/TitleCard";
 import { UsherCard } from "../components/usher/UsherCard";
 import { UsherSearchHit } from "../components/usher/UsherSearchHit";
 import type { MediaTitle, Provider } from "../domain/catalog";
+import { listingCopy } from "../domain/listings";
 import type { UsherMoment } from "../domain/usher";
 import { useBrowse, useFilmingPlaces, useGenres, useKeywords } from "../hooks/useBrowse";
 import { Chip, EmptyState, Page, PageHeader } from "../ui";
@@ -123,6 +125,21 @@ export function BrowsePage({
     sort !== preset.sort;
   const isEmpty = !browse.isLoading && browse.items.length === 0;
   const foundNothing = isEmpty && trimmedQuery.length > 0 && !browse.error;
+  const facetProvider =
+    selectedProviders.length === 1
+      ? providers.find((provider) => provider.id === selectedProviders[0])
+      : undefined;
+  const facetCopy =
+    !trimmedQuery &&
+    selectedGenres.length <= 1 &&
+    selectedProviders.length <= 1 &&
+    (selectedGenres.length === 1 || facetProvider)
+      ? listingCopy({
+          type: mediaType || null,
+          genre: selectedGenres[0] ?? null,
+          service: facetProvider?.name ?? null,
+        })
+      : null;
   const pendingCount = browse.items.filter((item) => item.pending).length;
   const resultCount = browse.items.length - pendingCount;
 
@@ -135,7 +152,7 @@ export function BrowsePage({
   return (
     <Page>
       <PageHeader
-        heading={trimmedQuery ? `“${trimmedQuery}”` : preset.title}
+        heading={trimmedQuery ? `“${trimmedQuery}”` : (facetCopy?.heading ?? preset.title)}
         description={
           trimmedQuery
             ? browse.isLoading && browse.items.length === 0
@@ -143,7 +160,7 @@ export function BrowsePage({
               : `${resultCount}${browse.hasMore ? "+" : ""} result${
                   resultCount === 1 ? "" : "s"
                 }${pendingCount ? ` · ${pendingCount} being fetched` : ""}. Narrow it down below.`
-            : preset.description
+            : (facetCopy?.description ?? preset.description)
         }
       />
 
@@ -322,6 +339,8 @@ export function BrowsePage({
       )}
 
       {browse.hasMore && <LoadMore isLoading={browse.isLoading} onClick={browse.loadMore} />}
+
+      <BrowseIndex providers={providers} genres={genres} />
     </Page>
   );
 }

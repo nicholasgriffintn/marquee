@@ -1,0 +1,1 @@
+export const INDEXABLE_POPULARITY = 5;

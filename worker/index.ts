@@ -19,6 +19,7 @@ import { aliasRoutes } from "./routes/aliases.ts";
 import { catalogRoutes } from "./routes/catalog.ts";
 import { cinemaRoutes } from "./routes/cinema.ts";
 import { curatorRoutes } from "./routes/curator.ts";
+import { editionRoutes } from "./routes/editions.ts";
 import { episodeRoutes } from "./routes/episodes.ts";
 import { eventRoutes } from "./routes/events.ts";
 import { feedRoutes } from "./routes/feeds.ts";
@@ -110,6 +111,8 @@ app.route("/api/episodes", episodeRoutes);
 
 app.route("/api/curator", curatorRoutes);
 
+app.route("/api/editions", editionRoutes);
+
 app.route("/api/usher", usherRoutes);
 
 app.route("/api/revival", revivalRoutes);
@@ -133,15 +136,18 @@ app.notFound(async (context) => {
     return context.json({ error: "Not found" }, 404);
   }
 
-  const asset = await context.env.ASSETS.fetch(context.req.raw);
+  const shell = new Request(context.req.url, { headers: { accept: "text/html" } });
+  const asset = await context.env.ASSETS.fetch(shell);
   const origin = canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN);
   const decorated = await withPageMetadata(context.env, asset, new URL(context.req.url), origin);
   const response = new Response(decorated.body, decorated);
-  const scriptSource = import.meta.env.DEV ? "'self' 'unsafe-inline'" : "'self'";
+  const scriptSource = import.meta.env.DEV
+    ? "'self' 'unsafe-inline'"
+    : "'self' https://static.cloudflareinsights.com";
 
   response.headers.set(
     "content-security-policy",
-    `default-src 'self'; style-src 'self' 'unsafe-inline'; script-src ${scriptSource}; img-src 'self' data: https://image.tmdb.org https://www.themoviedb.org https://avatars.githubusercontent.com https://i.ytimg.com https://archive.org https://tile.loc.gov https://api.europeana.eu; media-src 'self' blob: https://archive.org https://*.archive.org https://tile.loc.gov; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; frame-src https://www.youtube-nocookie.com https://www.youtube.com; worker-src 'self' blob:; form-action 'self'`,
+    `default-src 'self'; style-src 'self' 'unsafe-inline'; script-src ${scriptSource}; img-src 'self' data: https://image.tmdb.org https://www.themoviedb.org https://avatars.githubusercontent.com https://i.ytimg.com https://archive.org https://tile.loc.gov https://api.europeana.eu; media-src 'self' blob: https://archive.org https://*.archive.org https://tile.loc.gov; connect-src 'self' https://cloudflareinsights.com; base-uri 'none'; frame-ancestors 'none'; frame-src https://www.youtube-nocookie.com https://www.youtube.com; worker-src 'self' blob:; form-action 'self'`,
   );
   response.headers.set(
     "permissions-policy",
@@ -157,6 +163,12 @@ app.notFound(async (context) => {
   );
   response.headers.set("referrer-policy", "strict-origin-when-cross-origin");
   response.headers.set("x-content-type-options", "nosniff");
+
+  if ((response.headers.get("content-type") ?? "").includes("text/html")) {
+    response.headers.delete("etag");
+    response.headers.delete("content-length");
+    response.headers.set("cache-control", "public, max-age=0, must-revalidate");
+  }
 
   return response;
 });

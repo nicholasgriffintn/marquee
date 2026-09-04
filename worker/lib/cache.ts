@@ -68,6 +68,13 @@ export async function writeKvValue(env: Bindings, key: string, value: unknown, s
   });
 }
 
+export async function listKvKeys(env: Bindings, prefix: string) {
+  const scoped = kvKey(prefix);
+  const listed = await env.CACHE.list({ prefix: scoped });
+
+  return listed.keys.map((entry) => entry.name.slice(scoped.length));
+}
+
 export async function withKvCache<T>(
   env: Bindings,
   key: string,

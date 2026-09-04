@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 
 import { accessTier, admitted, REQUIREMENT_MESSAGES } from "../../src/domain/access.ts";
-import { toCard } from "../../src/domain/revival.ts";
+import { isHubFamily, toCard } from "../../src/domain/revival.ts";
 import { sessionPrincipal } from "../auth/session.ts";
 import { edgeCache } from "../lib/cache.ts";
 import { readJsonObject } from "../lib/http.ts";
@@ -18,15 +18,27 @@ import {
 } from "../repositories/revival.ts";
 import {
   getBill,
+  getHubs,
   getResumeShelf,
   getScreening,
   getShelves,
-  shelfSelector,
+  hubLabel,
+  resolveShelf,
 } from "../services/revival.ts";
 import { viewerAccess } from "../services/viewer/access.ts";
 import type { Bindings } from "../types.ts";
 
 export const revivalRoutes = new Hono<{ Bindings: Bindings }>();
+
+revivalRoutes.get("/hubs", edgeCache(3_600), async (context) => {
+  try {
+    return context.json(await getHubs(context.env));
+  } catch (error) {
+    logError("revival_hubs_failed", error, { area: "revival" });
+
+    return context.json({ decades: [], directors: [], genres: [] });
+  }
+});
 
 revivalRoutes.get("/vault", edgeCache(600), async (context) => {
   try {
@@ -150,22 +162,26 @@ revivalRoutes.get("/browse", edgeCache(300, { byAccess: true }), async (context)
 
 revivalRoutes.get("/shelf/:id", edgeCache(300, { byAccess: true }), async (context) => {
   const id = context.req.param("id");
-  const selector = shelfSelector(id);
+  const selector = await resolveShelf(context.env, id);
   const page = pageParam(context.req.query("page"));
 
   if (!selector) {
     return context.json({ error: "No such shelf" }, 404);
   }
 
+  const family = id.slice(0, Math.max(0, id.indexOf(":")));
+
   try {
-    const [works, total, access] = await Promise.all([
+    const [works, total, access, label] = await Promise.all([
       readShelfPage(context.env.DB, selector, PAGE_SIZE, (page - 1) * PAGE_SIZE),
       countShelf(context.env.DB, selector),
       viewerAccess(context.env, context.req.raw),
+      isHubFamily(family) ? hubLabel(context.env, family, id.slice(family.length + 1)) : null,
     ]);
 
     return context.json({
       id,
+      label,
       works: admitted(works, access).map(toCard),
       page,
       pageSize: PAGE_SIZE,

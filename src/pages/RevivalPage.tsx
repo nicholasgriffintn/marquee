@@ -6,12 +6,20 @@ import { Rail, RailEmpty, RailHeading, RailTrack } from "../components/rail/Rail
 import { ProjectionNote } from "../components/revival/ProjectionNote";
 import { ReelCard } from "../components/revival/ReelCard";
 import { RevivalGate } from "../components/revival/RevivalGate";
+import { VaultIndex } from "../components/revival/VaultIndex";
 import { SearchField } from "../components/SearchField";
 import { UsherMark } from "../components/usher/UsherMark";
-import { revivalPath, workMeta, type RevivalBillSlot, type RevivalShelf } from "../domain/revival";
+import {
+  REVIVAL_TERM_PATH,
+  revivalPath,
+  workMeta,
+  type RevivalBillSlot,
+  type RevivalShelf,
+} from "../domain/revival";
 import { useNearViewport } from "../hooks/useNearViewport";
 import {
   useBill,
+  useHubs,
   useResumeShelf,
   useShelves,
   useVaultSearch,
@@ -132,6 +140,7 @@ export function RevivalPage({ isReady, isSignedIn }: { isReady: boolean; isSigne
   const total = useVaultTotal(isOpen);
   const bill = useBill(isOpen);
   const shelves = useShelves(isOpen);
+  const hubs = useHubs(isOpen);
   const resuming = useResumeShelf(isOpen && isSignedIn);
   const [query, setQuery] = useState("");
   const search = useVaultSearch(gate.accepted ? query : "");
@@ -240,6 +249,8 @@ export function RevivalPage({ isReady, isSignedIn }: { isReady: boolean; isSigne
 
           {shelves.shelves.length > 0 && (
             <>
+              <VaultIndex hubs={hubs} />
+
               <ProjectionNote seed={total} />
 
               <div className={styles.note}>
@@ -259,9 +270,12 @@ export function RevivalPage({ isReady, isSignedIn }: { isReady: boolean; isSigne
                   walked in there yourself. Every print says which of the two it is, and why, on its
                   own page. I would rather tell you where a thing came from than have you wonder.
                 </Text>
-                <Text size="sm" leading="relaxed">
+                <Text size="sm" leading="relaxed" className={styles.noteLine}>
                   If you think something here is on the wrong shelf, say so. It comes down the same
                   day, and we argue about it afterwards.
+                </Text>
+                <Text size="sm" leading="relaxed">
+                  <Link to={REVIVAL_TERM_PATH}>The long version, with worked examples.</Link>
                 </Text>
               </div>
             </>

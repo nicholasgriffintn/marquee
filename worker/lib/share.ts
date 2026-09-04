@@ -1,10 +1,23 @@
 import { NO_ACCESS } from "../../src/domain/access.ts";
 import { collectionPath, titlePath, type MediaTitle } from "../../src/domain/catalog.ts";
-import { revivalPath, runtimeLabel, type RevivalWork } from "../../src/domain/revival.ts";
+import { editionPath, isWeekOf } from "../../src/domain/edition.ts";
+import { listingCopy } from "../../src/domain/listings.ts";
+import {
+  hubPath,
+  hubTitle,
+  isHubFamily,
+  REVIVAL_TERM_PATH,
+  revivalPath,
+  runtimeLabel,
+  type HubFamily,
+  type RevivalWork,
+} from "../../src/domain/revival.ts";
+import { INDEXABLE_POPULARITY } from "../../src/domain/visibility.ts";
 import { sentenceList } from "../../src/lib/string.ts";
 import { readCollectionTitleIds, readItems } from "../repositories/catalog-reader.ts";
 import { readPerson } from "../repositories/people.ts";
-import { readWork } from "../repositories/revival.ts";
+import { countShelf, readWork } from "../repositories/revival.ts";
+import { hubLabel, resolveShelf } from "../services/revival.ts";
 import type { Bindings } from "../types.ts";
 import { withKvCache } from "./cache.ts";
 import { isKnownTitle } from "./validation.ts";
@@ -20,14 +33,9 @@ export type PageCard = {
 };
 
 const CARD_CACHE_SECONDS = 3_600;
+const PROVIDER_NAME_CACHE_SECONDS = 86_400;
 const NAMED_SERVICES = 3;
 const FACET_PARAMS = new Set(["type", "genres", "providers"]);
-
-const LISTING_KINDS: Record<string, { one: string; many: string }> = {
-  movie: { one: "film", many: "films" },
-  tv: { one: "TV series", many: "TV series" },
-  all: { one: "film or TV series", many: "films and TV" },
-};
 
 export const NOINDEX_PATHS = new Set([
   "/search",
@@ -45,9 +53,14 @@ const STATIC_CARDS: Record<string, { title: string; description: string }> = {
       "Search live UK streaming, ask for a recommendation in plain English, and keep a shelf of what you have watched.",
   },
   "/this-week": {
-    title: "This week — new arrivals and returning series · Marquee",
+    title: "This week on UK streaming — new arrivals and returning series · Marquee",
     description:
-      "What lands on your services this week, what comes back, and what the town is reading about. Printed every Monday.",
+      "What landed on Netflix, Prime Video, Disney+, iPlayer and the rest this week, which series are back, and what the town is reading about. Printed every Monday.",
+  },
+  [REVIVAL_TERM_PATH]: {
+    title: "Why a film can be public domain in America and not in Britain · Marquee",
+    description:
+      "UK copyright runs seventy years from the death of the last director, writer or composer, not from the release date. How the revival house checks it, with Nosferatu, The Lost World and Metropolis as the worked examples.",
   },
   "/sources": {
     title: "Where Marquee's data comes from — every service and source · Marquee",
@@ -93,10 +106,6 @@ function absolute(url: string | null, origin: string) {
 
 function ldJson(data: Record<string, unknown>) {
   return JSON.stringify(data).replaceAll("<", "\\u003c");
-}
-
-function capitalise(value: string) {
-  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 function kindLabel(title: MediaTitle) {
@@ -199,7 +208,7 @@ async function titleCard(env: Bindings, titleId: string, origin: string): Promis
     image: `${origin}/media/og/${encodeURIComponent(titleId)}.png`,
     canonical: url,
     ogType: "video.other",
-    index: true,
+    index: title.providers.length > 0 || title.popularity >= INDEXABLE_POPULARITY,
     structuredData: [
       titleStructuredData(title, url, origin),
       breadcrumbs(origin, [
@@ -335,13 +344,76 @@ async function revivalWorkCard(
   };
 }
 
-async function providerName(env: Bindings, providerId: string) {
-  const row = await env.DB.first<{ name: string }>(
-    "SELECT name FROM catalog_title_providers WHERE provider_id = $1 LIMIT 1",
-    [providerId],
-  );
+function providerName(env: Bindings, providerId: string) {
+  return withKvCache(env, `provider-name:${providerId}`, PROVIDER_NAME_CACHE_SECONDS, async () => {
+    const row = await env.DB.first<{ name: string }>(
+      "SELECT name FROM catalog_title_providers WHERE provider_id = $1 LIMIT 1",
+      [providerId],
+    );
 
-  return row?.name ?? null;
+    return row?.name ?? null;
+  });
+}
+
+async function revivalHubCard(
+  env: Bindings,
+  family: HubFamily,
+  slug: string,
+  origin: string,
+): Promise<PageCard | null> {
+  const [selector, label] = await Promise.all([
+    resolveShelf(env, `${family}:${slug}`),
+    hubLabel(env, family, slug),
+  ]);
+
+  if (!selector || !label) {
+    return null;
+  }
+
+  const total = await countShelf(env.DB, selector);
+  const url = `${origin}${hubPath(family, slug)}`;
+  const heading = hubTitle(family, label);
+  const plural = total === 1 ? "film" : "films";
+
+  return {
+    title: `${heading} — free public domain ${plural} to watch online · Marquee`,
+    description: `${total.toLocaleString("en-GB")} out-of-copyright ${plural} ${family === "director" ? `by ${label}` : `from ${heading.toLowerCase()}`}, streaming free in the UK with no account and no advert. Every print carries its provenance.`,
+    image: null,
+    canonical: url,
+    ogType: "website",
+    index: total > 0,
+    structuredData: [
+      breadcrumbs(origin, [
+        { name: "Revival house", item: `${origin}/revival` },
+        { name: heading, item: url },
+      ]),
+    ],
+  };
+}
+
+function editionCard(weekOf: string, origin: string): PageCard {
+  const url = `${origin}${editionPath(weekOf)}`;
+  const printed = new Date(`${weekOf}T00:00:00Z`).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+
+  return {
+    title: `This week on UK streaming, week of ${printed} · Marquee`,
+    description: `What landed on UK streaming services in the week of ${printed}, which series came back, and what the town was reading about.`,
+    image: null,
+    canonical: url,
+    ogType: "article",
+    index: true,
+    structuredData: [
+      breadcrumbs(origin, [
+        { name: "This week", item: `${origin}/this-week` },
+        { name: `Week of ${printed}`, item: url },
+      ]),
+    ],
+  };
 }
 
 function selected(url: URL, key: string) {
@@ -357,7 +429,6 @@ async function listingsCard(env: Bindings, url: URL, origin: string): Promise<Pa
   const genres = selected(url, "genres");
   const providers = selected(url, "providers");
   const extras = [...url.searchParams.keys()].filter((key) => !FACET_PARAMS.has(key));
-  const kind = LISTING_KINDS[type === "movie" || type === "tv" ? type : "all"];
   const genre = genres.length === 1 ? genres[0] : null;
   const service = providers.length === 1 ? await providerName(env, providers[0]) : null;
   const isFacet =
@@ -378,20 +449,20 @@ async function listingsCard(env: Bindings, url: URL, origin: string): Promise<Pa
 
   const query = facets.toString();
   const canonical = `${origin}/listings${query ? `?${query}` : ""}`;
-  const label = genre ? `${genre.toLowerCase()} ` : "";
-  const heading = capitalise(`${label}${kind.many}`);
-  const named = service ? `${heading} on ${service}` : heading;
+  const copy = listingCopy({
+    type: type === "movie" || type === "tv" ? type : null,
+    genre,
+    service,
+  });
 
   return {
-    title: `${service ? named : `${heading} to stream in the UK`} · Marquee`,
-    description: service
-      ? `Every ${label}${kind.one} on ${service} in the UK right now, ranked, with what it costs elsewhere if you do not subscribe.`
-      : `Every ${label}${kind.one} streaming in the UK right now, across every service, ranked and filterable by tag, service and where it was shot.`,
+    title: `${copy.title} · Marquee`,
+    description: copy.description,
     image: null,
     canonical,
     ogType: "website",
     index: isFacet,
-    structuredData: [breadcrumbs(origin, [{ name: named, item: canonical }])],
+    structuredData: [breadcrumbs(origin, [{ name: copy.heading, item: canonical }])],
   };
 }
 
@@ -447,7 +518,7 @@ function staticCard(path: string, origin: string): PageCard | null {
     image: null,
     canonical: `${origin}${path}`,
     ogType: "website",
-    index: true,
+    index: !NOINDEX_PATHS.has(path),
     structuredData: [],
   };
 }
@@ -458,6 +529,29 @@ function cachedCard(env: Bindings, key: string, build: () => Promise<PageCard | 
 
 export async function cardFor(env: Bindings, url: URL, origin: string): Promise<PageCard | null> {
   const path = url.pathname;
+  const fixed = staticCard(path, origin);
+
+  if (fixed) {
+    return fixed;
+  }
+
+  const hub = /^\/revival\/shelf\/([a-z]+)\/([^/?#]+)$/u.exec(path);
+
+  if (hub && isHubFamily(hub[1])) {
+    const family = hub[1];
+    const slug = decodeURIComponent(hub[2]);
+
+    return cachedCard(env, `${origin}:hub:${family}:${slug}`, () =>
+      revivalHubCard(env, family, slug, origin),
+    );
+  }
+
+  const edition = /^\/this-week\/([^/?#]+)$/u.exec(path);
+
+  if (edition) {
+    return isWeekOf(edition[1]) ? editionCard(edition[1], origin) : null;
+  }
+
   const routed = /^\/(movie|tv)\/([1-9][0-9]*)(?:\/|$)/u.exec(path);
 
   if (routed) {
@@ -510,7 +604,7 @@ export async function cardFor(env: Bindings, url: URL, origin: string): Promise<
     return directoryCard(url, origin);
   }
 
-  return staticCard(path, origin);
+  return null;
 }
 
 export async function withPageMetadata(
@@ -529,6 +623,9 @@ export async function withPageMetadata(
   const head = [
     `<link rel="canonical" href="${escapeAttribute(canonical)}">`,
     noindex ? `<meta name="robots" content="noindex, follow">` : "",
+    env.APP_STORE_ID
+      ? `<meta name="apple-itunes-app" content="app-id=${escapeAttribute(env.APP_STORE_ID)}">`
+      : "",
     card
       ? [
           `<meta property="og:type" content="${escapeAttribute(card.ogType)}">`,

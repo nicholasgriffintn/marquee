@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { ContentRail } from "../components/ContentRail";
 import { ErrorBoundary } from "../components/ErrorBoundary";
+import { FrontOfHouse } from "../components/FrontOfHouse";
 import {
   Hero,
   HeroAction,
@@ -62,6 +63,7 @@ export function TonightPage({
   isLoading,
   isBuildingRails,
   isSessionLoading,
+  isSignedIn,
   error,
   providerError,
   sectionGroups,
@@ -102,6 +104,7 @@ export function TonightPage({
   isLoading: boolean;
   isBuildingRails: boolean;
   isSessionLoading: boolean;
+  isSignedIn: boolean;
   error: string;
   providerError: string;
   sectionGroups: HomeSectionGroups;
@@ -306,6 +309,8 @@ export function TonightPage({
           onDismiss={onUsherDismiss}
         />
       )}
+
+      {!isSessionLoading && !isSignedIn && <FrontOfHouse />}
 
       {!isSessionLoading && (
         <ErrorBoundary label="The service filter">

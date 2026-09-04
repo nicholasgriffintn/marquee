@@ -1,65 +1,32 @@
+import { Link } from "react-router-dom";
+
 import { ErrorBoundary } from "../components/ErrorBoundary";
+import {
+  EpisodeItem,
+  EpisodeList,
+  ProgrammeHeading,
+  ProgrammeMasthead,
+} from "../components/programme/Programme";
 import { ResultsGrid } from "../components/ResultsGrid";
 import { TitleArt } from "../components/TitleArt";
 import { TitleCard } from "../components/TitleCard";
 import { UsherFacts } from "../components/usher/UsherHeroShell";
-import { UsherMark } from "../components/usher/UsherMark";
 import type { MediaTitle } from "../domain/catalog";
 import { useDigest } from "../hooks/useDigest";
 import { useJourneyOpen } from "../hooks/useJourneyOpen";
-import { formatDateTime, parseDate } from "../lib/dates";
 import { mediaMeta } from "../lib/media";
-import {
-  Button,
-  EmptyState,
-  Eyebrow,
-  Fact,
-  FactList,
-  Heading,
-  Page,
-  StatusNote,
-  Text,
-} from "../ui";
+import { Button, EmptyState, Eyebrow, Fact, FactList, Heading, Page, StatusNote } from "../ui";
 
 import styles from "./DigestPage.module.css";
 
-const FIRST_ISSUE = Date.UTC(1974, 0, 1);
-
-function issuedOn(value: string | undefined) {
-  return parseDate(value) ?? new Date();
-}
-
-function weekOf(value: string | undefined) {
-  return issuedOn(value).toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "long",
-  });
-}
-
-function issueNumber(value: string | undefined) {
-  const weeks = Math.floor((issuedOn(value).getTime() - FIRST_ISSUE) / (7 * 86_400_000));
-
-  return weeks.toLocaleString();
-}
-
-function formatWhen(value: string) {
-  return formatDateTime(value, {
-    weekday: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
 export function DigestPage({
-  isSignedIn,
   isSessionLoading,
   onOpen,
 }: {
-  isSignedIn: boolean;
   isSessionLoading: boolean;
   onOpen: (item: MediaTitle) => void;
 }) {
-  const { digest, isLoading } = useDigest(isSignedIn);
+  const { digest, isLoading } = useDigest(true);
   const openLead = useJourneyOpen(onOpen, {
     journey: digest?.lead?.journey,
     rank: 0,
@@ -72,41 +39,28 @@ export function DigestPage({
     journey: digest?.trendingJourney,
     titleIds: digest?.trending.map((item) => item.id),
   });
-  const isSettling = isSessionLoading || (isSignedIn && isLoading);
+  const isSettling = isSessionLoading || isLoading;
   const returning = (digest?.episodes ?? []).filter(
     (episode) => episode.episode === 1 && (episode.season ?? 1) > 1,
   );
 
   return (
     <Page>
-      <header className={styles.programme}>
-        <div className={styles.masthead}>
-          <UsherMark face="idle" crop="head" className={styles.mastheadMark} />
-          <div>
-            <span className={styles.mastheadName}>The Marquee</span>
-            <p className={styles.mastheadWeek}>Week of {weekOf(digest?.createdAt)}</p>
-          </div>
-          <em className={styles.mastheadIssue}>No. {issueNumber(digest?.createdAt)}</em>
-        </div>
-        <Heading level={1} size="title" className={styles.title}>
-          This week&rsquo;s programme
-        </Heading>
-        <Text family="serif" italic tone="muted" className={styles.note}>
-          Printed Monday mornings from your own shelf, the schedule, and whatever the town has been
-          reading about. Nobody asked me to keep doing this.
-        </Text>
-      </header>
+      <ProgrammeMasthead
+        issuedAt={digest?.createdAt}
+        heading="This week’s programme"
+        note={
+          <>
+            Printed Monday mornings from your own shelf, the schedule, and whatever the town has
+            been reading about. Nobody asked me to keep doing this. The{" "}
+            <Link to="/this-week/latest">public edition</Link> is on the board outside.
+          </>
+        }
+      />
 
       {isSettling && <StatusNote busy>Setting the programme…</StatusNote>}
 
-      {!isSettling && !isSignedIn && (
-        <EmptyState
-          heading="Sign in first."
-          description="The programme is set from your own shelf, so it needs to know whose it is."
-        />
-      )}
-
-      {!isSettling && isSignedIn && !digest && (
+      {!isSettling && !digest && (
         <EmptyState
           heading="Nothing to print yet."
           description="Save a few things to your shelf. The first programme goes out on Monday."
@@ -173,26 +127,23 @@ export function DigestPage({
 
       {returning.length > 0 ? (
         <>
-          <Heading level={2} size="label" tone="accent" className={styles.heading}>
-            Back this week
-          </Heading>
-          <ul className={styles.episodes}>
+          <ProgrammeHeading>Back this week</ProgrammeHeading>
+          <EpisodeList>
             {returning.map((episode) => (
-              <li key={`back-${episode.showName}-${episode.airsAt}`}>
-                <time dateTime={episode.airsAt}>{formatWhen(episode.airsAt)}</time>
-                <strong>{episode.showName}</strong>
-                <small>Series {episode.season} begins</small>
-              </li>
+              <EpisodeItem
+                key={`back-${episode.showName}-${episode.airsAt}`}
+                when={episode.airsAt}
+                name={episode.showName}
+                detail={`Series ${episode.season} begins`}
+              />
             ))}
-          </ul>
+          </EpisodeList>
         </>
       ) : null}
 
       {digest?.fresh.length ? (
         <ErrorBoundary label="This week's new titles">
-          <Heading level={2} size="label" tone="accent" className={styles.heading}>
-            New, and close to your taste
-          </Heading>
+          <ProgrammeHeading>New, and close to your taste</ProgrammeHeading>
           <ResultsGrid>
             {digest.fresh.map((item) => (
               <TitleCard key={item.id} item={item} onOpen={openFresh} />
@@ -203,30 +154,27 @@ export function DigestPage({
 
       {digest?.episodes.length ? (
         <>
-          <Heading level={2} size="label" tone="accent" className={styles.heading}>
-            On the schedule
-          </Heading>
-          <ul className={styles.episodes}>
+          <ProgrammeHeading>On the schedule</ProgrammeHeading>
+          <EpisodeList>
             {digest.episodes.map((episode) => (
-              <li key={`${episode.showName}-${episode.airsAt}`}>
-                <time dateTime={episode.airsAt}>{formatWhen(episode.airsAt)}</time>
-                <strong>{episode.showName}</strong>
-                <small>
-                  {episode.season && episode.episode
+              <EpisodeItem
+                key={`${episode.showName}-${episode.airsAt}`}
+                when={episode.airsAt}
+                name={episode.showName}
+                detail={
+                  episode.season && episode.episode
                     ? `S${episode.season}E${episode.episode}`
-                    : "New episode"}
-                </small>
-              </li>
+                    : "New episode"
+                }
+              />
             ))}
-          </ul>
+          </EpisodeList>
         </>
       ) : null}
 
       {digest?.trending.length ? (
         <ErrorBoundary label="What the town is reading about">
-          <Heading level={2} size="label" tone="accent" className={styles.heading}>
-            What the town is reading about
-          </Heading>
+          <ProgrammeHeading>What the town is reading about</ProgrammeHeading>
           <ResultsGrid>
             {digest.trending.map((item) => (
               <TitleCard key={item.id} item={item} onOpen={openTrending} />
