@@ -47,6 +47,29 @@ export function SiteFooter() {
           </Link>
         </Text>
       </div>
+      <nav className={styles.browse} aria-label="Browse">
+        <Link className={styles.link} to="/films">
+          Films
+        </Link>
+        <Link className={styles.link} to="/series">
+          Series
+        </Link>
+        <Link className={styles.link} to="/new">
+          New
+        </Link>
+        <Link className={styles.link} to="/popular">
+          Popular
+        </Link>
+        <Link className={styles.link} to="/this-week">
+          This week
+        </Link>
+        <Link className={styles.link} to="/revival">
+          Revival house
+        </Link>
+        <Link className={styles.link} to="/directory">
+          The index
+        </Link>
+      </nav>
       <nav className={styles.legal} aria-label="Legal">
         <Link className={styles.link} to="/tour">
           Take the tour

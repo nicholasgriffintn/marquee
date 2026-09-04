@@ -14,6 +14,7 @@ import {
   type CatalogSection,
   type MediaTitle,
 } from "./domain/catalog";
+import { REVIVAL_TERM_PATH } from "./domain/revival";
 import { asideFor, type UsherMoment } from "./domain/usher";
 import { useCatalog } from "./hooks/useCatalog";
 import { useCurator } from "./hooks/useCurator";
@@ -50,6 +51,15 @@ const CollectionPage = lazy(() =>
 );
 const DigestPage = lazy(() =>
   import("./pages/DigestPage").then((m) => ({ default: m.DigestPage })),
+);
+const EditionPage = lazy(() =>
+  import("./pages/EditionPage").then((m) => ({ default: m.EditionPage })),
+);
+const RevivalShelfPage = lazy(() =>
+  import("./pages/RevivalShelfPage").then((m) => ({ default: m.RevivalShelfPage })),
+);
+const RevivalTermPage = lazy(() =>
+  import("./pages/RevivalTermPage").then((m) => ({ default: m.RevivalTermPage })),
 );
 const LibraryPage = lazy(() =>
   import("./pages/LibraryPage").then((m) => ({ default: m.LibraryPage })),
@@ -495,6 +505,7 @@ export function App() {
                     isLoading={catalog.isLoading || !isViewerReady}
                     isBuildingRails={rails.isGenerating}
                     isSessionLoading={!isViewerReady}
+                    isSignedIn={isSignedIn}
                     error={catalog.error}
                     providerError={catalog.providerError}
                     sectionGroups={sectionGroups}
@@ -600,6 +611,24 @@ export function App() {
               />
 
               <Route
+                path={REVIVAL_TERM_PATH}
+                element={
+                  <Suspense fallback={<RouteFallback />}>
+                    <RevivalTermPage />
+                  </Suspense>
+                }
+              />
+
+              <Route
+                path="/revival/shelf/:family/:slug"
+                element={
+                  <Suspense fallback={<RouteFallback />}>
+                    <RevivalShelfPage isReady={isViewerReady} />
+                  </Suspense>
+                }
+              />
+
+              <Route
                 path="/revival/:workId"
                 element={
                   <Suspense fallback={<RouteFallback />}>
@@ -638,11 +667,26 @@ export function App() {
               <Route
                 path="/this-week"
                 element={
-                  <DigestPage
-                    isSignedIn={isSignedIn}
-                    isSessionLoading={session.isLoading}
-                    onOpen={openTitle}
-                  />
+                  session.isLoading ? (
+                    <RouteFallback />
+                  ) : isSignedIn ? (
+                    <Suspense fallback={<RouteFallback />}>
+                      <DigestPage isSessionLoading={session.isLoading} onOpen={openTitle} />
+                    </Suspense>
+                  ) : (
+                    <Suspense fallback={<RouteFallback />}>
+                      <EditionPage onOpen={openTitle} />
+                    </Suspense>
+                  )
+                }
+              />
+
+              <Route
+                path="/this-week/:weekOf"
+                element={
+                  <Suspense fallback={<RouteFallback />}>
+                    <EditionPage onOpen={openTitle} />
+                  </Suspense>
                 }
               />
 

@@ -6,6 +6,7 @@ export type PageMetadata = {
   ogType: string | null;
   structuredData: string[];
   index: boolean;
+  appStoreId: string | null;
 };
 
 function upsert(selector: string, create: () => HTMLElement) {
@@ -75,6 +76,7 @@ export function applyPageMetadata(metadata: PageMetadata) {
 
   setMeta("name", "description", metadata.description);
   setMeta("name", "robots", metadata.index ? null : "noindex, follow");
+  setMeta("name", "apple-itunes-app", metadata.appStoreId ? `app-id=${metadata.appStoreId}` : null);
   setCanonical(metadata.canonical);
 
   setMeta("property", "og:type", metadata.ogType);

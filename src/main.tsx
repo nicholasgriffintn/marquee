@@ -6,6 +6,7 @@ import { createBrowserRouter, RouterProvider } from "react-router-dom";
 
 import { App } from "./App";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { mountBeacon } from "./lib/beacon";
 import { queryClient } from "./lib/query-client";
 
 // oxlint-disable-next-line import/no-unassigned-import -- Vite loads the global stylesheet for its side effect.
@@ -16,6 +17,8 @@ const root = document.getElementById("root");
 if (!root) {
   throw new Error("Root element not found");
 }
+
+mountBeacon(import.meta.env.VITE_CF_BEACON_TOKEN);
 
 const router = createBrowserRouter([
   {

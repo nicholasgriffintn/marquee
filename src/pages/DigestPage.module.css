@@ -1,55 +1,3 @@
-.programme {
-  margin-bottom: var(--space-2);
-  padding-bottom: var(--space-5);
-}
-
-.masthead {
-  align-items: center;
-  border-bottom: 1px solid var(--panel-line);
-  display: flex;
-  gap: var(--space-3);
-  margin-bottom: var(--space-5);
-  padding-bottom: var(--space-3);
-}
-
-.mastheadMark {
-  flex: 0 0 auto;
-  height: 38px;
-  width: 52px;
-}
-
-.mastheadName {
-  color: var(--acid);
-  display: block;
-  font: var(--weight-bold) var(--type-label) / 1 var(--mono);
-  letter-spacing: 3px;
-  text-transform: uppercase;
-}
-
-.mastheadWeek {
-  color: var(--muted);
-  font: var(--weight-regular) var(--type-sm) / 1 var(--sans);
-  margin: 6px 0 0;
-}
-
-.mastheadIssue {
-  color: var(--muted);
-  font: var(--weight-bold) var(--type-label) / 1 var(--mono);
-  font-style: normal;
-  letter-spacing: 1.6px;
-  margin-left: auto;
-  text-transform: uppercase;
-}
-
-.title {
-  margin-bottom: var(--space-3);
-}
-
-.note {
-  font-size: var(--type-lede);
-  max-width: 56ch;
-}
-
 .lead {
   align-items: center;
   border-top: 1px solid var(--line);
@@ -111,51 +59,8 @@
   padding-top: var(--space-5);
 }
 
-.heading {
-  border-top: 1px solid var(--line);
-  margin: var(--space-6) 0 18px;
-  padding: var(--space-4) var(--space-2) 0;
-}
-
-.episodes {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(232px, 1fr));
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.episodes li {
-  border-top: 1px solid var(--line);
-  display: grid;
-  gap: 6px;
-  padding: var(--space-4) var(--space-2);
-}
-
-.episodes time {
-  color: var(--acid);
-  font: var(--type-label) var(--mono);
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
-}
-
-.episodes small {
-  color: var(--muted);
-  font-size: var(--type-xs);
-}
-
 @media (max-width: 760px) {
   .lead {
     grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-@media (max-width: 700px) {
-  .masthead {
-    flex-wrap: wrap;
-  }
-
-  .mastheadIssue {
-    margin-left: 0;
   }
 }

@@ -4,6 +4,7 @@ import type {
   RevivalBillResponse,
   RevivalBillSlot,
   RevivalCard,
+  RevivalHubs,
   RevivalScreening,
   RevivalShelf,
   RevivalShelvesResponse,
@@ -37,6 +38,45 @@ export function useShelves(isReady: boolean) {
   });
 
   return { shelves: data?.shelves ?? NO_SHELVES, error, isLoading: isLoading || !isReady };
+}
+
+export function useHubs(isReady: boolean) {
+  const { data } = useResource<RevivalHubs>("/api/revival/hubs", { enabled: isReady });
+
+  return data;
+}
+
+type ShelfPage = {
+  id: string;
+  label: string | null;
+  works: RevivalCard[];
+  page: number;
+  total: number;
+  hasMore: boolean;
+};
+
+export function useShelfPages(id: string | null, isReady: boolean) {
+  const [paging, setPaging] = useState<{ id: string | null; earlier: RevivalCard[]; page: number }>(
+    { id, earlier: [], page: 1 },
+  );
+  const page = paging.id === id ? paging.page : 1;
+  const earlier = paging.id === id ? paging.earlier : NO_CARDS;
+  const path = id && isReady ? `/api/revival/shelf/${encodeURIComponent(id)}?page=${page}` : null;
+  const { data, isLoading, error } = useResource<ShelfPage>(path, {
+    errorMessage: "That shelf is unavailable",
+  });
+  const current = data?.id === id && data.page === page ? data : null;
+  const works = current ? [...earlier, ...current.works] : earlier;
+
+  return {
+    label: current?.label ?? null,
+    works,
+    total: current?.total ?? 0,
+    hasMore: current?.hasMore ?? false,
+    isLoading,
+    error,
+    loadMore: () => setPaging({ id, earlier: works, page: page + 1 }),
+  };
 }
 
 export function useResumeShelf(isReady: boolean) {

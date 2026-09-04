@@ -11,6 +11,7 @@ import {
   type RevivalTagKind,
   type RevivalWork,
 } from "../../src/domain/revival.ts";
+import { slugify } from "../../src/domain/slug.ts";
 import { contentNoticeFor, revivalGateFor } from "../lib/revival-notice.ts";
 
 export type RevivalCandidate = {
@@ -407,6 +408,7 @@ export type ShelfSelector =
   | { of: "tag"; kind: RevivalTagKind; slug: string }
   | { of: "country"; country: string }
   | { of: "decade"; decade: number }
+  | { of: "director"; name: string }
   | { of: "runtime"; min: number; max: number }
   | { of: "kind"; kind: RevivalKind };
 
@@ -415,6 +417,10 @@ function selectorClause(selector: ShelfSelector) {
     const none: DatabaseValue[] = [];
 
     return { where: `w.country IN ('United Kingdom', 'Ireland')`, binds: none };
+  }
+
+  if (selector.of === "director") {
+    return { where: `w.director = $1`, binds: [selector.name] };
   }
 
   if (selector.of === "tag") {
@@ -552,6 +558,34 @@ export async function readDecadeGroups(db: Database, limit: number, minimum: num
     label: String(row.label),
     size: row.size,
   }));
+}
+
+const NOT_A_DIRECTOR = String.raw`(@|https?:|[0-9]|\(|,|\m(unknown|films?|organi[sz]ation|restoration|theat(er|re)|productions?|newsreel|company|pictures|studios?|corporation|inc)\M)`;
+
+export async function readDirectorGroups(db: Database, limit: number, minimum: number) {
+  const rows = await db.query<ShelfGroup>(
+    `SELECT director AS slug, director AS label, COUNT(*) AS size
+       FROM revival_works
+       WHERE status = 'approved' AND group_primary = 1
+         AND director IS NOT NULL AND director <> ''
+         AND director !~* $3
+       GROUP BY director
+       HAVING COUNT(*) >= $1
+       ORDER BY size DESC, director
+       LIMIT $2`,
+    [minimum, Math.min(limit, 60), NOT_A_DIRECTOR],
+  );
+
+  return rows.rows.map((row) => ({ slug: slugify(row.label), label: row.label, size: row.size }));
+}
+
+export async function readTagLabel(db: Database, kind: RevivalTagKind, slug: string) {
+  const row = await db.first<{ label: string }>(
+    `SELECT MIN(label) AS label FROM revival_tags WHERE kind = $1 AND slug = $2`,
+    [kind, slug],
+  );
+
+  return row?.label ?? null;
 }
 
 export async function drawFromShelf(db: Database, selector: ShelfSelector, offset: number) {

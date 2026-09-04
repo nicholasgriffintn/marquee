@@ -272,6 +272,15 @@ option. `/api/auth/methods` only advertises what the deployment can actually do.
 
 [email-service]: https://developers.cloudflare.com/email-service/
 
+Once the iOS app is on the App Store, set the `APP_STORE_ID` var in `wrangler.json` to its numeric
+id and every page carries the Smart App Banner. Leave it empty and no banner is offered.
+
+Visitor counts and referrers come from [Cloudflare Web Analytics][web-analytics], which is
+cookieless. Set `VITE_CF_BEACON_TOKEN` in the build environment to a site token and the beacon is
+loaded; leave it unset and nothing is.
+
+[web-analytics]: https://developers.cloudflare.com/web-analytics/
+
 Every new account starts as a viewer. This prevents a public sign-in from claiming a fresh or
 temporarily empty deployment.
 

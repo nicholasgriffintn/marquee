@@ -259,6 +259,47 @@ export function revivalPath(work: Pick<RevivalCard, "id">) {
   return `/revival/${work.id}`;
 }
 
+export const HUB_FAMILIES = [
+  "decade",
+  "director",
+  "genre",
+  "subject",
+  "country",
+  "person",
+] as const;
+
+export type HubFamily = (typeof HUB_FAMILIES)[number];
+
+export type RevivalGroup = { slug: string; label: string; size: number };
+
+export type RevivalHubs = {
+  decades: RevivalGroup[];
+  directors: RevivalGroup[];
+  genres: RevivalGroup[];
+};
+
+export function isHubFamily(value: unknown): value is HubFamily {
+  return HUB_FAMILIES.includes(value as HubFamily);
+}
+
+export function hubPath(family: HubFamily, slug: string) {
+  return `/revival/shelf/${family}/${encodeURIComponent(slug)}`;
+}
+
+export function hubTitle(family: HubFamily, label: string) {
+  if (family === "decade") {
+    return `The ${label}s`;
+  }
+
+  if (family === "country") {
+    return `From ${label}`;
+  }
+
+  return label;
+}
+
+export const REVIVAL_TERM_PATH = "/revival/the-term";
+
 export const RUNTIME_BANDS = [
   { id: "short", label: "Under ten minutes", max: 600 },
   { id: "half", label: "Ten to thirty minutes", max: 1_800 },

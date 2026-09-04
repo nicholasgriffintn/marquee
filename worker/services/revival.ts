@@ -1,6 +1,11 @@
 import { admitted, requirementFor, type ViewerAccess } from "../../src/domain/access.ts";
 import { assertsPublicDomain, RUNTIME_BANDS, toCard, toPrint } from "../../src/domain/revival.ts";
-import type { RevivalStatus, RevivalWork } from "../../src/domain/revival.ts";
+import type {
+  HubFamily,
+  RevivalHubs,
+  RevivalStatus,
+  RevivalWork,
+} from "../../src/domain/revival.ts";
 import {
   ARCHIVE_COLLECTIONS,
   archivePageCap,
@@ -12,6 +17,7 @@ import {
 import { EUROPEANA_COUNTRIES, searchEuropeana } from "../clients/europeana.ts";
 import { searchScreeningRoom } from "../clients/loc.ts";
 import { searchCommonsFilms } from "../clients/wikidata-films.ts";
+import { withKvCache } from "../lib/cache.ts";
 import { logError } from "../lib/logging.ts";
 import { billDay, lateNight, seedFrom, shuffler, standingOffset } from "../lib/revival-bill.ts";
 import { isRecord } from "../lib/values.ts";
@@ -21,10 +27,12 @@ import {
   readAlsoShowing,
   readCountryGroups,
   readDecadeGroups,
+  readDirectorGroups,
   readGroupPrints,
   readProgress,
   readShelfPage,
   readTagGroups,
+  readTagLabel,
   readWorksByIds,
   readSourceCursor,
   readViewerProgress,
@@ -754,4 +762,64 @@ export async function getScreening(
     alsoShowing: admitted(alsoShowing, access),
     prints: admitted(prints, access).map(toPrint),
   };
+}
+
+const HUB_CACHE_SECONDS = 3_600;
+const HUB_DECADES = 20;
+const HUB_DIRECTORS = 40;
+const HUB_DIRECTOR_MIN = 6;
+const HUB_GENRES = 24;
+const HUB_GENRE_MIN = 10;
+
+function getDirectorGroups(env: Bindings) {
+  return withKvCache(env, "revival:directors", HUB_CACHE_SECONDS, () =>
+    readDirectorGroups(env.DB, HUB_DIRECTORS, HUB_DIRECTOR_MIN),
+  );
+}
+
+export async function resolveShelf(env: Bindings, id: string): Promise<ShelfSelector | null> {
+  const divide = id.indexOf(":");
+
+  if (divide > 0 && id.slice(0, divide) === "director") {
+    const slug = id.slice(divide + 1);
+    const group = (await getDirectorGroups(env)).find((entry) => entry.slug === slug);
+
+    return group ? { of: "director", name: group.label } : null;
+  }
+
+  return shelfSelector(id);
+}
+
+export function getHubs(env: Bindings): Promise<RevivalHubs> {
+  return withKvCache(env, "revival:hubs", HUB_CACHE_SECONDS, async () => {
+    const [decades, directors, genres] = await Promise.all([
+      readDecadeGroups(env.DB, HUB_DECADES, SHELF_MIN),
+      getDirectorGroups(env),
+      readTagGroups(env.DB, "genre", HUB_GENRES, HUB_GENRE_MIN),
+    ]);
+
+    return {
+      decades: decades.toSorted((a, b) => Number(a.slug) - Number(b.slug)),
+      directors,
+      genres,
+    };
+  });
+}
+
+export async function hubLabel(env: Bindings, family: HubFamily, slug: string) {
+  if (family === "decade") {
+    return /^\d{4}$/u.test(slug) ? slug : null;
+  }
+
+  if (family === "country") {
+    return slug;
+  }
+
+  if (family === "director") {
+    const group = (await getDirectorGroups(env)).find((entry) => entry.slug === slug);
+
+    return group?.label ?? null;
+  }
+
+  return readTagLabel(env.DB, family, slug);
 }

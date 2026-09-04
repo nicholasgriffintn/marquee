@@ -3,10 +3,18 @@ import { Hono } from "hono";
 import { NO_ACCESS } from "../../src/domain/access.ts";
 import { titleSlug } from "../../src/domain/catalog.ts";
 import { barredCertifications } from "../../src/domain/certification.ts";
+import { editionPath } from "../../src/domain/edition.ts";
+import { listingPath } from "../../src/domain/listings.ts";
+import { hubPath, REVIVAL_TERM_PATH } from "../../src/domain/revival.ts";
+import { INDEXABLE_POPULARITY } from "../../src/domain/visibility.ts";
 import { edgeCache, withKvCache } from "../lib/cache.ts";
 import { contentNoticeFor, revivalGateFor } from "../lib/revival-notice.ts";
 import { canonicalOrigin } from "../lib/security.ts";
 import { certificationBar } from "../repositories/catalog-search.ts";
+import { readStreamingProviders } from "../repositories/listing-facets.ts";
+import { getGenres } from "../services/catalog.ts";
+import { listEditions } from "../services/edition.ts";
+import { getHubs } from "../services/revival.ts";
 import type { Bindings } from "../types.ts";
 
 export const sitemapRoutes = new Hono<{ Bindings: Bindings }>();
@@ -16,10 +24,16 @@ const CACHE = "public, max-age=3600";
 const SITEMAP_CACHE_SECONDS = 86_400;
 const sitemapCache = edgeCache(SITEMAP_CACHE_SECONDS);
 
+const FACET_PROVIDERS = 20;
+const FACET_GENRES = 18;
+const LISTING_TYPES = ["movie", "tv"] as const;
+
 const STATIC_PATHS = [
   { path: "/", priority: "1.0", changefreq: "hourly" },
   { path: "/listings", priority: "0.9", changefreq: "hourly" },
+  { path: "/this-week", priority: "0.9", changefreq: "weekly" },
   { path: "/revival", priority: "0.8", changefreq: "daily" },
+  { path: REVIVAL_TERM_PATH, priority: "0.6", changefreq: "yearly" },
   { path: "/trailers", priority: "0.8", changefreq: "hourly" },
   { path: "/directory", priority: "0.5", changefreq: "weekly" },
   { path: "/directory?tab=collections", priority: "0.5", changefreq: "weekly" },
@@ -69,10 +83,14 @@ function served(body: string, contentType = "application/xml; charset=UTF-8") {
   });
 }
 
+const WORTH_INDEXING = `(popularity >= ${INDEXABLE_POPULARITY} OR EXISTS (
+  SELECT 1 FROM catalog_title_providers AS p WHERE p.title_id = catalog_titles.id
+))`;
+
 function countTitles(env: Bindings) {
   return withKvCache(env, "sitemap:title-count", SITEMAP_CACHE_SECONDS, async () => {
     const row = await env.DB.first<{ total: number }>(
-      "SELECT COUNT(*) AS total FROM catalog_titles",
+      `SELECT COUNT(*) AS total FROM catalog_titles WHERE ${WORTH_INDEXING}`,
     );
 
     return row?.total ?? 0;
@@ -92,6 +110,12 @@ sitemapRoutes.get("/robots.txt", sitemapCache, (context) => {
     "Disallow: /api/",
     "Disallow: /feeds/",
     "",
+    "User-agent: GPTBot",
+    "User-agent: ClaudeBot",
+    "User-agent: CCBot",
+    "User-agent: Bytespider",
+    "Disallow: /",
+    "",
     `Sitemap: ${origin}/sitemap.xml`,
     "",
   ].join("\n");
@@ -105,6 +129,9 @@ sitemapRoutes.get("/sitemap.xml", sitemapCache, async (context) => {
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const entries = [
     `${origin}/sitemap/pages.xml`,
+    `${origin}/sitemap/people.xml`,
+    `${origin}/sitemap/collections.xml`,
+    `${origin}/sitemap/revival.xml`,
     ...Array.from({ length: pages }, (_, index) => `${origin}/sitemap/titles/${index + 1}.xml`),
   ];
 
@@ -118,8 +145,35 @@ sitemapRoutes.get("/sitemap.xml", sitemapCache, async (context) => {
   );
 });
 
-sitemapRoutes.get("/sitemap/pages.xml", sitemapCache, (context) => {
+async function facetPaths(env: Bindings) {
+  const [providers, genres] = await Promise.all([
+    withKvCache(env, "sitemap:facet-providers", SITEMAP_CACHE_SECONDS, () =>
+      readStreamingProviders(env.DB, FACET_PROVIDERS),
+    ),
+    getGenres(env, FACET_GENRES),
+  ]);
+
+  const paths: string[] = [];
+
+  for (const type of LISTING_TYPES) {
+    for (const provider of providers) {
+      paths.push(listingPath(type, { providers: provider.id }));
+    }
+
+    for (const genre of genres) {
+      paths.push(listingPath(type, { genres: genre }));
+    }
+  }
+
+  return paths;
+}
+
+sitemapRoutes.get("/sitemap/pages.xml", sitemapCache, async (context) => {
   const origin = canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN);
+  const [facets, editions] = await Promise.all([
+    facetPaths(context.env).catch(() => []),
+    listEditions(context.env).catch(() => []),
+  ]);
 
   return served(
     [
@@ -130,6 +184,16 @@ sitemapRoutes.get("/sitemap/pages.xml", sitemapCache, (context) => {
           `<url><loc>${escapeXml(`${origin}${entry.path}`)}</loc>` +
           `<changefreq>${entry.changefreq}</changefreq>` +
           `<priority>${entry.priority}</priority></url>`,
+      ),
+      ...facets.map(
+        (path) =>
+          `<url><loc>${escapeXml(`${origin}${path}`)}</loc>` +
+          "<changefreq>daily</changefreq><priority>0.7</priority></url>",
+      ),
+      ...editions.map(
+        (weekOf) =>
+          `<url><loc>${escapeXml(`${origin}${editionPath(weekOf)}`)}</loc>` +
+          `<lastmod>${weekOf}</lastmod><changefreq>yearly</changefreq></url>`,
       ),
       "</urlset>",
     ].join(""),
@@ -206,13 +270,27 @@ sitemapRoutes.get("/sitemap/revival.xml", sitemapCache, async (context) => {
       }) === null,
   );
 
-  return urlset(
-    open.map(
+  const hubs = await getHubs(context.env).catch(() => null);
+  const hubPaths = hubs
+    ? [
+        ...hubs.decades.map((group) => hubPath("decade", group.slug)),
+        ...hubs.directors.map((group) => hubPath("director", group.slug)),
+        ...hubs.genres.map((group) => hubPath("genre", group.slug)),
+      ]
+    : [];
+
+  return urlset([
+    ...hubPaths.map(
+      (path) =>
+        `<url><loc>${escapeXml(`${origin}${path}`)}</loc>` +
+        "<changefreq>weekly</changefreq><priority>0.7</priority></url>",
+    ),
+    ...open.map(
       (row) =>
         `<url><loc>${escapeXml(`${origin}/revival/${encodeURIComponent(row.id)}`)}</loc>` +
         "<changefreq>monthly</changefreq></url>",
     ),
-  );
+  ]);
 });
 
 async function renderTitlesPage(env: Bindings, origin: string, page: number) {
@@ -221,7 +299,7 @@ async function renderTitlesPage(env: Bindings, origin: string, page: number) {
   const { rows: results } = await env.DB.query<TitleRow>(
     `SELECT media_type, tmdb_id, title, updated_at
        FROM catalog_titles
-      WHERE ${open.join(" AND ") || "TRUE"}
+      WHERE ${[WORTH_INDEXING, ...open].join(" AND ")}
       ORDER BY popularity DESC, id
       LIMIT $1 OFFSET $2`,
     bindings,
