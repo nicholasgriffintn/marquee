@@ -4,12 +4,15 @@ import type { DeliveredRail, RailsDelivery, RailStatus } from "../../src/domain/
 import { logError } from "../lib/logging.ts";
 import { readNotebookPreferences } from "../repositories/notebook-preferences.ts";
 import { readProviderPreferences } from "../repositories/profile.ts";
+import { readShelfStatuses } from "../repositories/viewer-context.ts";
 import type { Bindings } from "../types.ts";
 import { hydrateRails } from "./ai-rails.ts";
 import { getPersonalRails } from "./personal-rails.ts";
 import { readRailRecord } from "./rail-generation.ts";
+import type { StoredRail } from "./rail-identity.ts";
 import { ensureRailRefreshScheduled } from "./rail-refresh.ts";
 import { readCachedRailRevision } from "./rail-revision.ts";
+import { finishedTitleIds } from "./viewer/state.ts";
 
 export type DeliveryRequest = {
   viewerId: string | null;
@@ -32,6 +35,13 @@ const NO_CURATED: CuratedDelivery = {
   rails: [],
 };
 
+function withoutFinished(rails: StoredRail[], finished: Set<string>) {
+  return rails.map((rail) => ({
+    ...rail,
+    titleIds: rail.titleIds.filter((titleId) => !finished.has(titleId)),
+  }));
+}
+
 async function curatedDelivery(
   env: Bindings,
   viewerId: string,
@@ -39,16 +49,17 @@ async function curatedDelivery(
   access: ViewerAccess,
 ): Promise<CuratedDelivery> {
   try {
-    const [revision, preferences, providerIds] = await Promise.all([
+    const [revision, preferences, providerIds, shelf] = await Promise.all([
       readCachedRailRevision(env, viewerId),
       readNotebookPreferences(env.DB, viewerId),
       readProviderPreferences(env.DB, viewerId),
+      readShelfStatuses(env.DB, viewerId),
     ]);
     const record = await readRailRecord(env.DB, viewerId, revision);
     const rails = record.rails.length
       ? await hydrateRails(
           env,
-          record.rails,
+          withoutFinished(record.rails, new Set(finishedTitleIds(shelf))),
           record.generationId,
           preferences.preferredLanguage,
           providerIds ?? [],

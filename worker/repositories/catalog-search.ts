@@ -23,7 +23,8 @@ export type SearchScope = "title" | "everything";
 
 const SCORE_SORT_MIN_VOTES = 50;
 const INCLUDE_ID_LIMIT = 500;
-const EXCLUDE_ID_LIMIT = 2_000;
+const EXCLUDE_ID_LIMIT = 10_000;
+const TRENDING_ID_LIMIT = 2_000;
 const RANKED_CANDIDATE_LIMIT = 500;
 
 const WEIGHTED_RATING = "t.weighted_rating";
@@ -446,7 +447,7 @@ async function trendingIds(db: Database, filter: BrowseTrendingFilter) {
        ${TRENDING_FROM}
        WHERE ${where}
        ${TRENDING_ORDER}
-       LIMIT $${bindings.push(EXCLUDE_ID_LIMIT)}`,
+       LIMIT $${bindings.push(TRENDING_ID_LIMIT)}`,
     bindings,
   );
 

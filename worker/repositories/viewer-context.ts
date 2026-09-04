@@ -24,6 +24,17 @@ export async function readViewerEntries(db: Database, viewerId: string): Promise
   }));
 }
 
+export type ShelfStatus = { titleId: string; status: EntryStatus };
+
+export async function readShelfStatuses(db: Database, viewerId: string): Promise<ShelfStatus[]> {
+  const result = await db.query<ShelfStatus>(
+    `SELECT title_id AS "titleId", status FROM viewing_entries WHERE viewer_id = $1`,
+    [viewerId],
+  );
+
+  return result.rows;
+}
+
 type AffinityRow = { value: string; weight: number };
 
 const AFFINITY_WEIGHT = entryWeightSql("v.status", "v.rating");
