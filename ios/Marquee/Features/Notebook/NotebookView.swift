@@ -55,9 +55,10 @@ struct NotebookView: View {
         } else {
           notebookSection(number: 1, title: "What I have written down") { beliefs }
           notebookSection(number: 2, title: "Where you watch") { services }
-          notebookSection(number: 3, title: "Who sits with you") { guests }
-          notebookSection(number: 4, title: "When I should write") { alerts }
-          notebookSection(number: 5, title: "Take it with you") { feeds }
+          notebookSection(number: 3, title: "What you are old enough for") { access }
+          notebookSection(number: 4, title: "Who sits with you") { guests }
+          notebookSection(number: 5, title: "When I should write") { alerts }
+          notebookSection(number: 6, title: "Take it with you") { feeds }
         }
 
         if !model.error.isEmpty {
@@ -136,6 +137,62 @@ struct NotebookView: View {
         .tint(MarqueeTheme.blue)
       }
     }
+  }
+
+  @ViewBuilder private var access: some View {
+    if let preferences = model.preferences {
+      VStack(alignment: .leading, spacing: 14) {
+        accessToggle(
+          "I am 18 or over",
+          hint:
+            "Titles certified for adults only stay off the shelves, out of the Usher's hands and away from the revival house until you say so.",
+          isOn: preferences.adultConfirmed,
+          disabled: false
+        ) { confirmed in
+          Task {
+            await model.setAccess(
+              adultConfirmed: confirmed,
+              offensiveContentApproved: preferences.offensiveContentApproved,
+              api: appState.api
+            )
+          }
+        }
+        accessToggle(
+          "Show me prints that carry a content notice",
+          hint:
+            "Some of the revival house is racist propaganda, atrocity footage and the like, kept for historical study. It stays behind the curtain unless you ask for it.",
+          isOn: preferences.adultConfirmed && preferences.offensiveContentApproved,
+          disabled: !preferences.adultConfirmed
+        ) { approved in
+          Task {
+            await model.setAccess(
+              adultConfirmed: preferences.adultConfirmed,
+              offensiveContentApproved: approved,
+              api: appState.api
+            )
+          }
+        }
+      }
+    } else {
+      Text("These preferences are out of reach just now.").font(MarqueeTheme.sans(13))
+    }
+  }
+
+  private func accessToggle(
+    _ title: String,
+    hint: String,
+    isOn: Bool,
+    disabled: Bool,
+    onChange: @escaping (Bool) -> Void
+  ) -> some View {
+    Toggle(isOn: Binding(get: { isOn }, set: onChange)) {
+      VStack(alignment: .leading, spacing: 4) {
+        Text(title).font(MarqueeTheme.sans(13, weight: .bold))
+        Text(hint).font(MarqueeTheme.sans(12)).foregroundStyle(MarqueeTheme.ink.opacity(0.65))
+      }
+    }
+    .tint(MarqueeTheme.blue)
+    .disabled(disabled)
   }
 
   private var guests: some View {

@@ -92,6 +92,7 @@ final class RevivalScreeningModel: ObservableObject {
   @Published private(set) var hasStarted = false
   @Published private(set) var isLoading = true
   @Published private(set) var error = ""
+  @Published private(set) var gateMessage = ""
   private var timeObserver: Any?
   private var endObserver: NSObjectProtocol?
   private var lastReportedPosition = 0
@@ -103,6 +104,7 @@ final class RevivalScreeningModel: ObservableObject {
     screening = nil
     catalogueTitle = nil
     error = ""
+    gateMessage = ""
     lastReportedPosition = 0
     do {
       let value: RevivalScreening = try await api.get("/api/revival/\(id)")
@@ -115,6 +117,8 @@ final class RevivalScreeningModel: ObservableObject {
       self.player = player
       catalogueTitle = await loadCatalogueTitle(id: value.work.titleId, api: api)
       error = ""
+    } catch APIError.server(status: 403, let message) {
+      gateMessage = message
     } catch {
       self.error = error.localizedDescription
     }

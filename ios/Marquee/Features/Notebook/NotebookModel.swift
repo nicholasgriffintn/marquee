@@ -7,6 +7,7 @@ final class NotebookModel: ObservableObject {
   @Published private(set) var providers: [MarqueeProvider] = []
   @Published private(set) var feeds: FeedKeys?
   @Published private(set) var alerts: AlertConfiguration?
+  @Published private(set) var preferences: NotebookPreferences?
   @Published private(set) var isLoading = true
   @Published var error = ""
 
@@ -17,14 +18,32 @@ final class NotebookModel: ObservableObject {
     async let providerValue: ProvidersResponse? = try? api.get("/api/catalog/providers")
     async let feedValue: FeedKeys? = try? api.get("/api/notebook/feeds")
     async let alertValue: AlertConfiguration? = try? api.get("/api/notebook/alerts")
+    async let preferenceValue: NotebookPreferences? = try? api.get("/api/notebook/preferences")
 
-    let values = await (notebookValue, guestValue, providerValue, feedValue, alertValue)
+    let values = await (
+      notebookValue, guestValue, providerValue, feedValue, alertValue, preferenceValue
+    )
     beliefs = values.0?.beliefs ?? []
     guests = values.1?.guests ?? []
     providers = values.2?.providers ?? []
     feeds = values.3
     alerts = values.4
+    preferences = values.5
     isLoading = false
+  }
+
+  func setAccess(adultConfirmed: Bool, offensiveContentApproved: Bool, api: APIClient) async {
+    guard let preferences else { return }
+    do {
+      self.preferences = try await api.send(
+        "/api/notebook/preferences",
+        method: "POST",
+        body: preferences.withAccess(
+          adultConfirmed: adultConfirmed, offensiveContentApproved: offensiveContentApproved)
+      )
+    } catch {
+      self.error = error.localizedDescription
+    }
   }
 
   func act(

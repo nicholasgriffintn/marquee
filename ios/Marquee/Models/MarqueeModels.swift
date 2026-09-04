@@ -465,6 +465,26 @@ struct ProviderPreferences: Codable {
   let isSaved: Bool
 }
 
+struct NotebookPreferences: Codable {
+  let preferredCinemaId: String?
+  let preferredLocation: String
+  let preferredLanguage: String
+  let mutedGenres: [String]
+  let adultConfirmed: Bool
+  let offensiveContentApproved: Bool
+
+  func withAccess(adultConfirmed: Bool, offensiveContentApproved: Bool) -> NotebookPreferences {
+    NotebookPreferences(
+      preferredCinemaId: preferredCinemaId,
+      preferredLocation: preferredLocation,
+      preferredLanguage: preferredLanguage,
+      mutedGenres: mutedGenres,
+      adultConfirmed: adultConfirmed,
+      offensiveContentApproved: adultConfirmed && offensiveContentApproved
+    )
+  }
+}
+
 struct FeedKeys: Codable {
   let subscribed: Bool
   let createdAt: String?

@@ -3,6 +3,7 @@ import SwiftUI
 struct RevivalView: View {
   @EnvironmentObject private var appState: AppState
   @StateObject private var model = RevivalModel()
+  @AppStorage(RevivalGate.storageKey) private var hasAccepted = false
   @State private var query = ""
 
   private var isSearchActive: Bool {
@@ -10,6 +11,24 @@ struct RevivalView: View {
   }
 
   var body: some View {
+    if hasAccepted {
+      house
+    } else {
+      ScrollView {
+        VStack(alignment: .leading, spacing: 0) {
+          RevivalPageTitle(total: 0)
+            .padding(.bottom, 28)
+          RevivalGateView { hasAccepted = true }
+        }
+        .padding(.horizontal, 18)
+        .padding(.top, 30)
+        .padding(.bottom, 95)
+      }
+      .marqueeRootPage()
+    }
+  }
+
+  private var house: some View {
     ScrollView {
       LazyVStack(alignment: .leading, spacing: 0) {
         RevivalPageTitle(total: model.total)

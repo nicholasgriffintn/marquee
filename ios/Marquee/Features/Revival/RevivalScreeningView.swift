@@ -3,14 +3,21 @@ import SwiftUI
 struct RevivalScreeningView: View {
   @EnvironmentObject private var appState: AppState
   @StateObject private var model = RevivalScreeningModel()
+  @AppStorage(RevivalGate.storageKey) private var hasAccepted = false
   @State private var pendingDestination: ExternalDestination?
   let workID: String
 
   var body: some View {
     ScrollView {
       LazyVStack(alignment: .leading, spacing: 0) {
-        if model.isLoading {
+        if !hasAccepted {
+          RevivalGateView { hasAccepted = true }
+            .padding(.top, 30)
+        } else if model.isLoading {
           LoadingHouse(label: "Lacing the reel…")
+            .padding(.top, 30)
+        } else if !model.gateMessage.isEmpty {
+          RevivalGatedMessage(message: model.gateMessage)
             .padding(.top, 30)
         } else if let screening = model.screening {
           RevivalScreeningTitle(work: screening.work)
@@ -67,7 +74,10 @@ struct RevivalScreeningView: View {
     .navigationTitle(model.screening?.work.title ?? "Now showing")
     .navigationBarTitleDisplayMode(.inline)
     .toolbar(.hidden, for: .tabBar)
-    .task(id: workID) { await model.load(id: workID, api: appState.api) }
+    .task(id: "\(workID):\(hasAccepted):\(appState.isSignedIn)") {
+      guard hasAccepted else { return }
+      await model.load(id: workID, api: appState.api)
+    }
     .onDisappear {
       Task {
         await model.reportProgress(api: appState.api, canSave: appState.isSignedIn)
