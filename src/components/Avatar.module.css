@@ -8,7 +8,12 @@
   font-weight: var(--weight-heavy);
   justify-content: center;
   object-fit: cover;
+  overflow: hidden;
   text-transform: uppercase;
+}
+
+.fallback {
+  background: var(--paper);
 }
 
 .sm {

@@ -1,5 +1,5 @@
 import { avatarById } from "../../domain/avatars";
-import { Avatar } from "./Avatar";
+import { GeneratedAvatar } from "../GeneratedAvatar";
 import { useScreeningRoom } from "./ScreeningContext";
 
 import styles from "./StageCursors.module.css";
@@ -42,7 +42,7 @@ export function StageCursors({ stage }: { stage: string }) {
               />
             </svg>
             <span className={styles.tag}>
-              {avatar && <Avatar avatar={avatar} size={20} decorative />}
+              {avatar && <GeneratedAvatar avatar={avatar} size={20} decorative />}
               {member?.name ?? "Someone"}
             </span>
           </div>

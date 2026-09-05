@@ -1,4 +1,8 @@
+import { useState } from "react";
+
+import { avatarForName } from "../domain/avatars";
 import { classNames } from "../lib/class-names";
+import { GeneratedAvatar } from "./GeneratedAvatar";
 
 import styles from "./Avatar.module.css";
 
@@ -15,6 +19,8 @@ export function Avatar({
   shape?: "square" | "round";
   className?: string;
 }) {
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const source = url?.trim();
   const composed = classNames(
     styles.avatar,
     styles[size],
@@ -22,9 +28,21 @@ export function Avatar({
     className,
   );
 
-  if (url) {
-    return <img className={composed} src={url} alt="" />;
+  if (source && source !== failedUrl) {
+    return (
+      <img
+        key={source}
+        className={composed}
+        src={source}
+        alt=""
+        onError={() => setFailedUrl(source)}
+      />
+    );
   }
 
-  return <span className={composed}>{name.slice(0, 1)}</span>;
+  return (
+    <span className={classNames(composed, styles.fallback)} aria-hidden="true">
+      <GeneratedAvatar avatar={avatarForName(name)} size={size === "sm" ? 26 : 38} decorative />
+    </span>
+  );
 }

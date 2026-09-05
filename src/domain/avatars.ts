@@ -1,3 +1,4 @@
+import { hashString } from "../lib/string";
 import { type FacadeId, isFacadeId } from "./facades";
 
 export type AvatarHat = "pillbox" | "peaked" | "beret" | "flatcap";
@@ -209,4 +210,10 @@ export function avatarFor(cinema: string, ordinal: number) {
   const pool = AVATARS[cinema];
 
   return pool[ordinal % pool.length];
+}
+
+export function avatarForName(name: string) {
+  const pool = Object.values(AVATARS).flat();
+
+  return pool[hashString(name.trim().toLowerCase()) % pool.length];
 }

@@ -12,8 +12,8 @@ import {
 import type { ScreeningRoom } from "../../hooks/useScreening";
 import { classNames } from "../../lib/class-names";
 import { copyText } from "../../lib/clipboard";
+import { GeneratedAvatar } from "../GeneratedAvatar";
 import { UsherMark } from "../usher/UsherMark";
-import { Avatar } from "./Avatar";
 import { GameCard, SteerCard } from "./RoomGames";
 import { PollCard } from "./RoomPoll";
 
@@ -38,7 +38,7 @@ function MemberChip({ member, isYou }: { member: Member; isYou: boolean }) {
       )}
       title={`${member.name}${isYou ? " (you)" : ""}${member.online ? "" : ", stepped out"}`}
     >
-      {avatar ? <Avatar avatar={avatar} size={30} decorative /> : <i />}
+      {avatar ? <GeneratedAvatar avatar={avatar} size={30} decorative /> : <i />}
     </li>
   );
 }
@@ -68,7 +68,7 @@ function Entry({ entry, members }: { entry: FeedEntry; members: Map<string, Memb
   return (
     <li className={classNames(styles.entry, entry.kind !== "say" && styles.event)}>
       <span className={styles.entryAvatar}>
-        {avatar ? <Avatar avatar={avatar} size={22} decorative /> : null}
+        {avatar ? <GeneratedAvatar avatar={avatar} size={22} decorative /> : null}
       </span>
       <p>
         <strong>{member?.name ?? "Someone"}</strong>

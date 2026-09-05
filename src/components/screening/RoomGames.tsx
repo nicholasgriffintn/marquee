@@ -4,8 +4,8 @@ import { avatarById } from "../../domain/avatars";
 import type { GameState, Member, SteerState } from "../../domain/screening";
 import type { ScreeningRoom } from "../../hooks/useScreening";
 import { classNames } from "../../lib/class-names";
+import { GeneratedAvatar } from "../GeneratedAvatar";
 import { TitleArt } from "../TitleArt";
-import { Avatar } from "./Avatar";
 
 import styles from "./RoomGames.module.css";
 
@@ -65,7 +65,7 @@ function Leaderboard({
         return (
           <li key={key} className={classNames(key === you && styles.you)}>
             <i>{index + 1}</i>
-            {avatar && <Avatar avatar={avatar} size={22} decorative />}
+            {avatar && <GeneratedAvatar avatar={avatar} size={22} decorative />}
             <span>{member?.name ?? "Someone"}</span>
             <em>{score}</em>
           </li>

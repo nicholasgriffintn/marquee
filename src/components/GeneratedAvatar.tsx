@@ -1,9 +1,9 @@
 import type { ReactElement } from "react";
 
-import type { AvatarHat, AvatarMood, AvatarProp, AvatarSpec } from "../../domain/avatars";
-import { classNames } from "../../lib/class-names";
+import type { AvatarHat, AvatarMood, AvatarProp, AvatarSpec } from "../domain/avatars";
+import { classNames } from "../lib/class-names";
 
-import styles from "./Avatar.module.css";
+import styles from "./GeneratedAvatar.module.css";
 
 const INK = "var(--ink)";
 const PAPER = "var(--paper)";
@@ -123,7 +123,7 @@ function Prop({ kind }: { kind: AvatarProp }) {
   }
 }
 
-export function Avatar({
+export function GeneratedAvatar({
   avatar,
   size = 40,
   className,

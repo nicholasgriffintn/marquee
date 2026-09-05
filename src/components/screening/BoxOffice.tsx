@@ -6,8 +6,8 @@ import { isFacadeId } from "../../domain/facades";
 import { findTool } from "../../domain/screening";
 import type { ScreeningRoom } from "../../hooks/useScreening";
 import { Button, Modal, StatusNote, TextInput } from "../../ui";
+import { GeneratedAvatar } from "../GeneratedAvatar";
 import { CinemaFacade } from "../tour/facades/CinemaFacade";
-import { Avatar } from "./Avatar";
 
 import styles from "./BoxOffice.module.css";
 
@@ -58,7 +58,7 @@ export function BoxOffice({
 
             <div className={styles.reveal}>
               <span className={styles.big}>
-                <Avatar avatar={avatar} size={168} />
+                <GeneratedAvatar avatar={avatar} size={168} />
               </span>
               <div className={styles.revealCopy}>
                 <strong>{avatar.name}</strong>
