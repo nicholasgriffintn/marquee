@@ -1,17 +1,20 @@
 import {
-  AuthError,
   createAuth,
-  type AuthChallengeRecord,
   type AuthSessionRecord,
   type ChallengeStore,
-  type ExternalIdentity,
   type IdentityStore,
   type SessionStore,
   type UserStore,
 } from "@ngriffin_uk/auth-core";
 import type { OAuthStateRecord, OAuthStateStore } from "@ngriffin_uk/auth-oauth2";
 
-import { boundedString, parseJson } from "../lib/values.ts";
+import {
+  mapChallenge,
+  mapOAuthState,
+  type ChallengeRow,
+  type OAuthStateRow,
+} from "../lib/auth-records.ts";
+import { findIdentity, resolveIdentity } from "./identities.ts";
 import { mapUser, type MarqueeUser, type UserRow } from "./model.ts";
 
 export function createDatabaseAuth(db: Database) {
@@ -66,30 +69,6 @@ export function createDatabaseChallengeStore(db: Database): ChallengeStore {
 
       return (result.rowCount ?? 0) > 0;
     },
-  };
-}
-
-type ChallengeRow = {
-  token_hash: string;
-  provider: string;
-  kind: string;
-  payload: string;
-  attempts: number;
-  created_at: string;
-  expires_at: string;
-};
-
-function mapChallenge(row: ChallengeRow): AuthChallengeRecord {
-  const payload = parseJson(row.payload);
-
-  return {
-    tokenHash: row.token_hash,
-    provider: row.provider,
-    kind: row.kind as AuthChallengeRecord["kind"],
-    payload: payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {},
-    attempts: row.attempts,
-    createdAt: new Date(row.created_at),
-    expiresAt: new Date(row.expires_at),
   };
 }
 
@@ -187,78 +166,6 @@ async function deleteUserSessions(db: Database, userId: string) {
   await db.execute("DELETE FROM sessions WHERE user_id = $1", [userId]);
 }
 
-async function findIdentity(db: Database, provider: string, subject: string) {
-  const row = await db.first<UserRow>(
-    `SELECT users.* FROM identities
-       JOIN users ON users.id = identities.user_id
-       WHERE identities.provider = $1 AND identities.provider_subject = $2`,
-    [provider, subject],
-  );
-
-  return row ? mapUser(row) : null;
-}
-
-async function resolveIdentity(db: Database, identity: ExternalIdentity) {
-  if (identity.provider !== "github") {
-    throw new AuthError("identity_conflict");
-  }
-
-  const login = boundedString(identity.claims.login, 256);
-
-  if (!login) {
-    throw new AuthError("provider_error");
-  }
-
-  const name = boundedString(identity.claims.name) ?? login;
-  const avatarUrl = boundedString(identity.claims.avatar_url);
-  const existing = await findIdentity(db, identity.provider, identity.providerSubject);
-
-  if (existing) {
-    await db.execute(
-      `UPDATE users SET name = $1, github_login = $2, avatar_url = $3
-         WHERE id = $4`,
-      [name, login, avatarUrl, existing.id],
-    );
-
-    return {
-      ...existing,
-      displayName: name,
-      githubLogin: login,
-      ...(avatarUrl ? { avatarUrl } : {}),
-    };
-  }
-
-  const userId = crypto.randomUUID();
-
-  await db.transaction(async (transaction) => {
-    const results = [];
-
-    results.push(
-      await transaction.execute(
-        "INSERT INTO users (id, name, github_login, avatar_url, role) VALUES ($1, $2, $3, $4, 'viewer')",
-        [userId, name, login, avatarUrl],
-      ),
-    );
-    results.push(
-      await transaction.execute(
-        `INSERT INTO identities (provider, provider_subject, user_id, claims_json)
-         VALUES ($1, $2, $3, $4)`,
-        ["github", identity.providerSubject, userId, JSON.stringify(identity.claims)],
-      ),
-    );
-
-    return results;
-  });
-
-  const row = await db.first<UserRow>("SELECT * FROM users WHERE id = $1", [userId]);
-
-  if (!row) {
-    throw new AuthError("provider_error");
-  }
-
-  return mapUser(row);
-}
-
 async function storeOAuthState(db: Database, state: OAuthStateRecord) {
   await db.execute(
     `INSERT INTO oauth_states
@@ -281,16 +188,7 @@ async function consumeOAuthState(
   db: Database,
   stateHash: string,
 ): Promise<OAuthStateRecord | null> {
-  const row = await db.first<{
-    state_hash: string;
-    provider: string;
-    code_verifier: string | null;
-    nonce: string | null;
-    redirect_uri: string | null;
-    context_json: string;
-    created_at: string;
-    expires_at: string;
-  }>(
+  const row = await db.first<OAuthStateRow>(
     `DELETE FROM oauth_states
        WHERE state_hash = $1 AND expires_at > CURRENT_TIMESTAMP
        RETURNING *`,
@@ -301,19 +199,5 @@ async function consumeOAuthState(
     return null;
   }
 
-  const context = parseJson(row.context_json);
-
-  return {
-    stateHash: row.state_hash,
-    provider: row.provider,
-    createdAt: new Date(row.created_at),
-    expiresAt: new Date(row.expires_at),
-    context:
-      context && typeof context === "object" && !Array.isArray(context)
-        ? (context as Record<string, string>)
-        : {},
-    ...(row.code_verifier ? { codeVerifier: row.code_verifier } : {}),
-    ...(row.nonce ? { nonce: row.nonce } : {}),
-    ...(row.redirect_uri ? { redirectUri: row.redirect_uri } : {}),
-  };
+  return mapOAuthState(row);
 }

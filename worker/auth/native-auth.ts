@@ -1,26 +1,28 @@
-import { parseCookies, serializeCookie, serializeExpiredCookie } from "@ngriffin_uk/auth-cookie";
+import { parseCookies } from "@ngriffin_uk/auth-cookie";
 import { AuthError } from "@ngriffin_uk/auth-core";
 import { Hono } from "hono";
 
 import { API_SCOPES } from "../../src/domain/scopes.ts";
+import { nativeCallbackUrl } from "../lib/auth-urls.ts";
 import { jsonResponse, readJsonObject, withCookies } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
-import { canonicalOrigin } from "../lib/security.ts";
 import { randomHex } from "../lib/tokens.ts";
 import { hashState } from "../repositories/links.ts";
 import type { Bindings } from "../types.ts";
 import { mintToken, storeApiToken } from "./api-tokens.ts";
+import { expiredCookie, temporaryCookie } from "./cookies.ts";
+import { configuredProviders } from "./providers.ts";
 import { authenticationFor, RETURN_COOKIE, STATE_COOKIE, type AppContext } from "./session.ts";
 
 const NATIVE_CODE_PREFIX = "mqc_";
 const NATIVE_CODE_TTL_MINUTES = 10;
 
-const NATIVE_AUTH_COOKIE = "marquee_native_auth";
-const NATIVE_AUTH_CALLBACK = "marquee://auth/callback";
+export const NATIVE_AUTH_COOKIE = "marquee_native_auth";
 
 export const nativeAuthRoutes = new Hono<{ Bindings: Bindings }>();
 
-nativeAuthRoutes.get("/github", (context) => startNativeGitHub(context));
+nativeAuthRoutes.get("/github", (context) => startNativeOAuth(context, "github"));
+nativeAuthRoutes.get("/google", (context) => startNativeOAuth(context, "google"));
 nativeAuthRoutes.get("/magic", (context) => completeNativeMagicLink(context));
 nativeAuthRoutes.post("/exchange", (context) => exchangeNativeCode(context));
 
@@ -59,16 +61,6 @@ async function consumeNativeAuthCode(env: Bindings, code: string, verifier?: str
   );
 
   return row?.userId ?? null;
-}
-
-function nativeCallbackUrl(parameters: Record<string, string>) {
-  const url = new URL(NATIVE_AUTH_CALLBACK);
-
-  for (const [key, value] of Object.entries(parameters)) {
-    url.searchParams.set(key, value);
-  }
-
-  return url;
 }
 
 export async function completeNativeAuthentication(
@@ -140,13 +132,15 @@ export function nativeAuthenticationFailure(context: AppContext, error: string) 
   );
 }
 
-async function startNativeGitHub(context: AppContext) {
-  if (!context.env.GITHUB_CLIENT_ID || !context.env.GITHUB_CLIENT_SECRET) {
+async function startNativeOAuth(context: AppContext, provider: string) {
+  const configured = configuredProviders(context.env).find((entry) => entry.id === provider);
+
+  if (!configured) {
     return context.redirect(nativeCallbackUrl({ error: "provider_not_found" }).href);
   }
 
   try {
-    const url = await authenticationFor(context.env, context.req.raw).startGitHub();
+    const url = await authenticationFor(context.env, context.req.raw).startOAuth(configured.id);
     const state = url.searchParams.get("state");
 
     if (!state) {
@@ -157,6 +151,7 @@ async function startNativeGitHub(context: AppContext) {
       context.redirect(url.href),
       temporaryCookie(context, STATE_COOKIE, state),
       temporaryCookie(context, NATIVE_AUTH_COOKIE, "ios"),
+      expiredCookie(context, RETURN_COOKIE),
     );
   } catch (error) {
     logError("native_auth_start_failed", error);
@@ -186,28 +181,8 @@ function isNativeFlow(context: AppContext) {
   return parseCookies(context.req.header("cookie") ?? "").get(NATIVE_AUTH_COOKIE) === "ios";
 }
 
-function temporaryCookie(context: AppContext, name: string, value: string) {
-  return serializeCookie(name, value, {
-    path: "/",
-    httpOnly: true,
-    sameSite: "lax",
-    secure: usesHttps(context),
-    maxAge: 600,
-    priority: "high",
-  });
-}
-
 function expiredFlowCookies(context: AppContext) {
   return [STATE_COOKIE, RETURN_COOKIE, NATIVE_AUTH_COOKIE].map((name) =>
-    serializeExpiredCookie(name, {
-      path: "/",
-      httpOnly: true,
-      sameSite: "lax",
-      secure: usesHttps(context),
-    }),
+    expiredCookie(context, name),
   );
-}
-
-function usesHttps(context: AppContext) {
-  return canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN).startsWith("https://");
 }

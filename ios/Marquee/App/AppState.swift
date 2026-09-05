@@ -46,8 +46,8 @@ final class AppState: ObservableObject {
     }
   }
 
-  func signInWithGitHub() async {
-    guard !isSigningIn else { return }
+  func signIn(with provider: AuthMethodProvider) async {
+    guard !isSigningIn, provider.id == "github" || provider.id == "google" else { return }
 
     isSigningIn = true
     defer { isSigningIn = false }
@@ -55,7 +55,7 @@ final class AppState: ObservableObject {
     let guestProviderIDs = selectedProviderIDs
 
     do {
-      let start = AppConfiguration.baseURL.appending(path: "/api/auth/native/github")
+      let start = AppConfiguration.baseURL.appending(path: "/api/auth/native/\(provider.id)")
       let code = try await authentication.authenticate(at: start)
       try await completeNativeSignIn(
         code: code,

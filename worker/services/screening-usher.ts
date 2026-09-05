@@ -20,7 +20,7 @@ const INFRASTRUCTURE = [
   "Data lives in Postgres reached through Hyperdrive, with Drizzle for migrations. Edge caching is in Workers KV. Posters and mirrored prints are in R2. Semantic search uses Vectorize with bge-m3 embeddings from Workers AI, reranked by bge-reranker-base. Language models are called through Cloudflare AI Gateway.",
   "Background work runs on Queues (ingestion, availability, ratings, anime, posters, embeddings, revival, rail refresh) and Workflows (catalog sweep, rails, digest), scheduled by cron triggers.",
   "Durable Objects hold per-viewer curator sessions and shared screening rooms like this one. Rate limits are Cloudflare rate limiting bindings, one per policy, chosen by route in worker/security/policies.ts.",
-  "Sign-in is GitHub OAuth or a magic link; API tokens are scoped bearer tokens; an MCP server sits at /mcp for agents. Telemetry goes to Analytics Engine.",
+  "Sign-in is GitHub or Google OAuth, or a magic link; API tokens are scoped bearer tokens; an MCP server sits at /mcp for agents. Telemetry goes to Analytics Engine.",
 ].join(" ");
 
 const STOP_NOTES = new Map<string, string>(

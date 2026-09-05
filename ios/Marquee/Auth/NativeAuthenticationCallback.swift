@@ -29,7 +29,7 @@ enum NativeAuthenticationCallback {
   private static func message(for code: String) -> String {
     switch code {
     case "invalid_callback": "That ticket does not match the stub. Start again."
-    case "provider_not_found": "GitHub sign-in is not available here."
+    case "provider_not_found": "That sign-in method is not available here."
     case "identity_conflict": "That seat belongs to another sign-in."
     default: "Sign-in did not complete. Try again."
     }

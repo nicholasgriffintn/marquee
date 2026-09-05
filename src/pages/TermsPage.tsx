@@ -189,10 +189,10 @@ export function TermsPage() {
           <section className={styles.section} id="third-parties">
             <h2>6. Connected services and external sites</h2>
             <p>
-              GitHub sign-in, Trakt connections, archive players, streaming providers, cinemas and
-              other external links are operated by other organisations. Their own terms and privacy
-              policies apply once you use them. Marquee does not control their accounts, payments,
-              content, availability or security.
+              GitHub and Google sign-in, Trakt connections, archive players, streaming providers,
+              cinemas and other external links are operated by other organisations. Their own terms
+              and privacy policies apply once you use them. Marquee does not control their accounts,
+              payments, content, availability or security.
             </p>
             <p>
               Connecting Trakt authorises Marquee to read the viewing data you select and, only

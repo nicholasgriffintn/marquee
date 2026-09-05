@@ -98,17 +98,17 @@ struct SignInView: View {
       .padding(12)
       .background(MarqueeTheme.acid)
       .foregroundStyle(MarqueeTheme.blue)
-    } else if model.github != nil || model.magicLink {
+    } else if !model.providers.isEmpty || model.magicLink {
       VStack(spacing: 12) {
-        if let github = model.github {
+        ForEach(model.providers) { provider in
           Button {
-            Task { await appState.signInWithGitHub() }
+            Task { await appState.signIn(with: provider) }
           } label: {
             HStack(spacing: 10) {
               if appState.isSigningIn {
                 ProgressView().tint(MarqueeTheme.paper)
               }
-              Text(appState.isSigningIn ? "Opening GitHub…" : github.label)
+              Text(appState.isSigningIn ? "Opening sign-in…" : provider.label)
             }
             .font(MarqueeTheme.sans(13, weight: .heavy))
             .foregroundStyle(MarqueeTheme.paper)
@@ -120,7 +120,7 @@ struct SignInView: View {
           .disabled(appState.isSigningIn || model.isRequestingMagicLink)
         }
 
-        if model.github != nil && model.magicLink {
+        if !model.providers.isEmpty && model.magicLink {
           Text("OR")
             .font(MarqueeTheme.mono(10, weight: .bold))
             .tracking(2)

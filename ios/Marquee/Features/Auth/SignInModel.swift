@@ -4,7 +4,7 @@ import Foundation
 final class SignInModel: ObservableObject {
   @Published private(set) var isLoading = true
   @Published private(set) var isRequestingMagicLink = false
-  @Published private(set) var github: AuthMethodProvider?
+  @Published private(set) var providers: [AuthMethodProvider] = []
   @Published private(set) var magicLink = false
   @Published private(set) var magicLinkMessage = ""
   @Published var email = ""
@@ -16,10 +16,10 @@ final class SignInModel: ObservableObject {
 
     do {
       let methods: AuthMethodsResponse = try await api.get("/api/auth/methods")
-      github = methods.providers.first(where: { $0.id == "github" })
+      providers = methods.providers.filter { $0.id == "github" || $0.id == "google" }
       magicLink = methods.magicLink
 
-      if github == nil && !magicLink {
+      if providers.isEmpty && !magicLink {
         error = "The window is shut. No supported sign-in method is configured on this deployment."
       }
     } catch {

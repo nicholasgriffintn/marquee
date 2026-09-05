@@ -1,4 +1,4 @@
-import { parseCookies, serializeCookie, serializeExpiredCookie } from "@ngriffin_uk/auth-cookie";
+import { parseCookies } from "@ngriffin_uk/auth-cookie";
 import { AuthError } from "@ngriffin_uk/auth-core";
 import { Hono } from "hono";
 
@@ -6,7 +6,7 @@ import { DEFAULT_SCOPES, parseAgentScopes } from "../../src/domain/scopes.ts";
 import { emailConfigured } from "../clients/email.ts";
 import { jsonResponse, readJsonObject, withCookies } from "../lib/http.ts";
 import { logError } from "../lib/logging.ts";
-import { canonicalOrigin, safeReturnPath } from "../lib/security.ts";
+import { safeReturnPath } from "../lib/security.ts";
 import { isRecord } from "../lib/values.ts";
 import { confirmAlertEmail } from "../repositories/alerts.ts";
 import { hashState } from "../repositories/links.ts";
@@ -18,17 +18,15 @@ import {
   revokeBearerToken,
   storeApiToken,
 } from "./api-tokens.ts";
-import {
-  completeNativeAuthentication,
-  nativeAuthenticationFailure,
-  nativeAuthRoutes,
-} from "./native-auth.ts";
+import { destination, expiredCookie, sessionCookie, temporaryCookie } from "./cookies.ts";
+import { nativeAuthRoutes } from "./native-auth.ts";
+import { completeOAuth, failedCallback, startOAuth } from "./oauth-flow.ts";
+import { configuredProviders } from "./providers.ts";
 import {
   authenticationFor,
   RETURN_COOKIE,
   SESSION_COOKIE,
   sessionPrincipal,
-  STATE_COOKIE,
   type AppContext,
 } from "./session.ts";
 
@@ -45,18 +43,6 @@ authRoutes.post("/logout", (context) => logout(context));
 authRoutes.get("/tokens", (context) => listTokens(context));
 authRoutes.post("/tokens", (context) => createToken(context));
 authRoutes.delete("/tokens/:id", (context) => revokeToken(context));
-
-type ProviderId = "github";
-
-function configuredProviders(env: Bindings) {
-  const providers: { id: ProviderId; label: string }[] = [];
-
-  if (env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET) {
-    providers.push({ id: "github", label: "Continue with GitHub" });
-  }
-
-  return providers;
-}
 
 function listMethods(context: AppContext) {
   return jsonResponse({
@@ -175,90 +161,7 @@ async function runAuthProtocol(context: AppContext) {
     return jsonResponse({ error: "That is not a door I can open." }, 400);
   }
 
-  const provider = typeof body?.provider === "string" ? body.provider : "";
-  const known = configuredProviders(context.env).some((entry) => entry.id === provider);
-
-  if (!known) {
-    return jsonResponse({ error: "We do not take that ticket here." }, 400);
-  }
-
-  const values = isRecord(body?.values) ? body.values : {};
-  const returnTo = safeReturnPath(typeof values.returnTo === "string" ? values.returnTo : "");
-
-  try {
-    const url = await authenticationFor(context.env, context.req.raw).startGitHub();
-    const state = url.searchParams.get("state");
-
-    if (!state) {
-      throw new AuthError("provider_error");
-    }
-
-    return withCookies(
-      jsonResponse({ status: "redirect_required", provider, url: url.href }),
-      stateCookie(context, state),
-      returnTo
-        ? temporaryCookie(context, RETURN_COOKIE, returnTo)
-        : expiredCookie(context, RETURN_COOKIE),
-    );
-  } catch (error) {
-    logError("auth_start_failed", error, { provider });
-
-    return jsonResponse({ error: "The box office is closed for a moment. Try again." }, 502);
-  }
-}
-
-async function completeOAuth(context: AppContext) {
-  if (context.req.param("provider") !== "github") {
-    return failedCallback(context, "provider_not_found");
-  }
-
-  return completeGitHub(context);
-}
-
-async function completeGitHub(context: AppContext) {
-  const url = new URL(context.req.url);
-  const state = url.searchParams.get("state");
-  const code = url.searchParams.get("code");
-  const cookies = parseCookies(context.req.header("cookie") ?? "");
-  const stateCookieValue = cookies.get(STATE_COOKIE);
-  const returnTo = safeReturnPath(cookies.get(RETURN_COOKIE));
-
-  if (!state || !code || !stateCookieValue || state !== stateCookieValue) {
-    return failedCallback(context, "invalid_callback");
-  }
-
-  try {
-    const result = await authenticationFor(context.env, context.req.raw).completeGitHub(
-      code,
-      state,
-    );
-
-    if (result.status !== "authenticated") {
-      throw new AuthError("unsupported_operation");
-    }
-
-    const nativeResponse = await completeNativeAuthentication(
-      context,
-      result.session.user.id,
-      result.session.token,
-    );
-
-    if (nativeResponse) {
-      return nativeResponse;
-    }
-
-    return withCookies(
-      context.redirect(destination(context, returnTo).href),
-      ...flowCookies(context),
-      sessionCookie(context, result.session.token, result.session.expiresAt),
-    );
-  } catch (error) {
-    const codeValue = error instanceof AuthError ? error.code : "authentication_failed";
-
-    logError("github_oauth_callback_failed", error, { code: codeValue });
-
-    return failedCallback(context, codeValue);
-  }
+  return startOAuth(context, body);
 }
 
 async function getSession(context: AppContext) {
@@ -336,72 +239,4 @@ async function revokeToken(context: AppContext) {
   const removed = await revokeApiToken(context.env, principal.user.id, id ?? "");
 
   return removed ? jsonResponse({ removed: true }) : jsonResponse({ error: "Unknown token" }, 404);
-}
-
-function failedCallback(context: AppContext, error: string) {
-  const nativeResponse = nativeAuthenticationFailure(context, error);
-
-  if (nativeResponse) {
-    return nativeResponse;
-  }
-
-  const url = destination(context);
-
-  url.searchParams.set("authError", error);
-
-  return withCookies(context.redirect(url.href), ...flowCookies(context));
-}
-
-function destination(context: AppContext, returnTo?: string) {
-  return new URL(
-    safeReturnPath(returnTo) ?? "/",
-    canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN),
-  );
-}
-
-function flowCookies(context: AppContext) {
-  return [expiredCookie(context, STATE_COOKIE), expiredCookie(context, RETURN_COOKIE)];
-}
-
-function stateCookie(context: AppContext, state: string) {
-  return temporaryCookie(context, STATE_COOKIE, state);
-}
-
-function temporaryCookie(context: AppContext, name: string, value: string) {
-  return serializeCookie(name, value, cookieAttributes(context, { maxAge: 600 }));
-}
-
-function sessionCookie(context: AppContext, token: string, expiresAt: Date) {
-  return serializeCookie(
-    SESSION_COOKIE,
-    token,
-    cookieAttributes(context, {
-      expires: expiresAt,
-      maxAge: Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 1_000)),
-    }),
-  );
-}
-
-function expiredCookie(context: AppContext, name: string) {
-  return serializeExpiredCookie(name, {
-    path: "/",
-    httpOnly: true,
-    sameSite: "lax",
-    secure: usesHttps(context),
-  });
-}
-
-function cookieAttributes(context: AppContext, attributes: { expires?: Date; maxAge: number }) {
-  return {
-    ...attributes,
-    path: "/",
-    httpOnly: true,
-    sameSite: "lax" as const,
-    secure: usesHttps(context),
-    priority: "high" as const,
-  };
-}
-
-function usesHttps(context: AppContext) {
-  return canonicalOrigin(context.req.raw, context.env.SITE_ORIGIN).startsWith("https://");
 }

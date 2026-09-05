@@ -198,7 +198,8 @@ token in the clear.
 | Key                            | Gives you                                          |
 | ------------------------------ | -------------------------------------------------- |
 | `TMDB_API_TOKEN`               | Titles, images, credits, providers — the catalogue |
-| `GITHUB_CLIENT_ID` / `_SECRET` | Sign-in                                            |
+| `GOOGLE_CLIENT_ID` / `_SECRET` | Google sign-in                                    |
+| `GITHUB_CLIENT_ID` / `_SECRET` | GitHub sign-in                                    |
 | `OMDB_API_KEY`                 | Ratings, awards, box office, episodes, search      |
 | `TRAKT_CLIENT_ID` / `_SECRET`  | Importing a viewer's history                       |
 | `EUROPEANA_API_KEY`            | British and European prints for the revival house  |
@@ -237,7 +238,14 @@ pnpm dev
 Open <http://localhost:8787>.
 
 Fill in `.dev.vars` from the table above. For sign-in, create a GitHub OAuth app with
-`http://localhost:8787/api/auth/callback/github` as its callback URL. For Trakt, an application at
+`http://localhost:8787/api/auth/callback/github` as its callback URL. For Google sign-in, create a
+[Google OAuth client](https://developers.google.com/identity/openid-connect/openid-connect)
+of type **Web application** and register `http://localhost:8787/api/auth/callback/google` as an
+authorised redirect URI. Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `.dev.vars`; the
+Google button appears on web and iOS only when both are set. Google sign-in requests profile
+access and creates a separate account from GitHub or magic-link sign-in.
+
+For Trakt, create an application at
 <https://trakt.tv/oauth/applications> with `http://localhost:8787/api/links/trakt/callback`.
 
 Postgres runs in Docker (`pnpm db:local:setup`) and the queues run locally. Nothing syncs on its own — crons do not fire on a timer, and the
@@ -264,6 +272,10 @@ pnpm deploy
 Migrations are a separate step — `pnpm deploy` only type-checks, builds and ships. Point the
 `routes` entry in `wrangler.json` at your own domain, set `SITE_ORIGIN` if the Worker is served
 behind a different canonical one, and add the deployed callback URL to the GitHub OAuth app.
+For Google, register `https://marquee.pashi.app/api/auth/callback/google` (or your canonical origin)
+and set the production credentials with `pnpm exec wrangler secret put GOOGLE_CLIENT_ID` and
+`pnpm exec wrangler secret put GOOGLE_CLIENT_SECRET`. Web and iOS share this OAuth client and
+callback. Leave Google credentials unset to offer only the other configured sign-in methods.
 
 Magic-link sign-in rides on [Cloudflare Email Service][email-service] through the `send_email`
 binding, so no third party sees who is asking for a ticket. Onboard a sending domain and point

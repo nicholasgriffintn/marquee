@@ -35,6 +35,9 @@ importers:
       '@ngriffin_uk/auth-provider-github':
         specifier: ^4.0.0
         version: 4.0.0(@ngriffin_uk/auth-core@0.5.1)(@ngriffin_uk/auth-oauth2@4.0.1(@ngriffin_uk/auth-core@0.5.1)(@ngriffin_uk/auth-crypto@1.1.1)(@ngriffin_uk/auth-encoding@0.2.4)(@ngriffin_uk/auth-jwt@2.0.0(@ngriffin_uk/auth-crypto@1.1.1)(@ngriffin_uk/auth-encoding@0.2.4)(@ngriffin_uk/auth-request@0.2.4))(@ngriffin_uk/auth-request@0.2.4))
+      '@ngriffin_uk/auth-provider-google':
+        specifier: ^4.0.0
+        version: 4.0.0(@ngriffin_uk/auth-core@0.5.1)(@ngriffin_uk/auth-oauth2@4.0.1(@ngriffin_uk/auth-core@0.5.1)(@ngriffin_uk/auth-crypto@1.1.1)(@ngriffin_uk/auth-encoding@0.2.4)(@ngriffin_uk/auth-jwt@2.0.0(@ngriffin_uk/auth-crypto@1.1.1)(@ngriffin_uk/auth-encoding@0.2.4)(@ngriffin_uk/auth-request@0.2.4))(@ngriffin_uk/auth-request@0.2.4))
       '@ngriffin_uk/auth-react':
         specifier: ^0.7.1
         version: 0.7.1(react@19.2.8)
@@ -911,6 +914,12 @@ packages:
 
   '@ngriffin_uk/auth-provider-github@4.0.0':
     resolution: {integrity: sha512-3iIdxeC6Wd4mAZCLOzpYnIDrS1CH6OJ335pUFifjeQiXhrlEjJVFy5wdRZt7qTE1QJwPKdXVbPfGqNN0Yoh8oQ==}
+    peerDependencies:
+      '@ngriffin_uk/auth-core': ^0.5.0
+      '@ngriffin_uk/auth-oauth2': ^4.0.0
+
+  '@ngriffin_uk/auth-provider-google@4.0.0':
+    resolution: {integrity: sha512-W4NRN4gBqLqqf0YMzsivf9IaiDl6n9L6HmZ4j847zyn+oun/k9ndxgkdCLUTnO9WG7Vb2w6v5Pt7CVcd07C4Yg==}
     peerDependencies:
       '@ngriffin_uk/auth-core': ^0.5.0
       '@ngriffin_uk/auth-oauth2': ^4.0.0
@@ -2745,6 +2754,11 @@ snapshots:
   '@ngriffin_uk/auth-protocol@0.1.1': {}
 
   '@ngriffin_uk/auth-provider-github@4.0.0(@ngriffin_uk/auth-core@0.5.1)(@ngriffin_uk/auth-oauth2@4.0.1(@ngriffin_uk/auth-core@0.5.1)(@ngriffin_uk/auth-crypto@1.1.1)(@ngriffin_uk/auth-encoding@0.2.4)(@ngriffin_uk/auth-jwt@2.0.0(@ngriffin_uk/auth-crypto@1.1.1)(@ngriffin_uk/auth-encoding@0.2.4)(@ngriffin_uk/auth-request@0.2.4))(@ngriffin_uk/auth-request@0.2.4))':
+    dependencies:
+      '@ngriffin_uk/auth-core': 0.5.1
+      '@ngriffin_uk/auth-oauth2': 4.0.1(@ngriffin_uk/auth-core@0.5.1)(@ngriffin_uk/auth-crypto@1.1.1)(@ngriffin_uk/auth-encoding@0.2.4)(@ngriffin_uk/auth-jwt@2.0.0(@ngriffin_uk/auth-crypto@1.1.1)(@ngriffin_uk/auth-encoding@0.2.4)(@ngriffin_uk/auth-request@0.2.4))(@ngriffin_uk/auth-request@0.2.4)
+
+  '@ngriffin_uk/auth-provider-google@4.0.0(@ngriffin_uk/auth-core@0.5.1)(@ngriffin_uk/auth-oauth2@4.0.1(@ngriffin_uk/auth-core@0.5.1)(@ngriffin_uk/auth-crypto@1.1.1)(@ngriffin_uk/auth-encoding@0.2.4)(@ngriffin_uk/auth-jwt@2.0.0(@ngriffin_uk/auth-crypto@1.1.1)(@ngriffin_uk/auth-encoding@0.2.4)(@ngriffin_uk/auth-request@0.2.4))(@ngriffin_uk/auth-request@0.2.4))':
     dependencies:
       '@ngriffin_uk/auth-core': 0.5.1
       '@ngriffin_uk/auth-oauth2': 4.0.1(@ngriffin_uk/auth-core@0.5.1)(@ngriffin_uk/auth-crypto@1.1.1)(@ngriffin_uk/auth-encoding@0.2.4)(@ngriffin_uk/auth-jwt@2.0.0(@ngriffin_uk/auth-crypto@1.1.1)(@ngriffin_uk/auth-encoding@0.2.4)(@ngriffin_uk/auth-request@0.2.4))(@ngriffin_uk/auth-request@0.2.4)

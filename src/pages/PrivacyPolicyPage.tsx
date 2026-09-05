@@ -97,8 +97,10 @@ export function PrivacyPolicyPage() {
               If you use an email sign-in link, Marquee stores your email address and creates a
               display name from the part before the @ sign. If you sign in with GitHub, GitHub
               provides your account ID, username, display name and avatar. Marquee does not ask for
-              access to your repositories. It also stores protected records for sign-in sessions and
-              any API or feed keys you create.
+              access to your repositories. If you sign in with Google, Google provides your account
+              ID, display name and profile picture. Marquee does not request your Google email
+              address or access to Gmail, Drive or contacts. It also stores protected records for
+              sign-in sessions and any API or feed keys you create.
             </p>
 
             <h3>Your shelf and preferences</h3>
@@ -309,6 +311,10 @@ export function PrivacyPolicyPage() {
               <li>
                 <strong>GitHub</strong> provides the profile fields described above if you choose
                 GitHub sign-in.
+              </li>
+              <li>
+                <strong>Google</strong> provides the profile fields described above if you choose
+                Google sign-in.
               </li>
               <li>
                 <strong>Trakt</strong> receives and returns viewing information only if you connect

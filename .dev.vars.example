@@ -12,6 +12,8 @@ AI_GATEWAY_TOKEN=your-cloudflare-ai-gateway-run-token
 
 GITHUB_CLIENT_ID=your-github-oauth-app-client-id
 GITHUB_CLIENT_SECRET=your-github-oauth-app-client-secret
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
 # Any high-entropy string. Without it no linked account can be stored at all.
 TOKEN_ENCRYPTION_KEY=generate-a-long-random-string
 
