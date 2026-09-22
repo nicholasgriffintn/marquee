@@ -5,7 +5,7 @@
   "compatibility_date": "2026-08-21",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
-  "preview_urls": false,
+  "preview_urls": true,
   "routes": [
     {
       "pattern": "marquee.pashi.app",
@@ -392,5 +392,203 @@
       "tag": "v2",
       "new_sqlite_classes": ["Screening"]
     }
-  ]
+  ],
+  "previews": {
+    "vars": {
+      "AI_GATEWAY_ID": "marquee",
+      "MAIL_FROM": "",
+      "APP_STORE_ID": "",
+      "AI_MODEL": "@cf/moonshotai/kimi-k2.6",
+      "AI_FAST_MODEL": "@cf/meta/llama-4-scout-17b-16e-instruct"
+    },
+    "kv_namespaces": [
+      {
+        "binding": "CACHE",
+        "id": "5a1eb43ce65943d8be89a52e7b2905b6"
+      }
+    ],
+    "r2_buckets": [
+      {
+        "binding": "MEDIA",
+        "bucket_name": "marquee-preview-media"
+      }
+    ],
+    "ratelimits": [
+      {
+        "name": "AUTH_RATE_LIMITER",
+        "namespace_id": "864216",
+        "simple": {
+          "limit": 20,
+          "period": 60
+        }
+      },
+      {
+        "name": "CURATOR_RATE_LIMITER",
+        "namespace_id": "864215",
+        "simple": {
+          "limit": 10,
+          "period": 60
+        }
+      },
+      {
+        "name": "SEARCH_RATE_LIMITER",
+        "namespace_id": "864217",
+        "simple": {
+          "limit": 90,
+          "period": 60
+        }
+      },
+      {
+        "name": "SEARCH_MEMBER_RATE_LIMITER",
+        "namespace_id": "864218",
+        "simple": {
+          "limit": 120,
+          "period": 60
+        }
+      },
+      {
+        "name": "CURATOR_FREE_RATE_LIMITER",
+        "namespace_id": "864219",
+        "simple": {
+          "limit": 4,
+          "period": 60
+        }
+      },
+      {
+        "name": "INSIGHT_RATE_LIMITER",
+        "namespace_id": "864220",
+        "simple": {
+          "limit": 40,
+          "period": 60
+        }
+      },
+      {
+        "name": "PUBLIC_RATE_LIMITER",
+        "namespace_id": "864221",
+        "simple": {
+          "limit": 120,
+          "period": 60
+        }
+      },
+      {
+        "name": "MEMBER_RATE_LIMITER",
+        "namespace_id": "864222",
+        "simple": {
+          "limit": 600,
+          "period": 60
+        }
+      },
+      {
+        "name": "WRITE_RATE_LIMITER",
+        "namespace_id": "864223",
+        "simple": {
+          "limit": 30,
+          "period": 60
+        }
+      },
+      {
+        "name": "TELEMETRY_RATE_LIMITER",
+        "namespace_id": "864224",
+        "simple": {
+          "limit": 120,
+          "period": 60
+        }
+      },
+      {
+        "name": "MEDIA_RATE_LIMITER",
+        "namespace_id": "864225",
+        "simple": {
+          "limit": 1200,
+          "period": 60
+        }
+      },
+      {
+        "name": "REEL_RATE_LIMITER",
+        "namespace_id": "864226",
+        "simple": {
+          "limit": 60,
+          "period": 60
+        }
+      },
+      {
+        "name": "DOOR_RATE_LIMITER",
+        "namespace_id": "864227",
+        "simple": {
+          "limit": 3,
+          "period": 60
+        }
+      }
+    ],
+    "observability": {
+      "enabled": true
+    },
+    "queues": {
+      "producers": [
+        {
+          "binding": "INGESTION_QUEUE",
+          "queue": "marquee-preview-ingestion"
+        },
+        {
+          "binding": "AVAILABILITY_QUEUE",
+          "queue": "marquee-preview-availability"
+        },
+        {
+          "binding": "RATINGS_QUEUE",
+          "queue": "marquee-preview-ratings"
+        },
+        {
+          "binding": "ANIME_QUEUE",
+          "queue": "marquee-preview-anime"
+        },
+        {
+          "binding": "POSTER_QUEUE",
+          "queue": "marquee-preview-posters"
+        },
+        {
+          "binding": "EMBEDDING_QUEUE",
+          "queue": "marquee-preview-embeddings"
+        },
+        {
+          "binding": "REVIVAL_QUEUE",
+          "queue": "marquee-preview-revival"
+        },
+        {
+          "binding": "RAIL_REFRESH_QUEUE",
+          "queue": "marquee-preview-rail-refresh"
+        }
+      ]
+    },
+    "images": {
+      "binding": "IMAGES"
+    },
+    "vectorize": [
+      {
+        "binding": "VECTORS",
+        "index_name": "marquee-preview-titles",
+        "remote": true
+      }
+    ],
+    "ai": {
+      "binding": "AI",
+      "remote": true
+    },
+    "analytics_engine_datasets": [
+      {
+        "binding": "EVENTS",
+        "dataset": "marquee_preview_events"
+      }
+    ],
+    "durable_objects": {
+      "bindings": [
+        {
+          "name": "CURATOR_SESSION",
+          "class_name": "CuratorSession"
+        },
+        {
+          "name": "SCREENING",
+          "class_name": "Screening"
+        }
+      ]
+    }
+  }
 }

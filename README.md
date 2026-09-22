@@ -198,8 +198,8 @@ token in the clear.
 | Key                            | Gives you                                          |
 | ------------------------------ | -------------------------------------------------- |
 | `TMDB_API_TOKEN`               | Titles, images, credits, providers — the catalogue |
-| `GOOGLE_CLIENT_ID` / `_SECRET` | Google sign-in                                    |
-| `GITHUB_CLIENT_ID` / `_SECRET` | GitHub sign-in                                    |
+| `GOOGLE_CLIENT_ID` / `_SECRET` | Google sign-in                                     |
+| `GITHUB_CLIENT_ID` / `_SECRET` | GitHub sign-in                                     |
 | `OMDB_API_KEY`                 | Ratings, awards, box office, episodes, search      |
 | `TRAKT_CLIENT_ID` / `_SECRET`  | Importing a viewer's history                       |
 | `EUROPEANA_API_KEY`            | British and European prints for the revival house  |
@@ -253,6 +253,28 @@ scheduled handler is a no-op while `LOCAL_DEV=true`, so no third-party rate limi
 work. Run jobs by hand from `/admin`, which has a button for each one and takes the same code path
 the crons take in production. To exercise the cron entrypoint itself, set `LOCAL_SYNC=on` and hit
 `/cdn-cgi/local/scheduled`.
+
+## Previewing
+
+Use Cloudflare Worker Previews when a branch needs a shareable, production-like environment:
+
+```bash
+pnpm preview
+```
+
+This checks and builds the branch, then creates or updates a persistent Preview named after the
+current Git branch. The command prints its stable Preview URL and an immutable deployment URL.
+Delete the branch Preview when it is no longer needed with `pnpm preview:delete`. Pull requests
+from this repository create `pr-<number>` Previews automatically and remove them when they close.
+
+Previews use dedicated KV, R2, Queue, Vectorize, Analytics Engine and Postgres resources. Durable
+Objects are isolated automatically by Cloudflare. Queue consumers, Workflows, cron triggers and
+email delivery do not run in a Preview; do not use the admin background-job controls there.
+
+Worker Previews do not inherit production secrets. Put shared non-production values in the
+[Previews Base configuration](https://developers.cloudflare.com/workers/previews/configuration/#secrets),
+then override a single branch with `pnpm exec wrangler preview secret put SECRET_NAME` when needed.
+Keep OAuth credentials unset unless the provider has the Preview callback URL registered.
 
 ## The iOS app
 
