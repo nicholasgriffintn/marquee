@@ -9,6 +9,7 @@ KINOCHECK_API_KEY=
 CLOUDFLARE_ACCOUNT_ID=your-cloudflare-account-id
 CLOUDFLARE_API_TOKEN=your-cloudflare-analytics-token
 AI_GATEWAY_TOKEN=your-cloudflare-ai-gateway-run-token
+TYPESAFE_API_KEY=
 
 GITHUB_CLIENT_ID=your-github-oauth-app-client-id
 GITHUB_CLIENT_SECRET=your-github-oauth-app-client-secret

@@ -4,7 +4,7 @@ import { Heading, Page } from "../ui";
 
 import styles from "./LegalPage.module.css";
 
-const UPDATED = "1 September 2026";
+const UPDATED = "22 September 2026";
 
 export function PrivacyPolicyPage() {
   return (
@@ -266,14 +266,21 @@ export function PrivacyPolicyPage() {
               processed for that purpose.
             </p>
             <p>
-              Requests travel through Cloudflare AI Gateway. By default, its log holds a copy of the
-              whole request, including anything about you the request carried, together with the
-              model's reply. Replies may also be held in the Gateway response cache and reused for a
-              later request that matches; the short brief Marquee writes about a single title is
-              cached for a day. Gateway logging, Gateway caching and that shared title cache are
-              disabled when an account uses its own provider key. Marquee does not attach your
-              account identifier to these requests. It sends the name of the feature and a random
-              reference created for that one decision, which cannot be traced back to you.
+              If TypeSafe Jev is configured, Marquee sends search text or a summary of viewing
+              preferences and guest constraints, together with public title details, directly to
+              TypeSafe to choose or rank titles. The request does not include your account
+              identifier or guest names. TypeSafe returns a structured decision; Marquee keeps
+              control of the shortlist and falls back to its existing model when Jev cannot answer.
+            </p>
+            <p>
+              Other AI requests travel through Cloudflare AI Gateway. By default, its log holds a
+              copy of the whole request, including anything about you the request carried, together
+              with the model's reply. Replies may also be held in the Gateway response cache and
+              reused for a later request that matches; the short brief Marquee writes about a single
+              title is cached for a day. Gateway logging, Gateway caching and that shared title
+              cache are disabled when an account uses its own provider key. Marquee does not attach
+              your account identifier to these requests. It sends the name of the feature and a
+              random reference created for that one decision, which cannot be traced back to you.
             </p>
             <p>
               Cloudflare states in its{" "}
@@ -309,6 +316,10 @@ export function PrivacyPolicyPage() {
                 security, logs, usage analytics, email delivery and AI processing.
               </li>
               <li>
+                <strong>TypeSafe</strong> processes structured search and recommendation decisions
+                when the Jev integration is configured.
+              </li>
+              <li>
                 <strong>GitHub</strong> provides the profile fields described above if you choose
                 GitHub sign-in.
               </li>
@@ -333,12 +344,12 @@ export function PrivacyPolicyPage() {
               under its own privacy policy.
             </p>
             <p>
-              Cloudflare, GitHub and Trakt are based in or may process information in the United
-              States and other countries. Where UK personal data is transferred to a country without
-              UK adequacy regulations, Marquee relies on safeguards recognised by UK law, such as
-              the UK International Data Transfer Addendum, and requires service providers to protect
-              the information. Email the privacy contact above if you want more information or a
-              copy of the relevant safeguards.
+              Cloudflare, TypeSafe, GitHub and Trakt are based in or may process information in the
+              United States and other countries. Where UK personal data is transferred to a country
+              without UK adequacy regulations, Marquee relies on safeguards recognised by UK law,
+              such as the UK International Data Transfer Addendum, and requires service providers to
+              protect the information. Email the privacy contact above if you want more information
+              or a copy of the relevant safeguards.
             </p>
           </section>
 

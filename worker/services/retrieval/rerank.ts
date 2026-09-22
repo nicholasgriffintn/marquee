@@ -5,6 +5,7 @@ import { logError } from "../../lib/logging.ts";
 import { normaliseQueryText } from "../../lib/text.ts";
 import { isRecord } from "../../lib/values.ts";
 import type { Bindings } from "../../types.ts";
+import { rankTitleDecisions } from "../title-decisions.ts";
 
 const RERANK_MODEL = "@cf/baai/bge-reranker-base";
 const RERANK_TEXT_LENGTH = 400;
@@ -52,7 +53,7 @@ async function rerankOptions(env: Bindings, query: string, ids: string[]): Promi
 
 export type Ranking = { ids: string[]; scores: Map<string, number> };
 
-export async function rerankTitles(
+async function workersAiRanking(
   env: Bindings,
   text: string,
   candidates: MediaTitle[],
@@ -95,4 +96,31 @@ export async function rerankTitles(
   }
 
   return { ids, scores };
+}
+
+export async function rerankTitles(
+  env: Bindings,
+  text: string,
+  candidates: MediaTitle[],
+): Promise<Ranking> {
+  try {
+    const ranked = await rankTitleDecisions(env, {
+      state: { query: normaliseQueryText(text).slice(0, RERANK_QUERY_LENGTH) },
+      instructions: {
+        question: "Which title best matches `query`?",
+        focus:
+          "Judge meaning and intent, including format, theme and subject, rather than shared words alone.",
+      },
+      titles: candidates,
+      timeoutMs: RERANK_TIMEOUT_MS,
+    });
+
+    if (ranked) {
+      return { ids: ranked.ids, scores: ranked.scores };
+    }
+  } catch (error) {
+    logError("jev_rerank_failed", error);
+  }
+
+  return workersAiRanking(env, text, candidates);
 }
