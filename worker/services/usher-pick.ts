@@ -23,6 +23,7 @@ import {
   type TitleSource,
 } from "./retrieval/index.ts";
 import { tasteVector } from "./taste.ts";
+import { rankTitleDecisions } from "./title-decisions.ts";
 import { preferenceSummary } from "./usher.ts";
 import { eligibilityFor, readViewerState } from "./viewer/state.ts";
 import { factBrief, factsFor, serviceFor } from "./why.ts";
@@ -37,7 +38,10 @@ const PICK_PROMPT = [
   'Reply with JSON only: {"titleId":"","line":""}.',
 ].join(" ");
 
-export const PICK_PROMPT_VERSION = promptVersion(PICK_PROMPT);
+const JEV_PICK_INSTRUCTIONS =
+  "Which shortlisted title is the best single choice for this viewer tonight? Use the viewing context and supplied title facts.";
+
+export const PICK_PROMPT_VERSION = promptVersion(PICK_PROMPT, JEV_PICK_INSTRUCTIONS);
 
 function fallbackLine(title: MediaTitle, showing: Showing) {
   if (showing.slot === "late" || showing.slot === "small-hours") {
@@ -200,16 +204,6 @@ export async function pickOne(
     return null;
   }
 
-  const listing = titles
-    .map(
-      (title) =>
-        `${title.id} · ${title.title}${title.year ? ` (${title.year})` : ""} · ${
-          title.mediaType === "movie" ? "film" : "series"
-        }${title.runtimeMinutes ? `, ${title.runtimeMinutes} min` : ""} · ${title.genres
-          .slice(0, 3)
-          .join(", ")} · ${title.overview.slice(0, 240)}`,
-    )
-    .join("\n");
   const summary = preferenceSummary(viewer.preferences);
   const [shelf, viewerBeliefs] = await Promise.all([shelfDetail, beliefs]);
   const factsById = new Map(
@@ -222,6 +216,60 @@ export async function pickOne(
       }),
     ]),
   );
+
+  if (titles.length === 1) {
+    const [chosen] = titles;
+
+    decision.select([chosen.id]);
+    await settleThrough(decision, "served", options.defer);
+
+    return {
+      item: chosen,
+      line: fallbackLine(chosen, showing),
+      facts: factsById.get(chosen.id) ?? [],
+      decisionId: decision.id,
+    };
+  }
+
+  try {
+    const ranking = await rankTitleDecisions(env, {
+      state: {
+        showing: showing.brief,
+        preferences: summary || "No stated preferences yet",
+      },
+      instructions: JEV_PICK_INSTRUCTIONS,
+      titles,
+      facts: factsById,
+      record: decision,
+      timeoutMs: 3_000,
+    });
+    const chosen = ranking ? titles.find((title) => title.id === ranking.ids[0]) : null;
+
+    if (chosen) {
+      decision.select([chosen.id]);
+      await settleThrough(decision, "served", options.defer);
+
+      return {
+        item: chosen,
+        line: fallbackLine(chosen, showing),
+        facts: factsById.get(chosen.id) ?? [],
+        decisionId: decision.id,
+      };
+    }
+  } catch (error) {
+    logError("jev_usher_pick_failed", error);
+  }
+
+  const listing = titles
+    .map(
+      (title) =>
+        `${title.id} · ${title.title}${title.year ? ` (${title.year})` : ""} · ${
+          title.mediaType === "movie" ? "film" : "series"
+        }${title.runtimeMinutes ? `, ${title.runtimeMinutes} min` : ""} · ${title.genres
+          .slice(0, 3)
+          .join(", ")} · ${title.overview.slice(0, 240)}`,
+    )
+    .join("\n");
   const messages: ChatMessage[] = [
     { role: "system", content: PICK_PROMPT },
     {

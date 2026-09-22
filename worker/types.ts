@@ -27,6 +27,7 @@ export type WorkerBindings = DatabaseBinding & {
   AI_GATEWAY_ID: string;
   AI_MODEL: string;
   AI_FAST_MODEL?: string;
+  TYPESAFE_API_KEY?: string;
   GITHUB_CLIENT_ID?: string;
   GITHUB_CLIENT_SECRET?: string;
   GOOGLE_CLIENT_ID?: string;

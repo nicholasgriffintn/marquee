@@ -13,6 +13,7 @@ import { readGuests, type Guest } from "../repositories/guests.ts";
 import { readShelfDetail } from "../repositories/viewer-context.ts";
 import type { Bindings } from "../types.ts";
 import { beginDecision, settleThrough, type DeferTask } from "./decisions.ts";
+import { rankTitleDecisions } from "./title-decisions.ts";
 import { shortlistFor, type ShortlistConstraints } from "./usher-pick.ts";
 import { preferenceSummary } from "./usher.ts";
 import { factBrief, factsFor, serviceFor } from "./why.ts";
@@ -125,7 +126,10 @@ const ORDER_PROMPT = [
   'Reply with JSON only: {"pick":{"titleId":"","line":""},"backups":[{"titleId":"","line":""},{"titleId":"","line":""}]}.',
 ].join(" ");
 
-export const ORDER_PROMPT_VERSION = promptVersion(ORDER_PROMPT);
+const JEV_ORDER_INSTRUCTIONS =
+  "Which shortlisted title best suits this viewing plan and everyone in the room? Rank the remaining options for backups.";
+
+export const ORDER_PROMPT_VERSION = promptVersion(ORDER_PROMPT, JEV_ORDER_INSTRUCTIONS);
 
 export function constraintsFor(order: TonightOrder, guests: Guest[] = []): ShortlistConstraints {
   const company = COMPANY[order.company];
@@ -302,6 +306,48 @@ export async function pickToOrder(
       decisionId: decision.id,
     };
   };
+
+  if (titles.length <= 2) {
+    return fallback();
+  }
+
+  try {
+    const ranking = await rankTitleDecisions(env, {
+      state: {
+        showing: showing.brief,
+        company: COMPANY[order.company]?.note ?? "",
+        length: LENGTH[order.length]?.note ?? "",
+        mood: MOOD[order.mood]?.note ?? "",
+        preferences: summary || "No stated preferences yet",
+        guests: guests.map((guest) => ({ vetoes: guest.vetoes, leanings: guest.leanings })),
+      },
+      instructions: JEV_ORDER_INSTRUCTIONS,
+      titles,
+      facts: new Map(titles.map((title) => [title.id, briefed.get(title.id)?.facts ?? []])),
+      record: decision,
+      timeoutMs: 3_000,
+    });
+    const rankedTitles =
+      ranking?.ids.flatMap((id) => titles.find((title) => title.id === id) ?? []) ?? [];
+    const [headline, ...otherTitles] = rankedTitles;
+
+    if (headline) {
+      const backups = otherTitles
+        .slice(0, BACKUPS)
+        .map((item, index) => dress(item, backupLine(index)));
+
+      await settle(headline.id, backups);
+
+      return {
+        order,
+        pick: dress(headline, orderLine(headline, order)),
+        backups,
+        decisionId: decision.id,
+      };
+    }
+  } catch (error) {
+    logError("jev_usher_order_failed", error);
+  }
 
   try {
     const parsed = await runAiObject(env, {

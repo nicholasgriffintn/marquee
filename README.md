@@ -198,8 +198,8 @@ token in the clear.
 | Key                            | Gives you                                          |
 | ------------------------------ | -------------------------------------------------- |
 | `TMDB_API_TOKEN`               | Titles, images, credits, providers — the catalogue |
-| `GOOGLE_CLIENT_ID` / `_SECRET` | Google sign-in                                    |
-| `GITHUB_CLIENT_ID` / `_SECRET` | GitHub sign-in                                    |
+| `GOOGLE_CLIENT_ID` / `_SECRET` | Google sign-in                                     |
+| `GITHUB_CLIENT_ID` / `_SECRET` | GitHub sign-in                                     |
 | `OMDB_API_KEY`                 | Ratings, awards, box office, episodes, search      |
 | `TRAKT_CLIENT_ID` / `_SECRET`  | Importing a viewer's history                       |
 | `EUROPEANA_API_KEY`            | British and European prints for the revival house  |
@@ -207,7 +207,12 @@ token in the clear.
 | `CLOUDFLARE_ACCOUNT_ID`        | AI Gateway and Analytics Engine account            |
 | `CLOUDFLARE_API_TOKEN`         | Analytics Engine queries                           |
 | `AI_GATEWAY_TOKEN`             | AI Gateway requests; grant only AI Gateway Run     |
+| `TYPESAFE_API_KEY`             | TypeSafe Jev decision requests                     |
 | `TOKEN_ENCRYPTION_KEY`         | Encrypting linked-account tokens at rest           |
+
+When Jev is enabled, search and Usher decisions send the search text or viewing preferences,
+guest constraints where relevant, and public title details to TypeSafe. The key stays in the
+Worker; if Jev cannot answer, the existing ranking or generation path takes over.
 
 TMDB is the one you cannot really run without. Air dates come from TVmaze, the trending rail from
 Wikipedia pageviews, the latest trailers from KinoCheck, and the revival house's UK term checks
@@ -301,8 +306,8 @@ A fresh deployment fills will automatically collect data. Watch it on `/admin`.
 ## Notes for the curious
 
 **Search** is hybrid: an FTS5 index over titles, synopses, keywords and credits for precision, a
-Vectorize index of bge-m3 embeddings for meaning, the two interleaved and reranked by
-`@cf/baai/bge-reranker-base`. Media type and year are Vectorize metadata indexes, so those
+Vectorize index of bge-m3 embeddings for meaning, the two interleaved and reranked by Jev when
+configured, with `@cf/baai/bge-reranker-base` as fallback. Media type and year are Vectorize metadata indexes, so those
 constraints narrow the neighbour search rather than thinning its results afterwards; everything
 else is left to the database, and the neighbour count grows to make room for it.
 

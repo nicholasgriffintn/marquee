@@ -20,6 +20,7 @@ export type UpstreamSourceId =
   | "vue"
   | "overpass"
   | "ai-gateway"
+  | "typesafe"
   | "cloudflare-analytics"
   | "mirror";
 
@@ -298,6 +299,17 @@ export const UPSTREAM_SOURCES: Record<UpstreamSourceId, UpstreamSourceConfig> = 
     kind: "platform",
     powers: "The curator, the usher, rail copy and every other model call",
     credential: "AI_GATEWAY_TOKEN",
+    optional: true,
+    window: "day",
+    callLimit: 20_000,
+    enforced: false,
+  }),
+  typesafe: source({
+    id: "typesafe",
+    label: "TypeSafe Jev",
+    kind: "platform",
+    powers: "Fast typed ranking decisions for search and the Usher",
+    credential: "TYPESAFE_API_KEY",
     optional: true,
     window: "day",
     callLimit: 20_000,
