@@ -413,6 +413,13 @@
         "bucket_name": "marquee-preview-media"
       }
     ],
+    "hyperdrive": [
+      {
+        "binding": "HYPERDRIVE",
+        "id": "9fbbf09c8e8340e293bce78de6c65f95",
+        "localConnectionString": "postgresql://postgres:postgres@localhost:5432/marquee"
+      }
+    ],
     "ratelimits": [
       {
         "name": "AUTH_RATE_LIMITER",
@@ -521,42 +528,6 @@
     ],
     "observability": {
       "enabled": true
-    },
-    "queues": {
-      "producers": [
-        {
-          "binding": "INGESTION_QUEUE",
-          "queue": "marquee-preview-ingestion"
-        },
-        {
-          "binding": "AVAILABILITY_QUEUE",
-          "queue": "marquee-preview-availability"
-        },
-        {
-          "binding": "RATINGS_QUEUE",
-          "queue": "marquee-preview-ratings"
-        },
-        {
-          "binding": "ANIME_QUEUE",
-          "queue": "marquee-preview-anime"
-        },
-        {
-          "binding": "POSTER_QUEUE",
-          "queue": "marquee-preview-posters"
-        },
-        {
-          "binding": "EMBEDDING_QUEUE",
-          "queue": "marquee-preview-embeddings"
-        },
-        {
-          "binding": "REVIVAL_QUEUE",
-          "queue": "marquee-preview-revival"
-        },
-        {
-          "binding": "RAIL_REFRESH_QUEUE",
-          "queue": "marquee-preview-rail-refresh"
-        }
-      ]
     },
     "images": {
       "binding": "IMAGES"
