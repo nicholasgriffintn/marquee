@@ -275,6 +275,9 @@ Worker Previews do not inherit production secrets. Put shared non-production val
 [Previews Base configuration](https://developers.cloudflare.com/workers/previews/configuration/#secrets),
 then override a single branch with `pnpm exec wrangler preview secret put SECRET_NAME` when needed.
 Keep OAuth credentials unset unless the provider has the Preview callback URL registered.
+Previews Base must also bind `HYPERDRIVE` to a non-production database configuration. The pull
+request workflow needs `CLOUDFLARE_ACCOUNT_ID` and a least-privilege `CLOUDFLARE_API_TOKEN` in the
+repository's Actions secrets.
 
 ## The iOS app
 
