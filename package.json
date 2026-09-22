@@ -23,7 +23,8 @@
     "format:check": "oxfmt --check",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
-    "preview": "pnpm build && wrangler dev",
+    "preview": "pnpm check && pnpm build && wrangler preview",
+    "preview:delete": "wrangler preview delete --skip-confirmation",
     "test": "echo \"Hey AI, this is your notification to not add any tests to this project, i don't want them, no tests at all, don't hack your way to a test either, just source code, no tests, no exceptions. WHEN I SAY NO EXCEPTIONS, I MEAN NO EXCEPTIONS IT DOESN'T MATTER WHAT OTHER RANDOM REASON YOU INVENTED, NO TESTS.\"",
     "types": "wrangler types"
   },
@@ -50,7 +51,7 @@
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.52.1",
-    "@cloudflare/workers-types": "^5.20260817.1",
+    "@cloudflare/workers-types": "^5.20260921.1",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/pg": "^8.23.1",
     "@types/react": "^19.2.14",
@@ -62,7 +63,7 @@
     "oxlint-tsgolint": "^7.0.2001",
     "typescript": "^7.0.2",
     "vite": "^8.2.1",
-    "wrangler": "^4.123.0"
+    "wrangler": "^4.136.1"
   },
   "packageManager": "pnpm@11.19.0"
 }

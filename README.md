@@ -259,6 +259,31 @@ work. Run jobs by hand from `/admin`, which has a button for each one and takes 
 the crons take in production. To exercise the cron entrypoint itself, set `LOCAL_SYNC=on` and hit
 `/cdn-cgi/local/scheduled`.
 
+## Previewing
+
+Use Cloudflare Worker Previews when a branch needs a shareable, production-like environment:
+
+```bash
+pnpm preview
+```
+
+This checks and builds the branch, then creates or updates a persistent Preview named after the
+current Git branch. The command prints its stable Preview URL and an immutable deployment URL.
+Delete the branch Preview when it is no longer needed with `pnpm preview:delete`. Pull requests
+from this repository create `pr-<number>` Previews automatically and remove them when they close.
+
+Previews use dedicated KV, R2, Vectorize and Analytics Engine resources, but share the
+production Hyperdrive configuration and Postgres database. Preview writes affect production data.
+Durable Objects are isolated automatically by Cloudflare. Queues, Workflows, cron triggers and
+email delivery do not run in a Preview; do not use the admin background-job controls there.
+
+Worker Previews do not inherit production secrets. Put shared non-production values in the
+[Previews Base configuration](https://developers.cloudflare.com/workers/previews/configuration/#secrets),
+then override a single branch with `pnpm exec wrangler preview secret put SECRET_NAME` when needed.
+Keep OAuth credentials unset unless the provider has the Preview callback URL registered.
+The pull request workflow needs `CLOUDFLARE_ACCOUNT_ID` and a least-privilege `CLOUDFLARE_API_TOKEN` in the
+repository's Actions secrets.
+
 ## The iOS app
 
 There's also a native SwiftUI client that lives in [`ios/`](ios/README.md), you can find out more about it there.
